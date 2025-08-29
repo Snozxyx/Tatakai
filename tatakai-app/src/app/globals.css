@@ -176,3 +176,45 @@
   -webkit-line-clamp: 3;
   line-clamp: 3;
 }
+
+/* Mobile-specific improvements */
+@media (max-width: 768px) {
+  /* Ensure minimum touch target sizes */
+  .min-touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Better mobile sheet styling */
+  [data-slot="sheet-content"] {
+    padding: 1rem;
+  }
+  
+  /* Improved mobile scrolling */
+  .mobile-scroll {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+  
+  /* Better mobile focus styles */
+  button:focus-visible,
+  a:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+}
+
+/* Enhanced mobile navigation */
+@media (max-width: 640px) {
+  /* Mobile search modal adjustments */
+  .search-modal {
+    margin: 1rem;
+    margin-top: 4rem;
+  }
+  
+  /* Mobile menu item spacing */
+  .mobile-menu-item {
+    padding: 1rem;
+    min-height: 56px;
+  }
+}

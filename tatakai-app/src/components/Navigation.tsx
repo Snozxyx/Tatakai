@@ -147,7 +147,7 @@ const Navigation = () => {
                   variant="ghost"
                   size="sm"
                   onClick={() => setIsSearchOpen(true)}
-                  className="hidden sm:flex"
+                  className="hidden sm:flex min-h-[44px] px-4"
                 >
                   <Search className="w-4 h-4" />
                   <span className="ml-2">Search</span>
@@ -156,9 +156,9 @@ const Navigation = () => {
                   variant="ghost"
                   size="sm"
                   onClick={() => setIsSearchOpen(true)}
-                  className="sm:hidden"
+                  className="sm:hidden min-h-[44px] min-w-[44px] p-2"
                 >
-                  <Search className="w-4 h-4" />
+                  <Search className="w-5 h-5" />
                 </Button>
               </motion.div>
 
@@ -166,11 +166,13 @@ const Navigation = () => {
               <motion.div
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
+                className="hidden md:block"
               >
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={toggleTheme}
+                  className="min-h-[44px] min-w-[44px] p-2"
                 >
                   {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
                 </Button>
@@ -179,20 +181,33 @@ const Navigation = () => {
               {/* Mobile Menu */}
               <Sheet>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="sm" className="md:hidden">
-                    <Menu className="w-4 h-4" />
+                  <Button variant="ghost" size="sm" className="md:hidden min-h-[44px] min-w-[44px] p-2">
+                    <Menu className="w-5 h-5" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="right" className="w-80">
-                  <div className="flex flex-col space-y-4 mt-8">
+                <SheetContent side="right" className="w-80 bg-background border-border">
+                  <div className="flex flex-col space-y-2 mt-12">
+                    {/* Theme Toggle in Mobile Menu */}
+                    <div className="flex items-center justify-between p-4 mb-4 bg-muted/50 rounded-lg">
+                      <span className="text-sm font-medium text-foreground">Theme</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={toggleTheme}
+                        className="min-h-[44px] min-w-[44px] p-2"
+                      >
+                        {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                      </Button>
+                    </div>
+                    
                     {mobileMenuItems.map((item) => (
                       <Link
                         key={item.name}
                         href={item.href}
-                        className="flex items-center space-x-3 p-3 rounded-lg hover:bg-accent transition-colors"
+                        className="flex items-center space-x-4 p-4 min-h-[56px] rounded-lg hover:bg-accent/80 focus:bg-accent/80 transition-colors text-foreground border border-transparent hover:border-border/50"
                       >
-                        <item.icon className="w-5 h-5" />
-                        <span>{item.name}</span>
+                        <item.icon className="w-6 h-6 text-muted-foreground" />
+                        <span className="text-base font-medium">{item.name}</span>
                       </Link>
                     ))}
                   </div>
@@ -217,39 +232,40 @@ const Navigation = () => {
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="max-w-2xl mx-auto mt-20 p-6"
+              className="max-w-2xl mx-auto mt-20 p-4 sm:p-6 search-modal"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="bg-card border border-border rounded-lg shadow-lg p-4">
+              <div className="bg-card border border-border rounded-lg shadow-lg p-4 sm:p-6">
                 <div className="flex items-center space-x-3 mb-4">
-                  <Search className="w-5 h-5 text-muted-foreground" />
+                  <Search className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                   <Input
                     placeholder="Search for anime..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSearch(searchQuery)}
-                    className="border-none focus:ring-0"
+                    className="border-none focus:ring-0 text-base sm:text-sm min-h-[44px]"
                     autoFocus
                   />
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setIsSearchOpen(false)}
+                    className="min-h-[44px] min-w-[44px] p-2 flex-shrink-0"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-5 h-5" />
                   </Button>
                 </div>
 
                 {/* Search Suggestions */}
                 {searchSuggestions.length > 0 && (
-                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                  <div className="space-y-1 max-h-80 overflow-y-auto custom-scrollbar">
                     {searchSuggestions.map((suggestion: Anime, index: number) => (
                       <motion.div
                         key={suggestion.id}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05 }}
-                        className="flex items-center space-x-3 p-3 rounded-lg hover:bg-accent cursor-pointer transition-colors"
+                        className="flex items-center space-x-3 p-4 min-h-[72px] rounded-lg hover:bg-accent/80 focus:bg-accent/80 cursor-pointer transition-colors border border-transparent hover:border-border/50 active:scale-95"
                         onClick={() => router.push(`/anime/${suggestion.id}`)}
                       >
                         <Image
@@ -257,12 +273,12 @@ const Navigation = () => {
                           alt={suggestion.name}
                           width={48}
                           height={64}
-                          className="w-12 h-16 object-cover rounded"
+                          className="w-12 h-16 object-cover rounded flex-shrink-0"
                         />
-                        <div className="flex-1">
-                          <h4 className="font-medium text-sm">{suggestion.name}</h4>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-sm sm:text-base truncate text-foreground">{suggestion.name}</h4>
                           {suggestion.jname && (
-                            <p className="text-xs text-muted-foreground">{suggestion.jname}</p>
+                            <p className="text-xs sm:text-sm text-muted-foreground truncate">{suggestion.jname}</p>
                           )}
                         </div>
                       </motion.div>
