@@ -184,15 +184,15 @@ const Navigation = () => {
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="right" className="w-80">
-                  <div className="flex flex-col space-y-4 mt-8">
+                  <div className="flex flex-col space-y-2 mt-8">
                     {mobileMenuItems.map((item) => (
                       <Link
                         key={item.name}
                         href={item.href}
-                        className="flex items-center space-x-3 p-3 rounded-lg hover:bg-accent transition-colors"
+                        className="flex items-center space-x-3 p-4 rounded-lg hover:bg-accent transition-colors text-foreground hover:text-foreground min-h-[48px] touch-manipulation"
                       >
-                        <item.icon className="w-5 h-5" />
-                        <span>{item.name}</span>
+                        <item.icon className="w-6 h-6 text-muted-foreground" />
+                        <span className="text-base font-medium">{item.name}</span>
                       </Link>
                     ))}
                   </div>
@@ -217,7 +217,7 @@ const Navigation = () => {
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="max-w-2xl mx-auto mt-20 p-6"
+              className="max-w-2xl mx-auto mt-4 sm:mt-20 p-4 sm:p-6"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="bg-card border border-border rounded-lg shadow-lg p-4">
@@ -228,13 +228,14 @@ const Navigation = () => {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSearch(searchQuery)}
-                    className="border-none focus:ring-0"
+                    className="border-none focus:ring-0 text-base mobile-search-input"
                     autoFocus
                   />
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setIsSearchOpen(false)}
+                    className="min-w-[44px] min-h-[44px] touch-manipulation"
                   >
                     <X className="w-4 h-4" />
                   </Button>
@@ -249,7 +250,7 @@ const Navigation = () => {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05 }}
-                        className="flex items-center space-x-3 p-3 rounded-lg hover:bg-accent cursor-pointer transition-colors"
+                        className="flex items-center space-x-3 p-3 rounded-lg hover:bg-accent cursor-pointer transition-colors min-h-[60px] touch-manipulation"
                         onClick={() => router.push(`/anime/${suggestion.id}`)}
                       >
                         <Image
@@ -257,12 +258,12 @@ const Navigation = () => {
                           alt={suggestion.name}
                           width={48}
                           height={64}
-                          className="w-12 h-16 object-cover rounded"
+                          className="w-12 h-16 object-cover rounded flex-shrink-0"
                         />
-                        <div className="flex-1">
-                          <h4 className="font-medium text-sm">{suggestion.name}</h4>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-sm text-foreground truncate">{suggestion.name}</h4>
                           {suggestion.jname && (
-                            <p className="text-xs text-muted-foreground">{suggestion.jname}</p>
+                            <p className="text-xs text-muted-foreground truncate">{suggestion.jname}</p>
                           )}
                         </div>
                       </motion.div>

@@ -127,6 +127,45 @@
   }
 }
 
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  /* Improve touch targets */
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+  
+  /* Better mobile padding */
+  .mobile-padding {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  /* Ensure minimum touch target size */
+  button, .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Better mobile text sizes */
+  .mobile-text-base {
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+  
+  /* Mobile navigation improvements */
+  .mobile-nav-item {
+    padding: 12px 16px;
+    min-height: 48px;
+  }
+}
+
+/* Improve mobile viewport handling */
+@supports (-webkit-touch-callout: none) {
+  /* iOS Safari specific styles */
+  .ios-scroll-fix {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
 /* Custom scrollbar styles */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
@@ -175,4 +214,47 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
   line-clamp: 3;
+}
+
+/* Mobile-specific improvements */
+@media (hover: none) and (pointer: coarse) {
+  /* Touch device optimizations */
+  .hover\:bg-accent:hover {
+    background-color: hsl(var(--accent));
+  }
+  
+  /* Ensure proper touch feedback */
+  button:active,
+  .touch-target:active {
+    transform: scale(0.98);
+    transition: transform 0.1s ease;
+  }
+}
+
+/* Better mobile scroll areas */
+.mobile-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Mobile-friendly search input */
+.mobile-search-input {
+  font-size: 16px !important; /* Prevents zoom on iOS */
+  padding: 12px 16px;
+  border-radius: 8px;
+}
+
+/* Improved mobile card layouts */
+@media (max-width: 640px) {
+  .mobile-card-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .mobile-card-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
 }

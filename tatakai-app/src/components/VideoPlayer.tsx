@@ -501,18 +501,18 @@ export default function VideoPlayer({ sources, subtitles }: VideoPlayerProps) {
                 e.stopPropagation();
                 togglePlay();
               }}
-              className="text-white hover:text-rose-500 bg-black/30 hover:bg-black/50 rounded-full p-6 backdrop-blur-sm"
+              className="text-white hover:text-rose-500 bg-black/30 hover:bg-black/50 rounded-full p-6 sm:p-8 backdrop-blur-sm min-w-[80px] min-h-[80px] touch-manipulation"
             >
-              <Play className="w-16 h-16" />
+              <Play className="w-12 h-12 sm:w-16 sm:h-16" />
             </Button>
           </div>
         )}
 
         {/* Bottom controls */}
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-6 pointer-events-auto">
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4 sm:p-6 pointer-events-auto">
           {/* Progress bar */}
           <div 
-            className="w-full h-2 bg-white/20 rounded-full mb-6 cursor-pointer group/progress hover:h-3 transition-all"
+            className="w-full h-3 sm:h-2 bg-white/20 rounded-full mb-4 sm:mb-6 cursor-pointer group/progress hover:h-4 sm:hover:h-3 transition-all touch-manipulation"
             onClick={(e) => {
               e.stopPropagation();
               handleSeek(e);
@@ -522,13 +522,13 @@ export default function VideoPlayer({ sources, subtitles }: VideoPlayerProps) {
               className="h-full bg-rose-500 rounded-full transition-all relative"
               style={{ width: duration ? `${(currentTime / duration) * 100}%` : '0%' }}
             >
-              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 bg-rose-500 rounded-full opacity-0 group-hover/progress:opacity-100 transition-opacity"></div>
+              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-5 h-5 sm:w-4 sm:h-4 bg-rose-500 rounded-full opacity-0 group-hover/progress:opacity-100 transition-opacity"></div>
             </div>
           </div>
 
           {/* Control buttons */}
           <div className="flex items-center justify-between text-white">
-            <div className="flex items-center space-x-6">
+            <div className="flex items-center space-x-4 sm:space-x-6">
               <Button
                 size="sm"
                 variant="ghost"
@@ -536,16 +536,16 @@ export default function VideoPlayer({ sources, subtitles }: VideoPlayerProps) {
                   e.stopPropagation();
                   togglePlay();
                 }}
-                className="text-white hover:text-rose-500 hover:bg-white/10 rounded-full p-2"
+                className="text-white hover:text-rose-500 hover:bg-white/10 rounded-full p-2 sm:p-3 min-w-[44px] min-h-[44px] touch-manipulation"
               >
                 {isPlaying ? (
-                  <Pause className="w-6 h-6" />
+                  <Pause className="w-6 h-6 sm:w-7 sm:h-7" />
                 ) : (
-                  <Play className="w-6 h-6" />
+                  <Play className="w-6 h-6 sm:w-7 sm:h-7" />
                 )}
               </Button>
 
-              <div className="flex items-center space-x-2">
+              <div className="hidden sm:flex items-center space-x-2">
                 <Button
                   size="sm"
                   variant="ghost"
@@ -553,7 +553,7 @@ export default function VideoPlayer({ sources, subtitles }: VideoPlayerProps) {
                     e.stopPropagation();
                     toggleMute();
                   }}
-                  className="text-white hover:text-rose-500 hover:bg-white/10 rounded-full p-2"
+                  className="text-white hover:text-rose-500 hover:bg-white/10 rounded-full p-2 min-w-[44px] min-h-[44px] touch-manipulation"
                 >
                   {isMuted ? (
                     <VolumeX className="w-6 h-6" />
@@ -562,7 +562,7 @@ export default function VideoPlayer({ sources, subtitles }: VideoPlayerProps) {
                   )}
                 </Button>
 
-                {/* Volume slider */}
+                {/* Volume slider - hidden on mobile */}
                 <input
                   type="range"
                   min="0"
@@ -580,24 +580,41 @@ export default function VideoPlayer({ sources, subtitles }: VideoPlayerProps) {
                 />
               </div>
 
-              <span className="text-sm font-medium">
+              <span className="text-xs sm:text-sm font-medium">
                 {formatTime(currentTime)} / {formatTime(duration)}
               </span>
             </div>
 
-            <div className="flex items-center space-x-4">
-              {/* Subtitle selector - Always show */}
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              {/* Mobile volume control */}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleMute();
+                }}
+                className="sm:hidden text-white hover:text-rose-500 hover:bg-white/10 rounded-full p-2 min-w-[44px] min-h-[44px] touch-manipulation"
+              >
+                {isMuted ? (
+                  <VolumeX className="w-6 h-6" />
+                ) : (
+                  <Volume2 className="w-6 h-6" />
+                )}
+              </Button>
+
+              {/* Subtitle selector */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     size="sm"
                     variant="ghost"
-                    className={`text-white hover:text-rose-500 hover:bg-white/10 rounded-full p-2 ${
+                    className={`text-white hover:text-rose-500 hover:bg-white/10 rounded-full p-2 min-w-[44px] min-h-[44px] touch-manipulation ${
                       currentSubtitle !== 'off' && subtitles && subtitles.length > 0 ? 'text-rose-500' : ''
                     }`}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <Subtitles className="w-6 h-6" />
+                    <Subtitles className="w-5 h-5 sm:w-6 sm:h-6" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="bg-black/90 backdrop-blur-sm border-white/20">
@@ -641,10 +658,10 @@ export default function VideoPlayer({ sources, subtitles }: VideoPlayerProps) {
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="text-white hover:text-rose-500 hover:bg-white/10 rounded-full p-2"
+                    className="text-white hover:text-rose-500 hover:bg-white/10 rounded-full p-2 min-w-[44px] min-h-[44px] touch-manipulation"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <Settings className="w-6 h-6" />
+                    <Settings className="w-5 h-5 sm:w-6 sm:h-6" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="bg-black/90 backdrop-blur-sm border-white/20">
@@ -704,9 +721,9 @@ export default function VideoPlayer({ sources, subtitles }: VideoPlayerProps) {
                   e.stopPropagation();
                   toggleFullscreen();
                 }}
-                className="text-white hover:text-rose-500 hover:bg-white/10 rounded-full p-2"
+                className="text-white hover:text-rose-500 hover:bg-white/10 rounded-full p-2 min-w-[44px] min-h-[44px] touch-manipulation"
               >
-                <Maximize className="w-6 h-6" />
+                <Maximize className="w-5 h-5 sm:w-6 sm:h-6" />
               </Button>
             </div>
           </div>

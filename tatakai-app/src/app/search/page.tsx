@@ -86,7 +86,7 @@ const SearchPage = () => {
 
     if (viewMode === 'grid') {
       return (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 mobile-card-grid">
           {searchResults.data.animes.map((anime, index) => (
             <AnimeCard
               key={anime.id}
@@ -145,10 +145,10 @@ const SearchPage = () => {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                    className="pl-10"
+                    className="pl-10 mobile-search-input"
                   />
                 </div>
-                <Button onClick={handleSearch} disabled={loading}>
+                <Button onClick={handleSearch} disabled={loading} className="min-h-[44px] touch-manipulation">
                   {loading ? 'Searching...' : 'Search'}
                 </Button>
               </div>
@@ -163,11 +163,11 @@ const SearchPage = () => {
           transition={{ delay: 0.2 }}
           className="mb-6"
         >
-          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+          <div className="flex flex-col gap-4 items-start">
             {/* Filters */}
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-3 w-full">
               <Select onValueChange={(value) => handleFilterChange('type', value)}>
-                <SelectTrigger className="w-32">
+                <SelectTrigger className="w-full sm:w-32">
                   <SelectValue placeholder="Type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -178,7 +178,7 @@ const SearchPage = () => {
               </Select>
 
               <Select onValueChange={(value) => handleFilterChange('genre', value)}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-full sm:w-40">
                   <SelectValue placeholder="Genre" />
                 </SelectTrigger>
                 <SelectContent>
@@ -189,7 +189,7 @@ const SearchPage = () => {
               </Select>
 
               <Select onValueChange={(value) => handleFilterChange('sort', value)}>
-                <SelectTrigger className="w-48">
+                <SelectTrigger className="w-full sm:w-48">
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
                 <SelectContent>
@@ -201,20 +201,24 @@ const SearchPage = () => {
             </div>
 
             {/* View Controls */}
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 w-full justify-center sm:justify-start">
               <Button
                 variant={viewMode === 'grid' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setViewMode('grid')}
+                className="min-h-[44px] touch-manipulation"
               >
                 <Grid className="w-4 h-4" />
+                <span className="ml-2 sm:hidden">Grid</span>
               </Button>
               <Button
                 variant={viewMode === 'list' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setViewMode('list')}
+                className="min-h-[44px] touch-manipulation"
               >
                 <List className="w-4 h-4" />
+                <span className="ml-2 sm:hidden">List</span>
               </Button>
             </div>
           </div>
@@ -244,7 +248,7 @@ const SearchPage = () => {
           transition={{ delay: 0.4 }}
         >
           {loading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 mobile-card-grid">
               {[...Array(18)].map((_, i) => (
                 <div key={i} className="space-y-3">
                   <Skeleton className="h-64 w-full" />
@@ -272,6 +276,7 @@ const SearchPage = () => {
                 size="sm"
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
+                className="min-h-[44px] touch-manipulation"
               >
                 Previous
               </Button>
@@ -285,6 +290,7 @@ const SearchPage = () => {
                       variant={currentPage === pageNum ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setCurrentPage(pageNum)}
+                      className="min-h-[44px] min-w-[44px] touch-manipulation"
                     >
                       {pageNum}
                     </Button>
@@ -297,6 +303,7 @@ const SearchPage = () => {
                 size="sm"
                 onClick={() => setCurrentPage(prev => Math.min(searchResults.data.totalPages, prev + 1))}
                 disabled={!searchResults.data.hasNextPage}
+                className="min-h-[44px] touch-manipulation"
               >
                 Next
               </Button>
