@@ -4,16 +4,26 @@
  */
 class TatakaiAnimeAPI {
     static BASE_URL = 'https://aniwatch-api-taupe-eight.vercel.app/api/v2/hianime';
+    static LOCAL_PROXY = 'http://localhost:3001/api';
 
     /**
      * Generic fetch wrapper for API calls
      */
     static async fetchAPI(endpoint, options = {}) {
         try {
-            const url = `${this.BASE_URL}${endpoint}`;
+            let url = `${this.BASE_URL}${endpoint}`;
+            
+            // In development/browser environment, use local proxy for CORS
+            // In actual webOS environment, direct calls should work fine
+            if (typeof window !== 'undefined' && 
+                (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+                url = `${this.LOCAL_PROXY}${endpoint}`;
+            }
+            
             console.log('Fetching:', url);
             
             const response = await fetch(url, {
+                mode: 'cors',
                 headers: {
                     'Accept': 'application/json',
                     'User-Agent': 'Mozilla/5.0 (Web0S; Linux; SmartTV) Tatakai/1.0.0',
