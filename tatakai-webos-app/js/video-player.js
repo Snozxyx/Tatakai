@@ -112,17 +112,31 @@ class VideoPlayerManager {
         const primarySource = sortedSources[0];
         console.log('Using primary source:', primarySource);
 
+        // Set up headers if available
+        this.setupHeaders(sourcesData.headers);
+
         // Load video based on source type
         if (primarySource.isM3U8 && this.isHLSSupported()) {
-            this.loadHLSVideo(primarySource.url);
+            this.loadHLSVideo(primarySource.url, sourcesData.headers);
         } else {
-            this.loadDirectVideo(primarySource.url);
+            this.loadDirectVideo(primarySource.url, sourcesData.headers);
         }
 
         // Load subtitles if available
         if (sourcesData.subtitles && sourcesData.subtitles.length > 0) {
             this.loadSubtitles(sourcesData.subtitles);
         }
+    }
+
+    /**
+     * Setup headers for video requests
+     */
+    setupHeaders(headers) {
+        if (!headers) return;
+        
+        // Store headers for later use
+        this.videoHeaders = headers;
+        console.log('Video headers set:', headers);
     }
 
     /**
@@ -136,7 +150,7 @@ class VideoPlayerManager {
     /**
      * Load HLS video
      */
-    loadHLSVideo(url) {
+    loadHLSVideo(url, headers = {}) {
         if (this.player.canPlayType('application/vnd.apple.mpegurl')) {
             // Native HLS support (Safari, webOS)
             console.log('Using native HLS support');
@@ -145,12 +159,24 @@ class VideoPlayerManager {
         } else if (typeof Hls !== 'undefined' && Hls.isSupported()) {
             // Use hls.js for other browsers
             console.log('Using hls.js');
-            this.hls = new Hls({
+            
+            const hlsConfig = {
                 debug: false,
                 enableWorker: true,
                 lowLatencyMode: false,
                 backBufferLength: 90
-            });
+            };
+
+            // Add headers to HLS config if available
+            if (headers && Object.keys(headers).length > 0) {
+                hlsConfig.xhrSetup = function(xhr, url) {
+                    Object.keys(headers).forEach(key => {
+                        xhr.setRequestHeader(key, headers[key]);
+                    });
+                };
+            }
+
+            this.hls = new Hls(hlsConfig);
 
             this.hls.loadSource(url);
             this.hls.attachMedia(this.player);
@@ -177,8 +203,10 @@ class VideoPlayerManager {
     /**
      * Load direct video
      */
-    loadDirectVideo(url) {
+    loadDirectVideo(url, headers = {}) {
         console.log('Loading direct video:', url);
+        // Note: For direct video URLs, headers typically need to be set at the server level
+        // or through a proxy, as HTML5 video element doesn't support custom headers directly
         this.player.src = url;
         this.player.load();
     }

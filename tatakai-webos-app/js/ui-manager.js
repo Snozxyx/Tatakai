@@ -691,6 +691,27 @@ class UIManager {
     }
 
     /**
+     * Navigate to different screens
+     */
+    navigateToScreen(screenId) {
+        // Hide all screens
+        document.querySelectorAll('.screen').forEach(screen => {
+            screen.classList.remove('active');
+        });
+
+        // Show target screen
+        const targetScreen = document.getElementById(screenId + '-screen');
+        if (targetScreen) {
+            targetScreen.classList.add('active');
+        }
+
+        // Update navigation state
+        if (window.navigationManager) {
+            window.navigationManager.refresh();
+        }
+    }
+
+    /**
      * Escape HTML to prevent XSS
      */
     escapeHtml(text) {
