@@ -312,6 +312,8 @@ const WatchPage = () => {
             <VideoPlayer 
               sources={sources.data.sources}
               subtitles={sources?.data?.tracks || []}
+              malId={undefined} // TODO: Extract MAL ID from API response
+              episodeNumber={currentEpisode?.number}
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
