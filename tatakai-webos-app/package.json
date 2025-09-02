@@ -1,0 +1,30 @@
+{
+  "name": "tatakai-webos-app",
+  "version": "1.0.0",
+  "description": "Tatakai Anime Streaming App for webOS",
+  "main": "index.html",
+  "scripts": {
+    "build": "echo 'webOS app ready for packaging'",
+    "package": "ares-package .",
+    "install": "ares-install com.tatakai.animeapp_1.0.0_all.ipk",
+    "launch": "ares-launch com.tatakai.animeapp",
+    "serve": "python3 -m http.server 8080",
+    "dev": "npm run serve"
+  },
+  "keywords": ["webos", "tv", "anime", "streaming", "entertainment"],
+  "author": "Tatakai",
+  "license": "MIT",
+  "webOS": {
+    "id": "com.tatakai.animeapp",
+    "title": "Tatakai - Anime Streaming",
+    "version": "1.0.0",
+    "vendor": "Tatakai",
+    "type": "web",
+    "main": "index.html",
+    "icon": "icon.png",
+    "category": {
+      "main": "Entertainment",
+      "sub": "Video"
+    }
+  }
+}

@@ -1,0 +1,373 @@
+/* TV-Specific UI Optimizations */
+
+/* Focus Management for Remote Control */
+.focusable {
+    outline: none;
+    transition: all 0.3s ease;
+}
+
+.focusable:focus,
+.focusable.focused {
+    outline: 3px solid #ff6b6b;
+    outline-offset: 2px;
+    box-shadow: 0 0 20px rgba(255, 107, 107, 0.6);
+}
+
+/* Large clickable areas for remote control */
+.nav-item,
+.anime-card,
+.spotlight-action,
+.search-btn,
+.category-card {
+    min-height: 44px;
+    min-width: 44px;
+}
+
+/* Search Input TV Optimization */
+.search-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.search-input-container {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 3rem;
+    align-items: center;
+}
+
+.search-input {
+    flex: 1;
+    padding: 16px 24px;
+    font-size: 1.4rem;
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 12px;
+    color: white;
+    backdrop-filter: blur(10px);
+}
+
+.search-input::placeholder {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.search-input:focus {
+    border-color: #ff6b6b;
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.search-btn {
+    padding: 16px 32px;
+    background: #ff6b6b;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 1.4rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.search-btn:hover,
+.search-btn.focused {
+    background: #ff5252;
+    transform: scale(1.05);
+    box-shadow: 0 0 20px rgba(255, 107, 107, 0.6);
+}
+
+/* Search Results */
+.search-results {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+}
+
+.search-no-results {
+    text-align: center;
+    color: #cccccc;
+    font-size: 1.4rem;
+    padding: 4rem;
+}
+
+/* Categories Grid */
+.categories-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 30px;
+    padding: 20px 0;
+}
+
+.category-card {
+    background: linear-gradient(135deg, rgba(255, 107, 107, 0.2), rgba(255, 107, 107, 0.1));
+    border: 2px solid rgba(255, 107, 107, 0.3);
+    border-radius: 16px;
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+.category-card:hover,
+.category-card.focused {
+    transform: scale(1.05);
+    border-color: #ff6b6b;
+    background: linear-gradient(135deg, rgba(255, 107, 107, 0.3), rgba(255, 107, 107, 0.2));
+    box-shadow: 0 10px 30px rgba(255, 107, 107, 0.4);
+}
+
+.category-title {
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: #ffffff;
+    margin-bottom: 0.5rem;
+}
+
+.category-count {
+    font-size: 1.2rem;
+    color: #cccccc;
+}
+
+/* Anime Detail Screen */
+.anime-detail-hero {
+    display: flex;
+    gap: 3rem;
+    margin-bottom: 3rem;
+    padding: 2rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    backdrop-filter: blur(10px);
+}
+
+.anime-detail-poster {
+    width: 300px;
+    height: 420px;
+    object-fit: cover;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.anime-detail-info {
+    flex: 1;
+}
+
+.anime-detail-title {
+    font-size: 3rem;
+    font-weight: bold;
+    color: #ffffff;
+    margin-bottom: 1rem;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+.anime-detail-meta {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 2rem;
+    font-size: 1.2rem;
+    color: #cccccc;
+}
+
+.anime-detail-description {
+    font-size: 1.3rem;
+    line-height: 1.8;
+    color: #ffffff;
+    margin-bottom: 2rem;
+}
+
+.anime-detail-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+.action-btn {
+    padding: 16px 32px;
+    border: none;
+    border-radius: 12px;
+    font-size: 1.2rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.action-btn.primary {
+    background: #ff6b6b;
+    color: white;
+}
+
+.action-btn.secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.action-btn:hover,
+.action-btn.focused {
+    transform: scale(1.05);
+    box-shadow: 0 0 20px rgba(255, 107, 107, 0.6);
+}
+
+.action-btn.primary:hover,
+.action-btn.primary.focused {
+    background: #ff5252;
+}
+
+.action-btn.secondary:hover,
+.action-btn.secondary.focused {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: #ff6b6b;
+}
+
+/* Episodes List */
+.episodes-section {
+    margin-top: 3rem;
+}
+
+.episodes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+    margin-top: 2rem;
+}
+
+.episode-card {
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+.episode-card:hover,
+.episode-card.focused {
+    transform: scale(1.03);
+    border-color: #ff6b6b;
+    background: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 0 20px rgba(255, 107, 107, 0.4);
+}
+
+.episode-number {
+    font-size: 1.1rem;
+    color: #ff6b6b;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.episode-title {
+    font-size: 1.3rem;
+    color: #ffffff;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+/* Video Player Styles */
+.video-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    display: flex;
+    flex-direction: column;
+}
+
+.video-player {
+    width: 100%;
+    height: calc(100vh - 200px);
+    background: #000;
+}
+
+.video-controls {
+    padding: 2rem;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+    color: white;
+}
+
+.video-info h3 {
+    font-size: 1.8rem;
+    margin-bottom: 0.5rem;
+}
+
+.video-info p {
+    font-size: 1.2rem;
+    color: #cccccc;
+}
+
+/* Help Overlay */
+.help-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    backdrop-filter: blur(10px);
+}
+
+.help-content {
+    background: rgba(15, 15, 35, 0.95);
+    border: 2px solid #ff6b6b;
+    border-radius: 16px;
+    padding: 3rem;
+    max-width: 600px;
+    text-align: center;
+}
+
+.help-content h3 {
+    font-size: 2rem;
+    color: #ff6b6b;
+    margin-bottom: 2rem;
+}
+
+.help-content ul {
+    list-style: none;
+    margin-bottom: 2rem;
+}
+
+.help-content li {
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+    color: #ffffff;
+}
+
+.help-content strong {
+    color: #ff6b6b;
+}
+
+.help-content p {
+    font-size: 1.1rem;
+    color: #cccccc;
+}
+
+/* Animation for smooth transitions */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.screen.active {
+    animation: fadeIn 0.5s ease-out;
+}
+
+/* Scrollbar styling for TV */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #ff6b6b;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #ff5252;
+}

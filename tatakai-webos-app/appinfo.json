@@ -1,0 +1,31 @@
+{
+  "id": "com.tatakai.animeapp",
+  "version": "1.0.0",
+  "vendor": "Tatakai",
+  "type": "web",
+  "main": "index.html",
+  "title": "Tatakai - Anime Streaming",
+  "icon": "icon.png",
+  "category": {
+    "main": "Entertainment",
+    "sub": "Video"
+  },
+  "requiredPermissions": [
+    "internet",
+    "media"
+  ],
+  "supportedLocales": [
+    "en-US"
+  ],
+  "resolution": "1920x1080",
+  "bgImage": "bg.png",
+  "transparent": false,
+  "visible": true,
+  "accessibility": {
+    "supportsAudioGuidance": false
+  },
+  "handlesRelaunch": true,
+  "removable": true,
+  "disableBackHistoryAPI": false,
+  "trustLevel": "default"
+}
