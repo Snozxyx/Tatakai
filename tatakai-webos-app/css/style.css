@@ -30,7 +30,7 @@ body {
 
 .logo h1 {
     font-size: 4rem;
-    color: #e50914;
+    color: #6366f1;
     text-align: center;
     margin-bottom: 2rem;
     font-weight: bold;
@@ -40,8 +40,8 @@ body {
 .loading-spinner {
     width: 60px;
     height: 60px;
-    border: 4px solid rgba(229, 9, 20, 0.2);
-    border-left: 4px solid #e50914;
+    border: 4px solid rgba(99, 102, 241, 0.2);
+    border-left: 4px solid #6366f1;
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin: 0 auto;
@@ -80,8 +80,8 @@ body {
     transform: translateX(-50%);
 }
 
-.netflix-logo {
-    color: #e50914;
+.tatakai-logo {
+    color: #6366f1;
     font-size: 1.8rem;
     font-weight: bold;
     letter-spacing: 1px;
@@ -442,7 +442,7 @@ body {
         font-size: 3rem;
     }
     
-    .netflix-logo {
+    .tatakai-logo {
         font-size: 1.5rem;
     }
     
@@ -476,4 +476,142 @@ body {
     .season-title {
         font-size: 1.5rem;
     }
+}
+
+/* Anime Layout Styles */
+.spotlight-section {
+    position: relative;
+    height: 600px;
+    overflow: hidden;
+}
+
+.spotlight-carousel {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.spotlight-item {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+    display: flex;
+    align-items: flex-end;
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out;
+}
+
+.spotlight-item.active {
+    opacity: 1;
+}
+
+.spotlight-content {
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+    padding: 60px;
+    color: white;
+    max-width: 600px;
+}
+
+.spotlight-title {
+    font-size: 3rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+}
+
+.spotlight-description {
+    font-size: 1.2rem;
+    margin-bottom: 2rem;
+    line-height: 1.5;
+}
+
+.spotlight-action {
+    background: #6366f1;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.spotlight-action:hover {
+    background: #5855eb;
+}
+
+.content-sections {
+    padding: 40px 60px;
+}
+
+.content-section {
+    margin-bottom: 60px;
+}
+
+.section-title {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: white;
+    margin-bottom: 20px;
+}
+
+.anime-grid {
+    display: flex;
+    gap: 20px;
+    overflow-x: auto;
+    padding-bottom: 10px;
+}
+
+.anime-card {
+    flex: 0 0 200px;
+    background: #1a1a1a;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+}
+
+.anime-card:hover {
+    transform: scale(1.05);
+}
+
+.anime-poster {
+    width: 100%;
+    height: 280px;
+    object-fit: cover;
+}
+
+.anime-info {
+    padding: 12px;
+}
+
+.anime-title {
+    font-size: 1rem;
+    font-weight: bold;
+    color: white;
+    margin-bottom: 8px;
+    line-height: 1.3;
+}
+
+.anime-meta {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.anime-meta span {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.8rem;
+    color: #ccc;
+}
+
+.anime-episodes {
+    font-size: 0.9rem;
+    color: #888;
 }

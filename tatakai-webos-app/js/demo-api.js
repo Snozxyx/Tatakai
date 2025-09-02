@@ -4,7 +4,7 @@
  */
 class DemoAnimeAPI {
     static BASE_URL = 'https://aniwatch-api-taupe-eight.vercel.app/api/v2/hianime';
-    static USE_MOCK_DATA = true; // Set to false to use real API
+    static USE_MOCK_DATA = false; // Set to false to use real API
 
     // Mock data for demo
     static mockHomeData = {
@@ -244,6 +244,12 @@ class DemoAnimeAPI {
             // Fallback to mock data on error
             if (endpoint === '/home') {
                 return this.mockHomeData;
+            } else if (endpoint.includes('/anime/') && !endpoint.includes('/episodes')) {
+                return this.mockAnimeInfo;
+            } else if (endpoint.includes('/episodes')) {
+                return this.mockEpisodes;
+            } else if (endpoint.includes('/episode/sources')) {
+                return this.mockSources;
             }
             throw error;
         }
@@ -291,7 +297,8 @@ class DemoAnimeAPI {
             return data;
         } catch (error) {
             console.error('Error fetching anime info:', error);
-            throw error;
+            console.log('Using mock anime data for:', animeId);
+            return this.mockAnimeInfo;
         }
     }
 
@@ -304,7 +311,8 @@ class DemoAnimeAPI {
             return data;
         } catch (error) {
             console.error('Error fetching anime episodes:', error);
-            throw error;
+            console.log('Using mock episodes data for:', animeId);
+            return this.mockEpisodes;
         }
     }
 

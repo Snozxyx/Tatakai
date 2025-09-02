@@ -22,20 +22,20 @@
             <div class="nav-left">
                 <ul class="nav-menu" role="menubar">
                     <li class="nav-item focusable" data-screen="home" role="menuitem">Home</li>
-                    <li class="nav-item focusable" data-screen="search" role="menuitem">TV Shows</li>
-                    <li class="nav-item focusable" data-screen="trending" role="menuitem">Movies</li>
-                    <li class="nav-item focusable" data-screen="categories" role="menuitem">Recently Added</li>
+                    <li class="nav-item focusable" data-screen="search" role="menuitem">Search</li>
+                    <li class="nav-item focusable" data-screen="trending" role="menuitem">Trending</li>
+                    <li class="nav-item focusable" data-screen="categories" role="menuitem">Categories</li>
                 </ul>
             </div>
             <div class="nav-center">
-                <h1 class="netflix-logo">NETFLIX</h1>
+                <h1 class="tatakai-logo">TATAKAI</h1>
             </div>
             <div class="nav-right">
                 <div class="search-icon focusable">🔍</div>
                 <div class="notifications-icon focusable">🔔</div>
                 <div class="profile-menu focusable">
                     <span class="profile-name">My List</span>
-                    <div class="profile-avatar">😊</div>
+                    <div class="profile-avatar">👤</div>
                 </div>
             </div>
         </nav>
@@ -44,100 +44,31 @@
         <main id="main-content" class="main-content hidden">
             <!-- Home Screen -->
             <section id="home-screen" class="screen active">
-                <div class="hero-section">
-                    <div id="hero-background" class="hero-background"></div>
-                    <div class="hero-content">
-                        <div class="hero-info">
-                            <h1 id="hero-title" class="hero-title">Game of Thrones</h1>
-                            <div class="hero-meta">
-                                <span class="match-score">98% Match</span>
-                                <span class="year">2011-2019</span>
-                                <span class="rating">18+</span>
-                            </div>
-                            <div class="hero-actions">
-                                <button class="btn-primary focusable">
-                                    <span class="play-icon">▶</span>
-                                    Resume
-                                </button>
-                                <button class="btn-secondary focusable">
-                                    <span class="plus-icon">+</span>
-                                    My List
-                                </button>
-                            </div>
-                        </div>
+                <div class="spotlight-section">
+                    <div id="spotlight-carousel" class="spotlight-carousel">
+                        <!-- Spotlight content will be loaded here -->
                     </div>
                 </div>
 
-                <div class="series-info">
-                    <div class="season-selector">
-                        <h3 class="season-title">Season 7</h3>
-                        <span class="all-seasons">All seasons</span>
+                <div class="content-sections">
+                    <div class="content-section">
+                        <h3 class="section-title">Trending Now</h3>
+                        <div id="trending-grid" class="anime-grid">
+                            <!-- Trending animes will be loaded here -->
+                        </div>
                     </div>
-                    <div class="episodes-grid">
-                        <div class="episode-card focusable">
-                            <div class="episode-thumbnail">
-                                <div class="placeholder-image trailer-bg">
-                                    <span class="placeholder-text">Trailer</span>
-                                </div>
-                                <div class="episode-overlay">
-                                    <span class="episode-duration">1:30</span>
-                                </div>
-                            </div>
-                            <div class="episode-info">
-                                <span class="episode-title">Trailer</span>
-                            </div>
+
+                    <div class="content-section">
+                        <h3 class="section-title">Latest Episodes</h3>
+                        <div id="latest-grid" class="anime-grid">
+                            <!-- Latest episodes will be loaded here -->
                         </div>
-                        <div class="episode-card focusable">
-                            <div class="episode-thumbnail">
-                                <div class="placeholder-image episode-bg">
-                                    <span class="placeholder-text">01</span>
-                                </div>
-                                <div class="episode-overlay">
-                                    <span class="episode-duration">59:00</span>
-                                </div>
-                            </div>
-                            <div class="episode-info">
-                                <span class="episode-title">01</span>
-                            </div>
-                        </div>
-                        <div class="episode-card focusable">
-                            <div class="episode-thumbnail">
-                                <div class="placeholder-image episode-bg">
-                                    <span class="placeholder-text">02</span>
-                                </div>
-                                <div class="episode-overlay">
-                                    <span class="episode-duration">58:00</span>
-                                </div>
-                            </div>
-                            <div class="episode-info">
-                                <span class="episode-title">02</span>
-                            </div>
-                        </div>
-                        <div class="episode-card focusable">
-                            <div class="episode-thumbnail">
-                                <div class="placeholder-image episode-bg">
-                                    <span class="placeholder-text">03</span>
-                                </div>
-                                <div class="episode-overlay">
-                                    <span class="episode-duration">63:00</span>
-                                </div>
-                            </div>
-                            <div class="episode-info">
-                                <span class="episode-title">03</span>
-                            </div>
-                        </div>
-                        <div class="episode-card focusable">
-                            <div class="episode-thumbnail">
-                                <div class="placeholder-image episode-bg">
-                                    <span class="placeholder-text">04</span>
-                                </div>
-                                <div class="episode-overlay">
-                                    <span class="episode-duration">78:00</span>
-                                </div>
-                            </div>
-                            <div class="episode-info">
-                                <span class="episode-title">04</span>
-                            </div>
+                    </div>
+
+                    <div class="content-section">
+                        <h3 class="section-title">Most Popular</h3>
+                        <div id="popular-grid" class="anime-grid">
+                            <!-- Popular animes will be loaded here -->
                         </div>
                     </div>
                 </div>
@@ -175,8 +106,41 @@
 
             <!-- Anime Detail Screen -->
             <section id="anime-detail-screen" class="screen">
-                <div id="anime-detail-content">
-                    <!-- Anime details will be loaded here -->
+                <div id="anime-detail-content" class="anime-detail-content">
+                    <div class="anime-detail-hero">
+                        <div class="anime-poster">
+                            <img id="anime-detail-poster" src="" alt="Anime Poster">
+                        </div>
+                        <div class="anime-info">
+                            <h1 id="anime-detail-title">Anime Title</h1>
+                            <p id="anime-detail-description">Anime description...</p>
+                            <div class="anime-stats">
+                                <span id="anime-detail-rating" class="stat">Rating: N/A</span>
+                                <span id="anime-detail-episodes" class="stat">Episodes: N/A</span>
+                                <span id="anime-detail-status" class="stat">Status: N/A</span>
+                            </div>
+                            <div class="anime-actions">
+                                <button id="play-anime-btn" class="btn primary focusable">
+                                    ▶️ Watch Now
+                                </button>
+                                <button id="add-to-list-btn" class="btn secondary focusable">
+                                    ➕ Add to List
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="anime-episodes-section">
+                        <h3>Episodes</h3>
+                        <div id="anime-episodes-list" class="episodes-list">
+                            <!-- Episodes will be loaded here -->
+                        </div>
+                    </div>
+                    <div class="anime-recommendations">
+                        <h3>Recommended</h3>
+                        <div id="recommended-anime-list" class="anime-grid">
+                            <!-- Recommended anime will be loaded here -->
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -186,10 +150,24 @@
                     <video id="video-player" class="video-player" controls>
                         <p>Your browser doesn't support HTML5 video.</p>
                     </video>
-                    <div class="video-controls">
+                    <div class="video-controls-overlay">
                         <div class="video-info">
                             <h3 id="video-title">Episode Title</h3>
                             <p id="video-description">Episode description...</p>
+                        </div>
+                        <div class="episode-controls">
+                            <button id="prev-episode-btn" class="btn secondary focusable">
+                                ⏮️ Previous
+                            </button>
+                            <button id="next-episode-btn" class="btn secondary focusable">
+                                ⏭️ Next
+                            </button>
+                            <button id="episodes-list-btn" class="btn secondary focusable">
+                                📋 Episodes
+                            </button>
+                            <button id="back-to-anime-btn" class="btn secondary focusable">
+                                ⬅️ Back to Anime
+                            </button>
                         </div>
                     </div>
                 </div>
