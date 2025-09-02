@@ -24,12 +24,13 @@ class UIManager {
      * Bind UI events
      */
     bindEvents() {
-        // Navigation menu clicks
-        document.querySelectorAll('.nav-item').forEach(item => {
+        // Sidebar navigation menu clicks
+        document.querySelectorAll('.sidebar-nav .nav-item').forEach(item => {
             item.addEventListener('click', (e) => {
-                const screen = e.target.dataset.screen;
+                const screen = e.currentTarget.dataset.screen;
                 if (screen) {
                     this.showScreen(screen);
+                    this.updateActiveNavItem(e.currentTarget);
                 }
             });
         });
@@ -91,16 +92,69 @@ class UIManager {
     renderHomeContent() {
         if (!this.currentData) return;
 
-        // Render spotlight carousel
-        this.renderSpotlight();
+        // Render hero section
+        this.renderHeroSection();
         
         // Render content sections
         this.renderSection('trending-grid', this.currentData.trendingAnimes);
-        this.renderSection('latest-grid', this.currentData.latestEpisodeAnimes);
+        this.renderSection('continue-grid', []); // Empty for now
         this.renderSection('popular-grid', this.currentData.mostPopularAnimes);
+        this.renderSection('latest-grid', this.currentData.latestEpisodeAnimes);
+    }
+
+    /**
+     * Render hero section (replacing spotlight)
+     */
+    renderHeroSection() {
+        const heroContent = document.getElementById('hero-content');
+        if (!heroContent || !this.currentData.spotlightAnimes || this.currentData.spotlightAnimes.length === 0) {
+            return;
+        }
+
+        const featuredAnime = this.currentData.spotlightAnimes[0];
+        const heroInfo = heroContent.querySelector('.hero-info');
+        const heroBackground = heroContent.querySelector('.hero-background');
         
-        // Start spotlight auto-rotation
-        this.startSpotlightRotation();
+        if (heroInfo) {
+            heroInfo.innerHTML = `
+                <div class="hero-badge">TATAKAI ORIGINAL</div>
+                <h1 class="hero-title">${this.escapeHtml(featuredAnime.name || 'Featured Anime')}</h1>
+                <div class="hero-status">Now Streaming</div>
+                <div class="hero-actions">
+                    <button class="btn-play focusable" data-anime-id="${featuredAnime.id}">
+                        <span class="play-icon">▶</span>
+                        Play Now
+                    </button>
+                    <button class="btn-info focusable" data-anime-id="${featuredAnime.id}">
+                        <span class="info-icon">ℹ</span>
+                        More Info
+                    </button>
+                </div>
+            `;
+
+            // Add event listeners for hero buttons
+            const playBtn = heroInfo.querySelector('.btn-play');
+            const infoBtn = heroInfo.querySelector('.btn-info');
+            
+            if (playBtn) {
+                playBtn.addEventListener('click', () => {
+                    this.startWatching(featuredAnime.id);
+                });
+            }
+            
+            if (infoBtn) {
+                infoBtn.addEventListener('click', () => {
+                    this.showAnimeDetail(featuredAnime.id);
+                });
+            }
+        }
+
+        // Set background image
+        if (heroBackground && featuredAnime.poster) {
+            heroBackground.style.backgroundImage = `url(${featuredAnime.poster})`;
+            heroBackground.style.backgroundSize = 'cover';
+            heroBackground.style.backgroundPosition = 'center';
+        }
     }
 
     /**
@@ -665,12 +719,29 @@ class UIManager {
             loadingScreen.classList.add('hidden');
         }
         
-        // Show main content and navigation after loading
+        // Show main content and sidebar navigation after loading
+        this.showNavigation();
+        this.showMainContent();
+    }
+
+    /**
+     * Show navigation
+     */
+    showNavigation() {
+        const sidebarNav = document.getElementById('sidebar-nav');
+        if (sidebarNav) {
+            sidebarNav.classList.remove('hidden');
+        }
+    }
+
+    /**
+     * Show main content
+     */
+    showMainContent() {
         const mainContent = document.getElementById('main-content');
-        const mainNav = document.getElementById('main-nav');
-        
-        if (mainContent) mainContent.classList.remove('hidden');
-        if (mainNav) mainNav.classList.remove('hidden');
+        if (mainContent) {
+            mainContent.classList.remove('hidden');
+        }
     }
 
     /**
@@ -708,6 +779,110 @@ class UIManager {
         // Update navigation state
         if (window.navigationManager) {
             window.navigationManager.refresh();
+        }
+    }
+
+    /**
+     * Update active navigation item
+     */
+    updateActiveNavItem(activeItem) {
+        // Remove active class from all nav items
+        document.querySelectorAll('.sidebar-nav .nav-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        
+        // Add active class to selected item
+        if (activeItem) {
+            activeItem.classList.add('active');
+        }
+    }
+
+    /**
+     * Show screen
+     */
+    showScreen(screenName) {
+        console.log('Showing screen:', screenName);
+        
+        // Hide all screens
+        document.querySelectorAll('.screen').forEach(screen => {
+            screen.classList.remove('active');
+        });
+        
+        // Show target screen
+        const targetScreen = document.getElementById(`${screenName}-screen`);
+        if (targetScreen) {
+            targetScreen.classList.add('active');
+            
+            // Load screen-specific data
+            this.loadScreenData(screenName);
+        }
+        
+        // Show navigation and main content
+        this.showNavigation();
+        this.showMainContent();
+        
+        // Update navigation focus
+        if (window.navigationManager) {
+            window.navigationManager.currentScreen = screenName;
+            setTimeout(() => {
+                window.navigationManager.refresh();
+            }, 100);
+        }
+    }
+
+    /**
+     * Load screen-specific data
+     */
+    loadScreenData(screenName) {
+        switch (screenName) {
+            case 'home':
+                if (!this.currentData) {
+                    this.loadHomeData();
+                }
+                break;
+            case 'search':
+                // Focus search input
+                setTimeout(() => {
+                    const searchInput = document.getElementById('search-input');
+                    if (searchInput) {
+                        searchInput.focus();
+                    }
+                }, 200);
+                break;
+            case 'trending':
+                this.loadTrendingData();
+                break;
+            case 'categories':
+                this.loadCategoriesData();
+                break;
+            case 'favorites':
+                this.loadFavoritesData();
+                break;
+        }
+    }
+
+    /**
+     * Load favorites data (placeholder)
+     */
+    loadFavoritesData() {
+        const favoritesScreen = document.getElementById('favorites-screen');
+        if (!favoritesScreen) {
+            // Create favorites screen if it doesn't exist
+            const mainContent = document.querySelector('.main-content');
+            const favoritesScreenHTML = `
+                <section id="favorites-screen" class="screen">
+                    <div class="search-container">
+                        <h2 class="screen-title">My Favorites</h2>
+                        <div id="favorites-list" class="search-results">
+                            <div class="search-no-results">
+                                <p>No favorites added yet.</p>
+                                <p>Start exploring anime and add them to your favorites!</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            `;
+            mainContent.insertAdjacentHTML('beforeend', favoritesScreenHTML);
         }
     }
 
