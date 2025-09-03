@@ -101,8 +101,6 @@ Tatakai Platform
 
 ## 📱 Components
 
-## 📱 Components
-
 ### 🌐 Web Application (tatakai-app)
 
 A modern React web application built with Next.js, providing a responsive interface for anime streaming across desktop and mobile devices.
