@@ -11,6 +11,12 @@ class VideoPlayerManager {
         this.controlsVisible = true;
         this.controlsTimeout = null;
         
+        // Skip functionality properties
+        this.skipTimes = [];
+        this.activeSkip = null;
+        this.currentAnimeData = null;
+        this.skipButton = null;
+        
         this.init();
     }
 
@@ -565,11 +571,23 @@ class VideoPlayerManager {
     onTimeUpdate() {
         // Update progress if custom controls are implemented
         // For now, just use default video element controls
+        
+        // Check for active skip times
+        if (this.skipTimes.length > 0 && this.player) {
+            const skip = AniSkipAPI.getActiveSkip(this.player.currentTime, this.skipTimes);
+            if (skip !== this.activeSkip) {
+                this.activeSkip = skip;
+                this.updateSkipButton();
+            }
+        }
     }
 
     onMetadataLoaded() {
         console.log('Video metadata loaded');
         console.log('Duration:', this.formatTime(this.player.duration));
+        
+        // Fetch skip times if we have anime data
+        this.fetchSkipTimes();
     }
 
     onFullscreenChange() {
@@ -596,6 +614,118 @@ class VideoPlayerManager {
         } else {
             return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
         }
+    }
+
+    /**
+     * Set anime data for skip functionality
+     * @param {Object} animeData Anime information
+     * @param {number} episodeNumber Current episode number
+     */
+    setAnimeData(animeData, episodeNumber) {
+        this.currentAnimeData = animeData;
+        this.currentEpisodeNumber = episodeNumber;
+        console.log('Anime data set:', animeData, 'Episode:', episodeNumber);
+    }
+
+    /**
+     * Fetch skip times from AniSkip API
+     */
+    async fetchSkipTimes() {
+        if (!this.currentAnimeData || !this.currentEpisodeNumber || !this.player) {
+            console.log('Missing data for skip times fetch');
+            return;
+        }
+
+        const malId = AniSkipAPI.extractMalId(this.currentAnimeData);
+        if (!malId) {
+            console.log('Could not extract MAL ID from anime data');
+            return;
+        }
+
+        const duration = Math.floor(this.player.duration);
+        if (!duration) {
+            console.log('Video duration not available');
+            return;
+        }
+
+        try {
+            console.log('Fetching skip times for MAL ID:', malId, 'Episode:', this.currentEpisodeNumber, 'Duration:', duration);
+            const response = await AniSkipAPI.getSkipTimes(malId, this.currentEpisodeNumber, duration);
+            
+            if (response.found && response.results.length > 0) {
+                this.skipTimes = response.results;
+                console.log('Skip times loaded:', response.results);
+                this.createSkipButton();
+            } else {
+                this.skipTimes = [];
+                console.log('No skip times found');
+            }
+        } catch (error) {
+            console.error('Failed to fetch skip times:', error);
+            this.skipTimes = [];
+        }
+    }
+
+    /**
+     * Create skip button element
+     */
+    createSkipButton() {
+        if (this.skipButton) return;
+
+        this.skipButton = document.createElement('button');
+        this.skipButton.className = 'skip-button';
+        this.skipButton.style.cssText = `
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 6px;
+            padding: 8px 16px;
+            font-size: 14px;
+            cursor: pointer;
+            display: none;
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        `;
+        
+        this.skipButton.addEventListener('click', () => this.handleSkip());
+        
+        // Add to video container
+        const videoContainer = this.player.parentElement;
+        if (videoContainer) {
+            videoContainer.appendChild(this.skipButton);
+        }
+    }
+
+    /**
+     * Update skip button visibility and text
+     */
+    updateSkipButton() {
+        if (!this.skipButton) return;
+
+        if (this.activeSkip) {
+            this.skipButton.textContent = `Skip ${AniSkipAPI.formatSkipType(this.activeSkip.skipType)}`;
+            this.skipButton.style.display = 'block';
+        } else {
+            this.skipButton.style.display = 'none';
+        }
+    }
+
+    /**
+     * Handle skip button click
+     */
+    handleSkip() {
+        if (!this.player || !this.activeSkip) return;
+        
+        const skipType = AniSkipAPI.formatSkipType(this.activeSkip.skipType);
+        this.player.currentTime = this.activeSkip.interval.endTime;
+        this.activeSkip = null;
+        this.updateSkipButton();
+        
+        WebOSAPI.showToast(`Skipped ${skipType}`);
+        console.log('Skipped to:', this.activeSkip?.interval.endTime);
     }
 
     /**

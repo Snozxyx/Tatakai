@@ -1,143 +1,192 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tatakai - Anime Streaming</title>
-    <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="css/tv-ui.css">
+    <link rel="stylesheet" href="/src/styles/globals.css">
+    <script type="module" src="/src/main.ts"></script>
 </head>
-<body>
+<body class="webos-app">
     <div id="app">
         <!-- Loading Screen -->
-        <div id="loading-screen" class="loading-screen">
-            <div class="logo">
-                <h1>Tatakai</h1>
-                <div class="loading-spinner"></div>
+        <div id="loading-screen" class="loading-screen fixed inset-0 bg-tatakai-dark flex items-center justify-center z-50">
+            <div class="text-center">
+                <h1 class="text-6xl font-bold text-tatakai-purple mb-8">Tatakai</h1>
+                <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-tatakai-orange mx-auto"></div>
             </div>
         </div>
 
-        <!-- Main Navigation -->
-        <nav id="main-nav" class="main-nav hidden">
-            <div class="nav-left">
-                <ul class="nav-menu" role="menubar">
-                    <li class="nav-item focusable" data-screen="home" role="menuitem">Home</li>
-                    <li class="nav-item focusable" data-screen="search" role="menuitem">Search</li>
-                    <li class="nav-item focusable" data-screen="trending" role="menuitem">Trending</li>
-                    <li class="nav-item focusable" data-screen="categories" role="menuitem">Categories</li>
-                </ul>
+        <!-- Left Sidebar Navigation -->
+        <nav id="sidebar-nav" class="webos-sidebar hidden">
+            <div class="px-6 py-8">
+                <h1 class="text-3xl font-bold text-tatakai-purple">TATAKAI</h1>
             </div>
-            <div class="nav-center">
-                <h1 class="tatakai-logo">TATAKAI</h1>
-            </div>
-            <div class="nav-right">
-                <div class="search-icon focusable">🔍</div>
-                <div class="notifications-icon focusable">🔔</div>
-                <div class="profile-menu focusable">
-                    <span class="profile-name">My List</span>
-                    <div class="profile-avatar">👤</div>
+            <ul class="space-y-2 px-4" role="menubar">
+                <li class="webos-nav-item focusable active" data-screen="home" role="menuitem">
+                    <i class="fas fa-home text-xl w-6"></i>
+                    <span class="text-lg">Home</span>
+                </li>
+                <li class="webos-nav-item focusable" data-screen="categories" role="menuitem">
+                    <i class="fas fa-th-large text-xl w-6"></i>
+                    <span class="text-lg">Categories</span>
+                </li>
+                <li class="webos-nav-item focusable" data-screen="search" role="menuitem">
+                    <i class="fas fa-search text-xl w-6"></i>
+                    <span class="text-lg">Search</span>
+                </li>
+                <li class="webos-nav-item focusable" data-screen="trending" role="menuitem">
+                    <i class="fas fa-fire text-xl w-6"></i>
+                    <span class="text-lg">Trending</span>
+                </li>
+                <li class="webos-nav-item focusable" data-screen="favorites" role="menuitem">
+                    <i class="fas fa-heart text-xl w-6"></i>
+                    <span class="text-lg">My List</span>
+                </li>
+            </ul>
+            <div class="absolute bottom-0 left-0 right-0 p-4 space-y-2">
+                <div class="webos-nav-item focusable" data-screen="settings" role="menuitem">
+                    <i class="fas fa-cog text-xl w-6"></i>
+                    <span class="text-lg">Settings</span>
+                </div>
+                <div class="webos-nav-item focusable profile-item" role="menuitem">
+                    <i class="fas fa-user text-xl w-6"></i>
+                    <span class="text-lg">Profile</span>
                 </div>
             </div>
         </nav>
 
         <!-- Main Content Area -->
-        <main id="main-content" class="main-content hidden">
+        <main id="main-content" class="webos-main hidden">
             <!-- Home Screen -->
-            <section id="home-screen" class="screen active">
-                <div class="spotlight-section">
-                    <div id="spotlight-carousel" class="spotlight-carousel">
-                        <!-- Spotlight content will be loaded here -->
+            <section id="home-screen" class="screen active p-8">
+                <div class="webos-hero mb-12 relative overflow-hidden rounded-xl">
+                    <div id="hero-content" class="relative z-10 p-12">
+                        <div class="max-w-2xl">
+                            <div class="inline-block bg-tatakai-orange text-black px-4 py-2 rounded-md text-sm font-bold mb-4">
+                                TATAKAI ORIGINAL
+                            </div>
+                            <h1 class="text-6xl font-bold mb-4 text-white">Featured Anime</h1>
+                            <div class="text-tatakai-orange text-xl mb-8">Now Streaming</div>
+                            <div class="flex gap-4">
+                                <button class="webos-button-primary focusable">
+                                    <i class="fas fa-play mr-2"></i>
+                                    Play Now
+                                </button>
+                                <button class="webos-button-secondary focusable">
+                                    <i class="fas fa-info-circle mr-2"></i>
+                                    More Info
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="content-sections">
+                <div class="space-y-12">
                     <div class="content-section">
-                        <h3 class="section-title">Trending Now</h3>
-                        <div id="trending-grid" class="anime-grid">
+                        <h3 class="text-3xl font-bold mb-6 text-white">New and Noteworthy</h3>
+                        <div id="trending-grid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
                             <!-- Trending animes will be loaded here -->
                         </div>
                     </div>
 
                     <div class="content-section">
-                        <h3 class="section-title">Latest Episodes</h3>
-                        <div id="latest-grid" class="anime-grid">
-                            <!-- Latest episodes will be loaded here -->
+                        <h3 class="text-3xl font-bold mb-6 text-white">Continue Watching</h3>
+                        <div id="continue-grid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                            <!-- Continue watching will be loaded here -->
                         </div>
                     </div>
 
                     <div class="content-section">
-                        <h3 class="section-title">Most Popular</h3>
-                        <div id="popular-grid" class="anime-grid">
+                        <h3 class="text-3xl font-bold mb-6 text-white">Popular Anime</h3>
+                        <div id="popular-grid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
                             <!-- Popular animes will be loaded here -->
+                        </div>
+                    </div>
+
+                    <div class="content-section">
+                        <h3 class="text-3xl font-bold mb-6 text-white">Latest Episodes</h3>
+                        <div id="latest-grid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                            <!-- Latest episodes will be loaded here -->
                         </div>
                     </div>
                 </div>
             </section>
 
             <!-- Search Screen -->
-            <section id="search-screen" class="screen">
-                <div class="search-container">
-                    <h2 class="screen-title">Search Anime</h2>
-                    <div class="search-input-container">
-                        <input type="text" id="search-input" class="search-input focusable" placeholder="Search for anime...">
-                        <button id="search-btn" class="search-btn focusable">Search</button>
+            <section id="search-screen" class="screen p-8">
+                <div class="max-w-4xl mx-auto">
+                    <h2 class="text-4xl font-bold mb-8 text-white">Search Anime</h2>
+                    <div class="flex gap-4 mb-8">
+                        <input type="text" id="search-input" class="webos-input flex-1 focusable" placeholder="Search for anime...">
+                        <button id="search-btn" class="webos-button-primary focusable">
+                            <i class="fas fa-search mr-2"></i>
+                            Search
+                        </button>
                     </div>
-                    <div id="search-results" class="search-results">
+                    <div id="search-results" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
                         <!-- Search results will be loaded here -->
                     </div>
                 </div>
             </section>
 
             <!-- Trending Screen -->
-            <section id="trending-screen" class="screen">
-                <h2 class="screen-title">Trending Anime</h2>
-                <div id="trending-list" class="anime-list">
+            <section id="trending-screen" class="screen p-8">
+                <h2 class="text-4xl font-bold mb-8 text-white">Trending Anime</h2>
+                <div id="trending-list" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
                     <!-- Trending anime list will be loaded here -->
                 </div>
             </section>
 
             <!-- Categories Screen -->
-            <section id="categories-screen" class="screen">
-                <h2 class="screen-title">Categories</h2>
-                <div id="categories-grid" class="categories-grid">
+            <section id="categories-screen" class="screen p-8">
+                <h2 class="text-4xl font-bold mb-8 text-white">Categories</h2>
+                <div id="categories-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                     <!-- Categories will be loaded here -->
                 </div>
             </section>
 
+            <!-- Settings Screen -->
+            <section id="settings-screen" class="screen">
+                <!-- Settings content will be dynamically generated -->
+            </section>
+
             <!-- Anime Detail Screen -->
-            <section id="anime-detail-screen" class="screen">
-                <div id="anime-detail-content" class="anime-detail-content">
-                    <div class="anime-detail-hero">
-                        <div class="anime-poster">
-                            <img id="anime-detail-poster" src="" alt="Anime Poster">
+            <section id="anime-detail-screen" class="screen p-8">
+                <div id="anime-detail-content" class="max-w-6xl mx-auto">
+                    <div class="flex gap-8 mb-12">
+                        <div class="flex-shrink-0">
+                            <img id="anime-detail-poster" src="" alt="Anime Poster" class="w-80 h-96 object-cover rounded-xl">
                         </div>
-                        <div class="anime-info">
-                            <h1 id="anime-detail-title">Anime Title</h1>
-                            <p id="anime-detail-description">Anime description...</p>
-                            <div class="anime-stats">
-                                <span id="anime-detail-rating" class="stat">Rating: N/A</span>
-                                <span id="anime-detail-episodes" class="stat">Episodes: N/A</span>
-                                <span id="anime-detail-status" class="stat">Status: N/A</span>
+                        <div class="flex-1">
+                            <h1 id="anime-detail-title" class="text-5xl font-bold mb-4 text-white">Anime Title</h1>
+                            <p id="anime-detail-description" class="text-xl text-gray-300 mb-6">Anime description...</p>
+                            <div class="flex gap-6 mb-8 text-lg">
+                                <span id="anime-detail-rating" class="text-tatakai-orange">Rating: N/A</span>
+                                <span id="anime-detail-episodes" class="text-gray-400">Episodes: N/A</span>
+                                <span id="anime-detail-status" class="text-gray-400">Status: N/A</span>
                             </div>
-                            <div class="anime-actions">
-                                <button id="play-anime-btn" class="btn primary focusable">
-                                    ▶️ Watch Now
+                            <div class="flex gap-4">
+                                <button id="play-anime-btn" class="webos-button-primary focusable">
+                                    <i class="fas fa-play mr-2"></i>
+                                    Watch Now
                                 </button>
-                                <button id="add-to-list-btn" class="btn secondary focusable">
-                                    ➕ Add to List
+                                <button id="add-to-list-btn" class="webos-button-secondary focusable">
+                                    <i class="fas fa-plus mr-2"></i>
+                                    Add to List
                                 </button>
                             </div>
                         </div>
                     </div>
-                    <div class="anime-episodes-section">
-                        <h3>Episodes</h3>
-                        <div id="anime-episodes-list" class="episodes-list">
+                    <div class="mb-12">
+                        <h3 class="text-3xl font-bold mb-6 text-white">Episodes</h3>
+                        <div id="anime-episodes-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <!-- Episodes will be loaded here -->
                         </div>
                     </div>
-                    <div class="anime-recommendations">
-                        <h3>Recommended</h3>
-                        <div id="recommended-anime-list" class="anime-grid">
+                    <div>
+                        <h3 class="text-3xl font-bold mb-6 text-white">Recommended</h3>
+                        <div id="recommended-anime-list" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
                             <!-- Recommended anime will be loaded here -->
                         </div>
                     </div>
@@ -146,28 +195,34 @@
 
             <!-- Video Player Screen -->
             <section id="video-player-screen" class="screen">
-                <div class="video-container">
-                    <video id="video-player" class="video-player" controls>
+                <div class="fixed inset-0 bg-black">
+                    <video id="video-player" class="w-full h-full" controls>
                         <p>Your browser doesn't support HTML5 video.</p>
                     </video>
-                    <div class="video-controls-overlay">
-                        <div class="video-info">
-                            <h3 id="video-title">Episode Title</h3>
-                            <p id="video-description">Episode description...</p>
-                        </div>
-                        <div class="episode-controls">
-                            <button id="prev-episode-btn" class="btn secondary focusable">
-                                ⏮️ Previous
-                            </button>
-                            <button id="next-episode-btn" class="btn secondary focusable">
-                                ⏭️ Next
-                            </button>
-                            <button id="episodes-list-btn" class="btn secondary focusable">
-                                📋 Episodes
-                            </button>
-                            <button id="back-to-anime-btn" class="btn secondary focusable">
-                                ⬅️ Back to Anime
-                            </button>
+                    <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent">
+                        <div class="absolute bottom-0 left-0 right-0 p-8">
+                            <div class="max-w-4xl mx-auto">
+                                <h3 id="video-title" class="text-3xl font-bold mb-2 text-white">Episode Title</h3>
+                                <p id="video-description" class="text-gray-300 mb-6">Episode description...</p>
+                                <div class="flex gap-4">
+                                    <button id="prev-episode-btn" class="webos-button-secondary focusable">
+                                        <i class="fas fa-backward mr-2"></i>
+                                        Previous
+                                    </button>
+                                    <button id="next-episode-btn" class="webos-button-secondary focusable">
+                                        <i class="fas fa-forward mr-2"></i>
+                                        Next
+                                    </button>
+                                    <button id="episodes-list-btn" class="webos-button-secondary focusable">
+                                        <i class="fas fa-list mr-2"></i>
+                                        Episodes
+                                    </button>
+                                    <button id="back-to-anime-btn" class="webos-button-secondary focusable">
+                                        <i class="fas fa-arrow-left mr-2"></i>
+                                        Back to Anime
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -175,10 +230,10 @@
         </main>
 
         <!-- Remote Control Instructions -->
-        <div id="help-overlay" class="help-overlay hidden">
-            <div class="help-content">
-                <h3>Remote Control Guide</h3>
-                <ul>
+        <div id="help-overlay" class="help-overlay hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+            <div class="bg-tatakai-grey p-8 rounded-xl max-w-md">
+                <h3 class="text-2xl font-bold mb-6 text-white">Remote Control Guide</h3>
+                <ul class="space-y-3 text-gray-300">
                     <li><strong>Arrow Keys:</strong> Navigate</li>
                     <li><strong>OK/Enter:</strong> Select</li>
                     <li><strong>Back:</strong> Go back</li>
@@ -186,17 +241,9 @@
                     <li><strong>Red Button:</strong> Search</li>
                     <li><strong>Blue Button:</strong> Categories</li>
                 </ul>
-                <p>Press Back to close this help</p>
+                <p class="mt-6 text-center text-gray-400">Press Back to close this help</p>
             </div>
         </div>
     </div>
-
-    <!-- Scripts -->
-    <script src="js/webos-api.js"></script>
-    <script src="js/api-client.js"></script>
-    <script src="js/navigation.js"></script>
-    <script src="js/ui-manager.js"></script>
-    <script src="js/video-player.js"></script>
-    <script src="js/app.js"></script>
 </body>
 </html>

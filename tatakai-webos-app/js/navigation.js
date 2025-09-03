@@ -144,17 +144,20 @@ class NavigationManager {
      * Update list of focusable elements
      */
     updateFocusableElements() {
+        this.focusableElements = [];
+        
+        // Always include sidebar navigation items if visible
+        const sidebarNav = document.querySelector('.sidebar-nav:not(.hidden)');
+        if (sidebarNav) {
+            const navItems = Array.from(sidebarNav.querySelectorAll('.focusable:not([disabled])'));
+            this.focusableElements = [...this.focusableElements, ...navItems];
+        }
+        
         // Get all focusable elements in the current visible screen
         const currentScreenEl = document.querySelector('.screen.active');
-        if (!currentScreenEl) return;
-        
-        this.focusableElements = Array.from(currentScreenEl.querySelectorAll('.focusable:not([disabled]):not(.hidden)'));
-        
-        // Add navigation menu items if visible
-        const navMenu = document.querySelector('.main-nav:not(.hidden)');
-        if (navMenu) {
-            const navItems = Array.from(navMenu.querySelectorAll('.focusable:not([disabled])'));
-            this.focusableElements = [...navItems, ...this.focusableElements];
+        if (currentScreenEl) {
+            const screenItems = Array.from(currentScreenEl.querySelectorAll('.focusable:not([disabled]):not(.hidden)'));
+            this.focusableElements = [...this.focusableElements, ...screenItems];
         }
         
         console.log('Updated focusable elements:', this.focusableElements.length);
@@ -197,6 +200,19 @@ class NavigationManager {
      * Scroll element into view if needed
      */
     scrollIntoView(element) {
+        // Check if element is in sidebar navigation
+        const sidebarNav = document.querySelector('.sidebar-nav');
+        if (sidebarNav && sidebarNav.contains(element)) {
+            // For sidebar elements, just ensure they're visible
+            element.scrollIntoView({
+                behavior: 'smooth',
+                block: 'nearest',
+                inline: 'nearest'
+            });
+            return;
+        }
+        
+        // For main content elements
         const rect = element.getBoundingClientRect();
         const containerRect = document.querySelector('.main-content').getBoundingClientRect();
         
@@ -432,10 +448,10 @@ class NavigationManager {
     }
 
     /**
-     * Show settings (placeholder)
+     * Show settings screen
      */
     showSettings() {
-        WebOSAPI.showToast('Settings feature coming soon!');
+        this.changeScreen('settings');
     }
 
     /**
