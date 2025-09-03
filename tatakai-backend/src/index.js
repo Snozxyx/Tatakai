@@ -12,6 +12,8 @@ const userRoutes = require('./routes/user');
 const animeRoutes = require('./routes/anime');
 const watchHistoryRoutes = require('./routes/watchHistory');
 const favoritesRoutes = require('./routes/favorites');
+const settingsRoutes = require('./routes/settings');
+const analyticsRoutes = require('./routes/analytics');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -73,6 +75,8 @@ app.use('/api/user', userRoutes);
 app.use('/api/anime', animeRoutes);
 app.use('/api/watch-history', watchHistoryRoutes);
 app.use('/api/favorites', favoritesRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

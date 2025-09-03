@@ -65,6 +65,14 @@
                 </li>
             </ul>
             <div class="nav-bottom">
+                <div class="nav-item focusable" data-screen="settings" role="menuitem">
+                    <div class="nav-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.82,11.69,4.82,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
+                        </svg>
+                    </div>
+                    <span class="nav-label">Settings</span>
+                </div>
                 <div class="nav-item focusable profile-item" role="menuitem">
                     <div class="nav-icon">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
@@ -163,6 +171,178 @@
                 <h2 class="screen-title">Categories</h2>
                 <div id="categories-grid" class="categories-grid">
                     <!-- Categories will be loaded here -->
+                </div>
+            </section>
+
+            <!-- Settings Screen -->
+            <section id="settings-screen" class="screen">
+                <div class="settings-container">
+                    <h2 class="screen-title">Settings</h2>
+                    <div class="settings-content">
+                        <div class="settings-sections">
+                            <div class="settings-section">
+                                <h3 class="settings-section-title">Playback</h3>
+                                <div class="settings-options">
+                                    <div class="setting-item focusable">
+                                        <div class="setting-info">
+                                            <span class="setting-label">Auto-skip Intros</span>
+                                            <span class="setting-description">Automatically skip anime opening sequences</span>
+                                        </div>
+                                        <div class="setting-control">
+                                            <div class="toggle-switch" data-setting="auto-skip-intros">
+                                                <div class="toggle-slider"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="setting-item focusable">
+                                        <div class="setting-info">
+                                            <span class="setting-label">Auto-skip Outros</span>
+                                            <span class="setting-description">Automatically skip anime ending sequences</span>
+                                        </div>
+                                        <div class="setting-control">
+                                            <div class="toggle-switch" data-setting="auto-skip-outros">
+                                                <div class="toggle-slider"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="setting-item focusable">
+                                        <div class="setting-info">
+                                            <span class="setting-label">Auto-play Next Episode</span>
+                                            <span class="setting-description">Automatically play the next episode</span>
+                                        </div>
+                                        <div class="setting-control">
+                                            <div class="toggle-switch active" data-setting="auto-play-next">
+                                                <div class="toggle-slider"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="setting-item focusable">
+                                        <div class="setting-info">
+                                            <span class="setting-label">Video Quality</span>
+                                            <span class="setting-description">Default video playback quality</span>
+                                        </div>
+                                        <div class="setting-control">
+                                            <select class="setting-select" data-setting="video-quality">
+                                                <option value="auto">Auto</option>
+                                                <option value="1080p">1080p</option>
+                                                <option value="720p">720p</option>
+                                                <option value="480p">480p</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="settings-section">
+                                <h3 class="settings-section-title">Display</h3>
+                                <div class="settings-options">
+                                    <div class="setting-item focusable">
+                                        <div class="setting-info">
+                                            <span class="setting-label">Theme</span>
+                                            <span class="setting-description">Choose app theme</span>
+                                        </div>
+                                        <div class="setting-control">
+                                            <select class="setting-select" data-setting="theme">
+                                                <option value="dark">Dark</option>
+                                                <option value="light">Light</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="setting-item focusable">
+                                        <div class="setting-info">
+                                            <span class="setting-label">Language</span>
+                                            <span class="setting-description">App display language</span>
+                                        </div>
+                                        <div class="setting-control">
+                                            <select class="setting-select" data-setting="language">
+                                                <option value="en">English</option>
+                                                <option value="ja">Japanese</option>
+                                                <option value="es">Spanish</option>
+                                                <option value="fr">French</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="setting-item focusable">
+                                        <div class="setting-info">
+                                            <span class="setting-label">Subtitle Language</span>
+                                            <span class="setting-description">Default subtitle language</span>
+                                        </div>
+                                        <div class="setting-control">
+                                            <select class="setting-select" data-setting="subtitle-language">
+                                                <option value="en">English</option>
+                                                <option value="ja">Japanese</option>
+                                                <option value="es">Spanish</option>
+                                                <option value="fr">French</option>
+                                                <option value="off">Off</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="settings-section">
+                                <h3 class="settings-section-title">Account</h3>
+                                <div class="settings-options">
+                                    <div class="setting-item focusable">
+                                        <div class="setting-info">
+                                            <span class="setting-label">Sync Watch History</span>
+                                            <span class="setting-description">Sync progress across devices</span>
+                                        </div>
+                                        <div class="setting-control">
+                                            <div class="toggle-switch active" data-setting="sync-history">
+                                                <div class="toggle-slider"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="setting-item focusable">
+                                        <div class="setting-info">
+                                            <span class="setting-label">Parental Controls</span>
+                                            <span class="setting-description">Manage content restrictions</span>
+                                        </div>
+                                        <div class="setting-control">
+                                            <button class="setting-button">Configure</button>
+                                        </div>
+                                    </div>
+                                    <div class="setting-item focusable">
+                                        <div class="setting-info">
+                                            <span class="setting-label">Privacy Settings</span>
+                                            <span class="setting-description">Manage data and privacy</span>
+                                        </div>
+                                        <div class="setting-control">
+                                            <button class="setting-button">Manage</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="settings-section">
+                                <h3 class="settings-section-title">About</h3>
+                                <div class="settings-options">
+                                    <div class="setting-item">
+                                        <div class="setting-info">
+                                            <span class="setting-label">App Version</span>
+                                            <span class="setting-description">1.0.0</span>
+                                        </div>
+                                    </div>
+                                    <div class="setting-item">
+                                        <div class="setting-info">
+                                            <span class="setting-label">Platform</span>
+                                            <span class="setting-description">LG webOS</span>
+                                        </div>
+                                    </div>
+                                    <div class="setting-item focusable">
+                                        <div class="setting-info">
+                                            <span class="setting-label">Clear Cache</span>
+                                            <span class="setting-description">Clear app cache and data</span>
+                                        </div>
+                                        <div class="setting-control">
+                                            <button class="setting-button">Clear</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
 

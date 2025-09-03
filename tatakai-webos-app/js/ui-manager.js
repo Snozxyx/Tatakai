@@ -862,6 +862,9 @@ class UIManager {
             case 'favorites':
                 this.loadFavoritesData();
                 break;
+            case 'settings':
+                this.loadSettingsData();
+                break;
         }
     }
 
@@ -887,6 +890,275 @@ class UIManager {
                 </section>
             `;
             mainContent.insertAdjacentHTML('beforeend', favoritesScreenHTML);
+        }
+    }
+
+    /**
+     * Load settings data and initialize toggle controls
+     */
+    async loadSettingsData() {
+        console.log('Loading settings screen');
+        
+        let settings = {};
+        
+        // Try to get settings from backend if authenticated
+        if (window.BackendAPIClient && BackendAPIClient.isAuthenticated()) {
+            try {
+                const backendSettings = await BackendAPIClient.getSettings();
+                if (backendSettings.success) {
+                    // Convert backend settings format to local format
+                    const data = backendSettings.data.settings;
+                    settings = {
+                        'auto-skip-intros': data.playback?.autoSkipIntros ?? true,
+                        'auto-skip-outros': data.playback?.autoSkipOutros ?? true,
+                        'auto-play-next': data.playback?.autoPlayNext ?? true,
+                        'video-quality': data.playback?.videoQuality ?? 'auto',
+                        'theme': data.display?.theme ?? 'dark',
+                        'language': data.display?.language ?? 'en',
+                        'subtitle-language': data.playback?.subtitleLanguage ?? 'en',
+                        'sync-history': data.account?.syncHistory ?? true
+                    };
+                }
+            } catch (error) {
+                console.warn('Failed to load backend settings, using local storage:', error);
+            }
+        }
+        
+        // Fallback to localStorage if backend not available or no settings
+        if (Object.keys(settings).length === 0) {
+            settings = {
+                'auto-skip-intros': localStorage.getItem('auto-skip-intros') === 'true',
+                'auto-skip-outros': localStorage.getItem('auto-skip-outros') === 'true',
+                'auto-play-next': localStorage.getItem('auto-play-next') !== 'false', // Default true
+                'video-quality': localStorage.getItem('video-quality') || 'auto',
+                'theme': localStorage.getItem('theme') || 'dark',
+                'language': localStorage.getItem('language') || 'en',
+                'subtitle-language': localStorage.getItem('subtitle-language') || 'en',
+                'sync-history': localStorage.getItem('sync-history') !== 'false' // Default true
+            };
+        }
+
+        // Update toggle switches
+        Object.keys(settings).forEach(settingKey => {
+            const toggleElement = document.querySelector(`[data-setting="${settingKey}"]`);
+            if (toggleElement && toggleElement.classList.contains('toggle-switch')) {
+                if (settings[settingKey]) {
+                    toggleElement.classList.add('active');
+                } else {
+                    toggleElement.classList.remove('active');
+                }
+            } else if (toggleElement && toggleElement.tagName === 'SELECT') {
+                toggleElement.value = settings[settingKey];
+            }
+        });
+
+        // Add event listeners for settings controls
+        this.initializeSettingsControls();
+    }
+
+    /**
+     * Initialize settings controls and event listeners
+     */
+    initializeSettingsControls() {
+        // Toggle switches
+        document.querySelectorAll('.toggle-switch').forEach(toggle => {
+            toggle.addEventListener('click', (e) => {
+                const settingKey = e.currentTarget.dataset.setting;
+                const isActive = e.currentTarget.classList.contains('active');
+                
+                // Toggle the switch
+                if (isActive) {
+                    e.currentTarget.classList.remove('active');
+                    localStorage.setItem(settingKey, 'false');
+                } else {
+                    e.currentTarget.classList.add('active');
+                    localStorage.setItem(settingKey, 'true');
+                }
+                
+                this.applySettingChange(settingKey, !isActive);
+            });
+        });
+
+        // Select dropdowns
+        document.querySelectorAll('.setting-select').forEach(select => {
+            select.addEventListener('change', (e) => {
+                const settingKey = e.currentTarget.dataset.setting;
+                const value = e.currentTarget.value;
+                
+                localStorage.setItem(settingKey, value);
+                this.applySettingChange(settingKey, value);
+            });
+        });
+
+        // Setting buttons
+        document.querySelectorAll('.setting-button').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const settingItem = e.currentTarget.closest('.setting-item');
+                const settingLabel = settingItem ? settingItem.querySelector('.setting-label').textContent : '';
+                
+                this.handleSettingButtonClick(settingLabel, button);
+            });
+        });
+    }
+
+    /**
+     * Apply setting changes
+     */
+    async applySettingChange(settingKey, value) {
+        console.log('Setting changed:', settingKey, value);
+        
+        // Save to localStorage first for immediate feedback
+        localStorage.setItem(settingKey, value.toString());
+        
+        // Sync with backend if authenticated
+        if (window.BackendAPIClient && BackendAPIClient.isAuthenticated()) {
+            try {
+                let backendUpdate = {};
+                
+                // Map local setting keys to backend format and group by category
+                switch (settingKey) {
+                    case 'auto-skip-intros':
+                        backendUpdate = { autoSkipIntros: value };
+                        await BackendAPIClient.updatePlaybackSettings(backendUpdate);
+                        break;
+                    case 'auto-skip-outros':
+                        backendUpdate = { autoSkipOutros: value };
+                        await BackendAPIClient.updatePlaybackSettings(backendUpdate);
+                        break;
+                    case 'auto-play-next':
+                        backendUpdate = { autoPlayNext: value };
+                        await BackendAPIClient.updatePlaybackSettings(backendUpdate);
+                        break;
+                    case 'video-quality':
+                        backendUpdate = { videoQuality: value };
+                        await BackendAPIClient.updatePlaybackSettings(backendUpdate);
+                        break;
+                    case 'subtitle-language':
+                        backendUpdate = { subtitleLanguage: value };
+                        await BackendAPIClient.updatePlaybackSettings(backendUpdate);
+                        break;
+                    case 'theme':
+                        backendUpdate = { theme: value };
+                        await BackendAPIClient.updateDisplaySettings(backendUpdate);
+                        break;
+                    case 'language':
+                        backendUpdate = { language: value };
+                        await BackendAPIClient.updateDisplaySettings(backendUpdate);
+                        break;
+                    case 'sync-history':
+                        backendUpdate = { syncHistory: value };
+                        await BackendAPIClient.updateAccountSettings(backendUpdate);
+                        break;
+                }
+                
+                console.log('Setting synced with backend');
+            } catch (error) {
+                console.warn('Failed to sync setting with backend:', error);
+                // Continue anyway, setting is saved locally
+            }
+        }
+        
+        // Apply immediate UI changes
+        switch (settingKey) {
+            case 'theme':
+                this.applyTheme(value);
+                break;
+            case 'language':
+                this.applyLanguage(value);
+                break;
+            case 'video-quality':
+                this.applyVideoQuality(value);
+                break;
+            default:
+                // For other settings, just show confirmation
+                WebOSAPI.showToast(`${settingKey.replace('-', ' ')} updated`);
+                break;
+        }
+    }
+
+    /**
+     * Apply theme setting
+     */
+    applyTheme(theme) {
+        if (theme === 'light') {
+            document.body.classList.add('light-theme');
+            WebOSAPI.showToast('Light theme applied');
+        } else {
+            document.body.classList.remove('light-theme');
+            WebOSAPI.showToast('Dark theme applied');
+        }
+    }
+
+    /**
+     * Apply language setting
+     */
+    applyLanguage(language) {
+        // This would typically reload the interface with new language
+        WebOSAPI.showToast(`Language set to ${language}`);
+    }
+
+    /**
+     * Apply video quality setting
+     */
+    applyVideoQuality(quality) {
+        WebOSAPI.showToast(`Video quality set to ${quality}`);
+    }
+
+    /**
+     * Handle setting button clicks
+     */
+    handleSettingButtonClick(settingLabel, button) {
+        switch (settingLabel) {
+            case 'Parental Controls':
+                WebOSAPI.showToast('Parental Controls - Feature coming soon');
+                break;
+            case 'Privacy Settings':
+                WebOSAPI.showToast('Privacy Settings - Feature coming soon');
+                break;
+            case 'Clear Cache':
+                this.clearAppCache();
+                break;
+            default:
+                WebOSAPI.showToast(`${settingLabel} - Feature coming soon`);
+                break;
+        }
+    }
+
+    /**
+     * Clear application cache
+     */
+    async clearAppCache() {
+        try {
+            // Clear localStorage
+            localStorage.clear();
+            
+            // Clear sessionStorage
+            sessionStorage.clear();
+            
+            // Clear backend cache if authenticated
+            if (window.BackendAPIClient && BackendAPIClient.isAuthenticated()) {
+                try {
+                    const result = await BackendAPIClient.clearCache();
+                    if (result.success) {
+                        WebOSAPI.showToast('All cache cleared successfully');
+                    } else {
+                        WebOSAPI.showToast('Local cache cleared, backend cache failed');
+                    }
+                } catch (error) {
+                    console.warn('Failed to clear backend cache:', error);
+                    WebOSAPI.showToast('Local cache cleared successfully');
+                }
+            } else {
+                WebOSAPI.showToast('Local cache cleared successfully');
+            }
+            
+            // Reload settings with defaults
+            setTimeout(() => {
+                this.loadSettingsData();
+            }, 1000);
+        } catch (error) {
+            console.error('Error clearing cache:', error);
+            WebOSAPI.showToast('Failed to clear cache');
         }
     }
 

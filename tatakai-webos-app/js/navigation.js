@@ -448,10 +448,10 @@ class NavigationManager {
     }
 
     /**
-     * Show settings (placeholder)
+     * Show settings screen
      */
     showSettings() {
-        WebOSAPI.showToast('Settings feature coming soon!');
+        this.changeScreen('settings');
     }
 
     /**

@@ -57,7 +57,77 @@ const userSchema = new mongoose.Schema({
       autoSkip: {
         type: Boolean,
         default: true
+      },
+      // Enhanced playback settings
+      autoSkipIntros: {
+        type: Boolean,
+        default: true
+      },
+      autoSkipOutros: {
+        type: Boolean,
+        default: true
+      },
+      autoPlayNext: {
+        type: Boolean,
+        default: true
+      },
+      videoQuality: {
+        type: String,
+        enum: ['auto', '1080p', '720p', '480p'],
+        default: 'auto'
+      },
+      subtitleLanguage: {
+        type: String,
+        enum: ['en', 'ja', 'es', 'fr', 'de', 'off'],
+        default: 'en'
+      },
+      // Account settings
+      syncHistory: {
+        type: Boolean,
+        default: true
+      },
+      emailNotifications: {
+        type: Boolean,
+        default: true
+      },
+      parentalControls: {
+        type: Boolean,
+        default: false
+      },
+      // Privacy settings
+      profileVisibility: {
+        type: String,
+        enum: ['public', 'private'],
+        default: 'private'
+      },
+      activitySharing: {
+        type: Boolean,
+        default: false
+      },
+      analyticsOptOut: {
+        type: Boolean,
+        default: false
       }
+    },
+    cache: {
+      lastClearDate: {
+        type: Date,
+        default: null
+      },
+      searchHistory: [{
+        query: String,
+        timestamp: {
+          type: Date,
+          default: Date.now
+        }
+      }],
+      recentlyViewed: [{
+        animeId: String,
+        timestamp: {
+          type: Date,
+          default: Date.now
+        }
+      }]
     }
   },
   isEmailVerified: {

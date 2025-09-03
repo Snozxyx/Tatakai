@@ -218,6 +218,91 @@ class BackendAPIClient {
     }
 
     /**
+     * Settings methods
+     */
+    static async getSettings() {
+        try {
+            return await BackendAPIClient.makeRequest('/settings');
+        } catch (error) {
+            console.warn('Failed to get settings:', error);
+            return { success: false, message: 'Settings not available' };
+        }
+    }
+
+    static async updatePlaybackSettings(settings) {
+        try {
+            return await BackendAPIClient.makeRequest('/settings/playback', {
+                method: 'PUT',
+                headers: BackendAPIClient.getAuthHeaders(),
+                body: JSON.stringify(settings)
+            });
+        } catch (error) {
+            console.error('Failed to update playback settings:', error);
+            return { success: false, message: 'Failed to update settings' };
+        }
+    }
+
+    static async updateDisplaySettings(settings) {
+        try {
+            return await BackendAPIClient.makeRequest('/settings/display', {
+                method: 'PUT',
+                headers: BackendAPIClient.getAuthHeaders(),
+                body: JSON.stringify(settings)
+            });
+        } catch (error) {
+            console.error('Failed to update display settings:', error);
+            return { success: false, message: 'Failed to update settings' };
+        }
+    }
+
+    static async updateAccountSettings(settings) {
+        try {
+            return await BackendAPIClient.makeRequest('/settings/account', {
+                method: 'PUT',
+                headers: BackendAPIClient.getAuthHeaders(),
+                body: JSON.stringify(settings)
+            });
+        } catch (error) {
+            console.error('Failed to update account settings:', error);
+            return { success: false, message: 'Failed to update settings' };
+        }
+    }
+
+    static async updatePrivacySettings(settings) {
+        try {
+            return await BackendAPIClient.makeRequest('/settings/privacy', {
+                method: 'PUT',
+                headers: BackendAPIClient.getAuthHeaders(),
+                body: JSON.stringify(settings)
+            });
+        } catch (error) {
+            console.error('Failed to update privacy settings:', error);
+            return { success: false, message: 'Failed to update settings' };
+        }
+    }
+
+    static async clearCache() {
+        try {
+            return await BackendAPIClient.makeRequest('/settings/clear-cache', {
+                method: 'POST',
+                headers: BackendAPIClient.getAuthHeaders()
+            });
+        } catch (error) {
+            console.error('Failed to clear cache:', error);
+            return { success: false, message: 'Failed to clear cache' };
+        }
+    }
+
+    static async exportUserData() {
+        try {
+            return await BackendAPIClient.makeRequest('/settings/export');
+        } catch (error) {
+            console.error('Failed to export user data:', error);
+            return { success: false, message: 'Failed to export data' };
+        }
+    }
+
+    /**
      * Utility methods
      */
     static isAuthenticated() {

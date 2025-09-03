@@ -456,3 +456,214 @@ body {
         font-size: 1.5rem;
     }
 }
+
+/* Settings Screen Styles */
+.settings-container {
+    padding: 60px 80px;
+    max-width: 1200px;
+}
+
+.settings-content {
+    margin-top: 40px;
+}
+
+.settings-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 60px;
+}
+
+.settings-section {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 40px;
+}
+
+.settings-section-title {
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: #ffffff;
+    margin-bottom: 32px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.settings-options {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.setting-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.setting-item.focusable:hover,
+.setting-item.focusable.focused {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.setting-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.setting-label {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: #ffffff;
+}
+
+.setting-description {
+    font-size: 0.95rem;
+    color: #8e8e93;
+    line-height: 1.4;
+}
+
+.setting-control {
+    margin-left: 32px;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+    position: relative;
+    width: 60px;
+    height: 32px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.toggle-switch.active {
+    background: #F3A712;
+}
+
+.toggle-slider {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 24px;
+    height: 24px;
+    background: #ffffff;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.toggle-switch.active .toggle-slider {
+    transform: translateX(28px);
+}
+
+/* Setting Select */
+.setting-select {
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: 1rem;
+    min-width: 140px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.setting-select:hover,
+.setting-select:focus {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.4);
+    outline: none;
+}
+
+.setting-select option {
+    background: #1a1a2e;
+    color: #ffffff;
+}
+
+/* Setting Button */
+.setting-button {
+    padding: 12px 24px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.setting-button:hover,
+.setting-button:focus {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: scale(1.05);
+    outline: none;
+}
+
+/* Enhanced navbar spacing for HBO Max style */
+.nav-item {
+    margin: 0 20px 12px;
+    padding: 18px 24px;
+    border-radius: 10px;
+}
+
+.nav-icon {
+    width: 28px;
+    height: 28px;
+    margin-right: 16px;
+}
+
+.nav-icon svg {
+    width: 24px;
+    height: 24px;
+}
+
+.nav-label {
+    font-size: 1.05rem;
+    font-weight: 500;
+    letter-spacing: 0.2px;
+}
+
+.nav-bottom .nav-item {
+    margin: 8px 20px;
+}
+
+/* Screen title improvements */
+.screen-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 40px;
+    letter-spacing: -0.5px;
+}
+
+/* Responsive settings for smaller screens */
+@media (max-width: 1366px) {
+    .settings-container {
+        padding: 40px 60px;
+    }
+    
+    .settings-section {
+        padding: 30px;
+    }
+    
+    .settings-section-title {
+        font-size: 1.5rem;
+    }
+    
+    .setting-label {
+        font-size: 1rem;
+    }
+}
+}
