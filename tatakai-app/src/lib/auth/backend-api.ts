@@ -1,5 +1,4 @@
 // Backend API client for authentication and user data
-const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
 
 interface User {
   id: string;
@@ -114,7 +113,7 @@ class BackendAPI {
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api${endpoint}`, {
+      const response = await fetch(`/api/backend?endpoint=${encodeURIComponent(endpoint)}`, {
         headers: this.getAuthHeaders(),
         ...options,
       });

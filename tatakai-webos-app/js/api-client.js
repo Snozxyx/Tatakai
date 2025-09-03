@@ -13,13 +13,6 @@ class TatakaiAnimeAPI {
         try {
             let url = `${this.BASE_URL}${endpoint}`;
             
-            // In development/browser environment, use local proxy for CORS
-            // In actual webOS environment, direct calls should work fine
-            if (typeof window !== 'undefined' && 
-                (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-                url = `${this.LOCAL_PROXY}${endpoint}`;
-            }
-            
             console.log('Fetching:', url);
             
             const response = await fetch(url, {
@@ -49,6 +42,12 @@ class TatakaiAnimeAPI {
             return transformedData;
         } catch (error) {
             console.error('API Error:', error);
+            
+            // Return fallback data for demo purposes
+            if (endpoint === '/home') {
+                return this.getFallbackHomeData();
+            }
+            
             throw new Error(`Failed to fetch data: ${error.message}`);
         }
     }
@@ -114,6 +113,72 @@ class TatakaiAnimeAPI {
      */
     static async getAnimeByGenre(genre, page = 1) {
         return await this.fetchAPI(`/genre/${genre}?page=${page}`);
+    }
+
+    /**
+     * Get fallback home data for demo purposes
+     */
+    static getFallbackHomeData() {
+        return {
+            success: true,
+            data: {
+                genres: ['Action', 'Adventure', 'Comedy', 'Drama', 'Fantasy', 'Romance', 'Sci-Fi'],
+                latestEpisodeAnimes: [
+                    {
+                        id: 'demon-slayer-kimetsu-no-yaiba-swordsmith-village-arc-18056',
+                        name: 'Demon Slayer: Swordsmith Village Arc',
+                        poster: 'https://cdn.noitatnemucod.net/thumbnail/300x400/100/bcd84731a3eda4f4a306250769675065.jpg',
+                        type: 'TV',
+                        episodes: { sub: 11, dub: 11 }
+                    },
+                    {
+                        id: 'jujutsu-kaisen-2nd-season-18413',
+                        name: 'Jujutsu Kaisen 2nd Season',
+                        poster: 'https://cdn.noitatnemucod.net/thumbnail/300x400/100/bcd84731a3eda4f4a306250769675066.jpg',
+                        type: 'TV',
+                        episodes: { sub: 23, dub: 23 }
+                    }
+                ],
+                spotlightAnimes: [
+                    {
+                        id: 'one-piece-100',
+                        name: 'One Piece',
+                        jname: 'ワンピース',
+                        poster: 'https://cdn.noitatnemucod.net/thumbnail/300x400/100/bcd84731a3eda4f4a306250769675067.jpg',
+                        description: 'Follow Monkey D. Luffy, a young pirate who gains rubber powers after eating a Devil Fruit.',
+                        rank: 1,
+                        otherInfo: ['TV', 'Ongoing', '1999']
+                    }
+                ],
+                top10Animes: {
+                    today: [],
+                    week: [],
+                    month: []
+                },
+                topAiringAnimes: [],
+                topUpcomingAnimes: [],
+                trendingAnimes: [
+                    {
+                        id: 'attack-on-titan-final-season-the-final-chapters-18329',
+                        name: 'Attack on Titan: Final Season - The Final Chapters',
+                        poster: 'https://cdn.noitatnemucod.net/thumbnail/300x400/100/bcd84731a3eda4f4a306250769675068.jpg',
+                        type: 'Special',
+                        episodes: { sub: 2, dub: 2 }
+                    }
+                ],
+                mostPopularAnimes: [
+                    {
+                        id: 'naruto-shippuden-355',
+                        name: 'Naruto: Shippuden',
+                        poster: 'https://cdn.noitatnemucod.net/thumbnail/300x400/100/bcd84731a3eda4f4a306250769675069.jpg',
+                        type: 'TV',
+                        episodes: { sub: 500, dub: 500 }
+                    }
+                ],
+                mostFavoriteAnimes: [],
+                latestCompletedAnimes: []
+            }
+        };
     }
 }
 

@@ -127,7 +127,17 @@ body {
     font-size: 1.4rem;
     margin-right: 12px;
     width: 24px;
+    height: 24px;
     text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.nav-icon svg {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
 }
 
 .nav-label {
@@ -274,7 +284,9 @@ body {
 
 .play-icon,
 .info-icon {
-    font-size: 1.2rem;
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
 }
 
 /* Content Sections */

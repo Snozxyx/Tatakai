@@ -24,29 +24,53 @@
             </div>
             <ul class="nav-menu" role="menubar">
                 <li class="nav-item focusable active" data-screen="home" role="menuitem">
-                    <div class="nav-icon">🏠</div>
+                    <div class="nav-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+                        </svg>
+                    </div>
                     <span class="nav-label">Home</span>
                 </li>
                 <li class="nav-item focusable" data-screen="categories" role="menuitem">
-                    <div class="nav-icon">⚏</div>
+                    <div class="nav-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/>
+                        </svg>
+                    </div>
                     <span class="nav-label">Categories</span>
                 </li>
                 <li class="nav-item focusable" data-screen="search" role="menuitem">
-                    <div class="nav-icon">🔍</div>
+                    <div class="nav-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                        </svg>
+                    </div>
                     <span class="nav-label">Search</span>
                 </li>
                 <li class="nav-item focusable" data-screen="trending" role="menuitem">
-                    <div class="nav-icon">📺</div>
+                    <div class="nav-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M7.58 4.08L6.15 2.65C3.75 4.48 2.17 7.3 2.03 10.5h2c.15-2.65 1.51-4.97 3.55-6.42zm12.39 6.42h2c-.15-3.2-1.73-6.02-4.12-7.85l-1.42 1.43c2.02 1.45 3.39 3.77 3.54 6.42zM18 11c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2v-5z"/>
+                        </svg>
+                    </div>
                     <span class="nav-label">Trending</span>
                 </li>
                 <li class="nav-item focusable" data-screen="favorites" role="menuitem">
-                    <div class="nav-icon">💾</div>
+                    <div class="nav-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                        </svg>
+                    </div>
                     <span class="nav-label">My List</span>
                 </li>
             </ul>
             <div class="nav-bottom">
                 <div class="nav-item focusable profile-item" role="menuitem">
-                    <div class="nav-icon">👤</div>
+                    <div class="nav-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                        </svg>
+                    </div>
                     <span class="nav-label">Profile</span>
                 </div>
             </div>
@@ -65,11 +89,15 @@
                             <div class="hero-status">Now Streaming</div>
                             <div class="hero-actions">
                                 <button class="btn-play focusable">
-                                    <span class="play-icon">▶</span>
+                                    <svg class="play-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M8 5v14l11-7z"/>
+                                    </svg>
                                     Play Now
                                 </button>
                                 <button class="btn-info focusable">
-                                    <span class="info-icon">ℹ</span>
+                                    <svg class="info-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                                    </svg>
                                     More Info
                                 </button>
                             </div>
@@ -228,6 +256,7 @@
     <!-- Scripts -->
     <script src="js/webos-api.js"></script>
     <script src="js/api-client.js"></script>
+    <script src="js/backend-api-client.js"></script>
     <script src="js/aniskip-api.js"></script>
     <script src="js/navigation.js"></script>
     <script src="js/ui-manager.js"></script>
