@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, Volume2, VolumeX, Maximize, Settings, Subtitles, SkipForward } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Settings, Subtitles } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,7 +11,6 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import type Hls from 'hls.js';
-import AniSkipAPI, { type SkipTime, type SkipTimesResponse } from '@/lib/aniskip';
 
 interface VideoSource {
   url: string;
@@ -29,11 +28,9 @@ interface VideoSubtitle {
 interface VideoPlayerProps {
   sources: VideoSource[];
   subtitles?: VideoSubtitle[];
-  malId?: number;
-  episodeNumber?: number;
 }
 
-export default function VideoPlayer({ sources, subtitles, malId, episodeNumber }: VideoPlayerProps) {
+export default function VideoPlayer({ sources, subtitles }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -49,11 +46,6 @@ export default function VideoPlayer({ sources, subtitles, malId, episodeNumber }
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isVideoInitialized, setIsVideoInitialized] = useState(false);
   const [pendingPlay, setPendingPlay] = useState(false);
-
-  // Skip functionality state
-  const [skipTimes, setSkipTimes] = useState<SkipTime[]>([]);
-  const [activeSkip, setActiveSkip] = useState<SkipTime | null>(null);
-  const [showSkipButton, setShowSkipButton] = useState(false);
 
   // Debug subtitles
   console.log('VideoPlayer subtitles:', subtitles);
@@ -100,13 +92,6 @@ export default function VideoPlayer({ sources, subtitles, malId, episodeNumber }
 
     const handleTimeUpdate = () => {
       setCurrentTime(video.currentTime);
-      
-      // Check for active skip times
-      if (skipTimes.length > 0) {
-        const skip = AniSkipAPI.getActiveSkip(video.currentTime, skipTimes);
-        setActiveSkip(skip);
-        setShowSkipButton(!!skip);
-      }
     };
 
     const handlePlay = () => {
@@ -282,28 +267,6 @@ export default function VideoPlayer({ sources, subtitles, malId, episodeNumber }
     };
   }, [currentSource]);
 
-  // Fetch skip times when video metadata is available
-  useEffect(() => {
-    if (malId && episodeNumber && duration > 0) {
-      console.log('Fetching skip times for MAL ID:', malId, 'Episode:', episodeNumber, 'Duration:', duration);
-      
-      AniSkipAPI.getSkipTimes(malId, episodeNumber, Math.floor(duration))
-        .then((response: SkipTimesResponse) => {
-          if (response.found && response.results.length > 0) {
-            setSkipTimes(response.results);
-            console.log('Skip times loaded:', response.results);
-          } else {
-            setSkipTimes([]);
-            console.log('No skip times found');
-          }
-        })
-        .catch((error) => {
-          console.error('Failed to fetch skip times:', error);
-          setSkipTimes([]);
-        });
-    }
-  }, [malId, episodeNumber, duration]);
-
   const togglePlay = useCallback(async () => {
     const video = videoRef.current;
     if (!video || isLoading) return;
@@ -397,17 +360,6 @@ export default function VideoPlayer({ sources, subtitles, malId, episodeNumber }
 
   const handleMouseMove = () => {
     showControlsTemporarily();
-  };
-
-  const handleSkip = () => {
-    const video = videoRef.current;
-    if (!video || !activeSkip) return;
-    
-    video.currentTime = activeSkip.interval.endTime;
-    setShowSkipButton(false);
-    setActiveSkip(null);
-    
-    console.log(`Skipped ${AniSkipAPI.formatSkipType(activeSkip.skipType)} to ${activeSkip.interval.endTime}s`);
   };
 
   const handleVideoClick = () => {
@@ -552,24 +504,6 @@ export default function VideoPlayer({ sources, subtitles, malId, episodeNumber }
               className="text-white hover:text-rose-500 bg-black/30 hover:bg-black/50 rounded-full p-6 backdrop-blur-sm"
             >
               <Play className="w-16 h-16" />
-            </Button>
-          </div>
-        )}
-
-        {/* Skip button overlay */}
-        {showSkipButton && activeSkip && (
-          <div className="absolute top-6 right-6 pointer-events-auto">
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleSkip();
-              }}
-              className="bg-black/70 hover:bg-black/90 text-white border border-white/20 backdrop-blur-sm"
-            >
-              <SkipForward className="w-4 h-4 mr-2" />
-              Skip {AniSkipAPI.formatSkipType(activeSkip.skipType)}
             </Button>
           </div>
         )}

@@ -1,0 +1,183 @@
+@import '@fortawesome/fontawesome-free/css/all.min.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 262.1 83.3% 57.8%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 262.1 83.3% 57.8%;
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+  }
+}
+
+/* TV-specific optimizations */
+@layer components {
+  .tv-focus {
+    @apply ring-2 ring-tatakai-purple ring-offset-2 ring-offset-background;
+  }
+  
+  .tv-safe-area {
+    @apply mx-auto max-w-screen-xl px-8 py-4;
+  }
+  
+  .tv-text-scale {
+    @apply text-tv-base;
+  }
+  
+  .tv-heading {
+    @apply text-tv-2xl font-bold tracking-wide;
+  }
+  
+  .tv-sidebar {
+    @apply w-64 bg-tatakai-dark border-r border-border;
+  }
+  
+  .tv-content {
+    @apply flex-1 bg-background;
+  }
+}
+
+/* HBO Max inspired design tokens */
+:root {
+  --hbo-purple: #8B5CF6;
+  --hbo-orange: #F3A712;
+  --hbo-dark: #0F0F23;
+  --hbo-grey: #1A1A2E;
+  --hbo-radius: 0.75rem;
+}
+
+/* WebOS TV specific styles */
+.webos-app {
+  @apply min-h-screen bg-tatakai-dark text-white font-sans;
+  overflow: hidden;
+  user-select: none;
+}
+
+.webos-sidebar {
+  @apply fixed left-0 top-0 h-full z-50 tv-sidebar;
+  width: 280px;
+}
+
+.webos-main {
+  @apply tv-content;
+  margin-left: 280px;
+  min-height: 100vh;
+}
+
+.webos-nav-item {
+  @apply flex items-center gap-4 px-6 py-4 text-tv-base hover:bg-accent transition-colors cursor-pointer;
+}
+
+.webos-nav-item.active {
+  @apply bg-tatakai-purple text-white;
+}
+
+.webos-nav-item:focus {
+  @apply tv-focus;
+}
+
+.webos-button {
+  @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-medium transition-all duration-200;
+}
+
+.webos-button-primary {
+  @apply webos-button bg-tatakai-purple hover:bg-tatakai-purple/90 text-white;
+}
+
+.webos-button-secondary {
+  @apply webos-button bg-tatakai-grey hover:bg-tatakai-grey/80 text-white border border-border;
+}
+
+.webos-hero {
+  @apply relative h-96 bg-gradient-to-r from-tatakai-dark via-tatakai-grey to-tatakai-dark;
+}
+
+.webos-card {
+  @apply bg-card rounded-lg border border-border p-6 shadow-lg hover:shadow-xl transition-shadow;
+}
+
+.webos-input {
+  @apply w-full px-4 py-3 bg-input border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-tatakai-purple focus:border-transparent;
+}
+
+/* Custom Toggle Switch for webOS */
+.switch-container {
+  position: relative;
+  display: inline-block;
+  width: 60px;
+  height: 32px;
+}
+
+.switch-container input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch-label {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #374151;
+  border-radius: 16px;
+  transition: .4s;
+}
+
+.switch-label:before {
+  position: absolute;
+  content: "";
+  height: 24px;
+  width: 24px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  border-radius: 50%;
+  transition: .4s;
+}
+
+.switch-container input:checked + .switch-label {
+  background-color: var(--hbo-purple);
+}
+
+.switch-container input:focus + .switch-label {
+  box-shadow: 0 0 0 2px var(--hbo-purple);
+}
+
+.switch-container input:checked + .switch-label:before {
+  transform: translateX(28px);
+}
+
+.switch-slider {
+  display: none; /* Hide the original slider */
+}
