@@ -1,0 +1,92 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --safe-v: 4vh;
+  --safe-h: 6vw;
+}
+
+.px-safeH { 
+  padding-left: var(--safe-h); 
+  padding-right: var(--safe-h); 
+}
+
+.py-safeV { 
+  padding-top: var(--safe-v); 
+  padding-bottom: var(--safe-v); 
+}
+
+.py-safeV-2 { 
+  padding-top: calc(var(--safe-v) / 2); 
+  padding-bottom: calc(var(--safe-v) / 2); 
+}
+
+/* TV Safe Areas */
+body {
+  background: #111111;
+  color: #ffffff;
+  font-family: 'Inter', system-ui, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Focus management for TV remote */
+.focusable {
+  outline: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.focusable:focus,
+.focusable.focused {
+  transform: scale(1.08);
+  box-shadow: 0 0 0 6px rgba(138,43,226,0.4), 0 4px 20px rgba(138,43,226,0.3);
+  z-index: 10;
+}
+
+/* Ensure focusable elements are accessible */
+.focusable {
+  border-radius: 8px;
+}
+
+/* Smooth scrolling for navigation */
+* {
+  scroll-behavior: smooth;
+}
+
+/* Hide scrollbars but keep functionality */
+::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
+}
+
+/* Animation for content loading */
+@keyframes fadeIn {
+  from { 
+    opacity: 0; 
+    transform: translateY(20px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.5s ease-out;
+}
+
+/* Shimmer effect for skeleton loaders */
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(90deg, #2E2E2E 25%, #3A3A3A 50%, #2E2E2E 75%);
+  background-size: 200px 100%;
+  animation: shimmer 1.5s infinite;
+}
