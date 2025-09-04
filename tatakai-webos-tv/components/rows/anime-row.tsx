@@ -15,7 +15,7 @@ interface AnimeRowProps {
 
 export function AnimeRow({ title, animes, rowId, showRankings = false }: AnimeRowProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const { focusNext, focusPrev } = useFocusContext()
+  const { currentSection } = useFocusContext()
 
   const scrollLeft = useCallback(() => {
     if (scrollContainerRef.current) {

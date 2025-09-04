@@ -1,13 +1,154 @@
 'use client'
 
-import { Search, Settings, User } from 'lucide-react'
+import { Menu, Search, Settings, User, Home, TrendingUp, Film, Tv, Gamepad2, X } from 'lucide-react'
 import { useTVKeyListener } from '../../lib/focus-management'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { SearchPage } from '../search/search-page'
+
+interface SidebarProps {
+  isOpen: boolean
+  onClose: () => void
+  activeItem: string | null
+  setActiveItem: (item: string | null) => void
+}
+
+function Sidebar({ isOpen, onClose, activeItem, setActiveItem }: SidebarProps) {
+  // Handle back button to close sidebar
+  useTVKeyListener(['BACK'], () => {
+    if (isOpen) {
+      onClose()
+    }
+  })
+
+  if (!isOpen) return null
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div 
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+        onClick={onClose}
+      />
+      
+      {/* Sidebar */}
+      <div className="fixed left-0 top-0 bottom-0 w-80 bg-background-light/95 backdrop-blur-md z-50 border-r border-border-light animate-slide-in-left">
+        <div className="p-8 space-y-8">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <h2 className="text-tv-2xl font-bold text-accent">Tatakai</h2>
+            <button 
+              className="focusable p-2 rounded-lg"
+              onClick={onClose}
+              aria-label="Close Menu"
+            >
+              <X size={32} />
+            </button>
+          </div>
+
+          {/* Navigation */}
+          <nav className="space-y-4">
+            <button 
+              className={`nav-item w-full text-left flex items-center space-x-4 ${
+                activeItem === 'home' ? 'active' : ''
+              }`}
+              onFocus={() => setActiveItem('home')}
+            >
+              <Home size={28} />
+              <span className="text-tv-base">Home</span>
+            </button>
+            
+            <button 
+              className={`nav-item w-full text-left flex items-center space-x-4 ${
+                activeItem === 'trending' ? 'active' : ''
+              }`}
+              onFocus={() => setActiveItem('trending')}
+            >
+              <TrendingUp size={28} />
+              <span className="text-tv-base">Trending</span>
+            </button>
+            
+            <button 
+              className={`nav-item w-full text-left flex items-center space-x-4 ${
+                activeItem === 'movies' ? 'active' : ''
+              }`}
+              onFocus={() => setActiveItem('movies')}
+            >
+              <Film size={28} />
+              <span className="text-tv-base">Movies</span>
+            </button>
+            
+            <button 
+              className={`nav-item w-full text-left flex items-center space-x-4 ${
+                activeItem === 'series' ? 'active' : ''
+              }`}
+              onFocus={() => setActiveItem('series')}
+            >
+              <Tv size={28} />
+              <span className="text-tv-base">TV Series</span>
+            </button>
+            
+            <button 
+              className={`nav-item w-full text-left flex items-center space-x-4 ${
+                activeItem === 'genres' ? 'active' : ''
+              }`}
+              onFocus={() => setActiveItem('genres')}
+            >
+              <Gamepad2 size={28} />
+              <span className="text-tv-base">Genres</span>
+            </button>
+          </nav>
+
+          {/* Divider */}
+          <div className="border-t border-border-light"></div>
+
+          {/* Actions */}
+          <div className="space-y-4">
+            <button 
+              className={`nav-item w-full text-left flex items-center space-x-4 ${
+                activeItem === 'search' ? 'active' : ''
+              }`}
+              onFocus={() => setActiveItem('search')}
+              aria-label="Search (Red Button)"
+            >
+              <Search size={28} />
+              <span className="text-tv-base">Search</span>
+              <div className="ml-auto w-4 h-4 bg-red-500 rounded"></div>
+            </button>
+            
+            <button 
+              className={`nav-item w-full text-left flex items-center space-x-4 ${
+                activeItem === 'profile' ? 'active' : ''
+              }`}
+              onFocus={() => setActiveItem('profile')}
+              aria-label="Profile (Green Button)"
+            >
+              <User size={28} />
+              <span className="text-tv-base">Profile</span>
+              <div className="ml-auto w-4 h-4 bg-green-500 rounded"></div>
+            </button>
+            
+            <button 
+              className={`nav-item w-full text-left flex items-center space-x-4 ${
+                activeItem === 'settings' ? 'active' : ''
+              }`}
+              onFocus={() => setActiveItem('settings')}
+              aria-label="Settings (Yellow Button)"
+            >
+              <Settings size={28} />
+              <span className="text-tv-base">Settings</span>
+              <div className="ml-auto w-4 h-4 bg-yellow-500 rounded"></div>
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
 
 export function Header() {
   const [activeItem, setActiveItem] = useState<string | null>(null)
   const [showSearch, setShowSearch] = useState(false)
+  const [showSidebar, setShowSidebar] = useState(false)
 
   // Handle color key shortcuts
   useTVKeyListener(['RED', 'GREEN', 'YELLOW', 'BLUE'], (key) => {
@@ -33,10 +174,19 @@ export function Header() {
 
   const handleSearchClick = () => {
     setShowSearch(true)
+    setShowSidebar(false)
   }
 
   const handleCloseSearch = () => {
     setShowSearch(false)
+  }
+
+  const handleMenuClick = () => {
+    setShowSidebar(true)
+  }
+
+  const handleCloseSidebar = () => {
+    setShowSidebar(false)
   }
 
   if (showSearch) {
@@ -44,103 +194,43 @@ export function Header() {
   }
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-md border-b border-border/20">
-      <div className="tv-safe flex items-center justify-between h-20">
-        {/* Logo */}
-        <div className="flex items-center space-x-8">
-          <h1 className="text-3xl font-bold text-accent">Tatakai</h1>
-          
-          {/* Navigation Menu */}
-          <nav className="hidden lg:flex items-center space-x-6">
+    <>
+      {/* Simplified Header - Content First */}
+      <header className="fixed top-0 left-0 right-0 z-30 bg-background/80 backdrop-blur-md">
+        <div className="tv-safe-x flex items-center justify-between h-24">
+          {/* Logo and Menu */}
+          <div className="flex items-center space-x-6">
             <button 
-              className="nav-item focusable"
-              onFocus={() => setActiveItem('home')}
+              className="focusable p-3 rounded-lg flex items-center space-x-4"
+              onClick={handleMenuClick}
+              aria-label="Open Menu"
             >
-              Home
+              <Menu size={32} />
+              <span className="text-tv-xl font-bold text-accent">Tatakai</span>
             </button>
-            <button 
-              className="nav-item focusable"
-              onFocus={() => setActiveItem('trending')}
-            >
-              Trending
-            </button>
-            <button 
-              className="nav-item focusable"
-              onFocus={() => setActiveItem('movies')}
-            >
-              Movies
-            </button>
-            <button 
-              className="nav-item focusable"
-              onFocus={() => setActiveItem('series')}
-            >
-              TV Series
-            </button>
-            <button 
-              className="nav-item focusable"
-              onFocus={() => setActiveItem('genres')}
-            >
-              Genres
-            </button>
-          </nav>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center space-x-4">
-          {/* Search Button */}
-          <button 
-            className="nav-item focusable flex items-center space-x-2"
-            onFocus={() => setActiveItem('search')}
-            onClick={handleSearchClick}
-            aria-label="Search (Red Button)"
-          >
-            <Search size={24} />
-            <span className="hidden xl:inline">Search</span>
-          </button>
-
-          {/* Profile Button */}
-          <button 
-            className="nav-item focusable flex items-center space-x-2"
-            onFocus={() => setActiveItem('profile')}
-            aria-label="Profile (Green Button)"
-          >
-            <User size={24} />
-            <span className="hidden xl:inline">Profile</span>
-          </button>
-
-          {/* Settings Button */}
-          <button 
-            className="nav-item focusable flex items-center space-x-2"
-            onFocus={() => setActiveItem('settings')}
-            aria-label="Settings (Yellow Button)"
-          >
-            <Settings size={24} />
-            <span className="hidden xl:inline">Settings</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Color Key Hints */}
-      <div className="absolute bottom-0 right-4 transform translate-y-full">
-        <div className="bg-black/80 rounded-lg p-2 text-xs space-y-1">
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 bg-red-500 rounded"></div>
-            <span>Search</span>
           </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 bg-green-500 rounded"></div>
-            <span>Profile</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-            <span>Settings</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 bg-blue-500 rounded"></div>
-            <span>Help</span>
+
+          {/* Quick Access */}
+          <div className="flex items-center space-x-4">
+            {/* Search Button */}
+            <button 
+              className="focusable p-3 rounded-lg"
+              onClick={handleSearchClick}
+              aria-label="Search (Red Button)"
+            >
+              <Search size={32} />
+            </button>
           </div>
         </div>
-      </div>
-    </header>
+      </header>
+
+      {/* Overlay Sidebar */}
+      <Sidebar 
+        isOpen={showSidebar}
+        onClose={handleCloseSidebar}
+        activeItem={activeItem}
+        setActiveItem={setActiveItem}
+      />
+    </>
   )
 }
