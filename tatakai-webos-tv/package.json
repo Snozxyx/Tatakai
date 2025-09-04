@@ -1,0 +1,55 @@
+{
+  "name": "tatakai-webos-tv",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tatakai LG webOS TV App - Netflix-style anime streaming for smart TVs",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "export": "next build && next export",
+    "webos:build": "npm run export && npm run webos:package",
+    "webos:package": "node scripts/package-webos.js",
+    "test": "vitest",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.86.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "framer-motion": "^11.18.2",
+    "hls.js": "^1.4.0",
+    "lucide-react": "^0.400.0",
+    "next": "^15.5.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^2.6.0",
+    "zustand": "^4.5.7"
+  },
+  "devDependencies": {
+    "@noriginmedia/norigin-spatial-navigation": "^2.3.0",
+    "@playwright/test": "^1.40.0",
+    "@types/node": "^20.19.13",
+    "@types/react": "^18.3.24",
+    "@types/react-dom": "^18.3.7",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^8.0.0",
+    "eslint-config-next": "^15.0.0",
+    "playwright": "^1.40.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.9.2",
+    "vitest": "^1.0.0"
+  },
+  "keywords": [
+    "webos",
+    "tv",
+    "anime",
+    "streaming",
+    "nextjs",
+    "react"
+  ],
+  "author": "Tatakai Team",
+  "license": "MIT"
+}
