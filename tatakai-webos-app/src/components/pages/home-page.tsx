@@ -190,8 +190,10 @@ export function HomePage() {
         const data = await AnimeAPI.getHomePage()
         setHomeData(data)
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load home data')
-        console.error('Error fetching home data:', err)
+        console.warn('Failed to fetch from API, using demo data:', err)
+        // Import demo data dynamically to avoid bundling in production
+        const { demoHomeData } = await import('@/lib/demo-data')
+        setHomeData(demoHomeData)
       } finally {
         setLoading(false)
       }
