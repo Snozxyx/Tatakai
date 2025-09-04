@@ -18,14 +18,14 @@ export function AnimeCard({ anime, index, showRanking = false, onFocus, focusId 
   const [isFocused, setIsFocused] = useState(false)
 
   const handleCardClick = () => {
-    console.log('Card clicked:', anime.name)
-    // TODO: Navigate to anime details
+    // Navigate to anime details page
+    window.location.href = `/anime/${anime.id}`
   }
 
   const handlePlayClick = (e: React.MouseEvent) => {
     e.stopPropagation()
-    console.log('Play clicked:', anime.name)
-    // TODO: Start playing anime
+    // Navigate directly to player (assuming episode 1)
+    window.location.href = `/watch/${anime.id}/s1e1`
   }
 
   const handleAddToListClick = (e: React.MouseEvent) => {

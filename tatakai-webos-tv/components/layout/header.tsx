@@ -3,16 +3,18 @@
 import { Search, Settings, User } from 'lucide-react'
 import { useTVKeyListener } from '../../lib/focus-management'
 import { useState } from 'react'
+import { SearchPage } from '../search/search-page'
 
 export function Header() {
   const [activeItem, setActiveItem] = useState<string | null>(null)
+  const [showSearch, setShowSearch] = useState(false)
 
   // Handle color key shortcuts
   useTVKeyListener(['RED', 'GREEN', 'YELLOW', 'BLUE'], (key) => {
     switch (key) {
       case 'RED':
         // Search shortcut
-        console.log('Search activated')
+        setShowSearch(true)
         break
       case 'GREEN':
         // Profile shortcut
@@ -28,6 +30,18 @@ export function Header() {
         break
     }
   })
+
+  const handleSearchClick = () => {
+    setShowSearch(true)
+  }
+
+  const handleCloseSearch = () => {
+    setShowSearch(false)
+  }
+
+  if (showSearch) {
+    return <SearchPage onClose={handleCloseSearch} />
+  }
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-md border-b border-border/20">
@@ -77,6 +91,7 @@ export function Header() {
           <button 
             className="nav-item focusable flex items-center space-x-2"
             onFocus={() => setActiveItem('search')}
+            onClick={handleSearchClick}
             aria-label="Search (Red Button)"
           >
             <Search size={24} />

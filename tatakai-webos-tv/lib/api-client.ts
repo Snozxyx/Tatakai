@@ -24,6 +24,7 @@ export interface SpotlightAnime extends AnimeBase {
 export interface AnimeDetails {
   id: string
   name: string
+  poster?: string
   malscore: string
   quality: string
   episodes: {
