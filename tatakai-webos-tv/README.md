@@ -49,40 +49,42 @@ tatakai-webos-tv/
 └── tailwind.config.js    # TV-optimized Tailwind theme
 ```
 
-## Installation & Development
+## Quick Start
 
-### Prerequisites
+### 1. Clone and Setup
+```bash
+cd tatakai-webos-tv
+npm install
+cp .env.example .env.local
+```
 
-- Node.js 18+ and npm
-- LG webOS TV SDK (for deployment)
+### 2. Development
+```bash
+npm run dev
+# Open http://localhost:3000
+# Test with keyboard navigation (arrows + enter)
+```
 
-### Development Setup
+### 3. Production Build
+```bash
+npm run build
+npm run start
+```
 
-1. **Clone and install dependencies:**
-   ```bash
-   cd tatakai-webos-tv
-   npm install
-   ```
+### 4. Deploy to webOS TV
+```bash
+# Build and package
+npm run build
+npm run webos:package
 
-2. **Set up environment variables:**
-   ```bash
-   cp .env.example .env.local
-   # Edit .env.local with your API settings
-   ```
+# Install webOS CLI (one-time)
+npm install -g @webosose/ares-cli
 
-3. **Start development server:**
-   ```bash
-   npm run dev
-   ```
-
-4. **Open in browser:**
-   Navigate to `http://localhost:3000` and test with keyboard navigation (arrow keys + enter)
-
-### TV Testing
-
-- Use browser dev tools to simulate TV resolutions (1920x1080, 1280x720)
-- Test navigation with keyboard only (no mouse)
-- Verify focus management and scroll behavior
+# Deploy to TV
+ares-package webos-package/
+ares-install com.tatakai.webostv_1.0.0_all.ipk -d [YOUR_TV]
+ares-launch com.tatakai.webostv -d [YOUR_TV]
+```
 
 ## Building for webOS TV
 
