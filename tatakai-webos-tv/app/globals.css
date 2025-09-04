@@ -1,0 +1,325 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    border-color: #333333;
+  }
+  
+  body {
+    background-color: #000000;
+    color: #FFFFFF;
+    font-family: 'Inter', system-ui, sans-serif;
+    /* TV-optimized base styles */
+    font-size: 18px;
+    line-height: 1.5;
+    /* Prevent text selection on TV */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    /* Disable context menu */
+    -webkit-touch-callout: none;
+  }
+
+  /* TV-safe typography */
+  h1 { font-size: 48px; font-weight: 700; line-height: 1.2; }
+  h2 { font-size: 40px; font-weight: 600; line-height: 1.2; }
+  h3 { font-size: 32px; font-weight: 600; line-height: 1.2; }
+  h4 { font-size: 28px; font-weight: 500; line-height: 1.2; }
+  h5 { font-size: 24px; font-weight: 500; line-height: 1.2; }
+  h6 { font-size: 20px; font-weight: 500; line-height: 1.2; }
+
+  p { font-size: 20px; line-height: 1.75; }
+
+  /* Focus management for TV */
+  .focus-ring {
+    outline: none;
+    box-shadow: 0 0 0 2px #8A2BE2, 0 0 0 4px rgba(138, 43, 226, 0.3);
+  }
+
+  /* TV-specific scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background-color: #1A1A1A;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: #8A2BE2;
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: #7B2BCB;
+  }
+}
+
+@layer components {
+  /* TV Navigation Components */
+  .nav-item {
+    padding: 12px 24px;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    min-height: 48px;
+    min-width: 48px;
+    outline: none;
+  }
+
+  .nav-item:hover,
+  .nav-item:focus {
+    background-color: #8A2BE2;
+    color: white;
+    transform: scale(1.05);
+    outline: 2px solid #8A2BE2;
+    outline-offset: 2px;
+  }
+
+  /* Card Components */
+  .anime-card {
+    background-color: #1A1A1A;
+    border: 1px solid #333333;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    outline: none;
+    aspect-ratio: 2/3;
+  }
+
+  .anime-card:hover,
+  .anime-card:focus {
+    border-color: #8A2BE2;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.8), 0 0 0 2px #8A2BE2;
+    transform: scale(1.05);
+  }
+
+  /* Hero/Billboard Component */
+  .hero-section {
+    position: relative;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    padding: 0 5%;
+    background: linear-gradient(135deg, rgba(0,0,0,0.8), rgba(138,43,226,0.1));
+  }
+
+  .hero-content {
+    z-index: 10;
+    max-width: 48rem;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .hero-title {
+    font-size: 48px;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 16px;
+  }
+
+  .hero-description {
+    font-size: 24px;
+    color: #B0B0B0;
+    margin-bottom: 24px;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Button Components */
+  .btn-primary {
+    background-color: #8A2BE2;
+    color: white;
+    padding: 16px 32px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 20px;
+    transition: all 0.3s ease;
+    min-height: 56px;
+    border: none;
+    outline: none;
+  }
+
+  .btn-primary:hover,
+  .btn-primary:focus {
+    background-color: #7B2BCB;
+    transform: scale(1.05);
+    outline: 2px solid #8A2BE2;
+    outline-offset: 2px;
+  }
+
+  .btn-secondary {
+    background-color: #1A1A1A;
+    color: white;
+    border: 1px solid #333333;
+    padding: 16px 32px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 20px;
+    transition: all 0.3s ease;
+    min-height: 56px;
+    outline: none;
+  }
+
+  .btn-secondary:hover,
+  .btn-secondary:focus {
+    background-color: #2A2A2A;
+    transform: scale(1.05);
+    outline: 2px solid #8A2BE2;
+    outline-offset: 2px;
+  }
+
+  /* Row/Carousel Components */
+  .content-row {
+    margin-bottom: 32px;
+    padding: 0 5%;
+  }
+
+  .row-title {
+    font-size: 32px;
+    font-weight: 600;
+    color: white;
+    margin-bottom: 16px;
+  }
+
+  .carousel-container {
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+    padding-bottom: 16px;
+    scroll-behavior: smooth;
+    scroll-snap-type: x mandatory;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .carousel-container::-webkit-scrollbar {
+    display: none;
+  }
+
+  .carousel-item {
+    flex-shrink: 0;
+    scroll-snap-align: start;
+  }
+
+  /* Player Controls */
+  .player-controls {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 32px;
+    background: linear-gradient(to top, rgba(0,0,0,1), transparent);
+  }
+
+  .control-btn {
+    padding: 12px;
+    border-radius: 50%;
+    background-color: rgba(0,0,0,0.5);
+    color: white;
+    transition: all 0.3s ease;
+    min-height: 48px;
+    min-width: 48px;
+    border: none;
+    outline: none;
+  }
+
+  .control-btn:hover,
+  .control-btn:focus {
+    background-color: #8A2BE2;
+    transform: scale(1.05);
+    outline: 2px solid #8A2BE2;
+    outline-offset: 2px;
+  }
+
+  /* Loading states */
+  .skeleton {
+    background-color: #1A1A1A;
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    border-radius: 8px;
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: .5;
+    }
+  }
+
+  /* Utility classes */
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .focusable {
+    outline: none;
+    transition: all 0.3s ease;
+  }
+
+  .focusable:focus {
+    outline: 2px solid #8A2BE2;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(138, 43, 226, 0.3);
+    transform: scale(1.05);
+  }
+
+  .tv-safe {
+    padding: 3% 5%;
+  }
+
+  .tv-safe-x {
+    padding-left: 5%;
+    padding-right: 5%;
+  }
+
+  .tv-safe-y {
+    padding-top: 3%;
+    padding-bottom: 3%;
+  }
+}
+
+@layer utilities {
+  /* TV-specific utilities */
+  .tv-focus {
+    outline: none;
+    box-shadow: 0 0 0 2px #8A2BE2, 0 0 0 4px rgba(138, 43, 226, 0.3);
+  }
+
+  .tv-hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.8);
+    transition: all 0.3s ease;
+  }
+
+  .tv-gradient {
+    background: linear-gradient(135deg, rgba(0,0,0,0.9), rgba(138,43,226,0.2));
+  }
+
+  .aspect-poster {
+    aspect-ratio: 2/3;
+  }
+
+  .aspect-banner {
+    aspect-ratio: 16/9;
+  }
+}
