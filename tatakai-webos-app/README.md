@@ -1,189 +1,303 @@
-# Tatakai webOS App
+# Tatakai webOS TV App
 
-A fully functional anime streaming application designed for LG webOS smart TVs, built with remote control navigation and TV-optimized user interface.
+A modern, comprehensive anime streaming application built specifically for LG webOS smart TVs. Features a TV-optimized interface with remote control navigation, spatial awareness, and integration with the Tatakai backend for user authentication, watch history, and favorites.
 
-## Features
+## 🚀 Features
 
-- **TV-Optimized Interface**: Designed specifically for 10-foot viewing experience
-- **Remote Control Navigation**: Full support for LG TV remote control with arrow keys, OK, Back, and colored buttons
-- **Anime Streaming**: Access to thousands of anime titles with multiple quality options
-- **Search Functionality**: Advanced search with suggestions and filters
-- **Categories & Genres**: Browse anime by various categories and genres
-- **Video Player**: Custom video player with HLS support and subtitle options
-- **Spotlight Carousel**: Featured anime with auto-rotation
-- **Responsive Design**: Supports multiple TV resolutions (1080p, 720p)
+### Core Functionality
+- **TV-Optimized Interface**: Designed for 10-foot viewing with large, accessible UI elements
+- **Remote Control Navigation**: Full support for LG TV remote with arrow keys, OK, Back, and media buttons
+- **Anime Streaming**: Access to thousands of anime titles via HiAnime API integration
+- **Spotlight Carousel**: Auto-rotating featured anime with smooth transitions
+- **Content Rails**: Multiple categorized content sections (Trending, Popular, Latest, etc.)
+- **Responsive Design**: Optimized for 1920x1080 and 1280x720 TV resolutions
 
-## API Integration
+### Technology Stack
+- **Frontend**: Next.js 14 + React 18 + TypeScript
+- **Styling**: Tailwind CSS with custom design tokens
+- **Animations**: Framer Motion for smooth TV-optimized transitions
+- **Icons**: Lucide React for consistent iconography
+- **UI Components**: Custom TV-focused component library
+- **Navigation**: Built-in keyboard/remote focus management (Spatial Navigation ready)
 
-This app uses the HiAnime API with the following endpoints:
+### Backend Integration
+- **Authentication**: JWT-based user authentication via Tatakai backend
+- **Watch History**: Progress tracking across episodes and anime
+- **Favorites**: Personal anime collection with ratings and notes
+- **API Integration**: HiAnime API for anime data, AniSkip for intro/outro detection
+- **Video Streaming**: HLS video player with quality selection and subtitle support
 
-- **Base URL**: `https://aniwatch-api-taupe-eight.vercel.app/api/v2/hianime`
-- **Home Page**: `/home` - Get featured and trending anime
-- **Search**: `/search?q={query}` - Search for anime with advanced filters
-- **Anime Details**: `/anime/{animeId}` - Get detailed anime information
-- **Episodes**: `/anime/{animeId}/episodes` - Get episode list
-- **Video Sources**: `/episode/sources?animeEpisodeId={id}&server={server}&category={category}`
+### webOS Integration
+- **Platform APIs**: webOSTV.js integration for TV-native features
+- **App Lifecycle**: Proper pause/resume and memory management
+- **Remote Controls**: Media keys (Play, Pause, Stop, FF, Rewind) support
+- **TV Services**: Device info, platform back navigation
+- **Performance**: Optimized for TV hardware limitations
 
-## Remote Control Features
+## 📦 Installation & Setup
 
-### Navigation
-- **Arrow Keys**: Navigate between UI elements
-- **OK/Enter**: Select current item
-- **Back**: Go to previous screen or exit
-- **Home**: Return to home screen
+### Prerequisites
+- Node.js 18+
+- npm or yarn
+- LG webOS TV SDK (for packaging and deployment)
+- Git
 
-### Special Functions
-- **Red Button**: Quick search
-- **Green Button**: Favorites (coming soon)
-- **Yellow Button**: Settings (coming soon)
-- **Blue Button**: Categories view
+### Development Setup
 
-### Video Playback
-- **Play/Pause**: Toggle video playback
-- **Left/Right Arrows**: Rewind/Fast forward (10 seconds)
-- **Up/Down Arrows**: Volume control
-- **Rewind/Fast Forward**: Skip 30 seconds
-- **Red Button**: Toggle subtitles
-- **Green Button**: Change quality
-- **Blue Button**: Toggle fullscreen
+1. **Clone and navigate to the webOS app:**
+   ```bash
+   cd tatakai-webos-app
+   ```
 
-## Installation
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
 
-### For webOS Development
+3. **Environment Configuration:**
+   Create `.env.local` file:
+   ```env
+   NEXT_PUBLIC_TATAKAI_API_BASE=http://localhost:5000
+   # Add other environment variables as needed
+   ```
 
-1. Install webOS CLI tools:
+4. **Start development server:**
+   ```bash
+   npm run dev
+   ```
+   The app will be available at `http://localhost:3000`
+
+5. **Build for production:**
+   ```bash
+   npm run build
+   ```
+
+### webOS TV Deployment
+
+1. **Install webOS CLI tools:**
    ```bash
    npm install -g @webosose/ares-cli
    ```
 
-2. Package the app:
+2. **Export static build:**
    ```bash
-   cd tatakai-webos-app
-   ares-package .
+   npm run export
    ```
 
-3. Install on webOS device:
+3. **Package for webOS:**
    ```bash
-   ares-install com.tatakai.animeapp_1.0.0_all.ipk
+   npm run webos-package
    ```
 
-4. Launch the app:
+4. **Install on TV/Emulator:**
    ```bash
-   ares-launch com.tatakai.animeapp
+   npm run webos-install
    ```
 
-### For Development/Testing
-
-1. Start local server:
+5. **Launch app:**
    ```bash
-   npm run serve
+   npm run webos-launch
    ```
 
-2. Open in browser:
-   ```
-   http://localhost:8080
-   ```
-
-## File Structure
+## 🏗️ Project Structure
 
 ```
 tatakai-webos-app/
-├── appinfo.json          # webOS app configuration
-├── index.html            # Main HTML file
-├── package.json          # Package configuration
-├── icon.png              # App icon (80x80)
-├── bg.png                # Background image
-├── css/
-│   ├── style.css         # Base styles
-│   └── tv-ui.css         # TV-specific UI optimizations
-├── js/
-│   ├── api-client.js     # HiAnime API client
-│   ├── webos-api.js      # webOS platform integration
-│   ├── navigation.js     # Remote control navigation
-│   ├── ui-manager.js     # UI state management
-│   ├── video-player.js   # Video playback handling
-│   └── app.js            # Main application entry point
-└── README.md             # This file
+├── src/
+│   ├── app/                    # Next.js App Router
+│   │   ├── globals.css         # Global styles with design tokens
+│   │   ├── layout.tsx          # Root layout with providers
+│   │   └── page.tsx            # Home page entry point
+│   ├── components/             # React components
+│   │   ├── layout/             # Layout components
+│   │   │   ├── tv-layout.tsx   # Main TV app layout
+│   │   │   └── side-navigation.tsx # TV navigation sidebar
+│   │   ├── pages/              # Page-level components
+│   │   │   └── home-page.tsx   # Home page with carousel and rails
+│   │   ├── providers/          # React context providers
+│   │   │   └── spatial-navigation-provider.tsx # TV navigation setup
+│   │   └── ui/                 # Reusable UI components
+│   │       ├── button.tsx      # Button component with variants
+│   │       └── card.tsx        # Card component for content
+│   ├── lib/                    # Utility libraries
+│   │   ├── api.ts              # API client for backend/HiAnime
+│   │   └── utils.ts            # Utility functions and helpers
+│   └── types/                  # TypeScript type definitions
+├── appinfo.json                # webOS app configuration
+├── next.config.js              # Next.js configuration for static export
+├── package.json                # Dependencies and scripts
+└── tailwind.config.js          # Tailwind CSS configuration
 ```
 
-## Key Components
+## 🎨 Design System
 
-### API Client (`api-client.js`)
-- Handles all API calls to HiAnime backend
-- Implements error handling and retry logic
-- Supports all documented endpoints
+The app uses a custom design system optimized for TV viewing, defined in `1design.json`:
 
-### Navigation Manager (`navigation.js`)
-- Advanced 2D navigation for TV remote controls
-- Smart focus management with spatial navigation
-- Keyboard and remote control event handling
+### Color Scheme
+- **Background**: Pure black (`#000000`) for TV displays
+- **Text**: White (`#FFFFFF`) and muted gray (`#B0B0B0`)
+- **Accent**: Purple (`#8A2BE2`) for focus states and branding
+- **Cards**: Dark gray (`#1A1A1A`) with subtle borders
 
-### UI Manager (`ui-manager.js`)
-- Manages screen transitions and content loading
-- Handles anime data rendering and grid layouts
-- Implements search functionality and results display
+### Typography
+- **Font Family**: Inter, system-ui, sans-serif
+- **Sizes**: Optimized for 10-foot viewing (larger than web standards)
+- **Weights**: Normal (400), Medium (500), Semibold (600), Bold (700)
 
-### Video Player (`video-player.js`)
-- Custom video player optimized for TV
-- HLS streaming support with quality selection
-- Subtitle support and remote control integration
+### Spacing & Layout
+- **Grid System**: Responsive poster grids with proper aspect ratios
+- **Focus Management**: 2px purple ring with proper offset for TV navigation
+- **Side Navigation**: 60px collapsed width for minimal screen usage
 
-### webOS Integration (`webos-api.js`)
-- Platform detection and webOS service integration
-- TV-specific APIs and features
-- Graceful fallback for web development
+## 🎮 Remote Control Support
 
-## TV Optimization Features
+### Navigation Keys
+- **Arrow Keys**: Directional navigation through UI elements
+- **OK/Enter**: Select focused element
+- **Back**: Navigate back or exit app (uses webOS platformBack)
+- **Home**: Return to home screen
 
-### Focus Management
-- Spatial navigation algorithm for intuitive remote control use
-- Visual focus indicators with smooth animations
-- Automatic scroll-into-view for focused elements
+### Media Keys
+- **Play/Pause**: Control video playback
+- **Stop**: Stop video and return to content
+- **Fast Forward/Rewind**: Seek video content
+- **Red Button**: Quick access to search
+- **Blue Button**: Access categories/menu
 
-### Performance
-- Optimized for TV hardware limitations
-- Efficient DOM rendering and memory management
-- Background resource cleanup when app is paused
+### Keyboard Shortcuts (Development)
+All remote control functions work with keyboard for development:
+- Arrow keys for navigation
+- Enter for selection
+- Backspace for back navigation
+- Space for play/pause
+
+## 🔧 API Integration
+
+### Tatakai Backend
+- **Authentication**: `/api/auth/login`, `/api/auth/register`, `/api/auth/me`
+- **Watch History**: `/api/watch-history/*` endpoints for progress tracking
+- **Favorites**: `/api/favorites/*` endpoints for personal collections
+- **User Management**: Profile updates, password changes, preferences
+
+### HiAnime API
+- **Home Data**: Spotlight, trending, popular, latest anime
+- **Search**: Anime search with filters and suggestions
+- **Anime Info**: Detailed information, episodes, characters
+- **Streaming**: Episode servers, sources, and subtitle support
+- **Categories**: Genre and category-based browsing
+
+### AniSkip Integration
+- **Skip Times**: Automatic intro/outro detection and skipping
+- **Episode Analysis**: ML-powered content analysis for better UX
+
+## 📱 Responsive Design
+
+### TV Resolutions
+- **1920x1080**: Full HD primary target
+- **1280x720**: HD fallback with adjusted layouts
+- **Container**: Max-width with centered content and proper padding
+
+### Grid Layouts
+- **Posters**: Responsive grid from 2 to 8 columns based on screen size
+- **Aspect Ratios**: 2:3 for posters, 16:9 for banners
+- **Gap System**: Consistent 8px, 16px, 24px spacing scale
+
+## 🎯 Performance Optimizations
+
+### TV-Specific Optimizations
+- **Memory Management**: Efficient DOM rendering and cleanup
+- **Image Loading**: Lazy loading with proper fallbacks
+- **Animation Performance**: Hardware-accelerated CSS transforms
+- **Bundle Size**: Optimized build with code splitting
+
+### Loading States
+- **Progressive Loading**: Skeleton screens and smooth transitions
+- **Error Boundaries**: Graceful error handling with retry options
+- **Network Resilience**: Offline detection and retry mechanisms
+
+## 🧪 Testing & Quality Assurance
+
+### Development Testing
+1. **Browser Testing**: Use Chrome DevTools with TV resolution simulation
+2. **Keyboard Navigation**: Test all interactions with keyboard arrows + Enter
+3. **Focus Management**: Verify focus rings and logical tab order
+4. **Performance**: Monitor memory usage and animation smoothness
+
+### webOS Testing
+1. **Emulator Testing**: Use LG webOS TV Simulator
+2. **Real Device Testing**: Deploy to actual LG TV hardware
+3. **Remote Control**: Test with physical TV remote control
+4. **Performance**: Monitor TV-specific performance metrics
 
 ### Accessibility
-- High contrast design for TV viewing
-- Large clickable areas for remote control accuracy
-- Clear visual feedback for all interactions
+- **High Contrast**: Design optimized for TV viewing distances
+- **Large Click Targets**: Minimum 48px touch/focus targets
+- **Clear Focus Indication**: Prominent focus rings and state changes
+- **Screen Reader**: Proper ARIA labels and semantic HTML
 
-## Development Notes
+## 🚀 Deployment
 
-### Testing
-- Use browser dev tools to simulate TV resolutions
-- Test with keyboard navigation (arrows + enter)
-- Verify focus management and scroll behavior
+### Development
+```bash
+npm run dev          # Start development server
+npm run build        # Build for production
+npm run start        # Start production server
+```
 
-### webOS Specific Features
-- App lifecycle management (pause/resume)
-- TV display mode optimization
-- Platform-specific error handling
+### webOS Production
+```bash
+npm run export       # Export static files
+npm run webos-package # Create .ipk package
+npm run webos-install # Install on connected TV
+npm run webos-launch  # Launch app on TV
+```
 
-### API Considerations
-- All API calls include proper error handling
-- Network timeouts and retry logic implemented
-- Graceful degradation for API failures
+### Environment Variables
+```env
+# Required
+NEXT_PUBLIC_TATAKAI_API_BASE=http://localhost:5000
 
-## Supported Resolutions
+# Optional
+NEXT_PUBLIC_HIANIME_API_BASE=https://aniwatch-api-taupe-eight.vercel.app/api/v2/hianime
+NEXT_PUBLIC_ANISKIP_API_BASE=https://api.aniskip.com/v2
+```
 
-- **1920x1080** (Full HD) - Primary target
-- **1366x768** (HD Ready) - Responsive support
-- Auto-scaling for other TV resolutions
+## 🤝 Contributing
 
-## Browser Compatibility
+1. **Code Style**: Follow existing TypeScript and React patterns
+2. **Components**: Create reusable, TV-optimized components
+3. **Testing**: Test on both browser and webOS emulator
+4. **Performance**: Consider TV hardware limitations
+5. **Accessibility**: Maintain focus management and keyboard navigation
 
-- **webOS Browser** (primary target)
-- **Chrome/Chromium** (development)
-- **Safari** (HLS native support)
-- **Firefox** (with hls.js fallback)
+## 📄 License
 
-## License
+This project is part of the Tatakai ecosystem. See the main repository for license information.
 
-MIT License - See package.json for details
+## 🔗 Related Projects
 
-## Contributing
+- **[Tatakai Backend](../tatakai-backend/)**: Node.js backend with authentication and user features
+- **[Tatakai Web App](../tatakai-app/)**: Next.js web application for desktop/mobile
+- **[Design System](../1design.json)**: Shared design tokens and component specifications
 
-This is a functional webOS app implementation. For improvements or bug reports, please ensure testing on actual webOS devices or webOS emulator.
+---
+
+## 🛠️ Future Enhancements
+
+### Planned Features
+- [ ] Advanced Spatial Navigation with Norigin library
+- [ ] Voice search integration with webOS voice APIs
+- [ ] Advanced video player with PiP and quality controls
+- [ ] Offline viewing capabilities with local storage
+- [ ] Multi-user profiles with parental controls
+- [ ] Advanced recommendation engine
+- [ ] Integration with LG ThinQ for smart home features
+
+### Technical Improvements
+- [ ] PWA capabilities for faster loading
+- [ ] Advanced caching strategies
+- [ ] WebRTC integration for social features
+- [ ] Advanced analytics and telemetry
+- [ ] A/B testing framework for UI improvements
+
+This documentation provides everything needed to develop, build, test, and deploy the Tatakai webOS TV app. For additional support, refer to the [LG webOS Developer Documentation](https://webostv.developer.lge.com/) and the main Tatakai repository.
