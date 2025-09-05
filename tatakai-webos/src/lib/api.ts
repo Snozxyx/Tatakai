@@ -2,106 +2,134 @@ export interface Anime {
   id: string;
   title: string;
   image: string;
-  episodeCount?: number;
+  episodeCount?: {
+    sub: number;
+    dub: number;
+  };
   year?: number;
   status?: string;
   description?: string;
   genres?: string[];
-  rating?: number;
+  rating?: string;
   trailer?: string;
+  type?: string;
+  duration?: string;
+  jname?: string;
 }
 
 export interface AnimeResponse {
   data: Anime[];
   pagination?: {
-    current_page: number;
-    has_next_page: boolean;
-    total: number;
+    currentPage: number;
+    hasNextPage: boolean;
+    totalPages: number;
   };
 }
 
-class ApiService {
-  private baseUrl = '/api/v4';
-  private requestQueue: Promise<any> = Promise.resolve();
-  
-  // Add delay between requests to avoid rate limiting
-  private async delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
+export interface HomeData {
+  spotlightAnimes: Anime[];
+  trendingAnimes: Anime[];
+  topAiringAnimes: Anime[];
+  mostPopularAnimes: Anime[];
+  latestEpisodeAnimes: Anime[];
+  latestCompletedAnimes: Anime[];
+  mostFavoriteAnimes: Anime[];
+}
 
-  // Queue requests to avoid hitting rate limits
-  private async queueRequest<T>(requestFn: () => Promise<T>): Promise<T> {
-    this.requestQueue = this.requestQueue.then(async () => {
-      await this.delay(300); // 300ms delay between requests
-      return requestFn();
-    });
-    return this.requestQueue;
-  }
+class ApiService {
+  private baseUrl = '/api/v2/hianime';
   
   async get(endpoint: string): Promise<any> {
-    return this.queueRequest(async () => {
-      try {
-        const response = await fetch(`${this.baseUrl}${endpoint}`);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return await response.json();
-      } catch (error) {
-        console.error('API request failed:', error);
-        throw error;
+    try {
+      const response = await fetch(`${this.baseUrl}${endpoint}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-    });
+      return await response.json();
+    } catch (error) {
+      console.error('API request failed:', error);
+      throw error;
+    }
   }
 
-  async getTopAnime(page: number = 1): Promise<AnimeResponse> {
-    const response = await this.get(`/top/anime?page=${page}`);
+  async getHomeData(): Promise<HomeData> {
+    const response = await this.get('/home');
+    const data = response.data;
+    
     return {
-      data: response.data?.map(this.transformAnime) || [],
-      pagination: response.pagination
-    };
-  }
-
-  async getSeasonNow(page: number = 1): Promise<AnimeResponse> {
-    const response = await this.get(`/seasons/now?page=${page}`);
-    return {
-      data: response.data?.map(this.transformAnime) || [],
-      pagination: response.pagination
+      spotlightAnimes: data.spotlightAnimes?.map(this.transformAnime) || [],
+      trendingAnimes: data.trendingAnimes?.map(this.transformAnime) || [],
+      topAiringAnimes: data.topAiringAnimes?.map(this.transformAnime) || [],
+      mostPopularAnimes: data.mostPopularAnimes?.map(this.transformAnime) || [],
+      latestEpisodeAnimes: data.latestEpisodeAnimes?.map(this.transformAnime) || [],
+      latestCompletedAnimes: data.latestCompletedAnimes?.map(this.transformAnime) || [],
+      mostFavoriteAnimes: data.mostFavoriteAnimes?.map(this.transformAnime) || []
     };
   }
 
   async searchAnime(query: string, page: number = 1): Promise<AnimeResponse> {
-    const response = await this.get(`/anime?q=${encodeURIComponent(query)}&page=${page}`);
+    const response = await this.get(`/search?q=${encodeURIComponent(query)}&page=${page}`);
     return {
-      data: response.data?.map(this.transformAnime) || [],
-      pagination: response.pagination
+      data: response.data?.animes?.map(this.transformAnime) || [],
+      pagination: {
+        currentPage: response.data?.currentPage || 1,
+        hasNextPage: response.data?.hasNextPage || false,
+        totalPages: response.data?.totalPages || 1
+      }
+    };
+  }
+
+  async getCategoryAnimes(category: string, page: number = 1): Promise<AnimeResponse> {
+    const response = await this.get(`/category/${category}?page=${page}`);
+    return {
+      data: response.data?.animes?.map(this.transformAnime) || [],
+      pagination: {
+        currentPage: response.data?.currentPage || 1,
+        hasNextPage: response.data?.hasNextPage || false,
+        totalPages: response.data?.totalPages || 1
+      }
     };
   }
 
   async getAnimeById(id: string): Promise<Anime> {
     const response = await this.get(`/anime/${id}`);
-    return this.transformAnime(response.data);
+    return this.transformAnime(response.data.anime);
+  }
+
+  // Convenience methods for specific categories
+  async getTrendingAnimes(page: number = 1): Promise<AnimeResponse> {
+    return this.getCategoryAnimes('most-popular', page);
+  }
+
+  async getTopRatedAnimes(page: number = 1): Promise<AnimeResponse> {
+    return this.getCategoryAnimes('most-favorite', page);
   }
 
   async getRecentlyAdded(page: number = 1): Promise<AnimeResponse> {
-    const response = await this.get(`/top/anime?filter=airing&page=${page}`);
-    return {
-      data: response.data?.map(this.transformAnime) || [],
-      pagination: response.pagination
-    };
+    return this.getCategoryAnimes('recently-added', page);
+  }
+
+  async getMovies(page: number = 1): Promise<AnimeResponse> {
+    return this.getCategoryAnimes('movie', page);
+  }
+
+  async getTVSeries(page: number = 1): Promise<AnimeResponse> {
+    return this.getCategoryAnimes('tv', page);
   }
 
   private transformAnime(apiAnime: any): Anime {
     return {
-      id: apiAnime.mal_id?.toString() || '',
-      title: apiAnime.title || apiAnime.title_english || '',
-      image: apiAnime.images?.jpg?.large_image_url || apiAnime.images?.jpg?.image_url || '',
-      episodeCount: apiAnime.episodes,
-      year: apiAnime.year || new Date(apiAnime.aired?.from).getFullYear(),
+      id: apiAnime.id || '',
+      title: apiAnime.name || apiAnime.title || '',
+      image: apiAnime.poster || '',
+      episodeCount: apiAnime.episodes || { sub: 0, dub: 0 },
+      type: apiAnime.type || '',
       status: apiAnime.status?.toLowerCase(),
-      description: apiAnime.synopsis,
-      genres: apiAnime.genres?.map((g: any) => g.name) || [],
-      rating: apiAnime.score,
-      trailer: apiAnime.trailer?.url
+      description: apiAnime.description || '',
+      genres: apiAnime.genres || [],
+      rating: apiAnime.rating || apiAnime.malscore || '',
+      duration: apiAnime.duration || '',
+      jname: apiAnime.jname || ''
     };
   }
 }

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { PlayIcon } from '@heroicons/react/24/solid';
+import { Button, Chip } from '@heroui/react';
+import { PlayIcon, InformationCircleIcon } from '@heroicons/react/24/solid';
 import AnimeCard from '../components/AnimeCard';
 import SkeletonCard from '../components/SkeletonCard';
-import { apiService, Anime } from '../lib/api';
+import { apiService, Anime, HomeData } from '../lib/api';
 
 interface AnimeSection {
   title: string;
@@ -15,66 +16,48 @@ export default function Home() {
     { title: 'Continue Watching', items: [], loading: true },
     { title: 'Trending Now', items: [], loading: true },
     { title: 'Recently Added', items: [], loading: true },
-    { title: 'Top Rated', items: [], loading: true },
+    { title: 'Most Popular', items: [], loading: true },
   ]);
 
   const [spotlightAnime, setSpotlightAnime] = useState<Anime | null>(null);
 
   useEffect(() => {
-    // Load real anime data from API sequentially to avoid rate limiting
+    // Load real anime data from HiAnime API
     const loadData = async () => {
       try {
-        // Load trending/top anime for spotlight first
-        const topAnimeResponse = await apiService.getTopAnime(1);
-        if (topAnimeResponse.data.length > 0) {
-          setSpotlightAnime(topAnimeResponse.data[0]);
+        console.log('Loading home data from HiAnime API...');
+        const homeData: HomeData = await apiService.getHomeData();
+        
+        // Set spotlight anime from the first spotlight anime
+        if (homeData.spotlightAnimes && homeData.spotlightAnimes.length > 0) {
+          setSpotlightAnime(homeData.spotlightAnimes[0]);
         }
 
-        // Load sections one by one to avoid rate limiting
-        try {
-          const trendingData = await apiService.getTopAnime(1);
-          setSections(prev => prev.map(section => 
-            section.title === 'Trending Now' 
-              ? { ...section, items: trendingData.data.slice(0, 6), loading: false }
-              : section
-          ));
-        } catch (error) {
-          console.error('Failed to load trending data:', error);
-        }
+        // Update sections with real data
+        setSections([
+          { 
+            title: 'Continue Watching', 
+            items: homeData.latestEpisodeAnimes?.slice(0, 6) || [], 
+            loading: false 
+          },
+          { 
+            title: 'Trending Now', 
+            items: homeData.trendingAnimes?.slice(0, 6) || [], 
+            loading: false 
+          },
+          { 
+            title: 'Recently Added', 
+            items: homeData.latestCompletedAnimes?.slice(0, 6) || [], 
+            loading: false 
+          },
+          { 
+            title: 'Most Popular', 
+            items: homeData.mostPopularAnimes?.slice(0, 6) || [], 
+            loading: false 
+          },
+        ]);
 
-        try {
-          const seasonData = await apiService.getSeasonNow(1);
-          setSections(prev => prev.map(section => 
-            section.title === 'Continue Watching' 
-              ? { ...section, items: seasonData.data.slice(0, 6), loading: false }
-              : section
-          ));
-        } catch (error) {
-          console.error('Failed to load season data:', error);
-        }
-
-        try {
-          const recentData = await apiService.getRecentlyAdded(1);
-          setSections(prev => prev.map(section => 
-            section.title === 'Recently Added' 
-              ? { ...section, items: recentData.data.slice(0, 6), loading: false }
-              : section
-          ));
-        } catch (error) {
-          console.error('Failed to load recent data:', error);
-        }
-
-        try {
-          const topRatedData = await apiService.getTopAnime(2);
-          setSections(prev => prev.map(section => 
-            section.title === 'Top Rated' 
-              ? { ...section, items: topRatedData.data.slice(0, 6), loading: false }
-              : section
-          ));
-        } catch (error) {
-          console.error('Failed to load top rated data:', error);
-        }
-
+        console.log('Home data loaded successfully:', homeData);
       } catch (error) {
         console.error('Failed to load anime data:', error);
         // Set empty data on error
@@ -94,78 +77,168 @@ export default function Home() {
     // Navigate to anime detail/player
   };
 
+  const heroStyle = {
+    position: 'relative' as const,
+    height: '60vh',
+    overflow: 'hidden'
+  };
+
+  const heroBackgroundStyle = {
+    position: 'absolute' as const,
+    inset: '0',
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    filter: 'blur(20px) brightness(0.3)'
+  };
+
+  const heroOverlayStyle = {
+    position: 'absolute' as const,
+    inset: '0',
+    background: 'linear-gradient(to right, rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.4), transparent)'
+  };
+
+  const heroContentStyle = {
+    position: 'relative' as const,
+    height: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    maxWidth: '32rem',
+    gap: '1.5rem',
+    flexDirection: 'column' as const,
+    justifyContent: 'center',
+    textAlign: 'left' as const
+  };
+
+  const sectionStyle = {
+    padding: '2rem 0',
+    gap: '3rem',
+    display: 'flex',
+    flexDirection: 'column' as const
+  };
+
+  const sectionContentStyle = {
+    display: 'flex',
+    gap: '1rem',
+    overflowX: 'auto',
+    overflowY: 'hidden',
+    paddingBottom: '1rem'
+  };
+
   return (
-    <div className="min-h-screen bg-tvbg text-white">
+    <div style={{ minHeight: '100vh', backgroundColor: '#111111', color: '#ffffff' }}>
       {/* Hero/Spotlight Section */}
       {spotlightAnime && (
-        <div className="relative h-[60vh] overflow-hidden">
+        <div style={heroStyle}>
           <div 
-            className="absolute inset-0 bg-cover bg-center"
             style={{ 
-              backgroundImage: `url(${spotlightAnime.image})`,
-              filter: 'blur(20px) brightness(0.3)'
+              ...heroBackgroundStyle,
+              backgroundImage: `url(${spotlightAnime.image})`
             }}
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
+          <div style={heroOverlayStyle} />
           
-          <div className="relative h-full flex items-center px-safeH">
-            <div className="max-w-2xl space-y-6">
-              <h1 className="text-4xl md:text-6xl font-bold leading-tight">
-                {spotlightAnime.title}
-              </h1>
-              <div className="flex items-center space-x-4 text-lg text-gray-300">
-                <span>{spotlightAnime.year}</span>
-                <span>•</span>
-                <span>{spotlightAnime.episodeCount} Episodes</span>
-                <span>•</span>
-                <span className="capitalize">{spotlightAnime.status}</span>
-              </div>
-              <div className="flex items-center space-x-4">
-                <button 
-                  className="focusable px-8 py-4 bg-tatakai-purple hover:bg-purple-700 text-white font-semibold rounded-lg flex items-center space-x-3"
-                  onClick={() => handleAnimeSelect(spotlightAnime)}
-                >
-                  <PlayIcon className="w-6 h-6" />
-                  <span>Watch Now</span>
-                </button>
-                <button className="focusable px-8 py-4 bg-white/20 hover:bg-white/30 text-white font-semibold rounded-lg">
-                  More Info
-                </button>
-              </div>
+          <div style={{ ...heroContentStyle }} className="px-safeH">
+            <h1 style={{
+              fontSize: 'clamp(2rem, 5vw, 4rem)',
+              fontWeight: 'bold',
+              lineHeight: '1.1',
+              marginBottom: '1rem'
+            }}>
+              {spotlightAnime.title}
+            </h1>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '1rem',
+              fontSize: '1.125rem',
+              color: 'rgba(255, 255, 255, 0.7)',
+              marginBottom: '1.5rem',
+              flexWrap: 'wrap'
+            }}>
+              {spotlightAnime.type && <Chip color="secondary" variant="flat">{spotlightAnime.type}</Chip>}
+              {spotlightAnime.episodeCount && (
+                <span>{spotlightAnime.episodeCount.sub || spotlightAnime.episodeCount.dub || 'Unknown'} Episodes</span>
+              )}
+              {spotlightAnime.rating && <span>⭐ {spotlightAnime.rating}</span>}
+            </div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '1rem',
+              flexWrap: 'wrap'
+            }}>
+              <Button 
+                color="primary"
+                size="lg"
+                startContent={<PlayIcon className="w-6 h-6" />}
+                onPress={() => handleAnimeSelect(spotlightAnime)}
+                className="focusable"
+                style={{
+                  backgroundColor: '#8B5CF6',
+                  fontWeight: '600'
+                }}
+              >
+                Watch Now
+              </Button>
+              <Button 
+                variant="flat"
+                color="default"
+                size="lg"
+                startContent={<InformationCircleIcon className="w-6 h-6" />}
+                className="focusable"
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                  color: '#ffffff',
+                  fontWeight: '600'
+                }}
+              >
+                More Info
+              </Button>
             </div>
           </div>
         </div>
       )}
 
       {/* Content Sections */}
-      <div className="py-8 space-y-12">
+      <div style={sectionStyle}>
         {sections.map((section, _sectionIndex) => (
           <div key={section.title} className="px-safeH">
-            <h2 className="text-2xl font-bold mb-6 text-white">{section.title}</h2>
+            <h2 style={{
+              fontSize: '1.5rem',
+              fontWeight: 'bold',
+              marginBottom: '1.5rem',
+              color: '#ffffff'
+            }}>
+              {section.title}
+            </h2>
             
-            <div className="flex space-x-4 overflow-x-auto overflow-y-hidden pb-4">
+            <div style={sectionContentStyle}>
               {section.loading ? (
                 // Show skeleton loaders
                 Array.from({ length: 6 }).map((_, index) => (
-                  <div key={index} className="flex-shrink-0">
+                  <div key={index} style={{ flexShrink: 0 }}>
                     <SkeletonCard />
                   </div>
                 ))
               ) : section.items.length > 0 ? (
                 // Show actual content
                 section.items.map((anime) => (
-                  <div key={anime.id} className="flex-shrink-0">
+                  <div key={anime.id} style={{ flexShrink: 0 }}>
                     <AnimeCard
                       title={anime.title}
                       imgSrc={anime.image}
-                      meta={`${anime.episodeCount || 'Unknown'} eps • ${anime.year || 'Unknown'}`}
+                      meta={`${anime.episodeCount?.sub || anime.episodeCount?.dub || 'Unknown'} eps${anime.type ? ` • ${anime.type}` : ''}`}
                       onSelect={() => handleAnimeSelect(anime)}
                     />
                   </div>
                 ))
               ) : (
                 // Show empty state
-                <div className="text-gray-400 text-lg py-8">
+                <div style={{
+                  color: 'rgba(255, 255, 255, 0.6)',
+                  fontSize: '1.125rem',
+                  padding: '2rem 0'
+                }}>
                   No content available. Check your connection and try again.
                 </div>
               )}

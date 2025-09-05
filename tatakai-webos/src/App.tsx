@@ -91,7 +91,12 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-tvbg text-white overflow-x-hidden">
+    <div style={{ 
+      minHeight: '100vh', 
+      backgroundColor: '#111111', 
+      color: '#ffffff',
+      overflowX: 'hidden'
+    }}>
       {/* Header */}
       {currentRoute !== 'player' && (
         <TVHeader onOpenNav={() => setSidebarOpen(true)} />
@@ -106,7 +111,7 @@ function App() {
       />
 
       {/* Main Content */}
-      <main className={currentRoute === 'player' ? '' : 'pt-0'}>
+      <main style={{ paddingTop: currentRoute === 'player' ? '0' : '0' }}>
         <AnimatePresence mode="wait">
           <motion.div
             key={currentRoute}
@@ -122,7 +127,7 @@ function App() {
       </main>
 
       {/* Global keyboard shortcuts */}
-      <div className="sr-only">
+      <div style={{ position: 'absolute', left: '-10000px', width: '1px', height: '1px' }}>
         <p>Use arrow keys to navigate, Enter to select, and Escape to go back</p>
       </div>
     </div>

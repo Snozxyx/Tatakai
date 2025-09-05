@@ -7,11 +7,11 @@ export default defineConfig({
     port: 3000,
     host: '0.0.0.0',
     proxy: {
-      '/api/v4': {
-        target: 'https://api.jikan.moe',
+      '/api/v2/hianime': {
+        target: 'https://aniwatch-api-taupe-eight.vercel.app',
         changeOrigin: true,
         secure: true,
-        rewrite: (path) => path.replace(/^\/api\/v4/, '/v4')
+        rewrite: (path) => path
       }
     }
   },

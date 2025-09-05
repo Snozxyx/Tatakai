@@ -1,34 +1,80 @@
 import React from 'react';
+import { Button } from '@heroui/react';
 import { MagnifyingGlassIcon, Bars3Icon } from '@heroicons/react/24/outline';
-import Focusable from './Focusable';
 
 export default function TVHeader({ onOpenNav }: { onOpenNav: () => void }) {
+  const headerStyle = {
+    width: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(17, 17, 17, 0.8)',
+    backdropFilter: 'blur(12px)',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+    padding: '1rem'
+  };
+
+  const logoContainerStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '1rem'
+  };
+
+  const logoStyle = {
+    height: '2.5rem',
+    width: 'auto'
+  };
+
+  const titleStyle = {
+    fontSize: '1.25rem',
+    fontWeight: 'bold',
+    color: '#ffffff'
+  };
+
+  const buttonContainerStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem'
+  };
+
   return (
-    <header className="w-full flex items-center justify-between px-safeH py-4 bg-tvbg/80 backdrop-blur-md border-b border-tv-border">
-      <div className="flex items-center gap-4">
-        <img src="/logo.png" alt="Tatakai" className="h-10 w-auto" />
-        <span className="text-xl font-bold text-white hidden sm:block">Tatakai</span>
+    <header style={headerStyle} className="px-safeH">
+      <div style={logoContainerStyle}>
+        <img src="/logo.png" alt="Tatakai" style={logoStyle} />
+        <span style={titleStyle}>Tatakai</span>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div style={buttonContainerStyle}>
         {/* Search Button */}
-        <Focusable 
-          tag="button" 
-          className="px-4 py-2 rounded-lg bg-tv-surface hover:bg-black/40 transition-colors flex items-center space-x-2 min-h-[44px]"
+        <Button
+          variant="flat"
+          color="default"
+          startContent={<MagnifyingGlassIcon className="w-5 h-5" />}
+          className="focusable"
+          style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+            color: '#ffffff',
+            minHeight: '44px'
+          }}
         >
-          <MagnifyingGlassIcon className="w-5 h-5 text-white" />
-          <span className="text-white hidden sm:block">Search</span>
-        </Focusable>
+          Search
+        </Button>
 
         {/* Menu Button */}
-        <Focusable 
-          tag="button" 
-          className="px-4 py-2 rounded-lg bg-tv-surface hover:bg-black/40 transition-colors flex items-center space-x-2 min-h-[44px]"
-          onEnterPress={onOpenNav}
+        <Button
+          variant="flat"
+          color="default"
+          startContent={<Bars3Icon className="w-5 h-5" />}
+          onPress={onOpenNav}
+          className="focusable"
+          style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+            color: '#ffffff',
+            minHeight: '44px'
+          }}
         >
-          <Bars3Icon className="w-5 h-5 text-white" />
-          <span className="text-white hidden sm:block">Menu</span>
-        </Focusable>
+          Menu
+        </Button>
       </div>
     </header>
   );

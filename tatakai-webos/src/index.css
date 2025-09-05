@@ -1,10 +1,33 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 :root {
   --safe-v: 4vh;
   --safe-h: 6vw;
+  font-family: 'Inter', system-ui, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #111111;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #111111;
+  color: #ffffff;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
 }
 
 .px-safeH { 
@@ -22,18 +45,11 @@
   padding-bottom: calc(var(--safe-v) / 2); 
 }
 
-/* TV Safe Areas */
-body {
-  background: #111111;
-  color: #ffffff;
-  font-family: 'Inter', system-ui, sans-serif;
-  overflow-x: hidden;
-}
-
 /* Focus management for TV remote */
 .focusable {
   outline: none;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border-radius: 8px;
 }
 
 .focusable:focus,
@@ -41,16 +57,6 @@ body {
   transform: scale(1.08);
   box-shadow: 0 0 0 6px rgba(138,43,226,0.4), 0 4px 20px rgba(138,43,226,0.3);
   z-index: 10;
-}
-
-/* Ensure focusable elements are accessible */
-.focusable {
-  border-radius: 8px;
-}
-
-/* Smooth scrolling for navigation */
-* {
-  scroll-behavior: smooth;
 }
 
 /* Hide scrollbars but keep functionality */
