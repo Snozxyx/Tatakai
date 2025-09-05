@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, CardBody, CardFooter, Image, Button } from '@heroui/react';
+import { Card, CardBody, Image, Button, Chip } from '@heroui/react';
 import { PlayIcon } from '@heroicons/react/24/solid';
 
 type Props = {
@@ -10,120 +10,66 @@ type Props = {
 };
 
 export default function AnimeCard({ title, imgSrc, onSelect, meta }: Props) {
-  const cardStyle = {
-    width: '160px',
-    aspectRatio: '2/3',
-    backgroundColor: 'rgba(30, 30, 30, 0.8)',
-    border: 'none'
-  };
-
-  const overlayStyle = {
-    position: 'absolute' as const,
-    inset: '0',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    opacity: '0',
-    transition: 'opacity 0.2s ease',
-    zIndex: 10
-  };
-
-  const gradientStyle = {
-    position: 'absolute' as const,
-    bottom: '0',
-    left: '0',
-    right: '0',
-    height: '33%',
-    background: 'linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent)',
-    padding: '0.75rem',
-    display: 'flex',
-    alignItems: 'flex-end'
-  };
-
   return (
-    <div 
-      className="focusable" 
-      style={{ position: 'relative', cursor: 'pointer' }}
-      onClick={onSelect}
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onSelect();
-        }
-      }}
+    <Card 
+      className="w-40 aspect-[2/3] bg-content1/80 backdrop-blur-md border border-white/10 hover:border-primary/50 transition-all duration-300 focusable overflow-hidden group cursor-pointer"
+      isPressable
+      onPress={onSelect}
+      shadow="lg"
     >
-      <Card style={cardStyle} className="overflow-hidden">
-        <CardBody style={{ padding: '0', position: 'relative' }}>
-          <Image
-            src={imgSrc}
-            alt={title}
-            style={{ 
-              width: '100%', 
-              height: '100%', 
-              objectFit: 'cover'
-            }}
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.src = '/placeholder-anime.png';
-            }}
-          />
-          
-          {/* Lower scrim gradient */}
-          <div style={gradientStyle}>
-            <div>
-              <div style={{
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                lineHeight: '1.2',
-                color: '#ffffff',
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden'
-              }}>
-                {title}
-              </div>
-              {meta && (
-                <div style={{
-                  fontSize: '0.75rem',
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  marginTop: '0.25rem'
-                }}>
-                  {meta}
-                </div>
-              )}
-            </div>
-          </div>
+      <CardBody className="p-0 relative">
+        <Image
+          src={imgSrc}
+          alt={title}
+          className="w-full h-full object-cover"
+          removeWrapper
+          loading="lazy"
+          onError={(e) => {
+            const target = e.target as HTMLImageElement;
+            target.src = '/placeholder-anime.png';
+          }}
+        />
+        
+        {/* Gradient overlay for text readability */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+        
+        {/* Title and meta at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
+          <h3 className="text-sm font-semibold line-clamp-2 mb-1">
+            {title}
+          </h3>
+          {meta && (
+            <p className="text-xs text-white/70 line-clamp-1">
+              {meta}
+            </p>
+          )}
+        </div>
 
-          {/* Action overlay - visible when focused */}
-          <div 
-            style={overlayStyle} 
-            className="focus-overlay"
+        {/* Play overlay - appears on hover/focus */}
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity duration-300">
+          <Button
+            color="primary"
+            variant="shadow"
+            startContent={<PlayIcon className="w-5 h-5" />}
+            className="font-semibold"
+            size="lg"
           >
-            <Button
-              variant="flat"
-              color="primary"
-              startContent={<PlayIcon className="w-5 h-5" />}
-              style={{
-                backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                backdropFilter: 'blur(4px)',
-                color: '#ffffff'
-              }}
-            >
-              Play
-            </Button>
-          </div>
-        </CardBody>
-      </Card>
+            Play
+          </Button>
+        </div>
 
-      <style jsx>{`
-        .focusable:focus .focus-overlay,
-        .focusable:hover .focus-overlay {
-          opacity: 1;
-        }
-      `}</style>
-    </div>
+        {/* Premium badge if applicable */}
+        {meta?.includes('Premium') && (
+          <Chip
+            color="warning"
+            variant="solid"
+            size="sm"
+            className="absolute top-2 right-2 font-semibold"
+          >
+            Premium
+          </Chip>
+        )}
+      </CardBody>
+    </Card>
   );
 }

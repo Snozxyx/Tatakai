@@ -1,12 +1,12 @@
 :root {
   --safe-v: 4vh;
   --safe-h: 6vw;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   line-height: 1.5;
   font-weight: 400;
   color-scheme: dark;
   color: rgba(255, 255, 255, 0.87);
-  background-color: #111111;
+  background-color: #0a0a0a;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -21,7 +21,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: #111111;
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0a0a0a 100%);
   color: #ffffff;
   overflow-x: hidden;
 }
@@ -45,31 +45,73 @@ body {
   padding-bottom: calc(var(--safe-v) / 2); 
 }
 
-/* Focus management for TV remote */
+/* Modern focus management for TV remote */
 .focusable {
   outline: none;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  border-radius: 8px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 12px;
+  position: relative;
 }
 
 .focusable:focus,
 .focusable.focused {
-  transform: scale(1.08);
-  box-shadow: 0 0 0 6px rgba(138,43,226,0.4), 0 4px 20px rgba(138,43,226,0.3);
-  z-index: 10;
+  transform: scale(1.05);
+  box-shadow: 
+    0 0 0 4px rgba(168, 85, 247, 0.4),
+    0 8px 25px rgba(168, 85, 247, 0.3),
+    0 4px 15px rgba(0, 0, 0, 0.3);
+  z-index: 50;
+}
+
+.focusable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
 }
 
 /* Hide scrollbars but keep functionality */
-::-webkit-scrollbar {
-  width: 0px;
-  background: transparent;
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
-/* Animation for content loading */
-@keyframes fadeIn {
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Glass morphism utility */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Text line clamp utilities */
+.line-clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Enhanced animations */
+@keyframes fadeInUp {
   from { 
     opacity: 0; 
-    transform: translateY(20px); 
+    transform: translateY(30px); 
   }
   to { 
     opacity: 1; 
@@ -77,22 +119,85 @@ body {
   }
 }
 
-.fade-in {
-  animation: fadeIn 0.5s ease-out;
-}
-
-/* Shimmer effect for skeleton loaders */
-@keyframes shimmer {
-  0% {
-    background-position: -200px 0;
+@keyframes fadeInScale {
+  from { 
+    opacity: 0; 
+    transform: scale(0.9); 
   }
-  100% {
-    background-position: calc(200px + 100%) 0;
+  to { 
+    opacity: 1; 
+    transform: scale(1); 
   }
 }
 
-.shimmer {
-  background: linear-gradient(90deg, #2E2E2E 25%, #3A3A3A 50%, #2E2E2E 75%);
-  background-size: 200px 100%;
-  animation: shimmer 1.5s infinite;
+.fade-in-up {
+  animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fade-in-scale {
+  animation: fadeInScale 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Custom gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 50%, #f59e0b 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Enhanced group hover effects */
+.group:hover .group-hover\:scale-105 {
+  transform: scale(1.05);
+}
+
+.group:focus .group-focus\:scale-105 {
+  transform: scale(1.05);
+}
+
+/* Modern button glow effect */
+.btn-glow {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-glow::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.btn-glow:hover::before {
+  left: 100%;
+}
+
+/* TV-optimized spacing */
+.space-y-6 > * + * {
+  margin-top: 1.5rem;
+}
+
+.space-y-8 > * + * {
+  margin-top: 2rem;
+}
+
+.space-y-12 > * + * {
+  margin-top: 3rem;
+}
+
+/* Enhanced card shadows */
+.card-shadow {
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.card-shadow-lg {
+  box-shadow: 
+    0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
