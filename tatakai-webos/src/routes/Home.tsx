@@ -1,15 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { PlayIcon } from '@heroicons/react/24/solid';
 import AnimeCard from '../components/AnimeCard';
 import SkeletonCard from '../components/SkeletonCard';
-
-interface Anime {
-  id: string;
-  title: string;
-  image: string;
-  episodeCount?: number;
-  year?: number;
-  status?: string;
-}
+import { apiService, Anime } from '../lib/api';
 
 interface AnimeSection {
   title: string;
@@ -28,70 +21,69 @@ export default function Home() {
   const [spotlightAnime, setSpotlightAnime] = useState<Anime | null>(null);
 
   useEffect(() => {
-    // Simulate API calls
+    // Load real anime data from API sequentially to avoid rate limiting
     const loadData = async () => {
-      // Mock data for demonstration
-      const mockAnimes: Anime[] = [
-        {
-          id: '1',
-          title: 'Attack on Titan',
-          image: '/api/placeholder/220/330',
-          episodeCount: 87,
-          year: 2013,
-          status: 'completed'
-        },
-        {
-          id: '2', 
-          title: 'Demon Slayer',
-          image: '/api/placeholder/220/330',
-          episodeCount: 44,
-          year: 2019,
-          status: 'ongoing'
-        },
-        {
-          id: '3',
-          title: 'One Piece',
-          image: '/api/placeholder/220/330',
-          episodeCount: 1000,
-          year: 1999,
-          status: 'ongoing'
-        },
-        {
-          id: '4',
-          title: 'Naruto',
-          image: '/api/placeholder/220/330',
-          episodeCount: 720,
-          year: 2002,
-          status: 'completed'
-        },
-        {
-          id: '5',
-          title: 'My Hero Academia',
-          image: '/api/placeholder/220/330',
-          episodeCount: 154,
-          year: 2016,
-          status: 'ongoing'
-        },
-        {
-          id: '6',
-          title: 'Jujutsu Kaisen',
-          image: '/api/placeholder/220/330',
-          episodeCount: 24,
-          year: 2020,
-          status: 'ongoing'
+      try {
+        // Load trending/top anime for spotlight first
+        const topAnimeResponse = await apiService.getTopAnime(1);
+        if (topAnimeResponse.data.length > 0) {
+          setSpotlightAnime(topAnimeResponse.data[0]);
         }
-      ];
 
-      setSpotlightAnime(mockAnimes[0]);
+        // Load sections one by one to avoid rate limiting
+        try {
+          const trendingData = await apiService.getTopAnime(1);
+          setSections(prev => prev.map(section => 
+            section.title === 'Trending Now' 
+              ? { ...section, items: trendingData.data.slice(0, 6), loading: false }
+              : section
+          ));
+        } catch (error) {
+          console.error('Failed to load trending data:', error);
+        }
 
-      // Simulate loading delays
-      setTimeout(() => {
-        setSections(prev => prev.map((section, index) => ({
+        try {
+          const seasonData = await apiService.getSeasonNow(1);
+          setSections(prev => prev.map(section => 
+            section.title === 'Continue Watching' 
+              ? { ...section, items: seasonData.data.slice(0, 6), loading: false }
+              : section
+          ));
+        } catch (error) {
+          console.error('Failed to load season data:', error);
+        }
+
+        try {
+          const recentData = await apiService.getRecentlyAdded(1);
+          setSections(prev => prev.map(section => 
+            section.title === 'Recently Added' 
+              ? { ...section, items: recentData.data.slice(0, 6), loading: false }
+              : section
+          ));
+        } catch (error) {
+          console.error('Failed to load recent data:', error);
+        }
+
+        try {
+          const topRatedData = await apiService.getTopAnime(2);
+          setSections(prev => prev.map(section => 
+            section.title === 'Top Rated' 
+              ? { ...section, items: topRatedData.data.slice(0, 6), loading: false }
+              : section
+          ));
+        } catch (error) {
+          console.error('Failed to load top rated data:', error);
+        }
+
+      } catch (error) {
+        console.error('Failed to load anime data:', error);
+        // Set empty data on error
+        setSections(prev => prev.map(section => ({
           ...section,
-          items: mockAnimes.slice(index * 3, (index * 3) + 6),
+          items: [],
           loading: false
         })));
-      }, 1500);
+      }
     };
 
     loadData();
@@ -133,9 +125,7 @@ export default function Home() {
                   className="focusable px-8 py-4 bg-tatakai-purple hover:bg-purple-700 text-white font-semibold rounded-lg flex items-center space-x-3"
                   onClick={() => handleAnimeSelect(spotlightAnime)}
                 >
-                  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                  </svg>
+                  <PlayIcon className="w-6 h-6" />
                   <span>Watch Now</span>
                 </button>
                 <button className="focusable px-8 py-4 bg-white/20 hover:bg-white/30 text-white font-semibold rounded-lg">
@@ -161,18 +151,23 @@ export default function Home() {
                     <SkeletonCard />
                   </div>
                 ))
-              ) : (
+              ) : section.items.length > 0 ? (
                 // Show actual content
                 section.items.map((anime) => (
                   <div key={anime.id} className="flex-shrink-0">
                     <AnimeCard
                       title={anime.title}
                       imgSrc={anime.image}
-                      meta={`${anime.episodeCount} eps • ${anime.year}`}
+                      meta={`${anime.episodeCount || 'Unknown'} eps • ${anime.year || 'Unknown'}`}
                       onSelect={() => handleAnimeSelect(anime)}
                     />
                   </div>
                 ))
+              ) : (
+                // Show empty state
+                <div className="text-gray-400 text-lg py-8">
+                  No content available. Check your connection and try again.
+                </div>
               )}
             </div>
           </div>

@@ -10,6 +10,7 @@
     "test": "vitest"
   },
   "dependencies": {
+    "@heroicons/react": "^2.2.0",
     "framer-motion": "^10.16.4",
     "hls.js": "^1.4.12",
     "react": "^18.2.0",

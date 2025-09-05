@@ -1,5 +1,13 @@
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  HomeIcon, 
+  FireIcon, 
+  FilmIcon, 
+  TvIcon, 
+  HeartIcon, 
+  MagnifyingGlassIcon 
+} from '@heroicons/react/24/outline';
 import TVHeader from './components/TVHeader';
 import OverlaySidebar from './components/OverlaySidebar';
 import Home from './routes/Home';
@@ -11,12 +19,12 @@ import './index.css';
 import './styles/tv-utils.css';
 
 const navigationItems = [
-  { id: 'home', label: 'Home', icon: '🏠' },
-  { id: 'trending', label: 'Trending', icon: '🔥' },
-  { id: 'movies', label: 'Movies', icon: '🎬' },
-  { id: 'series', label: 'TV Series', icon: '📺' },
-  { id: 'favorites', label: 'My List', icon: '❤️' },
-  { id: 'search', label: 'Search', icon: '🔍' },
+  { id: 'home', label: 'Home', icon: HomeIcon },
+  { id: 'trending', label: 'Trending', icon: FireIcon },
+  { id: 'movies', label: 'Movies', icon: FilmIcon },
+  { id: 'series', label: 'TV Series', icon: TvIcon },
+  { id: 'favorites', label: 'My List', icon: HeartIcon },
+  { id: 'search', label: 'Search', icon: MagnifyingGlassIcon },
 ];
 
 function App() {
