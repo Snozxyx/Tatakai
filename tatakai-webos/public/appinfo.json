@@ -1,0 +1,18 @@
+{
+  "id": "com.tatakai.animeapp",
+  "version": "1.0.0",
+  "vendor": "Tatakai Team",
+  "type": "web",
+  "main": "index.html",
+  "title": "Tatakai Anime",
+  "icon": "icon.png",
+  "largeIcon": "icon.png",
+  "uiRevision": "2",
+  "resolution": "1920x1080",
+  "disableBackHistoryAPI": true,
+  "requiredPermissions": [
+    "network.operation",
+    "audio",
+    "media.operation"
+  ]
+}
