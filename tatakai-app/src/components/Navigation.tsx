@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { AnimeAPI, type Anime } from '@/lib/api';
+import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
 
 const Navigation = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -31,7 +32,77 @@ const Navigation = () => {
   const [searchSuggestions, setSearchSuggestions] = useState<Anime[]>([]);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const router = useRouter();
+
+  // Desktop navigation keyboard navigation
+  const desktopNav = useKeyboardNavigation({
+    isActive: !isSearchOpen && !isMobileMenuOpen,
+    selector: '[data-keyboard-nav="desktop"]',
+    autoFocus: false,
+    onSelect: (element) => {
+      // Handle navigation or button clicks
+      const link = element.querySelector('a');
+      const button = element.querySelector('button');
+      if (link) {
+        link.click();
+      } else if (button) {
+        button.click();
+      } else {
+        element.click();
+      }
+    }
+  });
+
+  // Search modal keyboard navigation
+  const searchNav = useKeyboardNavigation({
+    isActive: isSearchOpen,
+    selector: '[data-keyboard-nav="search"]',
+    autoFocus: true,
+    onEscape: () => setIsSearchOpen(false),
+    onSelect: (element) => {
+      const suggestionId = element.getAttribute('data-anime-id');
+      if (suggestionId) {
+        router.push(`/anime/${suggestionId}`);
+        setIsSearchOpen(false);
+        setSearchQuery('');
+      }
+    }
+  });
+
+  // Mobile menu keyboard navigation
+  const mobileNav = useKeyboardNavigation({
+    isActive: isMobileMenuOpen,
+    selector: '[data-keyboard-nav="mobile"]',
+    autoFocus: true,
+    onEscape: () => setIsMobileMenuOpen(false),
+    onSelect: (element) => {
+      const link = element.querySelector('a');
+      const button = element.querySelector('button');
+      if (link) {
+        link.click();
+      } else if (button) {
+        button.click();
+      } else {
+        element.click();
+      }
+      setIsMobileMenuOpen(false);
+    }
+  });
+
+  // Update focusable elements when search suggestions change
+  useEffect(() => {
+    if (isSearchOpen) {
+      searchNav.updateFocusableElements();
+    }
+  }, [searchSuggestions, searchNav]);
+
+  // Update focusable elements when mobile menu state changes
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      mobileNav.updateFocusableElements();
+    }
+  }, [isMobileMenuOpen, mobileNav]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -99,6 +170,7 @@ const Navigation = () => {
   return (
     <>
       <motion.nav
+        ref={desktopNav.containerRef}
         initial={{ y: -100 }}
         animate={{ y: 0 }}
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
@@ -133,6 +205,8 @@ const Navigation = () => {
                   key={item.name}
                   whileHover={{ y: -2 }}
                   whileTap={{ y: 0 }}
+                  data-keyboard-nav="desktop"
+                  tabIndex={-1}
                 >
                   <Link
                     href={item.href}
@@ -151,6 +225,8 @@ const Navigation = () => {
               <motion.div
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
+                data-keyboard-nav="desktop"
+                tabIndex={-1}
               >
                 <Button
                   variant="ghost"
@@ -175,6 +251,8 @@ const Navigation = () => {
               <motion.div
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
+                data-keyboard-nav="desktop"
+                tabIndex={-1}
               >
                 <Button
                   variant="ghost"
@@ -187,7 +265,7 @@ const Navigation = () => {
               </motion.div>
 
               {/* Mobile Menu */}
-              <Sheet>
+              <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild>
                   <Button 
                     variant="ghost" 
@@ -201,33 +279,43 @@ const Navigation = () => {
                   side="right" 
                   className="w-[85vw] xs:w-80 sm:w-80 max-w-sm bg-background border-border"
                 >
-                  <div className="flex flex-col space-y-1 mt-8 px-2">
+                  <div ref={mobileNav.containerRef} className="flex flex-col space-y-1 mt-8 px-2">
                     {mobileMenuItems.map((item) => (
-                      <Link
+                      <div
                         key={item.name}
-                        href={item.href}
-                        className="flex items-center space-x-3 min-h-[48px] px-4 py-3 rounded-lg text-foreground hover:bg-accent hover:text-accent-foreground transition-colors duration-200 active:bg-accent/80"
+                        data-keyboard-nav="mobile"
+                        tabIndex={-1}
                       >
-                        <item.icon className="w-5 h-5 text-muted-foreground" />
-                        <span className="font-medium">{item.name}</span>
-                      </Link>
+                        <Link
+                          href={item.href}
+                          className="flex items-center space-x-3 min-h-[48px] px-4 py-3 rounded-lg text-foreground hover:bg-accent hover:text-accent-foreground transition-colors duration-200 active:bg-accent/80"
+                        >
+                          <item.icon className="w-5 h-5 text-muted-foreground" />
+                          <span className="font-medium">{item.name}</span>
+                        </Link>
+                      </div>
                     ))}
                     
                     {/* Mobile Theme Toggle */}
                     <div className="pt-4 mt-4 border-t border-border">
-                      <button
-                        onClick={toggleTheme}
-                        className="flex items-center space-x-3 min-h-[48px] px-4 py-3 rounded-lg text-foreground hover:bg-accent hover:text-accent-foreground transition-colors duration-200 active:bg-accent/80 w-full"
+                      <div
+                        data-keyboard-nav="mobile"
+                        tabIndex={-1}
                       >
-                        {isDarkMode ? (
-                          <Sun className="w-5 h-5 text-muted-foreground" />
-                        ) : (
-                          <Moon className="w-5 h-5 text-muted-foreground" />
-                        )}
-                        <span className="font-medium">
-                          {isDarkMode ? 'Light Mode' : 'Dark Mode'}
-                        </span>
-                      </button>
+                        <button
+                          onClick={toggleTheme}
+                          className="flex items-center space-x-3 min-h-[48px] px-4 py-3 rounded-lg text-foreground hover:bg-accent hover:text-accent-foreground transition-colors duration-200 active:bg-accent/80 w-full"
+                        >
+                          {isDarkMode ? (
+                            <Sun className="w-5 h-5 text-muted-foreground" />
+                          ) : (
+                            <Moon className="w-5 h-5 text-muted-foreground" />
+                          )}
+                          <span className="font-medium">
+                            {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+                          </span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </SheetContent>
@@ -277,14 +365,17 @@ const Navigation = () => {
 
                 {/* Search Suggestions */}
                 {searchSuggestions.length > 0 && (
-                  <div className="space-y-2 max-h-80 overflow-y-auto custom-scrollbar">
+                  <div ref={searchNav.containerRef} className="space-y-2 max-h-80 overflow-y-auto custom-scrollbar">
                     {searchSuggestions.map((suggestion: Anime, index: number) => (
                       <motion.div
                         key={suggestion.id}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05 }}
-                        className="flex items-center space-x-3 min-h-[56px] p-3 rounded-lg hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors duration-200 active:bg-accent/80"
+                        className="search-suggestion flex items-center space-x-3 min-h-[56px] p-3 rounded-lg hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors duration-200 active:bg-accent/80"
+                        data-keyboard-nav="search"
+                        data-anime-id={suggestion.id}
+                        tabIndex={-1}
                         onClick={() => router.push(`/anime/${suggestion.id}`)}
                       >
                         <Image

@@ -216,3 +216,28 @@ html {
     background: rgba(0, 0, 0, 0.7);
   }
 }
+
+/* Keyboard navigation focus styles */
+.keyboard-focused {
+  outline: 2px solid var(--color-primary) !important;
+  outline-offset: 2px;
+  border-radius: 6px;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+  position: relative;
+  z-index: 1;
+}
+
+.dark .keyboard-focused {
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+}
+
+/* Ensure keyboard focus is visible */
+[data-keyboard-nav] {
+  transition: outline 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Focus indicator for search suggestions */
+.search-suggestion.keyboard-focused {
+  background: var(--color-accent) !important;
+  color: var(--color-accent-foreground) !important;
+}
