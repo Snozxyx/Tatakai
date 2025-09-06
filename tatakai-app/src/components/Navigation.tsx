@@ -59,7 +59,6 @@ const Navigation = () => {
     isActive: isSearchOpen,
     selector: '[data-keyboard-nav="search"]',
     autoFocus: true,
-    onEscape: () => setIsSearchOpen(false),
     onSelect: (element) => {
       const suggestionId = element.getAttribute('data-anime-id');
       if (suggestionId) {
@@ -75,7 +74,6 @@ const Navigation = () => {
     isActive: isMobileMenuOpen,
     selector: '[data-keyboard-nav="mobile"]',
     autoFocus: true,
-    onEscape: () => setIsMobileMenuOpen(false),
     onSelect: (element) => {
       const link = element.querySelector('a');
       const button = element.querySelector('button');

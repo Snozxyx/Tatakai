@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 
 interface KeyboardNavigationOptions {
   onSelect?: (element: HTMLElement, index: number) => void;
-  onEscape?: () => void;
   isActive?: boolean;
   selector?: string;
   autoFocus?: boolean;
@@ -11,7 +10,6 @@ interface KeyboardNavigationOptions {
 export function useKeyboardNavigation(options: KeyboardNavigationOptions = {}) {
   const {
     onSelect,
-    onEscape,
     isActive = true,
     selector = '[data-keyboard-nav]',
     autoFocus = true
@@ -102,18 +100,11 @@ export function useKeyboardNavigation(options: KeyboardNavigationOptions = {}) {
         navigateDown();
         break;
       case 'Enter':
-      case ' ':
         event.preventDefault();
         selectCurrent();
         break;
-      case 'Escape':
-        if (onEscape) {
-          event.preventDefault();
-          onEscape();
-        }
-        break;
     }
-  }, [isActive, focusableElements.length, navigateUp, navigateDown, selectCurrent, onEscape]);
+  }, [isActive, focusableElements.length, navigateUp, navigateDown, selectCurrent]);
 
   // Initialize focus
   const initializeFocus = useCallback(() => {
