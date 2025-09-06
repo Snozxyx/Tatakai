@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
+import { DeviceProvider } from "@/contexts/DeviceContext";
+import DeviceAwareLayout from "@/components/DeviceAwareLayout";
 
 export const metadata: Metadata = {
   title: "Tatakai - Modern Anime Streaming",
@@ -17,13 +19,17 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="antialiased font-sans">
-        <div className="min-h-screen bg-background text-foreground">
-          <Navigation />
-          <main className="pt-16">
-            {children}
-          </main>
-          <Footer />
-        </div>
+        <DeviceProvider>
+          <DeviceAwareLayout>
+            <div className="min-h-screen bg-background text-foreground">
+              <Navigation />
+              <main className="device-nav" style={{ paddingTop: 'var(--device-nav-height)' }}>
+                {children}
+              </main>
+              <Footer />
+            </div>
+          </DeviceAwareLayout>
+        </DeviceProvider>
       </body>
     </html>
   );

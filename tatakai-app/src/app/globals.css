@@ -241,3 +241,131 @@ html {
   background: var(--color-accent) !important;
   color: var(--color-accent-foreground) !important;
 }
+
+/* Device-specific scaling variables */
+:root {
+  /* Mobile scaling (default) */
+  --device-scale: 1;
+  --device-text-scale: 1;
+  --device-spacing-scale: 1;
+  --device-touch-target: 44px;
+  --device-nav-height: 64px;
+  --device-font-base: 14px;
+  --device-font-lg: 16px;
+  --device-font-xl: 18px;
+  --device-font-2xl: 24px;
+  --device-border-radius: 6px;
+  --device-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Laptop scaling */
+.device-laptop {
+  --device-scale: 1.1;
+  --device-text-scale: 1;
+  --device-spacing-scale: 1.1;
+  --device-touch-target: 44px;
+  --device-nav-height: 64px;
+  --device-font-base: 14px;
+  --device-font-lg: 16px;
+  --device-font-xl: 20px;
+  --device-font-2xl: 28px;
+  --device-border-radius: 8px;
+  --device-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* TV scaling - Larger interface for distance viewing */
+.device-tv {
+  --device-scale: 1.5;
+  --device-text-scale: 1.3;
+  --device-spacing-scale: 1.4;
+  --device-touch-target: 60px;
+  --device-nav-height: 80px;
+  --device-font-base: 18px;
+  --device-font-lg: 22px;
+  --device-font-xl: 28px;
+  --device-font-2xl: 36px;
+  --device-border-radius: 12px;
+  --device-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Apply device scaling to common elements */
+.device-scaled {
+  font-size: calc(var(--device-font-base) * var(--device-text-scale));
+  border-radius: var(--device-border-radius);
+}
+
+.device-scaled-lg {
+  font-size: calc(var(--device-font-lg) * var(--device-text-scale));
+}
+
+.device-scaled-xl {
+  font-size: calc(var(--device-font-xl) * var(--device-text-scale));
+}
+
+.device-scaled-2xl {
+  font-size: calc(var(--device-font-2xl) * var(--device-text-scale));
+}
+
+/* Navigation scaling */
+.device-nav {
+  height: var(--device-nav-height);
+}
+
+.device-touch-target {
+  min-height: var(--device-touch-target);
+  min-width: var(--device-touch-target);
+}
+
+/* TV-specific enhancements */
+.device-tv .keyboard-focused {
+  outline: 3px solid var(--color-primary) !important;
+  outline-offset: 3px;
+  border-radius: var(--device-border-radius);
+  box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.2), var(--device-shadow);
+  transform: scale(1.02);
+  transition: all 0.2s ease;
+}
+
+.device-tv .search-suggestion.keyboard-focused {
+  transform: scale(1.01);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+}
+
+/* Enhanced contrast for TV viewing */
+.device-tv {
+  --color-primary: oklch(0.95 0 0);
+  --color-background: oklch(0.12 0 0);
+  --color-foreground: oklch(0.98 0 0);
+  --color-border: oklch(1 0 0 / 15%);
+}
+
+.device-tv.dark {
+  --color-primary: oklch(0.95 0 0);
+  --color-background: oklch(0.08 0 0);
+  --color-foreground: oklch(0.98 0 0);
+  --color-border: oklch(1 0 0 / 20%);
+}
+
+/* Responsive padding and margins for TV */
+.device-tv .p-4 { padding: calc(1rem * var(--device-spacing-scale)); }
+.device-tv .p-6 { padding: calc(1.5rem * var(--device-spacing-scale)); }
+.device-tv .px-4 { padding-left: calc(1rem * var(--device-spacing-scale)); padding-right: calc(1rem * var(--device-spacing-scale)); }
+.device-tv .px-6 { padding-left: calc(1.5rem * var(--device-spacing-scale)); padding-right: calc(1.5rem * var(--device-spacing-scale)); }
+.device-tv .py-3 { padding-top: calc(0.75rem * var(--device-spacing-scale)); padding-bottom: calc(0.75rem * var(--device-spacing-scale)); }
+.device-tv .space-x-3 > * + * { margin-left: calc(0.75rem * var(--device-spacing-scale)); }
+.device-tv .space-x-6 > * + * { margin-left: calc(1.5rem * var(--device-spacing-scale)); }
+
+/* TV-optimized button scaling */
+.device-tv button {
+  transform: scale(var(--device-scale));
+  transform-origin: center;
+  margin: calc(0.25rem * var(--device-spacing-scale));
+}
+
+/* Smooth transitions for all device scaling */
+.device-scaled,
+.device-nav,
+.device-touch-target,
+.device-tv button {
+  transition: font-size 0.3s ease, height 0.3s ease, transform 0.3s ease, padding 0.3s ease;
+}

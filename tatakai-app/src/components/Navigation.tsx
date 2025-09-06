@@ -18,13 +18,15 @@ import {
   User,
   Settings,
   Moon,
-  Sun
+  Sun,
+  Monitor
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { AnimeAPI, type Anime } from '@/lib/api';
 import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
+import { useDevice } from '@/contexts/DeviceContext';
 
 const Navigation = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -34,6 +36,7 @@ const Navigation = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const router = useRouter();
+  const { deviceType, showDeviceSelector } = useDevice();
 
   // Desktop navigation keyboard navigation
   const desktopNav = useKeyboardNavigation({
@@ -165,34 +168,45 @@ const Navigation = () => {
     { name: 'Settings', href: '/settings', icon: Settings },
   ];
 
+  const deviceMenuItems = [
+    { 
+      name: 'Device Settings', 
+      action: showDeviceSelector, 
+      icon: Monitor,
+      description: `Current: ${deviceType.charAt(0).toUpperCase() + deviceType.slice(1)}`
+    },
+  ];
+
   return (
     <>
       <motion.nav
         ref={desktopNav.containerRef}
         initial={{ y: -100 }}
         animate={{ y: 0 }}
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 device-nav ${
           isScrolled 
             ? 'bg-background/95 backdrop-blur-md border-b border-border' 
             : 'bg-transparent'
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between device-nav">
             {/* Logo */}
             <motion.div
               whileHover={{ scale: 1.05 }}
               className="flex items-center space-x-2"
             >
-              <Link href="/" className="flex items-center space-x-2">
+              <Link href="/" className="flex items-center space-x-2 device-scaled-lg">
                 <Image
                   src="/logo.png"
                   alt="Tatakai"
                   width={32}
                   height={32}
-                  className="w-8 h-8 rounded-lg"
+                  className={`rounded-lg ${
+                    deviceType === 'tv' ? 'w-10 h-10' : 'w-8 h-8'
+                  }`}
                 />
-                <span className="text-xl font-bold text-foreground">Tatakai</span>
+                <span className="text-xl font-bold text-foreground device-scaled-xl">Tatakai</span>
               </Link>
             </motion.div>
 
@@ -208,10 +222,10 @@ const Navigation = () => {
                 >
                   <Link
                     href={item.href}
-                    className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors"
+                    className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors device-scaled device-touch-target p-2 rounded-lg"
                   >
-                    <item.icon className="w-4 h-4" />
-                    <span>{item.name}</span>
+                    <item.icon className={`${deviceType === 'tv' ? 'w-6 h-6' : 'w-4 h-4'}`} />
+                    <span className="device-scaled">{item.name}</span>
                   </Link>
                 </motion.div>
               ))}
@@ -230,18 +244,18 @@ const Navigation = () => {
                   variant="ghost"
                   size="sm"
                   onClick={() => setIsSearchOpen(true)}
-                  className="hidden sm:flex min-h-[44px] px-3"
+                  className="hidden sm:flex device-touch-target px-3 device-scaled"
                 >
-                  <Search className="w-4 h-4" />
-                  <span className="ml-2">Search</span>
+                  <Search className={`${deviceType === 'tv' ? 'w-6 h-6' : 'w-4 h-4'}`} />
+                  <span className="ml-2 device-scaled">Search</span>
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setIsSearchOpen(true)}
-                  className="sm:hidden min-h-[44px] min-w-[44px] p-2"
+                  className="sm:hidden device-touch-target p-2"
                 >
-                  <Search className="w-5 h-5" />
+                  <Search className={`${deviceType === 'tv' ? 'w-7 h-7' : 'w-5 h-5'}`} />
                 </Button>
               </motion.div>
 
@@ -256,9 +270,12 @@ const Navigation = () => {
                   variant="ghost"
                   size="sm"
                   onClick={toggleTheme}
-                  className="min-h-[44px] min-w-[44px] p-2"
+                  className="device-touch-target p-2"
                 >
-                  {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                  {isDarkMode ? 
+                    <Sun className={`${deviceType === 'tv' ? 'w-7 h-7' : 'w-5 h-5'}`} /> : 
+                    <Moon className={`${deviceType === 'tv' ? 'w-7 h-7' : 'w-5 h-5'}`} />
+                  }
                 </Button>
               </motion.div>
 
@@ -268,9 +285,9 @@ const Navigation = () => {
                   <Button 
                     variant="ghost" 
                     size="sm" 
-                    className="md:hidden min-h-[44px] min-w-[44px] p-2"
+                    className="md:hidden device-touch-target p-2"
                   >
-                    <Menu className="w-5 h-5" />
+                    <Menu className={`${deviceType === 'tv' ? 'w-7 h-7' : 'w-5 h-5'}`} />
                   </Button>
                 </SheetTrigger>
                 <SheetContent 
@@ -286,30 +303,54 @@ const Navigation = () => {
                       >
                         <Link
                           href={item.href}
-                          className="flex items-center space-x-3 min-h-[48px] px-4 py-3 rounded-lg text-foreground hover:bg-accent hover:text-accent-foreground transition-colors duration-200 active:bg-accent/80"
+                          className="flex items-center space-x-3 device-touch-target px-4 py-3 rounded-lg text-foreground hover:bg-accent hover:text-accent-foreground transition-colors duration-200 active:bg-accent/80 device-scaled"
                         >
-                          <item.icon className="w-5 h-5 text-muted-foreground" />
-                          <span className="font-medium">{item.name}</span>
+                          <item.icon className={`${deviceType === 'tv' ? 'w-6 h-6' : 'w-5 h-5'} text-muted-foreground`} />
+                          <span className="font-medium device-scaled">{item.name}</span>
                         </Link>
                       </div>
                     ))}
                     
+                    {/* Device Settings */}
+                    <div className="pt-2 mt-2 border-t border-border">
+                      {deviceMenuItems.map((item) => (
+                        <div
+                          key={item.name}
+                          data-keyboard-nav="mobile"
+                          tabIndex={-1}
+                        >
+                          <button
+                            onClick={item.action}
+                            className="flex items-center justify-between w-full device-touch-target px-4 py-3 rounded-lg text-foreground hover:bg-accent hover:text-accent-foreground transition-colors duration-200 active:bg-accent/80 device-scaled"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <item.icon className={`${deviceType === 'tv' ? 'w-6 h-6' : 'w-5 h-5'} text-muted-foreground`} />
+                              <span className="font-medium device-scaled">{item.name}</span>
+                            </div>
+                            <span className="text-xs text-muted-foreground device-scaled">
+                              {item.description}
+                            </span>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    
                     {/* Mobile Theme Toggle */}
-                    <div className="pt-4 mt-4 border-t border-border">
+                    <div className="pt-2 mt-2 border-t border-border">
                       <div
                         data-keyboard-nav="mobile"
                         tabIndex={-1}
                       >
                         <button
                           onClick={toggleTheme}
-                          className="flex items-center space-x-3 min-h-[48px] px-4 py-3 rounded-lg text-foreground hover:bg-accent hover:text-accent-foreground transition-colors duration-200 active:bg-accent/80 w-full"
+                          className="flex items-center space-x-3 device-touch-target px-4 py-3 rounded-lg text-foreground hover:bg-accent hover:text-accent-foreground transition-colors duration-200 active:bg-accent/80 w-full device-scaled"
                         >
                           {isDarkMode ? (
-                            <Sun className="w-5 h-5 text-muted-foreground" />
+                            <Sun className={`${deviceType === 'tv' ? 'w-6 h-6' : 'w-5 h-5'} text-muted-foreground`} />
                           ) : (
-                            <Moon className="w-5 h-5 text-muted-foreground" />
+                            <Moon className={`${deviceType === 'tv' ? 'w-6 h-6' : 'w-5 h-5'} text-muted-foreground`} />
                           )}
-                          <span className="font-medium">
+                          <span className="font-medium device-scaled">
                             {isDarkMode ? 'Light Mode' : 'Dark Mode'}
                           </span>
                         </button>
@@ -340,24 +381,24 @@ const Navigation = () => {
               className="mx-auto mt-16 sm:mt-20 p-4 sm:p-6 max-w-2xl"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="bg-card border border-border rounded-lg shadow-lg p-4 sm:p-6">
+              <div className="bg-card border border-border rounded-lg shadow-lg p-4 sm:p-6 device-scaled">
                 <div className="flex items-center space-x-3 mb-4">
-                  <Search className="w-5 h-5 text-muted-foreground" />
+                  <Search className={`${deviceType === 'tv' ? 'w-6 h-6' : 'w-5 h-5'} text-muted-foreground`} />
                   <Input
                     placeholder="Search for anime..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSearch(searchQuery)}
-                    className="border-none focus:ring-0 text-base sm:text-sm"
+                    className="border-none focus:ring-0 device-scaled"
                     autoFocus
                   />
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setIsSearchOpen(false)}
-                    className="min-h-[44px] min-w-[44px] p-2"
+                    className="device-touch-target p-2"
                   >
-                    <X className="w-5 h-5" />
+                    <X className={`${deviceType === 'tv' ? 'w-6 h-6' : 'w-5 h-5'}`} />
                   </Button>
                 </div>
 
@@ -370,7 +411,7 @@ const Navigation = () => {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05 }}
-                        className="search-suggestion flex items-center space-x-3 min-h-[56px] p-3 rounded-lg hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors duration-200 active:bg-accent/80"
+                        className="search-suggestion flex items-center space-x-3 device-touch-target p-3 rounded-lg hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors duration-200 active:bg-accent/80 device-scaled"
                         data-keyboard-nav="search"
                         data-anime-id={suggestion.id}
                         tabIndex={-1}
@@ -381,12 +422,14 @@ const Navigation = () => {
                           alt={suggestion.name}
                           width={48}
                           height={64}
-                          className="w-12 h-16 object-cover rounded"
+                          className={`object-cover rounded ${
+                            deviceType === 'tv' ? 'w-16 h-20' : 'w-12 h-16'
+                          }`}
                         />
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-sm truncate">{suggestion.name}</h4>
+                          <h4 className="font-medium text-sm truncate device-scaled">{suggestion.name}</h4>
                           {suggestion.jname && (
-                            <p className="text-xs text-muted-foreground truncate">{suggestion.jname}</p>
+                            <p className="text-xs text-muted-foreground truncate device-scaled">{suggestion.jname}</p>
                           )}
                         </div>
                       </motion.div>
@@ -395,9 +438,9 @@ const Navigation = () => {
                 )}
 
                 {searchQuery.length > 2 && searchSuggestions.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Search className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    <p>No suggestions found</p>
+                  <div className="text-center py-8 text-muted-foreground device-scaled">
+                    <Search className={`${deviceType === 'tv' ? 'w-10 h-10' : 'w-8 h-8'} mx-auto mb-2 opacity-50`} />
+                    <p className="device-scaled">No suggestions found</p>
                   </div>
                 )}
               </div>
