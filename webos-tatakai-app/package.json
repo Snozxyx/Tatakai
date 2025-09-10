@@ -65,6 +65,6 @@
     "tailwindcss": "^3.4.10",
     "terser": "^5.44.0",
     "typescript": "^5.5.3",
-    "vite": "^5.4.1"
+    "vite": "^7.1.5"
   }
 }
