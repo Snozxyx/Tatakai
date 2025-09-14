@@ -3,7 +3,8 @@ import {
   init,
   useFocusable,
   FocusContext,
-  setKeyMap
+  setKeyMap,
+  setFocus
 } from '@noriginmedia/norigin-spatial-navigation';
 import TVLayout from '@/components/tv/TVLayout';
 import TVHomePage from '@/components/tv/TVHomePage';
@@ -28,6 +29,7 @@ const App: React.FC = () => {
   useEffect(() => {
     // Initialize the spatial navigation library
     init({
+      debug: false,
       visualDebug: false,
       shouldFocusDOMNode: true,
       distanceCalculationMethod: 'corners'
@@ -71,7 +73,18 @@ const AppContainer: React.FC = () => {
 
   // Set initial focus when app mounts
   useEffect(() => {
-    focusSelf();
+    // Try to set focus to the first navigation item after a delay
+    setTimeout(() => {
+      console.log('Attempting to set focus to nav-home');
+      try {
+        setFocus('nav-home');
+        console.log('setFocus called successfully');
+      } catch (error) {
+        console.error('Error calling setFocus:', error);
+        // Fallback to focusSelf
+        focusSelf();
+      }
+    }, 200);
   }, [focusSelf]);
 
   // Handle WebOS back button
