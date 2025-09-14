@@ -23,6 +23,7 @@
   "author": "Tatakai Team",
   "license": "MIT",
   "dependencies": {
+    "@noriginmedia/norigin-spatial-navigation": "^2.3.0",
     "@radix-ui/react-aspect-ratio": "^1.1.7",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-dialog": "^1.1.15",
