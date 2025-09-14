@@ -1,5 +1,5 @@
-import React, { useRef, useEffect } from 'react';
-import { useNavigation } from '@/context/NavigationProvider';
+import React from 'react';
+import { useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { cn } from '@/lib/utils';
 
 interface FocusableProps {
@@ -9,7 +9,6 @@ interface FocusableProps {
   onFocus?: () => void;
   onBlur?: () => void;
   onEnter?: () => void;
-  autoScroll?: boolean;
   disabled?: boolean;
 }
 
@@ -20,32 +19,22 @@ const Focusable: React.FC<FocusableProps> = ({
   onFocus,
   onBlur,
   onEnter,
-  autoScroll = true,
   disabled = false,
 }) => {
-  const elementRef = useRef<HTMLDivElement>(null);
-  const { registerElement, unregisterElement } = useNavigation();
-
-  useEffect(() => {
-    if (elementRef.current && !disabled) {
-      registerElement(id, elementRef.current, {
-        onFocus,
-        onBlur,
-        onEnter,
-        autoScroll,
-      });
-
-      return () => {
-        unregisterElement(id);
-      };
-    }
-  }, [id, registerElement, unregisterElement, onFocus, onBlur, onEnter, autoScroll, disabled]);
+  const { ref, focused } = useFocusable({
+    focusKey: id,
+    onEnterPress: onEnter,
+    onFocus,
+    onBlur,
+    focusable: !disabled
+  });
 
   return (
     <div
-      ref={elementRef}
+      ref={ref}
       className={cn(
         'tv-focusable',
+        focused && 'tv-focused',
         disabled && 'opacity-50 pointer-events-none',
         className
       )}

@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { NavigationProvider } from '@/context/NavigationProvider';
+import {
+  init,
+  useFocusable,
+  FocusContext,
+  setKeyMap
+} from '@noriginmedia/norigin-spatial-navigation';
 import TVLayout from '@/components/tv/TVLayout';
 import TVHomePage from '@/components/tv/TVHomePage';
 import TVVideoPlayer from '@/components/tv/TVVideoPlayer';
@@ -19,15 +24,59 @@ type Route =
   | { type: 'watch'; anime: Anime; episode?: Episode };
 
 const App: React.FC = () => {
-  const [currentRoute, setCurrentRoute] = useState<Route>({ type: 'home' });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Initialize spatial navigation once at app startup
+  useEffect(() => {
+    // Initialize the spatial navigation library
+    init({
+      visualDebug: false,
+      shouldFocusDOMNode: true,
+      distanceCalculationMethod: 'corners'
+    });
+
+    // Set up key mapping for webOS TV remotes
+    setKeyMap({
+      left: 'ArrowLeft',
+      right: 'ArrowRight',
+      up: 'ArrowUp',
+      down: 'ArrowDown',
+      enter: 'Enter'
+    });
+
+    console.log('Spatial navigation initialized');
+  }, []);
 
   // Initialize WebOS specific features
   useEffect(() => {
     if (isWebOS()) {
       console.log('WebOS TV environment detected');
-      
+    }
+  }, []);
+
+  return (
+    <AppContainer />
+  );
+};
+
+// Main App Container with spatial navigation
+const AppContainer: React.FC = () => {
+  const [currentRoute, setCurrentRoute] = useState<Route>({ type: 'home' });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Create root focusable container
+  const { ref, focusKey, focusSelf } = useFocusable({
+    focusKey: 'APP_ROOT',
+    trackChildren: true
+  });
+
+  // Set initial focus when app mounts
+  useEffect(() => {
+    focusSelf();
+  }, [focusSelf]);
+
+  // Handle WebOS back button
+  useEffect(() => {
+    if (isWebOS()) {
       // Handle WebOS back button
       if (typeof window !== 'undefined' && (window as any).webOSTV) {
         (window as any).webOSTV.platformBack = {
@@ -178,8 +227,8 @@ const App: React.FC = () => {
   };
 
   return (
-    <NavigationProvider initialFocus="nav-home">
-      <div className="app-container">
+    <FocusContext.Provider value={focusKey}>
+      <div ref={ref} className="app-container">
         {error && (
           <div className="fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg z-50">
             {error}
@@ -193,7 +242,7 @@ const App: React.FC = () => {
           {renderCurrentPage()}
         </TVLayout>
       </div>
-    </NavigationProvider>
+    </FocusContext.Provider>
   );
 };
 
