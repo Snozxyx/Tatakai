@@ -29,7 +29,7 @@
     "framer-motion": "^12.23.12",
     "hls.js": "^1.6.11",
     "lucide-react": "^0.542.0",
-    "next": "15.5.8",
+    "next": "15.5.9",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "tailwind-merge": "^3.3.1"
