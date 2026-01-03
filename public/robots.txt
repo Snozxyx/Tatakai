@@ -1,7 +1,6 @@
 User-agent: *
 Allow: /
 Disallow: /admin
-Disallow: /settings
 Disallow: /banned
 Disallow: /maintenance
 Disallow: /503
