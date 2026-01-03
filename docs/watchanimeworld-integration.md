@@ -150,6 +150,138 @@ Supported languages with automatic dub detection:
 | Korean | `ko` | ✅ |
 | Japanese | `ja` | ❌ (original) |
 
+## Embed Proxy (Anti-AdBlock Solution)
+
+The watchanimeworld-scraper function now includes an embed proxy endpoint to fix "AdBlock/Sandbox" errors on embed players.
+
+### Problem
+
+Some embed providers detect:
+- AdBlock extensions
+- Iframe sandbox attributes
+- Attempts to play in embedded contexts
+
+This causes errors like: "Due to certain reasons (AdBlock/Sandbox), ads are not being displayed, which prevents the player from functioning."
+
+### Solution
+
+The embed proxy:
+1. Fetches embed HTML from the provider
+2. Removes anti-AdBlock detection code
+3. Removes sandbox/iframe detection
+4. Blocks popup and redirect attempts
+5. Serves sanitized HTML to the client
+
+### Usage
+
+```typescript
+import { getProxiedEmbedUrl } from '@/lib/api';
+
+// Original embed URL from WatchAnimeWorld source
+const embedUrl = 'https://provider.example/embed/episode123';
+
+// Get proxied URL
+const proxiedUrl = getProxiedEmbedUrl(embedUrl);
+
+// Use in EmbedPlayer component
+<EmbedPlayer url={proxiedUrl} />
+```
+
+### Endpoint
+
+```
+GET /watchanimeworld-scraper?embedUrl={url}
+```
+
+**Parameters:**
+- `embedUrl` (required): The embed URL to proxy and rewrite
+
+**Response:**
+- Content-Type: `text/html; charset=utf-8`
+- Returns sanitized HTML with anti-AdBlock code removed
+
+### What Gets Removed/Blocked
+
+1. **AdBlock Detection Scripts:**
+   - Scripts containing "adblock", "AdBlock", "adsbygoogle"
+   - Ad network scripts (ads, doubleclick, googlesyndication)
+
+2. **Popup Attempts:**
+   - `window.open()` calls are blocked
+
+3. **Redirect Attempts:**
+   - `window.location.assign()`
+   - `window.location.replace()`
+   - Direct location assignments
+
+4. **Protective Measures:**
+   - Injects JavaScript to prevent parent window navigation
+   - All operations wrapped in try-catch for safety
+   - Logs blocked attempts to console
+
+### Example
+
+Before (causes error):
+```html
+<script>
+  if (window.self !== window.top) {
+    window.top.location = 'https://ads.example.com/';
+  }
+</script>
+```
+
+After (sanitized):
+```html
+<!-- Anti-iframe detection removed -->
+<script>
+  // Protective code injected
+  window.open = function() { return null; };
+  window.location.assign = function(url) {
+    if (url.includes('ads')) return;
+    // ... safe redirect
+  };
+</script>
+```
+
+### Frontend Integration
+
+The `WatchPage` component automatically uses proxied URLs for embed sources:
+
+```typescript
+// In WatchPage.tsx
+const selectedEmbedSource = useMemo(() => {
+  if (selectedServerIndex !== -2 || !selectedLangCode || !sourcesData) return null;
+  const source = sourcesData.sources.find(/* ... */);
+  
+  // Automatically proxy embed URLs
+  return {
+    ...source,
+    url: getProxiedEmbedUrl(source.url),
+  };
+}, [/* ... */]);
+```
+
+### Security Considerations
+
+✅ **Safe:**
+- Removes malicious code before serving
+- Blocks popups and redirects
+- No sandbox attribute needed (removed from iframe)
+
+⚠️ **Limitations:**
+- Cannot proxy HTTPS embeds to HTTP (mixed content)
+- Some obfuscated code may bypass detection
+- Providers may update detection methods
+
+### Deployment Note
+
+After deploying the updated function:
+```bash
+supabase functions deploy watchanimeworld-scraper
+```
+
+The embed proxy is immediately available at the same endpoint with `embedUrl` parameter.
+
 ## Cloudflare Handling
 
 When a provider page returns a Cloudflare challenge:
