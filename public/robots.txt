@@ -1,3 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /settings
+Disallow: /banned
+Disallow: /maintenance
+Disallow: /503
+Disallow: /error
+
+# Specific bots
 User-agent: Googlebot
 Allow: /
 
@@ -10,11 +20,8 @@ Allow: /
 User-agent: facebookexternalhit
 Allow: /
 
-User-agent: *
-Allow: /
-
-# Sitemap (update with your actual domain)
-Sitemap: https://tatakai.app/sitemap.xml
+# Sitemap
+Sitemap: https://Tatakai.app/sitemap.xml
 
 # Crawl delay for well-behaved bots
 Crawl-delay: 1

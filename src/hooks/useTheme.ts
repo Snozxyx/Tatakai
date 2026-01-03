@@ -4,11 +4,8 @@ export type Theme =
   | 'midnight' 
   | 'cherry-blossom' 
   | 'neon-tokyo' 
-  | 'volcanic' 
   | 'deep-ocean' 
-  | 'zen-garden' 
-  | 'light-minimal'
-  | 'brutalism-dark';
+  | 'light-minimal';
 
 interface ThemeColors {
   primary: string;
@@ -90,25 +87,6 @@ export const THEME_COLORS: Record<Theme, ThemeColors> = {
     sidebarBackground: '260 20% 2%',
     sidebarBorder: '260 15% 15%',
   },
-  'volcanic': {
-    primary: '15 95% 55%',
-    secondary: '30 90% 50%',
-    accent: '0 85% 60%',
-    background: '15 15% 4%',
-    foreground: '30 10% 95%',
-    card: '15 12% 7%',
-    cardForeground: '30 10% 95%',
-    muted: '15 10% 13%',
-    mutedForeground: '15 8% 55%',
-    border: '15 12% 18%',
-    glass: '15 12% 9%',
-    glowPrimary: '15 95% 55%',
-    glowSecondary: '30 90% 50%',
-    surface: '15 12% 5%',
-    surfaceHover: '15 12% 11%',
-    sidebarBackground: '15 15% 3%',
-    sidebarBorder: '15 10% 14%',
-  },
   'deep-ocean': {
     primary: '200 90% 55%',
     secondary: '220 85% 50%',
@@ -127,25 +105,6 @@ export const THEME_COLORS: Record<Theme, ThemeColors> = {
     surfaceHover: '210 30% 10%',
     sidebarBackground: '210 35% 2%',
     sidebarBorder: '210 18% 12%',
-  },
-  'zen-garden': {
-    primary: '145 40% 50%',
-    secondary: '35 60% 45%',
-    accent: '160 45% 40%',
-    background: '90 10% 5%',
-    foreground: '90 5% 92%',
-    card: '90 8% 8%',
-    cardForeground: '90 5% 92%',
-    muted: '90 6% 14%',
-    mutedForeground: '90 5% 55%',
-    border: '90 8% 18%',
-    glass: '90 8% 10%',
-    glowPrimary: '145 40% 50%',
-    glowSecondary: '35 60% 45%',
-    surface: '90 8% 6%',
-    surfaceHover: '90 8% 12%',
-    sidebarBackground: '90 10% 4%',
-    sidebarBorder: '90 6% 14%',
   },
   'light-minimal': {
     primary: '220 90% 50%',
@@ -166,26 +125,6 @@ export const THEME_COLORS: Record<Theme, ThemeColors> = {
     sidebarBackground: '220 15% 97%',
     sidebarBorder: '220 10% 90%',
     isLight: true,
-  },
-  'brutalism-dark': {
-    primary: '55 100% 55%',
-    secondary: '45 100% 50%',
-    accent: '0 100% 55%',
-    background: '0 0% 8%',
-    foreground: '0 0% 98%',
-    card: '0 0% 12%',
-    cardForeground: '0 0% 98%',
-    muted: '0 0% 18%',
-    mutedForeground: '0 0% 65%',
-    border: '55 100% 55%',
-    glass: '0 0% 12%',
-    glowPrimary: '55 100% 55%',
-    glowSecondary: '0 100% 55%',
-    surface: '0 0% 10%',
-    surfaceHover: '0 0% 18%',
-    sidebarBackground: '0 0% 5%',
-    sidebarBorder: '55 100% 55%',
-    isBrutalism: true,
   },
 };
 
@@ -211,25 +150,11 @@ export const THEME_INFO: Record<Theme, { name: string; gradient: string; descrip
     icon: '🗼',
     category: 'dark',
   },
-  'volcanic': {
-    name: 'Volcanic',
-    gradient: 'from-orange-600 via-red-600 to-amber-500',
-    description: 'Fiery lava with warm ember glow',
-    icon: '🌋',
-    category: 'dark',
-  },
   'deep-ocean': {
     name: 'Deep Ocean',
     gradient: 'from-cyan-500 via-blue-600 to-indigo-700',
     description: 'Mysterious underwater depths',
     icon: '🌊',
-    category: 'dark',
-  },
-  'zen-garden': {
-    name: 'Zen Garden',
-    gradient: 'from-green-600 via-emerald-600 to-teal-600',
-    description: 'Calm forest tranquility',
-    icon: '🌿',
     category: 'dark',
   },
   'light-minimal': {
@@ -238,13 +163,6 @@ export const THEME_INFO: Record<Theme, { name: string; gradient: string; descrip
     description: 'Clean, bright, modern design',
     icon: '☀️',
     category: 'light',
-  },
-  'brutalism-dark': {
-    name: 'Brutalist Dark',
-    gradient: 'from-gray-900 via-yellow-400 to-red-500',
-    description: 'Dark brutalist aesthetic',
-    icon: '⬛',
-    category: 'dark',
   },
 };
 
@@ -300,13 +218,6 @@ export function useTheme() {
     } else {
       document.body.classList.add('dark-theme');
       document.body.classList.remove('light-theme');
-    }
-    
-    // Add brutalism class for special styling
-    if ((colors as any).isBrutalism) {
-      document.body.classList.add('brutalism-theme');
-    } else {
-      document.body.classList.remove('brutalism-theme');
     }
     
     // Set data-theme attribute for theme-specific CSS

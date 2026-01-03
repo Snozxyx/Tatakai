@@ -1,4 +1,4 @@
-import { LayoutGrid, Search, Settings, User, LogIn, Users, Menu } from "lucide-react";
+import { LayoutGrid, Search, TrendingUp, Heart, User, LogIn, Menu } from "lucide-react";
 import { NavIcon } from "@/components/ui/NavIcon";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, Shield } from "lucide-react";
+import { LogOut, Shield, Settings } from "lucide-react";
 
 export function MobileNav() {
   const location = useLocation();
@@ -37,14 +37,14 @@ export function MobileNav() {
         onClick={() => navigate("/search")}
       />
       <NavIcon 
-        icon={Users} 
-        active={isActive("/community")} 
-        onClick={() => navigate("/community")}
+        icon={TrendingUp} 
+        active={isActive("/trending")} 
+        onClick={() => navigate("/trending")}
       />
       <NavIcon 
-        icon={Settings} 
-        active={isActive("/settings")} 
-        onClick={() => navigate("/settings")}
+        icon={Heart} 
+        active={isActive("/favorites")} 
+        onClick={() => navigate("/favorites")}
       />
       {user && !isBanned ? (
         <DropdownMenu>
@@ -62,6 +62,10 @@ export function MobileNav() {
             <DropdownMenuItem onClick={() => navigate(profile?.username ? `/@${profile.username}` : '/profile')}>
               <User className="w-4 h-4 mr-2" />
               Profile
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate('/settings')}>
+              <Settings className="w-4 h-4 mr-2" />
+              Settings
             </DropdownMenuItem>
             {isAdmin && (
               <>
