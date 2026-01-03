@@ -360,12 +360,15 @@ serve(async (req) => {
       // Rewrite the HTML to remove anti-AdBlock code
       const rewrittenHtml = rewriteEmbedHtml(embedHtml);
 
+      // Security note: CSP allows 'unsafe-inline' and 'unsafe-eval' for third-party embed players
+      // that we don't control. This is necessary for embed functionality but reduces XSS protection.
+      // The content is already isolated in an iframe which provides some security boundary.
       return new Response(rewrittenHtml, {
         status: 200,
         headers: {
           ...corsHeaders,
           'Content-Type': 'text/html; charset=utf-8',
-          'Content-Security-Policy': "frame-ancestors *",
+          'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src * data: blob:; media-src * blob:; connect-src *; frame-ancestors *;",
         },
       });
     }
