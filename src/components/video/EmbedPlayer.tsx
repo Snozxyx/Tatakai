@@ -25,10 +25,14 @@ export function EmbedPlayer({ url, poster, language, onError }: EmbedPlayerProps
   const handleRetry = () => {
     setIsLoading(true);
     setError(false);
-    // Force iframe reload
+    // Force iframe reload by clearing and resetting src
     const iframe = document.querySelector('iframe[data-embed-player]') as HTMLIFrameElement;
     if (iframe) {
-      iframe.src = iframe.src;
+      const currentSrc = iframe.src;
+      iframe.src = 'about:blank';
+      requestAnimationFrame(() => {
+        iframe.src = currentSrc;
+      });
     }
   };
 

@@ -199,7 +199,7 @@ async function resolveShortLink(shortUrl: string, maxHops = 5): Promise<string> 
 }
 
 // Rewrite embed HTML to remove anti-AdBlock and detection code
-function rewriteEmbedHtml(html: string, embedUrl: string): string {
+function rewriteEmbedHtml(html: string): string {
   let rewritten = html;
   
   // Remove common anti-AdBlock patterns
@@ -210,16 +210,11 @@ function rewriteEmbedHtml(html: string, embedUrl: string): string {
     /<script[^>]*>[\s\S]*?AdBlock[\s\S]*?<\/script>/gi,
     /<script[^>]*>[\s\S]*?adsbygoogle[\s\S]*?<\/script>/gi,
     
-    // Sandbox detection
-    /if\s*\(\s*window\s*\.\s*self\s*!==\s*window\s*\.\s*top\s*\)[\s\S]*?{[\s\S]*?}/gi,
-    /if\s*\(\s*window\s*\.\s*top\s*!==\s*window\s*\.\s*self\s*\)[\s\S]*?{[\s\S]*?}/gi,
-    /if\s*\(\s*top\s*!==\s*self\s*\)[\s\S]*?{[\s\S]*?}/gi,
-    
-    // Popup and redirect attempts
+    // Popup and redirect attempts - match both quoted and unquoted
     /window\s*\.\s*open\s*\(/gi,
-    /window\s*\.\s*location\s*=\s*['"]/gi,
-    /document\s*\.\s*location\s*=\s*['"]/gi,
-    /top\s*\.\s*location\s*=\s*['"]/gi,
+    /window\s*\.\s*location\s*=/gi,
+    /document\s*\.\s*location\s*=/gi,
+    /top\s*\.\s*location\s*=/gi,
     
     // Common ad networks
     /<script[^>]*src=['"]*https?:\/\/[^'"]*(?:ads|adservice|doubleclick|googlesyndication)[^'"]*['"]*[^>]*><\/script>/gi,
@@ -250,34 +245,54 @@ function rewriteEmbedHtml(html: string, embedUrl: string): string {
     <script>
       // Prevent redirects and popups
       (function() {
-        const originalOpen = window.open;
-        window.open = function() { 
-          console.log('Blocked popup attempt');
-          return null; 
-        };
-        
-        // Prevent parent navigation
         try {
-          Object.defineProperty(window, 'top', { get: function() { return window; } });
-          Object.defineProperty(window, 'parent', { get: function() { return window; } });
-        } catch(e) {}
-        
-        // Block certain redirects
-        let locationChanging = false;
-        const locationDesc = Object.getOwnPropertyDescriptor(window, 'location');
-        Object.defineProperty(window, 'location', {
-          get: function() { return locationDesc.get.call(window); },
-          set: function(val) {
-            if (locationChanging) return;
-            if (typeof val === 'string' && (val.includes('ads') || val.includes('popup'))) {
-              console.log('Blocked redirect attempt to:', val);
-              return;
-            }
-            locationChanging = true;
-            locationDesc.set.call(window, val);
-            locationChanging = false;
+          const originalOpen = window.open;
+          window.open = function() { 
+            console.log('Blocked popup attempt');
+            return null; 
+          };
+          
+          // Prevent parent navigation (this may fail in some browsers, but try anyway)
+          try {
+            Object.defineProperty(window, 'top', { 
+              get: function() { return window; },
+              configurable: false 
+            });
+            Object.defineProperty(window, 'parent', { 
+              get: function() { return window; },
+              configurable: false 
+            });
+          } catch(e) {
+            console.log('Could not override top/parent:', e);
           }
-        });
+          
+          // Intercept location changes - wrap in try-catch as location may be non-configurable
+          try {
+            const originalLocation = window.location;
+            let redirecting = false;
+            
+            // Create a proxy-like behavior for location
+            ['assign', 'replace', 'reload'].forEach(function(method) {
+              const original = originalLocation[method];
+              if (typeof original === 'function') {
+                originalLocation[method] = function(url) {
+                  if (redirecting) return;
+                  if (typeof url === 'string' && (url.includes('ads') || url.includes('popup'))) {
+                    console.log('Blocked redirect attempt to:', url);
+                    return;
+                  }
+                  redirecting = true;
+                  original.call(originalLocation, url);
+                  redirecting = false;
+                };
+              }
+            });
+          } catch(e) {
+            console.log('Could not intercept location methods:', e);
+          }
+        } catch(e) {
+          console.error('Error in protective script:', e);
+        }
       })();
     </script>
   `;
@@ -330,7 +345,7 @@ serve(async (req) => {
       const embedHtml = await embedResponse.text();
       
       // Rewrite the HTML to remove anti-AdBlock code
-      const rewrittenHtml = rewriteEmbedHtml(embedHtml, embedUrl);
+      const rewrittenHtml = rewriteEmbedHtml(embedHtml);
 
       return new Response(rewrittenHtml, {
         status: 200,
