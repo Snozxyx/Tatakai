@@ -137,8 +137,12 @@ export default function AuthPage() {
           {/* Logo/Brand */}
           <div className="mb-10">
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg">
-                <Play className="w-6 h-6 fill-primary-foreground text-primary-foreground" />
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg overflow-hidden">
+                <img 
+                  src="/logo-transparent-small.png" 
+                  alt="Tatakai Logo" 
+                  className="w-10 h-10 object-contain"
+                />
               </div>
               <h1 className="font-display text-3xl font-bold gradient-text">Tatakai</h1>
             </div>

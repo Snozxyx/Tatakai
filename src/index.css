@@ -685,3 +685,34 @@ body[data-theme="tide"] .glass-panel {
 body[data-theme="harvest"] .glass-panel {
   box-shadow: 0 4px 20px hsl(var(--primary) / 0.1);
 }
+
+/* ========================================
+   AD BLOCKING FOR EMBED PLAYERS
+   Block common ad elements and containers
+   ======================================== */
+iframe[data-embed-player] {
+  /* Prevent popups and unwanted redirects */
+  pointer-events: auto;
+}
+
+/* Hide common ad containers in iframes */
+iframe[data-embed-player]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Block common ad element selectors (applies to content within iframe when possible) */
+[data-embed-player] [class*="ad-"],
+[data-embed-player] [class*="ads-"],
+[data-embed-player] [class*="advertisement"],
+[data-embed-player] [id*="ad-"],
+[data-embed-player] [id*="ads-"],
+[data-embed-player] [id*="advertisement"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+}

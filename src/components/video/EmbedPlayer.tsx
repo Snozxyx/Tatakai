@@ -74,7 +74,8 @@ export function EmbedPlayer({ url, poster, language, onError }: EmbedPlayerProps
         onLoad={handleLoad}
         onError={handleError}
         referrerPolicy="origin"
-        sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+        sandbox="allow-scripts allow-same-origin allow-forms"
+        title="Anime Video Player"
       />
     </div>
   );
