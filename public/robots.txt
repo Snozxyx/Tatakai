@@ -12,3 +12,9 @@ Allow: /
 
 User-agent: *
 Allow: /
+
+# Sitemap (update with your actual domain)
+Sitemap: https://tatakai.app/sitemap.xml
+
+# Crawl delay for well-behaved bots
+Crawl-delay: 1

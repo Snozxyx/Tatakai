@@ -6,6 +6,26 @@ A modern, feature-rich anime streaming platform built with React, TypeScript, an
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue)
 ![React](https://img.shields.io/badge/React-18-blue)
 
+## 🌟 Screenshots
+
+### Themes Gallery
+Tatakai features 8 unique, beautifully crafted themes:
+
+**Dark Themes:**
+- 🌙 **Midnight** - Classic dark with indigo & violet accents
+- 🌸 **Cherry Blossom** - Soft pink tones inspired by sakura
+- 🗼 **Neon Tokyo** - Electric neon cyberpunk vibes
+- 🌋 **Volcanic** - Fiery lava with warm ember glow
+- 🌊 **Deep Ocean** - Mysterious underwater depths
+- 🌿 **Zen Garden** - Calm forest tranquility
+- ⬛ **Brutalist Dark** - Bold, raw, minimalist aesthetic
+
+**Light Themes:**
+- ☀️ **Light Minimal** - Clean, bright, modern design
+
+### Main Features
+_Screenshots coming soon - showing homepage, video player, search, and community features_
+
 ## ✨ Features
 
 ### 🎥 Core Features
@@ -20,7 +40,8 @@ A modern, feature-rich anime streaming platform built with React, TypeScript, an
 - **Authentication** - Secure sign up/sign in with Supabase Auth
 - **User Profiles** - Customizable profiles with avatars
 - **Watch History** - Track and resume your viewing progress
-- **Multiple Themes** - 7 unique themes (Neon, Sunset, Ocean, etc.)
+- **Multiple Themes** - 8 unique themes with distinct visual identities
+- **Privacy Controls** - Public/private profile settings
 
 ### 🛡️ Admin Features
 - **User Management** - Ban/unban users, promote to admin
@@ -34,6 +55,7 @@ A modern, feature-rich anime streaming platform built with React, TypeScript, an
 - **Smart TV Support** - Optimized for LG webOS, Samsung Tizen, Android TV
 - **Beautiful UI** - Glassmorphic design with smooth animations
 - **Theme System** - Dynamic theme switching with unique color schemes
+- **Ad Blocking** - Built-in ad blocking for embed players
 
 ## 🚀 Tech Stack
 
@@ -141,39 +163,102 @@ WHERE user_id IN (
 
 ## 🎨 Available Themes
 
-- **Sunset** (Default) - Warm orange and pink gradients
-- **Neon** - Vibrant purple and blue neon
-- **Ocean** - Cool blue and teal tones
-- **Forest** - Natural green shades
-- **Rose** - Elegant pink and rose
-- **Midnight** - Deep purple and blue
-- **Brutalism Dark** - High-contrast minimalist
+Tatakai features 8 carefully curated themes, each with a distinct visual personality:
 
-## 🔐 Security Features
+### Dark Themes
+- **🌙 Midnight** - Classic dark with indigo & violet accents - perfect for nighttime viewing
+- **🌸 Cherry Blossom** - Soft pink tones inspired by Japanese sakura season
+- **🗼 Neon Tokyo** - Electric neon cyberpunk vibes with purple and cyan
+- **🌋 Volcanic** - Fiery lava with warm orange and red ember glow
+- **🌊 Deep Ocean** - Mysterious underwater depths with blue tones
+- **🌿 Zen Garden** - Calm forest tranquility with green hues
+- **⬛ Brutalist Dark** - Bold, raw, high-contrast minimalist aesthetic
 
-- Row Level Security (RLS) policies
-- Secure authentication via Supabase
-- Admin-only routes and operations
+### Light Themes
+- **☀️ Light Minimal** - Clean, bright, modern design for daytime use
+
+Each theme is optimized for readability, aesthetics, and provides a unique viewing experience.
+
+## 🔒 Security & Privacy Features
+
+- Row Level Security (RLS) policies on all database tables
+- Secure authentication via Supabase with email verification
+- Admin-only routes and operations with role-based access
 - Banned user flow with restricted access
-- CORS protection
-- SQL injection prevention
+- Private/public profile settings
+- CORS protection and SQL injection prevention
+- Ad-blocking for embed players with Content Security Policy
+- Secure iframe sandboxing for video embeds
 
 ## 📱 Responsive Breakpoints
 
-- Mobile: < 768px
-- Tablet: 768px - 1024px
-- Desktop: > 1024px
-- Smart TV: Detected automatically
+- **Mobile**: < 768px - Optimized touch interface with bottom navigation
+- **Tablet**: 768px - 1024px - Adaptive layout with sidebar
+- **Desktop**: > 1024px - Full-featured interface with side navigation
+- **Smart TV**: Detected automatically - Large touch targets and enhanced focus states
 
-## 🤝 Contributing
+## 🚀 Deployment
 
-Contributions are welcome! Please follow these steps:
+### Production Build
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+```bash
+npm run build
+# or
+bun run build
+```
+
+The build output will be in the `dist` directory, ready for deployment to any static hosting service.
+
+### Deployment Platforms
+
+**Recommended platforms:**
+- **Vercel** - Automatic deployments from Git
+- **Netlify** - Continuous deployment with preview URLs
+- **Cloudflare Pages** - Global CDN with edge computing
+- **AWS Amplify** - Full-stack deployment with CI/CD
+- **GitHub Pages** - Free hosting for public repositories
+
+### Environment Variables
+
+Make sure to set the following environment variables in your deployment platform:
+
+```env
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+### Post-Deployment Checklist
+
+- [ ] Verify all environment variables are set
+- [ ] Test authentication flow
+- [ ] Check video player functionality
+- [ ] Verify database connections
+- [ ] Test theme switching
+- [ ] Validate mobile responsiveness
+- [ ] Check admin panel access (if applicable)
+
+## 📊 Analytics & Monitoring
+
+The platform includes built-in analytics features:
+
+- **User Activity Tracking** - Monitor page visits and user engagement
+- **Video View Statistics** - Track anime popularity and viewing trends
+- **Admin Dashboard** - Real-time metrics and user management
+- **Error Monitoring** - Track and respond to issues quickly
+
+## 🎮 Smart TV Features
+
+Optimized experience for:
+- **LG webOS** - Native TV interface support
+- **Samsung Tizen** - Enhanced remote control navigation
+- **Android TV** - Optimized for TV screens
+- **Fire TV** - Amazon device compatibility
+
+Features include:
+- Large, easy-to-read text
+- Remote-friendly navigation
+- Enhanced focus indicators
+- Simplified UI for 10-foot viewing
 
 ## 📝 License
 
