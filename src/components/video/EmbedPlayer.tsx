@@ -102,6 +102,9 @@ export function EmbedPlayer({ url, poster, language, onError }: EmbedPlayerProps
         src={url}
         className="w-full h-full border-0"
         allowFullScreen
+        // Security note: allow-scripts and allow-same-origin are required for third-party
+        // embed players to function. This reduces sandboxing protection but is necessary
+        // for the player functionality. The iframe still provides isolation from the parent.
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         onLoad={handleIframeLoad}
