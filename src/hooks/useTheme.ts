@@ -8,7 +8,9 @@ export type Theme =
   | 'deep-ocean' 
   | 'zen-garden' 
   | 'light-minimal'
-  | 'brutalism-dark';
+  | 'brutalism-dark'
+  | 'sunset-dreams'
+  | 'aurora';
 
 interface ThemeColors {
   primary: string;
@@ -187,6 +189,44 @@ export const THEME_COLORS: Record<Theme, ThemeColors> = {
     sidebarBorder: '55 100% 55%',
     isBrutalism: true,
   },
+  'sunset-dreams': {
+    primary: '25 95% 60%',
+    secondary: '340 85% 65%',
+    accent: '50 100% 55%',
+    background: '25 20% 5%',
+    foreground: '25 10% 95%',
+    card: '25 15% 8%',
+    cardForeground: '25 10% 95%',
+    muted: '25 12% 14%',
+    mutedForeground: '25 10% 55%',
+    border: '25 12% 20%',
+    glass: '25 15% 10%',
+    glowPrimary: '25 95% 60%',
+    glowSecondary: '340 85% 65%',
+    surface: '25 15% 6%',
+    surfaceHover: '25 15% 12%',
+    sidebarBackground: '25 20% 4%',
+    sidebarBorder: '25 10% 16%',
+  },
+  'aurora': {
+    primary: '170 75% 55%',
+    secondary: '280 70% 60%',
+    accent: '200 80% 55%',
+    background: '220 25% 5%',
+    foreground: '170 10% 95%',
+    card: '220 20% 8%',
+    cardForeground: '170 10% 95%',
+    muted: '220 15% 14%',
+    mutedForeground: '220 12% 55%',
+    border: '220 15% 20%',
+    glass: '220 18% 10%',
+    glowPrimary: '170 75% 55%',
+    glowSecondary: '280 70% 60%',
+    surface: '220 20% 6%',
+    surfaceHover: '220 20% 12%',
+    sidebarBackground: '220 25% 4%',
+    sidebarBorder: '220 13% 16%',
+  },
 };
 
 export const THEME_INFO: Record<Theme, { name: string; gradient: string; description: string; icon: string; category: 'dark' | 'light' }> = {
@@ -244,6 +284,20 @@ export const THEME_INFO: Record<Theme, { name: string; gradient: string; descrip
     gradient: 'from-gray-900 via-yellow-400 to-red-500',
     description: 'Dark brutalist aesthetic',
     icon: '⬛',
+    category: 'dark',
+  },
+  'sunset-dreams': {
+    name: 'Sunset Dreams',
+    gradient: 'from-orange-500 via-pink-500 to-yellow-400',
+    description: 'Dreamy sunset with warm pink and orange',
+    icon: '🌇',
+    category: 'dark',
+  },
+  'aurora': {
+    name: 'Aurora',
+    gradient: 'from-teal-400 via-purple-500 to-cyan-400',
+    description: 'Magical aurora with teal and purple lights',
+    icon: '🌌',
     category: 'dark',
   },
 };

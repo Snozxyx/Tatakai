@@ -4,23 +4,20 @@ import { Check, Palette, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export function ThemeSelector() {
-  const { theme, setTheme, themes } = useTheme();
+  const { theme, setTheme, themes, themeInfo } = useTheme();
 
-  return (
-    <GlassPanel className="p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2 rounded-xl bg-primary/20">
-          <Palette className="w-5 h-5 text-primary" />
-        </div>
-        <div>
-          <h2 className="font-display text-xl font-semibold">Appearance</h2>
-          <p className="text-sm text-muted-foreground">Choose your visual theme</p>
-        </div>
-      </div>
-      
+  // Separate themes by category
+  const darkThemes = themes.filter(t => themeInfo[t].category === 'dark');
+  const lightThemes = themes.filter(t => themeInfo[t].category === 'light');
+
+  const renderThemes = (themeList: typeof themes, categoryLabel: string) => (
+    <div className="mb-8 last:mb-0">
+      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">
+        {categoryLabel}
+      </h3>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        {themes.map((t, index) => {
-          const info = THEME_INFO[t];
+        {themeList.map((t, index) => {
+          const info = themeInfo[t];
           const isActive = theme === t;
           
           return (
@@ -71,6 +68,23 @@ export function ThemeSelector() {
           );
         })}
       </div>
+    </div>
+  );
+
+  return (
+    <GlassPanel className="p-6">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="p-2 rounded-xl bg-primary/20">
+          <Palette className="w-5 h-5 text-primary" />
+        </div>
+        <div>
+          <h2 className="font-display text-xl font-semibold">Appearance</h2>
+          <p className="text-sm text-muted-foreground">Choose your visual theme</p>
+        </div>
+      </div>
+      
+      {renderThemes(darkThemes, 'Dark Themes')}
+      {renderThemes(lightThemes, 'Light Themes')}
     </GlassPanel>
   );
 }

@@ -8,23 +8,42 @@ A modern, feature-rich anime streaming platform built with React, TypeScript, an
 
 ## 🌟 Screenshots
 
-### Themes Gallery
-Tatakai features 8 unique, beautifully crafted themes:
+### Homepage
+![Tatakai Homepage](https://via.placeholder.com/1200x675/1a1b26/a9b1d6?text=Tatakai+Homepage+-+Coming+Soon)
+*Browse trending anime, continue watching, and discover new series*
 
-**Dark Themes:**
-- 🌙 **Midnight** - Classic dark with indigo & violet accents
-- 🌸 **Cherry Blossom** - Soft pink tones inspired by sakura
-- 🗼 **Neon Tokyo** - Electric neon cyberpunk vibes
-- 🌋 **Volcanic** - Fiery lava with warm ember glow
-- 🌊 **Deep Ocean** - Mysterious underwater depths
-- 🌿 **Zen Garden** - Calm forest tranquility
-- ⬛ **Brutalist Dark** - Bold, raw, minimalist aesthetic
+### Video Player
+![Video Player](https://via.placeholder.com/1200x675/1a1b26/a9b1d6?text=Video+Player+-+Coming+Soon)
+*Advanced video player with quality selection, subtitles, and AniSkip integration*
 
-**Light Themes:**
-- ☀️ **Light Minimal** - Clean, bright, modern design
+### Theme Gallery
+Tatakai features 10 unique, beautifully crafted themes organized by category:
 
-### Main Features
-_Screenshots coming soon - showing homepage, video player, search, and community features_
+#### 🌙 Dark Themes
+| Theme | Description | Preview |
+|-------|-------------|---------|
+| 🌙 **Midnight** | Classic dark with indigo & violet accents | ![Midnight](https://via.placeholder.com/200x100/2d2a4a/a9b1d6?text=Midnight) |
+| 🌸 **Cherry Blossom** | Soft pink tones inspired by sakura | ![Cherry Blossom](https://via.placeholder.com/200x100/3d2033/f5c2e7?text=Cherry+Blossom) |
+| 🗼 **Neon Tokyo** | Electric neon cyberpunk vibes | ![Neon Tokyo](https://via.placeholder.com/200x100/1a0e2e/bb9af7?text=Neon+Tokyo) |
+| 🌋 **Volcanic** | Fiery lava with warm ember glow | ![Volcanic](https://via.placeholder.com/200x100/1e0f0a/ff6b35?text=Volcanic) |
+| 🌊 **Deep Ocean** | Mysterious underwater depths | ![Deep Ocean](https://via.placeholder.com/200x100/0a1628/3daee9?text=Deep+Ocean) |
+| 🌿 **Zen Garden** | Calm forest tranquility | ![Zen Garden](https://via.placeholder.com/200x100/0f1814/74c69d?text=Zen+Garden) |
+| ⬛ **Brutalist Dark** | Bold, raw, minimalist aesthetic | ![Brutalist Dark](https://via.placeholder.com/200x100/141414/f7d94c?text=Brutalist+Dark) |
+| 🌇 **Sunset Dreams** | Dreamy sunset with warm pink and orange | ![Sunset Dreams](https://via.placeholder.com/200x100/1f1410/ff8c69?text=Sunset+Dreams) |
+| 🌌 **Aurora** | Magical aurora with teal and purple lights | ![Aurora](https://via.placeholder.com/200x100/0e1419/6dd5ed?text=Aurora) |
+
+#### ☀️ Light Themes
+| Theme | Description | Preview |
+|-------|-------------|---------|
+| ☀️ **Light Minimal** | Clean, bright, modern design | ![Light Minimal](https://via.placeholder.com/200x100/fafafa/4a5aef?text=Light+Minimal) |
+
+### Search & Discovery
+![Search Page](https://via.placeholder.com/1200x675/1a1b26/a9b1d6?text=Search+%26+Discovery+-+Coming+Soon)
+*Powerful search with genre filters and advanced options*
+
+### Community Features
+![Community](https://via.placeholder.com/1200x675/1a1b26/a9b1d6?text=Community+Features+-+Coming+Soon)
+*Engage with other anime fans through comments, ratings, and tier lists*
 
 ## ✨ Features
 
@@ -40,7 +59,7 @@ _Screenshots coming soon - showing homepage, video player, search, and community
 - **Authentication** - Secure sign up/sign in with Supabase Auth
 - **User Profiles** - Customizable profiles with avatars
 - **Watch History** - Track and resume your viewing progress
-- **Multiple Themes** - 8 unique themes with distinct visual identities
+- **Multiple Themes** - 10 unique themes (9 dark, 1 light) with distinct visual identities
 - **Privacy Controls** - Public/private profile settings
 
 ### 🛡️ Admin Features
@@ -163,9 +182,9 @@ WHERE user_id IN (
 
 ## 🎨 Available Themes
 
-Tatakai features 8 carefully curated themes, each with a distinct visual personality:
+Tatakai features 10 carefully curated themes, each with a distinct visual personality:
 
-### Dark Themes
+### Dark Themes (9 themes)
 - **🌙 Midnight** - Classic dark with indigo & violet accents - perfect for nighttime viewing
 - **🌸 Cherry Blossom** - Soft pink tones inspired by Japanese sakura season
 - **🗼 Neon Tokyo** - Electric neon cyberpunk vibes with purple and cyan
@@ -173,8 +192,10 @@ Tatakai features 8 carefully curated themes, each with a distinct visual persona
 - **🌊 Deep Ocean** - Mysterious underwater depths with blue tones
 - **🌿 Zen Garden** - Calm forest tranquility with green hues
 - **⬛ Brutalist Dark** - Bold, raw, high-contrast minimalist aesthetic
+- **🌇 Sunset Dreams** - Dreamy sunset with warm pink and orange gradients
+- **🌌 Aurora** - Magical aurora with mesmerizing teal and purple lights
 
-### Light Themes
+### Light Themes (1 theme)
 - **☀️ Light Minimal** - Clean, bright, modern design for daytime use
 
 Each theme is optimized for readability, aesthetics, and provides a unique viewing experience.
