@@ -365,7 +365,8 @@ serve(async (req) => {
         headers: {
           ...corsHeaders,
           'Content-Type': 'text/html; charset=utf-8',
-          'Content-Security-Policy': "frame-ancestors *",
+          'Content-Security-Policy': "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; frame-ancestors *;",
+          'X-Frame-Options': 'ALLOWALL',
         },
       });
     }

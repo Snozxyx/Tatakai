@@ -102,6 +102,7 @@ export function EmbedPlayer({ url, poster, language, onError }: EmbedPlayerProps
         src={url}
         className="w-full h-full border-0"
         allowFullScreen
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         onLoad={handleIframeLoad}
         onError={handleError}
