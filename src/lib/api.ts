@@ -392,3 +392,18 @@ export async function fetchWatchanimeworldSources(
   
   return response.json();
 }
+
+// Get proxied embed URL to bypass AdBlock/Sandbox restrictions
+export function getProxiedEmbedUrl(embedUrl: string): string {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  if (!supabaseUrl) {
+    console.warn('Supabase URL not configured, returning direct embed URL');
+    return embedUrl;
+  }
+  
+  const apikey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const params = new URLSearchParams({ embedUrl });
+  if (apikey) params.set('apikey', apikey);
+  
+  return `${supabaseUrl}/functions/v1/watchanimeworld-scraper?${params.toString()}`;
+}

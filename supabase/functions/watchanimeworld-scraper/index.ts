@@ -198,6 +198,102 @@ async function resolveShortLink(shortUrl: string, maxHops = 5): Promise<string> 
   return currentUrl;
 }
 
+// Rewrite embed HTML to remove anti-AdBlock and detection code
+function rewriteEmbedHtml(html: string, embedUrl: string): string {
+  let rewritten = html;
+  
+  // Remove common anti-AdBlock patterns
+  const patterns = [
+    // AdBlock detection scripts
+    /<!--\s*AdBlock.*?-->/gis,
+    /<script[^>]*>[\s\S]*?adblock[\s\S]*?<\/script>/gi,
+    /<script[^>]*>[\s\S]*?AdBlock[\s\S]*?<\/script>/gi,
+    /<script[^>]*>[\s\S]*?adsbygoogle[\s\S]*?<\/script>/gi,
+    
+    // Sandbox detection
+    /if\s*\(\s*window\s*\.\s*self\s*!==\s*window\s*\.\s*top\s*\)[\s\S]*?{[\s\S]*?}/gi,
+    /if\s*\(\s*window\s*\.\s*top\s*!==\s*window\s*\.\s*self\s*\)[\s\S]*?{[\s\S]*?}/gi,
+    /if\s*\(\s*top\s*!==\s*self\s*\)[\s\S]*?{[\s\S]*?}/gi,
+    
+    // Popup and redirect attempts
+    /window\s*\.\s*open\s*\(/gi,
+    /window\s*\.\s*location\s*=\s*['"]/gi,
+    /document\s*\.\s*location\s*=\s*['"]/gi,
+    /top\s*\.\s*location\s*=\s*['"]/gi,
+    
+    // Common ad networks
+    /<script[^>]*src=['"]*https?:\/\/[^'"]*(?:ads|adservice|doubleclick|googlesyndication)[^'"]*['"]*[^>]*><\/script>/gi,
+  ];
+  
+  for (const pattern of patterns) {
+    rewritten = rewritten.replace(pattern, '');
+  }
+  
+  // Replace problematic JavaScript functions with no-ops
+  rewritten = rewritten.replace(
+    /<script([^>]*)>/gi,
+    (match, attrs) => {
+      // Keep essential scripts, remove suspicious ones
+      if (attrs.includes('src=') && (
+        attrs.includes('ads') || 
+        attrs.includes('analytics') || 
+        attrs.includes('tracking')
+      )) {
+        return '<!-- removed ad script -->';
+      }
+      return match;
+    }
+  );
+  
+  // Inject script to prevent redirects and popups
+  const injectedScript = `
+    <script>
+      // Prevent redirects and popups
+      (function() {
+        const originalOpen = window.open;
+        window.open = function() { 
+          console.log('Blocked popup attempt');
+          return null; 
+        };
+        
+        // Prevent parent navigation
+        try {
+          Object.defineProperty(window, 'top', { get: function() { return window; } });
+          Object.defineProperty(window, 'parent', { get: function() { return window; } });
+        } catch(e) {}
+        
+        // Block certain redirects
+        let locationChanging = false;
+        const locationDesc = Object.getOwnPropertyDescriptor(window, 'location');
+        Object.defineProperty(window, 'location', {
+          get: function() { return locationDesc.get.call(window); },
+          set: function(val) {
+            if (locationChanging) return;
+            if (typeof val === 'string' && (val.includes('ads') || val.includes('popup'))) {
+              console.log('Blocked redirect attempt to:', val);
+              return;
+            }
+            locationChanging = true;
+            locationDesc.set.call(window, val);
+            locationChanging = false;
+          }
+        });
+      })();
+    </script>
+  `;
+  
+  // Inject before </head> or at start of body
+  if (rewritten.includes('</head>')) {
+    rewritten = rewritten.replace('</head>', injectedScript + '</head>');
+  } else if (rewritten.includes('<body')) {
+    rewritten = rewritten.replace(/<body([^>]*)>/, '<body$1>' + injectedScript);
+  } else {
+    rewritten = injectedScript + rewritten;
+  }
+  
+  return rewritten;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -206,10 +302,49 @@ serve(async (req) => {
   try {
     const url = new URL(req.url);
     const episodeUrl = url.searchParams.get('episodeUrl');
+    const embedUrl = url.searchParams.get('embedUrl');
     const clientIp = req.headers.get('x-forwarded-for') || req.headers.get('cf-connecting-ip') || 'unknown';
 
+    // Handle embed proxy request
+    if (embedUrl) {
+      // Rate limiting
+      if (!checkRateLimit(clientIp)) {
+        return new Response('Rate limit exceeded', {
+          status: 429,
+          headers: { ...corsHeaders, 'Content-Type': 'text/plain' },
+        });
+      }
+
+      console.log('Proxying embed:', embedUrl);
+
+      // Fetch embed HTML
+      const embedResponse = await fetchWithRetry(embedUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'text/html,application/xhtml+xml',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Referer': 'https://watchanimeworld.in/',
+        },
+      });
+
+      const embedHtml = await embedResponse.text();
+      
+      // Rewrite the HTML to remove anti-AdBlock code
+      const rewrittenHtml = rewriteEmbedHtml(embedHtml, embedUrl);
+
+      return new Response(rewrittenHtml, {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'text/html; charset=utf-8',
+          'X-Frame-Options': 'ALLOWALL',
+          'Content-Security-Policy': "frame-ancestors *",
+        },
+      });
+    }
+
     if (!episodeUrl) {
-      return new Response(JSON.stringify({ error: 'Missing episodeUrl parameter' }), {
+      return new Response(JSON.stringify({ error: 'Missing episodeUrl or embedUrl parameter' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

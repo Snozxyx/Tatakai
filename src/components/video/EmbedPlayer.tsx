@@ -102,7 +102,6 @@ export function EmbedPlayer({ url, poster, language, onError }: EmbedPlayerProps
         onLoad={handleIframeLoad}
         onError={handleError}
         referrerPolicy="no-referrer"
-        sandbox="allow-scripts allow-same-origin"
         title="Anime Video Player"
       />
     </div>
