@@ -30,9 +30,9 @@ export function EmbedPlayer({ url, poster, language, onError }: EmbedPlayerProps
     if (iframe) {
       const currentSrc = iframe.src;
       iframe.src = 'about:blank';
-      requestAnimationFrame(() => {
+      setTimeout(() => {
         iframe.src = currentSrc;
-      });
+      }, 0);
     }
   };
 

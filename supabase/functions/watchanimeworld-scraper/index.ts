@@ -269,24 +269,37 @@ function rewriteEmbedHtml(html: string): string {
           // Intercept location changes - wrap in try-catch as location may be non-configurable
           try {
             const originalLocation = window.location;
-            let redirecting = false;
             
-            // Create a proxy-like behavior for location
-            ['assign', 'replace', 'reload'].forEach(function(method) {
-              const original = originalLocation[method];
-              if (typeof original === 'function') {
-                originalLocation[method] = function(url) {
-                  if (redirecting) return;
-                  if (typeof url === 'string' && (url.includes('ads') || url.includes('popup'))) {
-                    console.log('Blocked redirect attempt to:', url);
-                    return;
-                  }
-                  redirecting = true;
-                  original.call(originalLocation, url);
-                  redirecting = false;
-                };
-              }
-            });
+            // Override assign and replace methods
+            if (typeof originalLocation.assign === 'function') {
+              const originalAssign = originalLocation.assign;
+              originalLocation.assign = function(url) {
+                if (typeof url === 'string' && (url.includes('ads') || url.includes('popup'))) {
+                  console.log('Blocked redirect attempt to:', url);
+                  return;
+                }
+                try {
+                  originalAssign.call(originalLocation, url);
+                } catch(e) {
+                  console.log('Error in assign:', e);
+                }
+              };
+            }
+            
+            if (typeof originalLocation.replace === 'function') {
+              const originalReplace = originalLocation.replace;
+              originalLocation.replace = function(url) {
+                if (typeof url === 'string' && (url.includes('ads') || url.includes('popup'))) {
+                  console.log('Blocked redirect attempt to:', url);
+                  return;
+                }
+                try {
+                  originalReplace.call(originalLocation, url);
+                } catch(e) {
+                  console.log('Error in replace:', e);
+                }
+              };
+            }
           } catch(e) {
             console.log('Could not intercept location methods:', e);
           }
@@ -352,7 +365,6 @@ serve(async (req) => {
         headers: {
           ...corsHeaders,
           'Content-Type': 'text/html; charset=utf-8',
-          'X-Frame-Options': 'ALLOWALL',
           'Content-Security-Policy': "frame-ancestors *",
         },
       });
