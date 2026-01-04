@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Tatakai</string>
+    <string name="home">Home</string>
+    <string name="search">Search</string>
+    <string name="watchlist">Watchlist</string>
+    <string name="profile">Profile</string>
+    <string name="downloads">Downloads</string>
+    <string name="settings">Settings</string>
+    <string name="sign_in">Sign In</string>
+    <string name="sign_out">Sign Out</string>
+    <string name="watch_now">Watch Now</string>
+    <string name="continue_watching">Continue Watching</string>
+    <string name="trending">Trending</string>
+    <string name="recommended">Recommended for You</string>
+    <string name="add_to_watchlist">Add to Watchlist</string>
+    <string name="remove_from_watchlist">Remove from Watchlist</string>
+    <string name="download_episode">Download Episode</string>
+    <string name="play">Play</string>
+    <string name="pause">Pause</string>
+    <string name="skip_intro">Skip Intro</string>
+    <string name="skip_outro">Skip Outro</string>
+    <string name="episode">Episode</string>
+    <string name="episodes">Episodes</string>
+    <string name="search_anime">Search anime...</string>
+    <string name="no_results">No results found</string>
+    <string name="loading">Loading...</string>
+    <string name="error_occurred">An error occurred</string>
+    <string name="retry">Retry</string>
+</resources>
