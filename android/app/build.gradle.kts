@@ -21,9 +21,21 @@ android {
         }
 
         // BuildConfig fields for Supabase configuration.
-        // Provide values via Gradle properties (e.g. SUPABASE_URL / SUPABASE_ANON_KEY) or local.properties.
-        val supabaseUrl = (project.findProperty("SUPABASE_URL") as String?) ?: ""
-        val supabaseAnonKey = (project.findProperty("SUPABASE_ANON_KEY") as String?) ?: ""
+        // Values can be provided via:
+        // 1) Gradle properties (SUPABASE_URL / SUPABASE_ANON_KEY)
+        // 2) android/local.properties (SUPABASE_URL / SUPABASE_ANON_KEY)
+        val localProps = java.util.Properties().apply {
+            val f = rootProject.file("local.properties")
+            if (f.exists()) {
+                f.inputStream().use { load(it) }
+            }
+        }
+        val supabaseUrl = (project.findProperty("SUPABASE_URL") as String?)
+            ?: localProps.getProperty("SUPABASE_URL")
+            ?: ""
+        val supabaseAnonKey = (project.findProperty("SUPABASE_ANON_KEY") as String?)
+            ?: localProps.getProperty("SUPABASE_ANON_KEY")
+            ?: ""
         buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
     }
@@ -71,11 +83,14 @@ dependencies {
 
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     implementation("androidx.activity:activity-compose:1.8.2")
 
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
 
     implementation("androidx.navigation:navigation-compose:2.7.7")
 
