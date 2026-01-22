@@ -1,0 +1,700 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 2%;
+    --foreground: 0 0% 98%;
+
+    --card: 0 0% 5%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 0 0% 5%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 239 84% 67%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 270 60% 50%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 240 6% 10%;
+    --muted-foreground: 240 5% 65%;
+
+    --accent: 270 60% 50%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 6% 15%;
+    --input: 240 6% 15%;
+    --ring: 239 84% 67%;
+
+    --radius: 1rem;
+
+    /* Custom colors */
+    --glass: 0 0% 7%;
+    --glass-border: 0 0% 100%;
+    --glow-primary: 239 84% 67%;
+    --glow-secondary: 270 60% 50%;
+    --surface: 0 0% 4%;
+    --surface-hover: 0 0% 8%;
+    --amber: 45 100% 50%;
+    --amber-glow: 45 100% 60%;
+    --orange: 25 95% 55%;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--secondary)));
+    --gradient-glass: linear-gradient(135deg, hsl(var(--glass-border) / 0.1), transparent);
+    --gradient-glow: radial-gradient(ellipse at center, hsl(var(--primary) / 0.3), transparent 70%);
+
+    /* Shadows */
+    --shadow-glow: 0 0 60px hsl(var(--primary) / 0.3);
+    --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.5);
+
+    /* Sidebar */
+    --sidebar-background: 0 0% 3%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 239 84% 67%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 6% 10%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 240 6% 12%;
+    --sidebar-ring: 239 84% 67%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Outfit', sans-serif;
+  }
+
+  ::selection {
+    @apply bg-primary/30 text-foreground;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-background;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/50;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply relative overflow-hidden rounded-3xl border border-border/30 bg-card/60 backdrop-blur-xl;
+    box-shadow: var(--shadow-card);
+  }
+
+  .glass-panel-hover {
+    @apply transition-all duration-500;
+  }
+
+  .glass-panel-hover:hover {
+    @apply border-border/50 bg-card/80 -translate-y-1;
+    box-shadow: 0 0 40px hsl(var(--primary) / 0.1);
+  }
+
+  .nav-icon {
+    @apply p-3 rounded-2xl transition-all duration-300;
+  }
+
+  .nav-icon-active {
+    @apply bg-foreground text-background;
+    box-shadow: 0 0 20px hsl(var(--foreground) / 0.4);
+  }
+
+  .nav-icon-inactive {
+    @apply text-muted-foreground hover:bg-muted hover:text-foreground;
+  }
+
+  .gradient-text {
+    @apply text-transparent bg-clip-text;
+    background-image: linear-gradient(to bottom, hsl(var(--foreground)), hsl(var(--muted-foreground)));
+  }
+
+  .glow-primary {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .animate-pulse-slow {
+    animation: pulse-slow 4s ease-in-out infinite;
+  }
+
+  .animate-shimmer {
+    animation: shimmer 2s linear infinite;
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--muted-foreground) / 0.2) 50%,
+      hsl(var(--muted)) 100%
+    );
+    background-size: 200% 100%;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted)) transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: 3px;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(1deg);
+  }
+}
+
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes gradient {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out forwards;
+}
+
+.animate-gradient {
+  animation: gradient 4s ease infinite;
+}
+
+.animation-delay-100 { animation-delay: 100ms; }
+.animation-delay-200 { animation-delay: 200ms; }
+.animation-delay-300 { animation-delay: 300ms; }
+.animation-delay-400 { animation-delay: 400ms; }
+.animation-delay-500 { animation-delay: 500ms; }
+
+@keyframes float-up {
+  0% {
+    opacity: 0;
+    transform: translateY(100%) scale(0.5);
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-500px) scale(1);
+  }
+}
+
+.animate-float-up {
+  animation: float-up 8s ease-in-out infinite;
+}
+
+/* Enhanced Video Subtitle Styling */
+.video-with-subtitles::cue {
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.1em;
+  line-height: 1.4;
+  padding: 0.2em 0.5em;
+  border-radius: 4px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
+}
+
+/* Subtitle Size Options */
+.subtitle-small::cue { font-size: 0.85em; }
+.subtitle-medium::cue { font-size: 1.1em; }
+.subtitle-large::cue { font-size: 1.4em; }
+.subtitle-xlarge::cue { font-size: 1.8em; }
+
+/* Subtitle Font Options */
+.subtitle-font-default::cue { font-family: 'Space Grotesk', system-ui, sans-serif; }
+.subtitle-font-serif::cue { font-family: Georgia, 'Times New Roman', serif; }
+.subtitle-font-mono::cue { font-family: 'Fira Code', 'Courier New', monospace; }
+
+/* Subtitle Background Options */
+.subtitle-bg-none::cue { background-color: transparent; text-shadow: 2px 2px 4px rgba(0, 0, 0, 1), -1px -1px 2px rgba(0, 0, 0, 0.8); }
+.subtitle-bg-semi::cue { background-color: rgba(0, 0, 0, 0.7); }
+.subtitle-bg-solid::cue { background-color: rgba(0, 0, 0, 0.95); }
+
+.video-with-subtitles::-webkit-media-text-track-display {
+  overflow: visible !important;
+}
+
+.video-with-subtitles::-webkit-media-text-track-container {
+  padding-bottom: 60px;
+  text-align: center;
+}
+
+/* Fullscreen subtitle adjustments */
+.video-player-container:fullscreen .subtitle-small::cue { font-size: 1.1em; }
+.video-player-container:fullscreen .subtitle-medium::cue { font-size: 1.4em; }
+.video-player-container:fullscreen .subtitle-large::cue { font-size: 1.8em; }
+.video-player-container:fullscreen .subtitle-xlarge::cue { font-size: 2.2em; }
+
+/* Mobile subtitle adjustments */
+@media (max-width: 768px) {
+  .subtitle-small::cue { font-size: 0.7em; }
+  .subtitle-medium::cue { font-size: 0.9em; }
+  .subtitle-large::cue { font-size: 1.1em; }
+  .subtitle-xlarge::cue { font-size: 1.4em; }
+}
+
+/* ========== BRUTALISM THEME STYLES ========== */
+.brutalism-theme {
+  font-family: 'Space Grotesk', monospace, sans-serif !important;
+}
+
+.brutalism-theme * {
+  border-radius: 0 !important;
+}
+
+.brutalism-theme .glass-panel {
+  border-width: 3px !important;
+  border-color: hsl(var(--foreground)) !important;
+  background: hsl(var(--card)) !important;
+  backdrop-filter: none !important;
+  box-shadow: 6px 6px 0 hsl(var(--foreground)) !important;
+}
+
+.brutalism-theme .glass-panel:hover {
+  transform: translate(-2px, -2px) !important;
+  box-shadow: 8px 8px 0 hsl(var(--foreground)) !important;
+}
+
+.brutalism-theme button:not(.video-controls-btn) {
+  border: 2px solid hsl(var(--foreground)) !important;
+  box-shadow: 3px 3px 0 hsl(var(--foreground)) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+}
+
+.brutalism-theme button:not(.video-controls-btn):hover {
+  transform: translate(-1px, -1px) !important;
+  box-shadow: 4px 4px 0 hsl(var(--foreground)) !important;
+}
+
+.brutalism-theme button:not(.video-controls-btn):active {
+  transform: translate(1px, 1px) !important;
+  box-shadow: 2px 2px 0 hsl(var(--foreground)) !important;
+}
+
+.brutalism-theme h1, .brutalism-theme h2, .brutalism-theme h3 {
+  font-weight: 900 !important;
+  text-transform: uppercase !important;
+  letter-spacing: -0.02em !important;
+}
+
+.brutalism-theme .nav-icon {
+  border: 2px solid hsl(var(--foreground)) !important;
+}
+
+.brutalism-theme .nav-icon-active {
+  background: hsl(var(--secondary)) !important;
+  box-shadow: 3px 3px 0 hsl(var(--foreground)) !important;
+}
+
+.brutalism-theme input,
+.brutalism-theme textarea,
+.brutalism-theme select {
+  border: 2px solid hsl(var(--foreground)) !important;
+  border-radius: 0 !important;
+}
+
+.brutalism-theme ::selection {
+  background: hsl(var(--secondary)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+.brutalism-theme ::-webkit-scrollbar-thumb {
+  background: hsl(var(--foreground)) !important;
+  border-radius: 0 !important;
+}
+
+.brutalism-theme .animate-float,
+.brutalism-theme .animate-pulse-slow {
+  animation: none !important;
+}
+
+/* Smart TV Mode Styles */
+.smart-tv-mode {
+  /* Larger touch targets and text for remote control navigation */
+}
+
+.smart-tv-mode button,
+.smart-tv-mode a,
+.smart-tv-mode [role="button"] {
+  min-height: 48px;
+  min-width: 48px;
+  font-size: 1.1em;
+}
+
+.smart-tv-mode .nav-icon {
+  padding: 1rem;
+}
+
+.smart-tv-mode h1 {
+  font-size: 2.5rem;
+}
+
+.smart-tv-mode h2 {
+  font-size: 2rem;
+}
+
+.smart-tv-mode h3 {
+  font-size: 1.5rem;
+}
+
+.smart-tv-mode p,
+.smart-tv-mode span {
+  font-size: 1.1rem;
+}
+
+/* Focus styles for remote navigation */
+.smart-tv-mode *:focus {
+  outline: 3px solid hsl(var(--primary));
+  outline-offset: 4px;
+}
+
+.smart-tv-mode button:focus,
+.smart-tv-mode a:focus,
+.smart-tv-mode [tabindex]:focus {
+  transform: scale(1.05);
+  box-shadow: 0 0 30px hsl(var(--primary) / 0.5);
+}
+
+/* Larger cards on TV */
+.smart-tv-mode .glass-panel {
+  min-height: 200px;
+}
+
+/* Hide mobile nav on TV */
+.smart-tv-mode .mobile-nav {
+  display: none;
+}
+
+/* Larger video controls */
+.smart-tv-mode video::-webkit-media-controls {
+  transform: scale(1.3);
+  transform-origin: bottom center;
+}
+
+/* ========== ENHANCED VIDEO PLAYER STYLES ========== */
+.video-player-modern {
+  --player-accent: hsl(var(--primary));
+  --player-bg: rgba(0, 0, 0, 0.85);
+}
+
+.video-controls-gradient {
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.95) 0%,
+    rgba(0, 0, 0, 0.7) 30%,
+    rgba(0, 0, 0, 0.3) 60%,
+    transparent 100%
+  );
+}
+
+.video-progress-track {
+  height: 4px;
+  transition: height 0.2s ease;
+}
+
+.video-progress-track:hover {
+  height: 8px;
+}
+
+.video-control-btn {
+  @apply p-2.5 rounded-xl bg-white/10 backdrop-blur-sm hover:bg-white/20 transition-all duration-200;
+}
+
+.video-control-btn:hover {
+  transform: scale(1.1);
+}
+
+.video-control-btn:active {
+  transform: scale(0.95);
+}
+
+.skip-button-glow {
+  animation: skip-glow 2s ease-in-out infinite;
+}
+
+@keyframes skip-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.5);
+  }
+  50% {
+    box-shadow: 0 0 40px hsl(var(--primary) / 0.8);
+  }
+}
+
+/* Smart TV specific video controls */
+.smart-tv-mode .video-control-btn {
+  min-width: 56px;
+  min-height: 56px;
+  padding: 1rem;
+}
+
+.smart-tv-mode .video-progress-track {
+  height: 8px;
+}
+
+.smart-tv-mode .video-progress-track:hover {
+  height: 12px;
+}
+/* ========================================
+   THEME-SPECIFIC UNIQUE STYLES
+   Each theme gets its own visual personality
+   ======================================== */
+
+/* Brutalism themes - Raw, bold, sharp edges */
+.brutalism-theme .glass-panel {
+  @apply rounded-none border-2;
+  box-shadow: 4px 4px 0 hsl(var(--border));
+}
+
+.brutalism-theme .glass-panel-hover:hover {
+  box-shadow: 6px 6px 0 hsl(var(--primary));
+  transform: translate(-2px, -2px);
+}
+
+.brutalism-theme button {
+  @apply rounded-none font-bold uppercase tracking-wider;
+}
+
+.brutalism-theme .rounded-full {
+  border-radius: 0 !important;
+}
+
+.brutalism-theme .rounded-xl,
+.brutalism-theme .rounded-2xl,
+.brutalism-theme .rounded-3xl {
+  border-radius: 0 !important;
+}
+
+/* Light themes - Soft shadows and subtle effects */
+.light-theme .glass-panel {
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+}
+
+.light-theme .glass-panel-hover:hover {
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.12);
+}
+
+/* Neon-Tokyo theme - Cyberpunk glowing effects */
+body[data-theme="neon-tokyo"] .glass-panel {
+  box-shadow: 0 0 20px hsl(var(--primary) / 0.2), 0 0 60px hsl(var(--secondary) / 0.1);
+}
+
+body[data-theme="neon-tokyo"] .glass-panel-hover:hover {
+  box-shadow: 0 0 30px hsl(var(--primary) / 0.4), 0 0 80px hsl(var(--secondary) / 0.2);
+}
+
+body[data-theme="neon-tokyo"] h1,
+body[data-theme="neon-tokyo"] h2,
+body[data-theme="neon-tokyo"] h3 {
+  text-shadow: 0 0 10px hsl(var(--primary) / 0.5);
+}
+
+/* Cyberpunk theme - Electric neon glow */
+body[data-theme="cyberpunk"] .glass-panel {
+  border-color: hsl(var(--primary) / 0.5);
+  box-shadow: 0 0 15px hsl(var(--primary) / 0.3), inset 0 0 20px hsl(var(--primary) / 0.05);
+}
+
+body[data-theme="cyberpunk"] h1,
+body[data-theme="cyberpunk"] h2 {
+  text-shadow: 0 0 20px hsl(var(--primary)), 0 0 40px hsl(var(--secondary) / 0.5);
+}
+
+/* Cherry Blossom theme - Soft, romantic feel */
+body[data-theme="cherry-blossom"] .glass-panel {
+  background: linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--card) / 0.8) 100%);
+}
+
+body[data-theme="cherry-blossom"] .glass-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.5), transparent);
+}
+
+/* Aurora Borealis theme - Gradient shimmer effect */
+body[data-theme="aurora-borealis"] .glass-panel {
+  background: linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--card) / 0.9) 100%);
+  border-image: linear-gradient(135deg, hsl(var(--primary) / 0.3), hsl(var(--secondary) / 0.3), hsl(var(--accent) / 0.3)) 1;
+}
+
+/* Volcanic theme - Warm ember glow */
+body[data-theme="volcanic"] .glass-panel-hover:hover {
+  box-shadow: 0 0 40px hsl(var(--primary) / 0.3), 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+/* Deep Ocean theme - Underwater depth effect */
+body[data-theme="deep-ocean"] .glass-panel {
+  background: linear-gradient(180deg, hsl(var(--card) / 0.8) 0%, hsl(var(--card)) 100%);
+}
+
+/* Golden Hour theme - Warm sunset glow */
+body[data-theme="golden-hour"] .glass-panel {
+  box-shadow: 0 8px 32px hsl(var(--primary) / 0.15);
+}
+
+/* Zen Garden theme - Minimal, peaceful */
+body[data-theme="zen-garden"] .glass-panel {
+  border-width: 1px;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.2);
+}
+
+body[data-theme="zen-garden"] .glass-panel-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+
+/* Northern Lights theme - Magical shimmer */
+body[data-theme="northern-lights"] .glass-panel {
+  background: linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--card) / 0.9) 100%);
+}
+
+body[data-theme="northern-lights"] .glass-panel::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, transparent 40%, hsl(var(--primary) / 0.03) 50%, transparent 60%);
+  pointer-events: none;
+}
+
+/* Obsidian theme - Pure elegant darkness */
+body[data-theme="obsidian"] .glass-panel {
+  border-color: hsl(var(--border) / 0.5);
+}
+
+body[data-theme="obsidian"] .glass-panel-hover:hover {
+  border-color: hsl(var(--primary));
+}
+
+/* Glacier theme - Icy cool reflections */
+body[data-theme="glacier"] .glass-panel {
+  box-shadow: 0 4px 32px hsl(var(--primary) / 0.1);
+}
+
+/* Solar theme - Radiant warmth */
+body[data-theme="solar"] .glass-panel-hover:hover {
+  box-shadow: 0 0 50px hsl(var(--primary) / 0.25), 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* Orchid theme - Vibrant floral */
+body[data-theme="orchid"] .glass-panel {
+  border-color: hsl(var(--primary) / 0.3);
+}
+
+body[data-theme="orchid"] .glass-panel-hover:hover {
+  border-color: hsl(var(--primary) / 0.6);
+  box-shadow: 0 0 30px hsl(var(--primary) / 0.2);
+}
+
+/* Lavender theme - Soft purple dreamscape */
+body[data-theme="lavender"] .glass-panel {
+  box-shadow: 0 4px 24px hsl(var(--primary) / 0.08);
+}
+
+/* Verdant theme - Lush forest depth */
+body[data-theme="verdant"] .glass-panel-hover:hover {
+  box-shadow: 0 8px 40px hsl(var(--primary) / 0.15);
+}
+
+/* Tide theme - Ocean wave motion */
+body[data-theme="tide"] .glass-panel {
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Harvest theme - Autumn warmth */
+body[data-theme="harvest"] .glass-panel {
+  box-shadow: 0 4px 20px hsl(var(--primary) / 0.1);
+}

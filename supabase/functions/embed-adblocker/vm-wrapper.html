@@ -1,0 +1,162 @@
+<!DOCTYPE html><html><head>
+<script>
+/* Tatakai Ad-Shield v2 - Click-Hijack Protection */
+(function() {
+  'use strict';
+  console.log("[Tatakai] Ad-Shield active - neutralizing click hijacking");
+
+  // ===== 1. BLOCK POPUP MECHANISMS =====
+  
+  // Override window.open to block ALL popup attempts
+  const fakeWindow = { 
+    closed: true, 
+    focus: function(){},
+    blur: function(){},
+    close: function(){},
+    location: { href: '' }
+  };
+  
+  window.open = function(url) { 
+    console.log("[Tatakai] Blocked popup:", url?.substring?.(0, 50) || 'unknown');
+    return fakeWindow;
+  };
+  
+  // Block createElement('a').click() pattern used for stealth redirects
+  const originalCreateElement = document.createElement.bind(document);
+  document.createElement = function(tagName) {
+    const element = originalCreateElement(tagName);
+    if (tagName.toLowerCase() === 'a') {
+      const originalClick = element.click.bind(element);
+      element.click = function() {
+        if (element.target === '_blank' || element.href?.includes?.('http')) {
+          console.log("[Tatakai] Blocked stealth redirect via <a> click:", element.href?.substring?.(0, 50));
+          return;
+        }
+        return originalClick();
+      };
+    }
+    return element;
+  };
+
+  // ===== 2. NEUTRALIZE CLICK-JACKING (mlCWFGuzX pattern) =====
+  
+  // Make document.onclick/ontouchend unassignable
+  Object.defineProperty(document, 'onclick', {
+    set: function(val) { 
+      console.log("[Tatakai] Blocked document.onclick hijack attempt");
+    },
+    get: function() { return null; },
+    configurable: false
+  });
+  
+  Object.defineProperty(document, 'ontouchend', {
+    set: function(val) { 
+      console.log("[Tatakai] Blocked document.ontouchend hijack attempt");
+    },
+    get: function() { return null; },
+    configurable: false
+  });
+
+  // ===== 3. NEUTRALIZE ADBLOCK DETECTION =====
+  
+  // Pretend FuckAdBlock is loaded but never detects
+  window.fuckAdBlock = {
+    onDetected: function() {},
+    onNotDetected: function(cb) { try { cb?.(); } catch(e){} },
+    check: function() { return false; },
+    emitEvent: function() {}
+  };
+  window.FuckAdBlock = window.fuckAdBlock;
+  window.blockAdBlock = window.fuckAdBlock;
+  window.BlockAdBlock = function() { return window.fuckAdBlock; };
+
+  // ===== 4. NEUTRALIZE EXTENSION DETECTION =====
+  
+  // The isUseExtension check looks at toString() of native functions
+  // Make our overrides look native
+  const nativeToString = function() { return 'function ' + this.name + '() { [native code] }'; };
+  
+  if (window.open.toString !== nativeToString) {
+    try {
+      window.open.toString = () => 'function open() { [native code] }';
+    } catch(e) {}
+  }
+
+  // ===== 5. NEUTRALIZE ANTI-FRAMING =====
+  
+  // Override top.location check to prevent redirect to abyss.to
+  try {
+    if (window.top !== window.self) {
+      Object.defineProperty(window, 'top', {
+        get: function() { return window.self; }
+      });
+    }
+  } catch(e) {
+    // Cross-origin, can't override
+  }
+
+  // ===== 6. AUTO-REMOVE OVERLAY AFTER LOAD =====
+  
+  // The abyss player has an #overlay that blocks video, remove it
+  window.addEventListener('load', function() {
+    setTimeout(function() {
+      const overlay = document.getElementById('overlay');
+      if (overlay) {
+        console.log("[Tatakai] Removing click-capture overlay");
+        overlay.remove();
+      }
+      // Also remove any loader elements
+      const loader = document.querySelector('.loader');
+      if (loader) loader.remove();
+    }, 500);
+  });
+
+  // ===== 7. BLOCK TRACKING PIXELS =====
+  
+  const originalImage = window.Image;
+  window.Image = function() {
+    const img = new originalImage();
+    const originalSetSrc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src').set;
+    Object.defineProperty(img, 'src', {
+      set: function(value) {
+        if (value && (
+          value.includes('pixel.morphify.net') ||
+          value.includes('googlesyndication') ||
+          value.includes('1x1.jpg') ||
+          value.includes('1x2.jpg')
+        )) {
+          console.log("[Tatakai] Blocked tracking pixel:", value.substring(0, 50));
+          return;
+        }
+        return originalSetSrc.call(img, value);
+      },
+      get: function() { return img.getAttribute('src'); }
+    });
+    return img;
+  };
+
+  // ===== 8. AUTO-PLAY VIDEO =====
+  
+  // Once JWPlayer is ready, auto-play to skip first-click requirement
+  let autoPlayAttempted = false;
+  const autoPlayInterval = setInterval(function() {
+    if (typeof jwplayer !== 'undefined' && jwplayer()?.play) {
+      if (!autoPlayAttempted) {
+        autoPlayAttempted = true;
+        try {
+          jwplayer().play();
+          console.log("[Tatakai] Auto-play triggered");
+        } catch(e) {}
+      }
+      clearInterval(autoPlayInterval);
+    }
+  }, 200);
+  
+  // Clear interval after 30s to prevent memory leak
+  setTimeout(() => clearInterval(autoPlayInterval), 30000);
+
+  console.log("[Tatakai] All protections active");
+})();
+</script>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>[Toonworld4all] Naruto - 006 [1080p BD x264 Multi Audio] DD2.0 ESub.mkv</title><style>#overlay, html {background: #000;}#overlay,#playback {bottom: 0;position: absolute}#overlay, svg {cursor: pointer}* {margin: 0;padding: 0}html {color: #fff;overflow: hidden}#overlay {width: 100%;height: auto;z-index: 100000;background: #00000000;top: 0;}#playback {pointer-events: none;width: 100%;height: 100%; display: flex;justify-content: center;align-items: center;}#playback svg {width: 50%;height: 50%;}svg {width: 24px;height: 24px;fill: #fff}.loader {display: flex;justify-content: center;align-items: center;height: 100svh;margin: 0}.loader span {border: 7px solid #f3f3f3;border-top: 7px solid #3498db;border-radius: 50%;width: 0.75rem;height: 0.75rem;animation: 1s linear infinite spin}@keyframes spin {0% {transform: rotate(0)}100% {transform: rotate(360deg)}}</style><script src="https://statics.sssrr.org/player/jwplayer.min.js"></script><script src="https://statics.sssrr.org/player/jwpsrv.js"></script><script src="https://statics.sssrr.org/player/jwplayer.core.controls.html5.js"></script><script>const isTouchScreen = "ontouchstart" in window || "onmsgesturechange" in window;const isUseExtension = "functionsetInterval(){[nativecode]}" != setInterval.toString().replace(/( |\\n)/g, "") ||"functionsetTimeout(){[nativecode]}" != setTimeout.toString().replace(/( |\\n)/g, "") ||"functionopen(){[nativecode]}" != window.open.toString().replace(/( |\\n)/g, "") ||"functionfetch(){[nativecode]}" != fetch.toString().replace(/( |\\n)/g, "");const getQueryParams = (url = window.location.search) => {const urlParams = new URLSearchParams(url);const params = {};for (const [key, value] of urlParams.entries()) {params[key] = decodeURIComponent(value);}return params;};const reqTrack = (name = null, params = {}) => {if(!name) return;const createElm = document.createElement("img");createElm.src = `https://pixel.morphify.net/${name}.jpg?${new URLSearchParams(params).toString()}`;createElm.style.display = "none";document.body.appendChild(createElm);createElm.onerror = () => createElm.remove();createElm.onload = () => createElm.remove();};const loadScript = (url = null) => {return new Promise(resolve => {if (!url) return resolve(false);var script = document.createElement('script');script.src = url;script.onload = () => {resolve(true);};script.onerror = () => {resolve(false);};return document.head.appendChild(script);});};</script></head><body><div id="player"><div class="loader"><span></span></div></div><div id="overlay"><div id="playback"><svg viewBox="0 0 24 24"><path d="M8.016 5.016l10.969 6.984-10.969 6.984v-13.969z"></path></svg></div></div><script>if(top.location == self.location && !/^(.+?)\.abyss\.to$/.test(document.location.hostname)) {window.location = "https://abyss.to";} else {const params = getQueryParams();const poster = params.thumbnail || params.image;if(poster) {const overlay = document.getElementById('overlay');if(overlay) {overlay.style.background = `#000 url('${poster}') center center no-repeat`;overlay.style["background-size"] = "contain";}}const track = { window: 0, close: 0 };var urls = ["https://usheebainaut.com/4/7807247", "https://attirecideryeah.com/2020443/"].map(url => ({ url, sort: Math.random() })).sort((a, b) => a.sort - b.sort).map(({ url }) => url);window.abyssConfig = {popups: [...urls]};loadScript('https://cdnjs.cloudflare.com/ajax/libs/fuckadblock/3.2.1/fuckadblock.min.js').then(() => {const adBlockDetected = () => {urls = ["https://usheebainaut.com/4/7807247","https://usheebainaut.com/4/7807247"];};if(typeof fuckAdBlock == 'undefined' || typeof FuckAdBlock == 'undefined') {adBlockDetected();} else {fuckAdBlock.onDetected(adBlockDetected);}});const pIB = () => {const overlay = document.getElementById('overlay');const url = urls.shift();if(!url) {/* document.onclick blocked *//* document.ontouchend blocked */if(overlay) overlay.remove();return;}if(isUseExtension) {var createElm = document.createElement("a");createElm.setAttribute("href", url);createElm.setAttribute("target", "_blank");createElm.click();} else {try {const open = window.open(url);open.focus();setTimeout(() => {if(!open.closed)return;track.close++;/* reqTrack blocked */;}, 50);} catch({ message }) {track.window++;/* reqTrack blocked */;}}if(urls.length)return;/* document.onclick blocked *//* document.ontouchend blocked */if(overlay) overlay.remove();if(track.window >= 2) {try {if(window.jwplayer) {jwplayer().remove();}} catch ({ message }) {console.error(message);}return document.write('<center style="display:flex;justify-content:center;align-items:center;height:100vh;padding:0 10px;background:#000;color:#fff"><h2>Due to certain reasons (AdBlock/Sandbox), ads are not being displayed, which prevents the player from functioning. Please allow ads to be displayed on this player by disabling AdBlock or removing the Sandbox, and try again.</h2></center>');}if(typeof jwplayer != "undefined" && typeof jwplayer().play == "function") {jwplayer().play();}};/* document.onclick blocked *//* document.ontouchend blocked */}</script><!-- gtag removed --><script>window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', 'G-RB29PDDFNK');</script><script>var isFristLoad = true;const viewPlaying = setInterval(async () => {if(typeof jwplayer != "undefined") {var player = jwplayer();if(player?.getState?.() == 'playing' && player?.getCurrentTime?.() > 0) {clearInterval(viewPlaying);const params = {id: 464030,v: "dY4cfyJSY",referer: "https://short.icu"};fetch('https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js', {method: 'HEAD',mode: 'no-cors',}).then(() => /* reqTrack blocked */).catch(() => /* reqTrack blocked */);}if(isFristLoad) {isFristLoad = false;let img = document.createElement('img');img.src = "https://pixel.morphify.net/1x1.jpg?v=dY4cfyJSY&id=464030";img.onload = () => img.parentNode&&img.parentNode.removeChild(img);img.onerror = () => {};document.body.appendChild(img);}}}, 1e3);</script><script src="https://iamcdn.net/player-v2/core.bundle.js"></script><script>window.addEventListener("load", ()=> {const datas = "eyJzbHVnIjoiZFk0Y2Z5SlNZIiwibWQ1X2lkIjoyNDIyMTA5NCwidXNlcl9pZCI6NDY0MDMwLCJtZWRpYSI6IjtcdTAwMWbV4Vx1MDAxMVxyaVx1MDAxOeGYXHUwMDA2vG/HLfLWkDun/DhxNcigqcLj8FNxT0J5y2zYVlx1MDAwMkM5e75cdTAwMTS+MTw88ec29VR+/Gcqz2mZvlxcZXVpVabM7Z1hjrRcdTAwMDB6wb6ytFo0OG+vXHUwMDEysZqsuWvO9JFCwnLjQXJcdTAwMWJxXHTrkCe6XHUwMDFj0dFcdTAwMDSNWpLDXHUwMDExdq1fYeajPlRiWHfTn6JM2vx+r05+R3bdXHUwMDA0o3ijjoaU8+s60cE/XHUwMDAz7zKs6ag+ct9yLopcdTAwMDM2TZ9cZr3wVlx1MDAwNHaA4DxYfnmoo1x1MDAxZmgsXG5KqVx1MDAxY1x1MDAwNjOoIJ3p6dtFKt47rjP+8Jg2h+KsXHUwMDE4k5Dt+POuX4I3vbpJIVx1MDAwMVx1MDAwMOpOz+Q/XHUwMDFmfG+TRP54cNVbXHUwMDA3YJEoNedQWs9bTam+cqSqOlx1MDAxNHNcdTAwMDa0/9rmxXkoeHSs5r/OUll4RWExNOaH77Py+Fx1MDAwYsvoMmNcdTAwMGVcdTAwMWZcdTAwMWTC6vSKt9Xc3az0s+l55WW3XFyqOdt2aFxuXHUwMDA0XHUwMDA0viTWeL1iblogr6Yg2r5cdTAwMWKfLaV1XGYrP2cwL9e4xP/BUDSHMFRBffBcdTAwMWFK2tlcdTAwMDUz+rKctFx1MDAwMFx1MDAxZDziuturvYlmI1x1MDAxZqcsZV3/XFxGIHPw8Or0n8Y+YWWUIdjFYdZelFCnMeuCaFx1MDAxOc3BcYP+I5nJMlx1MDAwZck9qMhcXNlcdTAwMTGwUK2RPVx1MDAwZlxi/dJRXHUwMDFjkkn6+IdGumDELcpkpIJ6Klx1MDAxMSWGj6HYVk+nl1x1MDAxNkWLJcFcdTAwMDZZPMzorK5R8tL7yrO7kqOAXHUwMDAzRVx1MDAwMrV4u/BgXG4tXHUwMDFjyaYrR9VcdCW+4TtGuDeQ7M+mg9WsQ1x1MDAwNbErfWa523pKUFxmm+lUqmPPXHUwMDBlsSAy0DbPnCRcdTAwMWZgac+cfELZe0w6pGiJM75nXHUwMDE2vWZJVXRcdTAwMTO5XHUwMDAw7m07XHQ2cJWFaukjo9ilcI7RVe7wUNBcZjdz41x0MyrEgXzhp/Ll2Vx1MDAwNetScaHxpMxsRaJcZnOKUVicXHUwMDFjPvZcdTAwMTfOXHUwMDExL2bvqFiyhKbrt5PARHae21TJXGKy6dcx3G1cXGPAXHUwMDAxaoeix1x0NCTFmZYmpmh7sfuKXHUwMDAxLKHM7TYh/squn1FcdTAwMDVXds6PrWRw+0Lvz1x1MDAwN1x0TCPlvDScXGb4qT3mXHUwMDA2cndcdTAwMWSdmH9eyrHJXHUwMDBiJTlahNbl1Mqq/1x1MDAwYkE1XHUwMDAw2lx0XHUwMDE0XHUwMDAwvlx1MDAxM1x1MDAwZmL5w4NcdTAwMTFGwoBtQTdLtkO5caWf5DPWdiq6ljo2Qc69Lf/EjXy3xnTDcHXzTvzNSUSR6DXSXHUwMDFkaW1CQlwi+VBcdTAwMTSh/d+wcdk30+gnPMfkRlx1MDAxOK3yZ/hcdTAwMTHRd7pMzGw1XHUwMDExYTuX0vPLi2VQwPkkyT/UQ5ZcdTAwMDK1XHUwMDFiT1eVNrOOXHUwMDExlVl7bNhcdTAwMWI5MMhcdTAwMDOg31dcdTAwMTnnXHUwMDA30b9Xx7+ff2LQfnPzVetcdTAwMDPM/lx1MDAxZijWsjOsXHUwMDEw0tNAPMmralx1MDAxNnpD96p6pOHUXHUwMDFk0a+2411yS5PxJvjvWNOq61x1MDAxYj9jk7BV5XNcIvQ9lmRRXHUwMDBiRXebJU/bmi49cFx1MDAwNVx1MDAwM3em39/km2IzVfBC580rl+gw3aqL32LXITY5zfBKMFx1MDAxZkXsoIlcdTAwMGVcYurorVDl8emjjaRuXHUwMDFkb0lcdTAwMGVLfGxRXHUwMDA09sFcYpdcdTAwMDWK8LdcdTAwMWEhXHUwMDBiXHUwMDE3aYVcdTAwMTRcdTAwMDZiO3mFcqrib1FcdTAwMTVKzM7G9DzhnIUsiYryY3fpMXlcdTAwMGaXXHUwMDFkf1xysphcdTAwMWE4pFx1MDAwYt5yXHUwMDExkVxmXHUwMDAzevlcdTAwMDHk6tFccs+BI5hgYsAnXHUwMDAynmFcdTAwMWNcIlx1MDAwMpSeNlx1MDAwNOJcdTAwMTRlXHK0SE0shb9T+ErAalx1MDAwNTKGWb+Useo0pc/CmbHPI/90bti8XHUwMDE48DjNZjNcdTAwMWVcdTAwMWVcdTAwMWJUUWBOLoGk2WVcdTAwMTdbyUdLYZJcZubmXHUwMDE3zHeN48JYXdvNry3p81xmXHUwMDE5Jk2zVfC5hXtQlaZJrHRcdTAwMTTFsJ+SivAiLCJjb25maWciOnsicG9zdGVyIjp0cnVlLCJwcmV2aWV3Ijp0cnVlfX0=";if(window.SoTrym)return window.SoTrym(JSON.parse(atob(datas)));loadScript("https://iamcdn.net/player-v2/lite.bundle.js").then(reload => {if(!reload || !window.SoTrym)return document.write("Your browser is interfering with the loading of essential assets. Please consider disabling extensions and ad blockers, or using an alternative browser.");return window.SoTrym(JSON.parse(atob(datas)));});});</script><script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9bd93b2f8d323b61',t:'MTc2ODM1Mjc5MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"00ec5bdfe5904063a58dc537639c2683","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body></html>

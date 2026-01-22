@@ -1,0 +1,38 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin
+Disallow: /auth
+
+# Allow search engine crawlers
+User-agent: Googlebot
+Allow: /
+Disallow: /api/
+Disallow: /admin
+
+User-agent: Bingbot
+Allow: /
+Disallow: /api/
+Disallow: /admin
+
+User-agent: Slurp
+Allow: /
+
+User-agent: DuckDuckBot
+Allow: /
+
+User-agent: Baiduspider
+Allow: /
+
+# Social media bots
+User-agent: Twitterbot
+Allow: /
+
+User-agent: facebookexternalhit
+Allow: /
+
+# Crawl-delay
+Crawl-delay: 1
+
+# Sitemap location
+Sitemap: https://tatakai.gabhasti.tech/sitemap.xml
