@@ -41,7 +41,7 @@ export function useDeviceCapabilities(): DeviceCapabilities {
                                    CSS.supports('-webkit-backdrop-filter', 'blur(1px)');
 
       // Get device memory (if available)
-      const deviceMemory = (navigator as any).deviceMemory;
+      const deviceMemory = 'deviceMemory' in navigator ? (navigator as Navigator & { deviceMemory?: number }).deviceMemory : undefined;
       
       // Get hardware concurrency (CPU cores)
       const hardwareConcurrency = navigator.hardwareConcurrency;
@@ -66,10 +66,10 @@ export function useDeviceCapabilities(): DeviceCapabilities {
       const recommendedTheme = isLowEndDevice ? 'lite-mode' : 'default';
 
       // Get memory info if available
-      const memoryInfo = (performance as any).memory ? {
-        totalJSHeapSize: (performance as any).memory.totalJSHeapSize,
-        usedJSHeapSize: (performance as any).memory.usedJSHeapSize,
-        jsHeapSizeLimit: (performance as any).memory.jsHeapSizeLimit,
+      const memoryInfo = (performance as Performance & { memory?: PerformanceMemory }).memory ? {
+        totalJSHeapSize: (performance as Performance & { memory?: PerformanceMemory }).memory.totalJSHeapSize,
+        usedJSHeapSize: (performance as Performance & { memory?: PerformanceMemory }).memory.usedJSHeapSize,
+        jsHeapSizeLimit: (performance as Performance & { memory?: PerformanceMemory }).memory.jsHeapSizeLimit,
       } : undefined;
 
       setCapabilities({

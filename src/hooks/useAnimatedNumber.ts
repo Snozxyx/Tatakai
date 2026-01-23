@@ -33,23 +33,3 @@ export function useAnimatedNumber(
 
   return `${prefix}${displayValue.toLocaleString()}${suffix}`;
 }
-
-export function useMultipleAnimatedNumbers(
-  endValues: number[],
-  duration: number = 1000,
-  options?: {
-    decimals?: number[];
-    prefixes?: string[];
-    suffixes?: string[];
-    easing?: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
-  }
-): string[] {
-  return endValues.map((endValue, index) => 
-    useAnimatedNumber(endValue, duration, {
-      decimals: options?.decimals?.[index] ?? 0,
-      prefix: options?.prefixes?.[index] ?? '',
-      suffix: options?.suffixes?.[index] ?? '',
-      easing: options?.easing ?? 'easeInOut',
-    })
-  ) as string[];
-}

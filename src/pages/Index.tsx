@@ -19,6 +19,7 @@ import { WatchRoomSection } from "@/components/home/WatchRoomSection";
 import { DiscordSection } from "@/components/home/DiscordSection";
 import { AppDownloadSection } from "@/components/home/AppDownloadSection";
 import { HeroSkeleton, CardSkeleton } from "@/components/ui/skeleton-custom";
+import { DynamicSuggestionBanner } from "@/components/suggestions/DynamicSuggestionBanner";
 import { Heart, Sparkles } from "lucide-react";
 
 const Index = () => {
@@ -41,6 +42,13 @@ const Index = () => {
       <Sidebar />
 
       <main className="relative z-10 pl-6 md:pl-32 pr-6 py-6 max-w-[1800px] mx-auto pb-24 md:pb-6">
+        {/* Dynamic Suggestion Banner for Home Page */}
+        <DynamicSuggestionBanner 
+          context="home"
+          maxPerSession={3}
+          className="absolute top-4 right-4 md:top-6 md:right-6"
+        />
+        
         <Header />
 
         {isLoading ? (

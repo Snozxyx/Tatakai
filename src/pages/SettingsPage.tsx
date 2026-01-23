@@ -17,7 +17,7 @@ import { useClearAllWatchHistory } from '@/hooks/useWatchHistory';
 import { getMALAuthUrl, getAniListAuthUrl, disconnectMAL, disconnectAniList } from '@/lib/externalIntegrations';
 import { toast } from 'sonner';
 import {
-  ArrowLeft, Palette, Film, Monitor, Info, Link2, Eye, EyeOff, Globe, CheckCircle, ExternalLink, Shield, History, Trash2, Search, Smartphone, Download, Wifi, FolderOpen, Play
+  ArrowLeft, Palette, Film, Monitor, Info, Link2, Eye, EyeOff, Globe, CheckCircle, ExternalLink, Shield, History, Trash2, Search, Smartphone, Download, Wifi, FolderOpen, Play, Zap, Gauge
 } from 'lucide-react';
 
 // Fallback changelog entries if database is empty
@@ -96,6 +96,42 @@ export default function SettingsPage() {
       return 'internal';
     }
   });
+  
+  const [ultraLiteMode, setUltraLiteMode] = useState(() => {
+    try {
+      return localStorage.getItem('tatakai_ultra_lite_mode') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleUltraLiteModeChange = (enabled: boolean) => {
+    setUltraLiteMode(enabled);
+    try {
+      localStorage.setItem('tatakai_ultra_lite_mode', enabled.toString());
+      
+      // Apply ultra lite mode effects
+      if (enabled) {
+        // Disable animations and reduce motion
+        document.documentElement.style.setProperty('--motion-scale', '0.5');
+        document.body.classList.add('ultra-lite-mode');
+        // Reduce image quality
+        document.documentElement.style.setProperty('--image-quality', 'low');
+        // Reduce particle effects
+        document.body.classList.add('reduce-motion');
+        toast.success('Ultra Lite Mode enabled - Performance optimized');
+      } else {
+        // Restore normal settings
+        document.documentElement.style.setProperty('--motion-scale', '1');
+        document.body.classList.remove('ultra-lite-mode');
+        document.documentElement.style.setProperty('--image-quality', 'high');
+        document.body.classList.remove('reduce-motion');
+        toast.success('Ultra Lite Mode disabled - Normal settings restored');
+      }
+    } catch {
+      toast.error('Failed to save setting');
+    }
+  };
 
   const handleDownloadLocationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
@@ -274,6 +310,22 @@ export default function SettingsPage() {
                 Display Settings
               </h2>
               <div className="space-y-6">
+                <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30">
+                  <div>
+                    <p className="font-medium">Ultra Lite Mode</p>
+                    <p className="text-sm text-muted-foreground">Maximum performance mode for low-end devices and slow connections</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={ultraLiteMode}
+                      onChange={(e) => handleUltraLiteModeChange(e.target.checked)}
+                      className="sr-only peer" 
+                    />
+                    <div className="w-11 h-6 bg-muted rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-foreground after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                  </label>
+                </div>
+                
                 <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30">
                   <div>
                     <p className="font-medium">Reduce Motion (Soon)</p>

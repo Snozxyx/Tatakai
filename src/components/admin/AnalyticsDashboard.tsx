@@ -112,7 +112,7 @@ export function AnalyticsDashboard() {
       const startDate = subDays(new Date(), days).toISOString();
       const { data, error } = await supabase
         .from('page_visits')
-        .select('device_type, platform, theme_used')
+        .select('device_type, platform, theme_used, referrer')
         .gte('created_at', startDate);
       
       if (error) throw error;
@@ -914,6 +914,179 @@ export function AnalyticsDashboard() {
           </div>
         </GlassPanel>
       </div>
+
+      {/* Traffic Sources Analytics */}
+      <GlassPanel className="p-6">
+        <h3 className="font-medium mb-4 flex items-center gap-2">
+          <TrendingUp className="w-4 h-4 text-primary" />
+          Traffic Sources
+        </h3>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Referrer Analysis */}
+          <div>
+            <h4 className="text-sm font-medium mb-3">Top Referrers</h4>
+            <div className="space-y-2">
+              {(() => {
+                const referrerData = deviceStats?.reduce((acc, visit) => {
+                  const referrer = visit.referrer || 'Direct';
+                  acc[referrer] = (acc[referrer] || 0) + 1;
+                  return acc;
+                }, {} as Record<string, number>) || {};
+                
+                const sortedReferrers = Object.entries(referrerData).sort(([,a], [,b]) => b - a);
+                const total = Object.values(referrerData).reduce((sum, count) => sum + count, 0);
+                
+                return sortedReferrers.slice(0, 8).map(([referrer, count]) => (
+                  <div key={referrer} className="flex items-center justify-between">
+                    <span className="text-sm truncate flex-1 mr-2">
+                      {referrer === 'Direct' ? '🔗 Direct Traffic' : 
+                       referrer.includes('google') ? '🔍 Google' :
+                       referrer.includes('youtube') ? '🎬 YouTube' :
+                       referrer.includes('twitter') || referrer.includes('x.com') ? '🐦 Twitter' :
+                       referrer.includes('reddit') ? '🤖 Reddit' :
+                       referrer.includes('facebook') ? '📘 Facebook' :
+                       referrer.includes('instagram') ? '📷 Instagram' :
+                       referrer.includes('discord') ? '💬 Discord' :
+                       '🌐 Other'}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${(count / total) * 100}%` }}
+                          className="h-full bg-primary rounded-full"
+                        />
+                      </div>
+                      <span className="text-sm text-muted-foreground w-12 text-right">
+                        {Math.round((count / total) * 100)}%
+                      </span>
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+          </div>
+
+          {/* Traffic Type Breakdown */}
+          <div>
+            <h4 className="text-sm font-medium mb-3">Traffic Types</h4>
+            <div className="space-y-3">
+              {(() => {
+                const organicCount = deviceStats?.filter(visit => 
+                  !visit.referrer || 
+                  visit.referrer.includes('google') || 
+                  visit.referrer.includes('bing') ||
+                  visit.referrer.includes('yahoo')
+                ).length || 0;
+                
+                const directCount = deviceStats?.filter(visit => 
+                  !visit.referrer || 
+                  visit.referrer.includes(window.location.hostname)
+                ).length || 0;
+                
+                const socialCount = deviceStats?.filter(visit => 
+                  visit.referrer && (
+                    visit.referrer.includes('twitter') ||
+                    visit.referrer.includes('facebook') ||
+                    visit.referrer.includes('instagram') ||
+                    visit.referrer.includes('discord') ||
+                    visit.referrer.includes('reddit')
+                  )
+                ).length || 0;
+                
+                const referralCount = deviceStats?.filter(visit => 
+                  visit.referrer && 
+                  !visit.referrer.includes('google') &&
+                  !visit.referrer.includes('bing') &&
+                  !visit.referrer.includes('yahoo') &&
+                  !visit.referrer.includes('twitter') &&
+                  !visit.referrer.includes('facebook') &&
+                  !visit.referrer.includes('instagram') &&
+                  !visit.referrer.includes('discord') &&
+                  !visit.referrer.includes('reddit') &&
+                  !visit.referrer.includes(window.location.hostname)
+                ).length || 0;
+
+                const trafficTypes = [
+                  { name: 'Organic Search', count: organicCount, color: 'bg-green-500', icon: '🔍' },
+                  { name: 'Direct', count: directCount, color: 'bg-blue-500', icon: '🔗' },
+                  { name: 'Social Media', count: socialCount, color: 'bg-purple-500', icon: '📱' },
+                  { name: 'Referral', count: referralCount, color: 'bg-orange-500', icon: '🤝' },
+                ];
+
+                const total = organicCount + directCount + socialCount + referralCount;
+
+                return trafficTypes.map((type) => (
+                  <div key={type.name} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{type.icon}</span>
+                      <span className="text-sm">{type.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-20 h-2 bg-muted rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: total > 0 ? `${(type.count / total) * 100}%` : '0%' }}
+                          className={`h-full ${type.color} rounded-full`}
+                        />
+                      </div>
+                      <span className="text-sm text-muted-foreground w-12 text-right">
+                        {type.count}
+                      </span>
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+          </div>
+        </div>
+
+        {/* Geographic Distribution */}
+        <div className="mt-6 pt-6 border-t border-border">
+          <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+            <MapPin className="w-4 h-4" />
+            Geographic Distribution
+          </h4>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {(() => {
+              const countryData = topCountries?.reduce((acc, country) => {
+                acc[country.name] = (acc[country.name] || 0) + country.value;
+                return acc;
+              }, {} as Record<string, number>) || {};
+              
+              const sortedCountries = Object.entries(countryData).sort(([,a], [,b]) => b - a);
+              const total = Object.values(countryData).reduce((sum, count) => sum + count, 0);
+              
+              return sortedCountries.slice(0, 8).map(([country, count]) => (
+                <div key={country} className="text-center p-3 rounded-lg bg-muted/30">
+                  <div className="text-lg mb-1">
+                    {country === 'United States' ? '🇺🇸' :
+                     country === 'Japan' ? '🇯🇵' :
+                     country === 'United Kingdom' ? '🇬🇧' :
+                     country === 'Germany' ? '🇩🇪' :
+                     country === 'France' ? '🇫🇷' :
+                     country === 'Canada' ? '🇨🇦' :
+                     country === 'Australia' ? '🇦🇺' :
+                     country === 'Brazil' ? '🇧🇷' :
+                     country === 'India' ? '🇮🇳' :
+                     country === 'South Korea' ? '🇰🇷' :
+                     country === 'Russia' ? '🇷🇺' :
+                     country === 'Mexico' ? '🇲🇽' :
+                     country === 'Spain' ? '🇪🇸' :
+                     country === 'Italy' ? '🇮🇹' :
+                     country === 'Netherlands' ? '🇳🇱' :
+                     '🌍'}
+                  </div>
+                  <div className="text-sm font-medium">{country}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {Math.round((count / total) * 100)}% ({count} visitors)
+                  </div>
+                </div>
+              ));
+            })()}
+          </div>
+        </div>
+      </GlassPanel>
 
       {/* System Health Dashboard */}
       <GlassPanel className="p-6">

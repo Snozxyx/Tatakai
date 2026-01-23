@@ -337,7 +337,7 @@ export function PopupBuilder({ className, initialData, onSave, onPreview }: Popu
         <h4 className="text-sm font-medium mb-3">Display Frequency</h4>
         <select
           value={popupData.display_frequency}
-          onChange={(e) => setPopupData(prev => ({ ...prev, display_frequency: e.target.value as any }))}
+          onChange={(e) => setPopupData(prev => ({ ...prev, display_frequency: e.target.value as 'once' | 'daily' | 'session' | 'always' }))}
           className="w-full px-3 py-2 border border-border rounded-md"
         >
           <option value="once">Once per user</option>
@@ -560,7 +560,7 @@ export function PopupBuilder({ className, initialData, onSave, onPreview }: Popu
         ].map(({ id, label, icon: Icon }) => (
           <button
             key={id}
-            onClick={() => setActiveTab(id as any)}
+            onClick={() => setActiveTab(id as 'design' | 'content' | 'settings' | 'preview')}
             className={cn(
               "flex items-center gap-2 px-6 py-3 text-sm font-medium border-b-2 transition-colors",
               activeTab === id

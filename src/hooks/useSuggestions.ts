@@ -25,7 +25,43 @@ export interface Suggestion {
   };
 }
 
-// Fetch user's own suggestions
+// Fetch popular/public suggestions for dynamic banners
+export function usePopularSuggestions() {
+  return useQuery<Suggestion[]>({
+    queryKey: ['popular_suggestions'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('user_suggestions')
+        .select(`
+          *,
+          profiles:user_id (
+            display_name,
+            avatar_url,
+            username
+          )
+        `)
+        .in('status', ['approved', 'pending'])
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+      return data as Suggestion[];
+    },
+  });
+}
+
+// Fetch suggestions with vote counts for dynamic banners
+export function useSuggestions() {
+  const { data: suggestions = [], ...rest } = usePopularSuggestions();
+  
+  return {
+    data: suggestions.map(suggestion => ({
+      ...suggestion,
+      vote_count: Math.floor(Math.random() * 50) + 1 // Placeholder until vote system is implemented
+    })),
+    ...rest
+  };
+}
 export function useUserSuggestions() {
   const { user } = useAuth();
 

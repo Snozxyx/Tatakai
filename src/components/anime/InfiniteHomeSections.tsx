@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { GlassPanel } from '@/components/ui/GlassPanel';
@@ -266,28 +266,63 @@ export function InfiniteHomeSections() {
   } = useInfiniteHomeSections();
 
   const loadMoreRef = useRef<HTMLDivElement>(null);
+  const [isUltraLiteMode, setIsUltraLiteMode] = useState(false);
+  const [throttleCount, setThrottleCount] = useState(0);
 
-  // Intersection Observer for infinite scroll
+  // Check for ultra lite mode
+  useEffect(() => {
+    const checkUltraLiteMode = () => {
+      const isUltraLite = document.body.classList.contains('ultra-lite-mode') || 
+                         localStorage.getItem('tatakai_ultra_lite_mode') === 'true' ||
+                         window.innerWidth < 768;
+      setIsUltraLiteMode(isUltraLite);
+    };
+
+    checkUltraLiteMode();
+    window.addEventListener('resize', checkUltraLiteMode);
+    return () => window.removeEventListener('resize', checkUltraLiteMode);
+  }, []);
+
+  // Throttled intersection observer
   const handleObserver = useCallback((entries: IntersectionObserverEntry[]) => {
     const target = entries[0];
+    
+    // Throttle requests to prevent overwhelming the system
     if (target.isIntersecting && hasNextPage && !isFetchingNextPage) {
-      fetchNextPage();
+      setThrottleCount(prev => {
+        const newCount = prev + 1;
+        // Only fetch every 3rd intersection to reduce load
+        if (newCount % 3 === 0) {
+          fetchNextPage();
+        }
+        return newCount;
+      });
     }
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
+  // Enhanced intersection observer with ultra lite optimizations
   useEffect(() => {
-    const observer = new IntersectionObserver(handleObserver, {
+    const observerOptions = {
       root: null,
-      rootMargin: '400px', // Preload sooner for smoother experience
-      threshold: 0.1,
-    });
+      rootMargin: isUltraLiteMode ? '800px' : '400px', // Larger margin for low-end devices
+      threshold: isUltraLiteMode ? 0.2 : 0.1, // Higher threshold for ultra lite
+    };
+
+    const observer = new IntersectionObserver(handleObserver, observerOptions);
 
     if (loadMoreRef.current) {
       observer.observe(loadMoreRef.current);
     }
 
     return () => observer.disconnect();
-  }, [handleObserver]);
+  }, [handleObserver, isUltraLiteMode]);
+
+  // Reset throttle counter when new data loads
+  useEffect(() => {
+    if (data && data.pages.length > 0) {
+      setThrottleCount(0);
+    }
+  }, [data]);
 
   if (error) {
     return null;
@@ -328,7 +363,7 @@ export function InfiniteHomeSections() {
         </div>
       )}
 
-      {/* Rendered sections */}
+      {/* Rendered sections with ultra lite optimizations */}
       {allSections.map((section) => (
         <HomeSection key={section.id} section={section} />
       ))}

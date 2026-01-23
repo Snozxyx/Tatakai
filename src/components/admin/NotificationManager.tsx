@@ -343,7 +343,7 @@ export function NotificationManager({ className }: NotificationManagerProps) {
             <label className="block text-sm font-medium mb-1">Type</label>
             <select
               value={formData.popup_type}
-              onChange={(e) => setFormData(prev => ({ ...prev, popup_type: e.target.value as any }))}
+              onChange={(e) => setFormData(prev => ({ ...prev, popup_type: e.target.value as 'info' | 'warning' | 'alert' | 'promotion' | 'maintenance' }))}
               className="w-full px-3 py-2 border border-border rounded-md"
             >
               <option value="info">Info</option>
@@ -437,7 +437,7 @@ export function NotificationManager({ className }: NotificationManagerProps) {
             <label className="block text-sm font-medium mb-1">Frequency</label>
             <select
               value={formData.display_frequency}
-              onChange={(e) => setFormData(prev => ({ ...prev, display_frequency: e.target.value as any }))}
+              onChange={(e) => setFormData(prev => ({ ...prev, display_frequency: e.target.value as 'once' | 'daily' | 'session' | 'always' }))}
               className="w-full px-3 py-2 border border-border rounded-md"
             >
               <option value="once">Once</option>

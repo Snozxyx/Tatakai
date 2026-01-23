@@ -21,7 +21,7 @@ interface Profile {
   mal_username?: string | null;
   anilist_access_token?: string | null;
   anilist_username?: string | null;
-  showcase_anime?: any | null;
+  showcase_anime?: unknown | null;
 }
 
 interface AuthContextType {
