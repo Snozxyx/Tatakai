@@ -23,7 +23,8 @@ export type Theme =
   | 'synthwave'
   | 'vampire'
   | 'matcha-light'
-  | 'ocean-breeze';
+  | 'ocean-breeze'
+  | 'lite-mode';
 
 interface ThemeColors {
   primary: string;
@@ -45,6 +46,7 @@ interface ThemeColors {
   sidebarBorder: string;
   isLight?: boolean;
   isBrutalism?: boolean;
+  isLiteMode?: boolean;
 }
 
 export const THEME_COLORS: Record<Theme, ThemeColors> = {
@@ -492,6 +494,27 @@ export const THEME_COLORS: Record<Theme, ThemeColors> = {
     sidebarBorder: '200 20% 90%',
     isLight: true,
   },
+  'lite-mode': {
+    primary: '220 90% 50%',
+    secondary: '260 80% 55%',
+    accent: '200 95% 45%',
+    background: '0 0% 100%',  // Pure white
+    foreground: '220 15% 10%', // Pure dark
+    card: '220 10% 96%',
+    cardForeground: '220 15% 10%',
+    muted: '220 10% 92%',
+    mutedForeground: '220 10% 40%',
+    border: '220 10% 88%',
+    glass: '220 10% 96%',
+    glowPrimary: '220 90% 50%',
+    glowSecondary: '260 80% 55%',
+    surface: '220 10% 96%',
+    surfaceHover: '220 10% 93%',
+    sidebarBackground: '220 15% 97%',
+    sidebarBorder: '220 10% 90%',
+    isLight: true,
+    isLiteMode: true,
+  },
 };
 
 export const THEME_INFO: Record<Theme, { name: string; gradient: string; description: string; icon: string; category: 'dark' | 'light' }> = {
@@ -656,6 +679,13 @@ export const THEME_INFO: Record<Theme, { name: string; gradient: string; descrip
     icon: '🌬️',
     category: 'light',
   },
+  'lite-mode': {
+    name: 'Lite Mode',
+    gradient: 'from-blue-400 via-indigo-400 to-purple-400',
+    description: 'Optimized for low-end devices',
+    icon: '⚡',
+    category: 'light',
+  },
 };
 
 const THEME_KEY = 'anime-theme';
@@ -713,10 +743,17 @@ export function useTheme() {
     }
 
     // Add brutalism class for special styling
-    if ((colors as any).isBrutalism) {
+    if (colors.isBrutalism) {
       document.body.classList.add('brutalism-theme');
     } else {
       document.body.classList.remove('brutalism-theme');
+    }
+
+    // Add lite mode class for performance optimizations
+    if (colors.isLiteMode) {
+      document.body.classList.add('lite-mode-theme');
+    } else {
+      document.body.classList.remove('lite-mode-theme');
     }
 
     // Set data-theme attribute for theme-specific CSS

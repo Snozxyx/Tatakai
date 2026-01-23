@@ -4,6 +4,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { NotificationBell } from "@/components/ui/NotificationBell";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { supabase } from "@/integrations/supabase/client";
 import {
   DropdownMenu,
@@ -69,7 +70,9 @@ export function Header() {
         let searches: string[] = history ? JSON.parse(history) : [];
         searches = [term, ...searches.filter(s => s !== term)].slice(0, 20);
         localStorage.setItem('tatakai_search_history', JSON.stringify(searches));
-      } catch { }
+      } catch {
+        // Silent fail for search history
+      }
       navigate(`/search?q=${encodeURIComponent(term)}`);
     }
   };
@@ -142,7 +145,7 @@ export function Header() {
         </form>
 
         <div className="hidden sm:block">
-          <NotificationBell />
+          <NotificationCenter />
         </div>
 
         {isLoading ? (

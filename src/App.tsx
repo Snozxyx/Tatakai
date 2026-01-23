@@ -7,9 +7,11 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams, useNavi
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { useSmartTV } from "@/hooks/useSmartTV";
 import { useTheme } from "@/hooks/useTheme";
+import { useDeviceCapabilities } from "@/hooks/useDeviceCapabilities";
 import { useMaintenanceMode } from "@/hooks/useAdminMessages";
 import { usePageTracking } from "@/hooks/useAnalytics";
 import { PopupDisplay } from "@/components/layout/PopupDisplay";
+import { GlobalPopup } from "@/components/notifications/GlobalPopup";
 import { Footer } from "@/components/layout/Footer";
 import { OfflineBanner } from '@/components/layout/OfflineBanner';
 import Index from "./pages/Index";
@@ -148,11 +150,19 @@ function StatusPageGuard({
 
 function AppContent() {
   // Initialize theme and smart TV detection
-  useTheme();
+  const { theme, setTheme } = useTheme();
+  const { recommendedTheme, isLowEndDevice } = useDeviceCapabilities();
   usePageTracking(); // Track page visits for analytics
   const { isSmartTV, platform } = useSmartTV();
   const { isBanned, isAdmin } = useAuth();
   const { isMaintenanceMode } = useMaintenanceMode();
+
+  // Auto-apply lite mode theme for low-end devices
+  useEffect(() => {
+    if (isLowEndDevice && recommendedTheme === 'lite-mode' && theme !== 'lite-mode') {
+      setTheme('lite-mode');
+    }
+  }, [isLowEndDevice, recommendedTheme, theme, setTheme]);
 
   useEffect(() => {
     if (isSmartTV) {
@@ -164,6 +174,8 @@ function AppContent() {
     <>
       <Toaster />
       <Sonner />
+      {/* Global popup system */}
+      <GlobalPopup />
       {/* Offline banner lives at top level so it can be seen anywhere */}
       <OfflineBanner />
       <BrowserRouter

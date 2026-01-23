@@ -4,7 +4,11 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAdminLogs, type AdminLog, useDeleteAdminLogs } from '@/hooks/useAdminLogs';
 import { formatDistanceToNow } from 'date-fns';
-import { Search, FileText, Trash2, Eye, CheckCircle, XCircle, Shield, User, Copy } from 'lucide-react';
+import { 
+  Search, FileText, Trash2, Eye, CheckCircle, XCircle, Shield, User, Copy,
+  Bell, Users, Zap, Palette, Settings, Target, Activity, Monitor,
+  MessageSquare, Star, TrendingUp, Database
+} from 'lucide-react';
 import { getProxiedImageUrl } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 export function AdminLogs() {
   const [searchTerm, setSearchTerm] = useState('');
   const [onlyClientErrors, setOnlyClientErrors] = useState(false);
+  const [logCategory, setLogCategory] = useState<'all' | 'notifications' | 'popups' | 'recommendations' | 'themes' | 'admin_actions'>('all');
   const { data: logs, isLoading } = useAdminLogs(200);
   const deleteMutation = useDeleteAdminLogs();
   const { toast } = useToast();
@@ -29,7 +34,29 @@ export function AdminLogs() {
 
     const matchesClientError = onlyClientErrors ? log.action === 'client_error' : true;
 
-    return matchesSearch && matchesClientError;
+    // Filter by category
+    let matchesCategory = true;
+    if (logCategory !== 'all') {
+      switch (logCategory) {
+        case 'notifications':
+          matchesCategory = log.action.includes('notification') || log.entity_type === 'notification';
+          break;
+        case 'popups':
+          matchesCategory = log.action.includes('popup') || log.entity_type === 'global_popup';
+          break;
+        case 'recommendations':
+          matchesCategory = log.action.includes('recommendation') || log.entity_type === 'cached_recommendations';
+          break;
+        case 'themes':
+          matchesCategory = log.action.includes('theme') || log.details?.theme_name;
+          break;
+        case 'admin_actions':
+          matchesCategory = log.action.includes('admin_') || log.entity_type === 'admin_action_logs';
+          break;
+      }
+    }
+
+    return matchesSearch && matchesClientError && matchesCategory;
   });
 
   const handleCopyErrorId = async (errorId?: string) => {
@@ -58,21 +85,33 @@ export function AdminLogs() {
     try {
       await deleteMutation.mutateAsync({ ids });
       toast({ title: 'Deleted', description: `Deleted ${ids.length} logs.` });
-    } catch (e: any) {
-      toast({ title: 'Delete failed', description: e?.message || String(e) });
+    } catch (e: unknown) {
+      toast({ title: 'Delete failed', description: (e as Error)?.message || String(e) });
     }
   };
 
   const getActionIcon = (action: string) => {
+    if (action.includes('notification')) return <Bell className="w-4 h-4 text-blue-400" />;
+    if (action.includes('popup')) return <Users className="w-4 h-4 text-green-400" />;
+    if (action.includes('recommendation')) return <Zap className="w-4 h-4 text-purple-400" />;
+    if (action.includes('theme')) return <Palette className="w-4 h-4 text-pink-400" />;
     if (action.includes('delete') || action.includes('remove')) return <Trash2 className="w-4 h-4 text-red-400" />;
     if (action.includes('approve')) return <CheckCircle className="w-4 h-4 text-green-400" />;
     if (action.includes('reject')) return <XCircle className="w-4 h-4 text-orange-400" />;
     if (action.includes('view')) return <Eye className="w-4 h-4 text-blue-400" />;
     if (action.includes('ban')) return <Shield className="w-4 h-4 text-red-500" />;
+    if (action.includes('feature')) return <Settings className="w-4 h-4 text-gray-400" />;
+    if (action.includes('analytics')) return <TrendingUp className="w-4 h-4 text-indigo-400" />;
+    if (action.includes('cache')) return <Database className="w-4 h-4 text-cyan-400" />;
+    if (action.includes('admin_')) return <Activity className="w-4 h-4 text-yellow-400" />;
     return <FileText className="w-4 h-4 text-gray-400" />;
   };
 
   const getActionColor = (action: string) => {
+    if (action.includes('notification')) return 'default';
+    if (action.includes('popup')) return 'secondary';
+    if (action.includes('recommendation')) return 'outline';
+    if (action.includes('theme')) return 'outline';
     if (action.includes('delete') || action.includes('remove') || action.includes('ban')) return 'destructive';
     if (action.includes('approve')) return 'default';
     if (action.includes('reject')) return 'secondary';
@@ -92,6 +131,29 @@ export function AdminLogs() {
           <Badge variant="secondary" className="text-lg px-4 py-2">
             {filteredLogs?.length || 0} Logs
           </Badge>
+
+          {/* Category Filter */}
+          <div className="flex items-center gap-2">
+            {[
+              { key: 'all', label: 'All', icon: FileText },
+              { key: 'notifications', label: 'Notifications', icon: Bell },
+              { key: 'popups', label: 'Popups', icon: Users },
+              { key: 'recommendations', label: 'AI/ML', icon: Zap },
+              { key: 'themes', label: 'Themes', icon: Palette },
+              { key: 'admin_actions', label: 'Admin', icon: Shield },
+            ].map(({ key, label, icon: Icon }) => (
+              <Button
+                key={key}
+                variant={logCategory === key ? 'default' : 'outline'}
+                size="sm"
+                className="gap-2"
+                onClick={() => setLogCategory(key as 'all' | 'notifications' | 'popups' | 'recommendations' | 'themes' | 'admin_actions')}
+              >
+                <Icon className="w-4 h-4" />
+                {label}
+              </Button>
+            ))}
+          </div>
 
           <Button
             variant={onlyClientErrors ? 'default' : 'outline'}

@@ -7,13 +7,16 @@ import { Button } from '@/components/ui/button';
 import { useMLRecommendations, useTasteProfile } from '@/hooks/useMLRecommendations';
 import { usePersonalizedRecommendations } from '@/hooks/useRecommendations';
 import { useAuth } from '@/contexts/AuthContext';
-import { Sparkles, TrendingUp, Brain, Star, Calendar, Film, Target } from 'lucide-react';
+import { Sparkles, TrendingUp, Brain, Star, Calendar, Film, Target, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getProxiedImageUrl } from '@/lib/api';
 import { MLRecommendation, TasteProfile } from '@/lib/mlRecommendations';
+import { useAnimatedNumber } from '@/hooks/useAnimatedNumber';
 
 function RecommendationCard({ recommendation }: { recommendation: MLRecommendation }) {
   const { anime, score, confidence, reasons, factors } = recommendation;
+  const animatedScore = useAnimatedNumber(score, 1200, { suffix: '%' });
+  const animatedConfidence = useAnimatedNumber(Math.round(confidence * 100), 1200, { suffix: '%' });
 
   return (
     <Link to={`/anime/${anime.id}`}>
@@ -30,7 +33,7 @@ function RecommendationCard({ recommendation }: { recommendation: MLRecommendati
           {/* Score Badge */}
           <div className="absolute top-3 right-3 px-3 py-1.5 rounded-full bg-primary/90 backdrop-blur text-primary-foreground text-xs font-bold flex items-center gap-1">
             <Star className="w-3 h-3 fill-current" />
-            {score}%
+            {animatedScore}
           </div>
 
           {/* Confidence Indicator */}
@@ -40,7 +43,7 @@ function RecommendationCard({ recommendation }: { recommendation: MLRecommendati
               confidence > 0.4 ? 'bg-yellow-500/80 text-white' :
               'bg-gray-500/80 text-white'
             }`}>
-              {confidence > 0.7 ? 'High' : confidence > 0.4 ? 'Medium' : 'Low'} Match
+              {animatedConfidence} Match
             </div>
           </div>
 
@@ -158,6 +161,11 @@ export default function RecommendationsPage() {
   const { data: personalizedRecs, isLoading: loadingPersonalized } = usePersonalizedRecommendations(12);
   const [filter, setFilter] = useState<'all' | 'high' | 'medium'>('all');
 
+  // Animated loading values - always call hooks first
+  const animatedScore = useAnimatedNumber(95, 2000, { suffix: '%' });
+  const animatedConfidence = useAnimatedNumber(87, 2000, { suffix: '%' });
+  const animatedMatch = useAnimatedNumber(92, 2000, { suffix: '%' });
+
   if (!user) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -177,6 +185,84 @@ export default function RecommendationsPage() {
     if (filter === 'medium') return rec.confidence > 0.4 && rec.confidence <= 0.7;
     return true;
   }) || [];
+
+  // Loading component with animated numbers
+  const LoadingRecommendations = () => (
+    <div className="space-y-6">
+      {/* Animated Loading Header */}
+      <GlassPanel className="p-6">
+        <div className="flex items-center gap-4 mb-6">
+          <div className="p-3 bg-primary/20 rounded-xl">
+            <Zap className="w-6 h-6 text-primary animate-pulse" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              Generating Recommendations
+              <span className="text-primary animate-pulse">...</span>
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Analyzing your viewing patterns and preferences
+            </p>
+          </div>
+        </div>
+
+        {/* Animated Metrics */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-primary mb-1">
+              {animatedScore}
+            </div>
+            <div className="text-xs text-muted-foreground">Match Score</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-green-500 mb-1">
+              {animatedConfidence}
+            </div>
+            <div className="text-xs text-muted-foreground">Confidence</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-purple-500 mb-1">
+              {animatedMatch}
+            </div>
+            <div className="text-xs text-muted-foreground">Accuracy</div>
+          </div>
+        </div>
+
+        {/* Loading Animation */}
+        <div className="mt-6 space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span>Analyzing taste profile...</span>
+            <span className="text-primary">✓</span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span>Processing watch history...</span>
+            <span className="text-primary animate-pulse">⟳</span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span>Generating recommendations...</span>
+            <span className="text-muted-foreground">⟳</span>
+          </div>
+        </div>
+      </GlassPanel>
+
+      {/* Loading Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+        {Array.from({ length: 12 }).map((_, i) => (
+          <div key={i} className="aspect-[3/4] bg-muted/50 rounded-xl animate-pulse relative overflow-hidden">
+            {/* Animated shimmer effect */}
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-pulse" />
+            {/* Score badge skeleton */}
+            <div className="absolute top-3 right-3 w-12 h-6 bg-primary/20 rounded-full animate-pulse" />
+            {/* Content skeleton */}
+            <div className="absolute bottom-0 left-0 right-0 p-4 space-y-2">
+              <div className="h-4 bg-muted/50 rounded animate-pulse" />
+              <div className="h-3 bg-muted/50 rounded w-2/3 animate-pulse" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -234,7 +320,7 @@ export default function RecommendationsPage() {
             </div>
           ) : personalizedRecs && personalizedRecs.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {personalizedRecs.slice(0, 12).map((item: any, index: number) => (
+              {personalizedRecs.slice(0, 12).map((item, index: number) => (
                 <Link key={item.anime.id} to={`/anime/${item.anime.id}`}>
                   <GlassPanel hoverEffect className="group cursor-pointer overflow-hidden">
                     <div className="relative aspect-[3/4]">
@@ -312,11 +398,7 @@ export default function RecommendationsPage() {
           </div>
 
           {loadingRecs ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {Array.from({ length: 12 }).map((_, i) => (
-                <div key={i} className="aspect-[3/4] bg-muted/50 rounded-xl animate-pulse" />
-              ))}
-            </div>
+            <LoadingRecommendations />
           ) : filteredRecommendations.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
               {filteredRecommendations.map((rec) => (

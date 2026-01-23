@@ -174,6 +174,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = async (email: string, password: string, displayName?: string) => {
     const redirectUrl = `${window.location.origin}/`;
     
+    // Auto-generate username from display name
+    let username: string | undefined;
+    if (displayName) {
+      try {
+        username = await generateUsername(displayName);
+      } catch (error) {
+        console.warn('Failed to generate username:', error);
+        // Fallback to email prefix
+        username = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 20);
+      }
+    }
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -181,11 +193,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         emailRedirectTo: redirectUrl,
         data: {
           display_name: displayName || email.split('@')[0],
+          username: username,
         },
       },
     });
     return { error };
   };
+
+  async function generateUsername(displayName: string): Promise<string> {
+    let baseUsername = displayName
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]/g, '')
+      .substring(0, 20);
+
+    if (!baseUsername) {
+      baseUsername = 'user';
+    }
+
+    let username = baseUsername;
+    let counter = 1;
+
+    while (counter < 100) {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', username)
+        .maybeSingle();
+
+      if (error) {
+        console.warn('Error checking username availability:', error);
+        break;
+      }
+
+      if (!data) {
+        // No rows found, username is available
+        return username;
+      }
+
+      // Username exists, try with suffix
+      const randomSuffix = Math.floor(Math.random() * 10000)
+        .toString()
+        .padStart(4, '0');
+      username = `${baseUsername}${randomSuffix}`;
+      counter++;
+    }
+
+    // Fallback with timestamp
+    return `${baseUsername}${Date.now().toString().slice(-4)}`;
+  }
 
   const signOut = async () => {
     await supabase.auth.signOut();
