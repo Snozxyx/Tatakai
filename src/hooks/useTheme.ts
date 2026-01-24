@@ -23,7 +23,8 @@ export type Theme =
   | 'synthwave'
   | 'vampire'
   | 'matcha-light'
-  | 'ocean-breeze';
+  | 'ocean-breeze'
+  | 'lite-minimal';
 
 interface ThemeColors {
   primary: string;
@@ -492,6 +493,27 @@ export const THEME_COLORS: Record<Theme, ThemeColors> = {
     sidebarBorder: '200 20% 90%',
     isLight: true,
   },
+  'lite-minimal': {
+    primary: '220 90% 50%',
+    secondary: '260 80% 55%',
+    accent: '200 95% 45%',
+    background: '0 0% 100%',
+    foreground: '220 15% 10%',
+    card: '0 0% 100%',
+    cardForeground: '220 15% 10%',
+    muted: '220 10% 98%',
+    mutedForeground: '220 10% 40%',
+    border: '220 10% 95%',
+    glass: '0 0% 100%',
+    glowPrimary: '220 90% 50%',
+    glowSecondary: '260 80% 55%',
+    surface: '220 10% 99%',
+    surfaceHover: '220 10% 98%',
+    sidebarBackground: '220 15% 99%',
+    sidebarBorder: '220 10% 97%',
+    isLight: true,
+    isUltraLite: true,
+  },
 };
 
 export const THEME_INFO: Record<Theme, { name: string; gradient: string; description: string; icon: string; category: 'dark' | 'light' }> = {
@@ -656,6 +678,13 @@ export const THEME_INFO: Record<Theme, { name: string; gradient: string; descrip
     icon: '🌬️',
     category: 'light',
   },
+  'lite-minimal': {
+    name: 'Ultra Lite',
+    gradient: 'from-blue-100 via-indigo-100 to-purple-100',
+    description: 'Ultra-light theme optimized for low-end devices',
+    icon: '🚀',
+    category: 'light',
+  },
 };
 
 const THEME_KEY = 'anime-theme';
@@ -668,6 +697,63 @@ export function useTheme() {
     }
     return 'cherry-blossom';
   });
+
+  // Device detection for low-end devices
+  const detectLowEndDevice = useCallback(() => {
+    try {
+      // Check device memory (if available)
+      const deviceMemory = (navigator as any).deviceMemory || 4;
+      
+      // Check CPU cores
+      const cpuCores = navigator.hardwareConcurrency || 4;
+      
+      // Check if user has already made a theme selection
+      const hasManualSelection = localStorage.getItem('manual_theme_selection') === 'true';
+      
+      // Check connection speed (if available)
+      const connection = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
+      const isSlowConnection = connection ? 
+        (connection.effectiveType && connection.effectiveType.includes('2g')) || 
+        (connection.saveData) ||
+        (connection.rtt && connection.rtt > 500) :
+        false;
+      
+      // Consider low-end if:
+      // - Device memory < 4GB
+      // - CPU cores < 4
+      // - Slow connection
+      // - No manual theme selection
+      const isLowEnd = deviceMemory < 4 || cpuCores < 4 || isSlowConnection;
+      
+      // Store detection result
+      localStorage.setItem('is_low_end_device', isLowEnd ? 'true' : 'false');
+      
+      return isLowEnd && !hasManualSelection;
+    } catch (error) {
+      console.log('Device detection failed:', error);
+      return false;
+    }
+  }, []);
+
+  // Auto-apply lite theme for low-end devices on first visit
+  useEffect(() => {
+    const isFirstVisit = localStorage.getItem('theme_first_visit') !== 'false';
+    const hasManualSelection = localStorage.getItem('manual_theme_selection') === 'true';
+    
+    if (isFirstVisit && !hasManualSelection) {
+      const isLowEnd = detectLowEndDevice();
+      
+      if (isLowEnd) {
+        // Auto-apply lite theme for low-end devices
+        setThemeState('lite-minimal');
+        localStorage.setItem(THEME_KEY, 'lite-minimal');
+        localStorage.setItem('theme_auto_detected', 'lite-minimal');
+      }
+      
+      // Mark as not first visit
+      localStorage.setItem('theme_first_visit', 'false');
+    }
+  }, [detectLowEndDevice]);
 
   const applyTheme = useCallback((themeName: Theme) => {
     const colors = THEME_COLORS[themeName];
@@ -719,6 +805,13 @@ export function useTheme() {
       document.body.classList.remove('brutalism-theme');
     }
 
+    // Add ultra-lite mode class for performance optimizations
+    if ((colors as any).isUltraLite) {
+      document.body.classList.add('ultra-lite-mode');
+    } else {
+      document.body.classList.remove('ultra-lite-mode');
+    }
+
     // Set data-theme attribute for theme-specific CSS
     document.body.setAttribute('data-theme', themeName);
   }, []);
@@ -734,11 +827,38 @@ export function useTheme() {
 
   const isLightTheme = THEME_COLORS[theme]?.isLight ?? false;
 
+  // Check if current theme is ultra-lite
+  const isUltraLiteTheme = THEME_COLORS[theme]?.isUltraLite ?? false;
+
+  // Get device capability info
+  const getDeviceCapabilityInfo = useCallback(() => {
+    try {
+      const deviceMemory = (navigator as any).deviceMemory || 'Unknown';
+      const cpuCores = navigator.hardwareConcurrency || 'Unknown';
+      const isLowEnd = localStorage.getItem('is_low_end_device') === 'true';
+      
+      return {
+        deviceMemory: typeof deviceMemory === 'number' ? `${deviceMemory}GB` : deviceMemory,
+        cpuCores: typeof cpuCores === 'number' ? `${cpuCores} cores` : cpuCores,
+        isLowEndDevice: isLowEnd,
+      };
+    } catch (error) {
+      return {
+        deviceMemory: 'Unknown',
+        cpuCores: 'Unknown',
+        isLowEndDevice: false,
+      };
+    }
+  }, []);
+
   return {
     theme,
     setTheme,
     themes: Object.keys(THEME_COLORS) as Theme[],
     themeInfo: THEME_INFO,
     isLightTheme,
+    isUltraLiteTheme,
+    getDeviceCapabilityInfo,
+    detectLowEndDevice,
   };
 }

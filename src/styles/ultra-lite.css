@@ -1,0 +1,54 @@
+/* Ultra Lite Mode - Performance optimizations for low-end devices */
+.ultra-lite-mode {
+  /* Reduce animations and transitions */
+  --animation-duration: 0.1s !important;
+  --transition-duration: 0.1s !important;
+}
+
+.ultra-lite-mode * {
+  /* Disable all animations and transitions */
+  animation-duration: 0.1s !important;
+  transition-duration: 0.1s !important;
+  animation-iteration-count: 1 !important;
+  transition-timing-function: ease !important;
+  will-change: auto !important;
+}
+
+.ultra-lite-mode .glass-panel {
+  /* Reduce glass effect opacity for performance */
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+}
+
+.ultra-lite-mode img,
+.ultra-lite-mode video,
+.ultra-lite-mode iframe {
+  /* Reduce image quality and disable animations */
+  image-rendering: pixelated !important;
+  image-rendering: -moz-crisp-edges !important;
+  image-rendering: crisp-edges !important;
+}
+
+.ultra-lite-mode::-webkit-scrollbar {
+  /* Simplify scrollbars */
+  width: 8px !important;
+  height: 8px !important;
+}
+
+.ultra-lite-mode::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2) !important;
+  border-radius: 4px !important;
+}
+
+.ultra-lite-mode::-webkit-scrollbar-track {
+  background-color: transparent !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ultra-lite-mode * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

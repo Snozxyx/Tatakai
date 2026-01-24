@@ -25,14 +25,63 @@ import { WatchRoomManager } from '@/components/admin/WatchRoomsManager';
 import { AppVersionManager } from '@/components/admin/AppVersionManager';
 import { ModerationLogs } from '@/components/admin/ModerationLogs';
 import { CustomSourceManager } from '@/components/admin/CustomSourceManager';
+import { NotificationsManager } from '@/components/admin/NotificationsManager';
 import {
   ArrowLeft, Shield, ShieldCheck, ShieldOff, ShieldAlert, Users, MessageSquare, Star, Search,
   Trash2, Ban, CheckCircle, AlertTriangle, BarChart3, Send,
-  Settings, Power, Unlock, BellRing, Server, AlertCircle, Megaphone, History, Layers, FileText, Image, Radio, Menu, ChevronRight
+  Settings, Power, Unlock, BellRing, Server, AlertCircle, Megaphone, History, Layers, FileText, Image, Radio, Menu, ChevronRight, Bell
 } from 'lucide-react';
+
+// Type definitions for Supabase tables
+interface MaintenanceMode {
+  id: string;
+  is_active: boolean;
+  message: string;
+  enabled_at?: string;
+  enabled_by?: string;
+  updated_at?: string;
+}
+
+interface Profile {
+  id: string;
+  user_id: string;
+  username?: string;
+  display_name?: string;
+  is_admin?: boolean;
+  is_banned?: boolean;
+  banned_at?: string;
+  banned_by?: string;
+  ban_reason?: string;
+  created_at: string;
+}
+
+interface Comment {
+  id: string;
+  user_id: string;
+  anime_id: string;
+  episode_id?: string;
+  content: string;
+  is_spoiler?: boolean;
+  created_at: string;
+  profile?: {
+    user_id: string;
+    display_name?: string;
+  };
+}
+
+interface AdminMessage {
+  id: string;
+  title: string;
+  content: string;
+  message_type: 'individual' | 'broadcast';
+  recipient_id?: string;
+  sender_id?: string;
+  created_at: string;
+}
 
 const navItems = [
   { value: 'analytics', label: 'Analytics', icon: BarChart3 },
+  { value: 'notifications', label: 'Notifications', icon: Bell },
   { value: 'users', label: 'Users', icon: Users },
   { value: 'comments', label: 'Comments', icon: MessageSquare },
   { value: 'content', label: 'Content', icon: Layers },
@@ -73,21 +122,20 @@ export default function AdminPage() {
   }
 
   // Fetch maintenance mode
-  const { data: maintenanceMode } = useQuery({
+  const { data: maintenanceMode } = useQuery<MaintenanceMode | null>({
     queryKey: ['maintenance_mode'],
     queryFn: async () => {
-      const { data, error } = await (supabase
-        .from('maintenance_mode' as any)
+      const { data, error } = await supabase
+        .from('maintenance_mode')
         .select('*')
-        .single() as any);
+        .single();
       if (error && error.code !== 'PGRST116') throw error;
-      return data as { id: string; is_active: boolean; message: string } | null;
+      return data;
     },
-    enabled: isAdmin,
   });
 
   // Fetch users
-  const { data: users, isLoading: loadingUsers } = useQuery({
+  const { data: users, isLoading: loadingUsers } = useQuery<Profile[]>({
     queryKey: ['admin_users'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -99,7 +147,6 @@ export default function AdminPage() {
       if (error) throw error;
       return data;
     },
-    enabled: isAdmin,
   });
 
   // Fetch all comments
@@ -116,20 +163,19 @@ export default function AdminPage() {
 
       if (!data || data.length === 0) return [];
 
-      const userIds = [...new Set(data.map(c => c.user_id))];
+      const userIds = [...new Set(data.map((c: any) => c.user_id))];
       const { data: profiles } = await supabase
         .from('profiles')
         .select('user_id, display_name')
         .in('user_id', userIds);
 
-      const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
+      const profileMap = new Map(profiles?.map((p: any) => [p.user_id, p]) || []);
 
-      return data.map(c => ({
+      return data.map((c: any) => ({
         ...c,
         profile: profileMap.get(c.user_id),
       }));
     },
-    enabled: isAdmin,
   });
 
   // Fetch sent messages
@@ -145,7 +191,6 @@ export default function AdminPage() {
       if (error) throw error;
       return data || [];
     },
-    enabled: isAdmin,
   });
 
   // Delete comment mutation
@@ -157,13 +202,6 @@ export default function AdminPage() {
         .eq('id', commentId);
 
       if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin_comments'] });
-      toast.success('Comment deleted');
-    },
-    onError: () => {
-      toast.error('Failed to delete comment');
     },
   });
 
@@ -181,13 +219,6 @@ export default function AdminPage() {
         })
         .eq('id', maintenanceMode?.id) as any);
       if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['maintenance_mode'] });
-      toast.success(maintenanceMode?.is_active ? 'Maintenance mode disabled' : 'Maintenance mode enabled');
-    },
-    onError: () => {
-      toast.error('Failed to toggle maintenance mode');
     },
   });
 
@@ -207,16 +238,6 @@ export default function AdminPage() {
         .eq('user_id', userId) as any);
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin_users'] });
-      toast.success('User banned successfully');
-      setShowBanModal(false);
-      setBanReason('');
-      setUserToBan(null);
-    },
-    onError: () => {
-      toast.error('Failed to ban user');
-    },
   });
 
   // Unban user mutation
@@ -234,13 +255,6 @@ export default function AdminPage() {
         .eq('user_id', userId) as any);
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin_users'] });
-      toast.success('User unbanned successfully');
-    },
-    onError: () => {
-      toast.error('Failed to unban user');
-    },
   });
 
   // Toggle admin status mutation
@@ -251,13 +265,6 @@ export default function AdminPage() {
         .update({ is_admin: makeAdmin } as any)
         .eq('user_id', userId) as any);
       if (error) throw error;
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['admin_users'] });
-      toast.success(variables.makeAdmin ? 'User promoted to admin' : 'Admin privileges revoked');
-    },
-    onError: () => {
-      toast.error('Failed to update admin status');
     },
   });
 
@@ -275,23 +282,6 @@ export default function AdminPage() {
           sender_id: currentUser.user?.id,
         }) as any);
       if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin_sent_messages'] });
-      toast.success('Message sent successfully');
-      setMessageTitle('');
-      setMessageContent('');
-      setSelectedUserId(null);
-    },
-    onError: (error: any) => {
-      console.error('Failed to send message:', error);
-      if (error?.code === '42P01') {
-        toast.error('Admin messages table not found. Please run the migration.');
-      } else if (error?.message?.includes('permission denied') || error?.code === '42501') {
-        toast.error('Permission denied. Make sure you are an admin.');
-      } else {
-        toast.error('Failed to send message: ' + (error?.message || 'Unknown error'));
-      }
     },
   });
 
@@ -450,6 +440,13 @@ export default function AdminPage() {
           </div>
 
           <div className="flex-1 min-w-0">
+
+            {/* Notifications Tab */}
+            <TabsContent value="notifications">
+              <GlassPanel className="p-6">
+                <NotificationsManager />
+              </GlassPanel>
+            </TabsContent>
 
             {/* Analytics Tab */}
             <TabsContent value="analytics">

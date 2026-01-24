@@ -1,14 +1,34 @@
-import { Play, LayoutGrid, Search, TrendingUp, Heart, User, Settings, LogIn, Users } from "lucide-react";
+import { Play, LayoutGrid, Search, TrendingUp, Heart, User, Settings, LogIn, Users, Bell } from "lucide-react";
 import { NavIcon } from "@/components/ui/NavIcon";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, profile, isBanned } = useAuth();
+  const { user, profile, isBanned, isAdmin } = useAuth();
 
   const isActive = (path: string) => location.pathname === path;
+
+  // Fetch unread notification count for admin users
+  const { data: unreadCount } = useQuery({
+    queryKey: ['admin_notifications_unread_count'],
+    queryFn: async () => {
+      if (!isAdmin || !user) return 0;
+
+      const { data, error } = await supabase
+        .from('admin_notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('admin_id', user.id)
+        .eq('is_read', false);
+
+      if (error) return 0;
+      return data?.count || 0;
+    },
+    enabled: isAdmin && !!user,
+  });
 
   return (
     <nav className="fixed left-6 top-1/2 -translate-y-1/2 z-50 hidden md:flex flex-col gap-6 p-2 rounded-3xl border border-border/30 bg-background/40 backdrop-blur-xl shadow-2xl">
@@ -23,6 +43,22 @@ export function Sidebar() {
           className="w-full h-full object-contain"
         />
       </div>
+      
+      {isAdmin && (
+        <div className="relative">
+          <NavIcon 
+            icon={Bell} 
+            active={isActive("/admin") && location.hash === "#notifications"}
+            onClick={() => navigate("/admin#notifications")}
+            label="Notifications"
+          />
+          {unreadCount > 0 && (
+            <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold">
+              {unreadCount}
+            </div>
+          )}
+        </div>
+      )}
       
       <NavIcon 
         icon={LayoutGrid} 
