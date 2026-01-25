@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams, useNavigate } from "react-router-dom";
+import { BrowserRouter, HashRouter, Routes, Route, Navigate, useLocation, useParams, useNavigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { useSmartTV } from "@/hooks/useSmartTV";
 import { useTheme } from "@/hooks/useTheme";
@@ -11,7 +11,8 @@ import { useMaintenanceMode } from "@/hooks/useAdminMessages";
 import { usePageTracking } from "@/hooks/useAnalytics";
 import { PopupDisplay } from "@/components/layout/PopupDisplay";
 import { Footer } from "@/components/layout/Footer";
-import { OfflineBanner } from '@/components/layout/OfflineBanner';
+import { OfflineBanner } from "@/components/layout/OfflineBanner";
+import { isTauri } from "@/lib/platform";
 import Index from "./pages/Index";
 import AnimePage from "./pages/AnimePage";
 import WatchPage from "./pages/WatchPage";
@@ -154,6 +155,8 @@ function AppContent() {
   const { isBanned, isAdmin } = useAuth();
   const { isMaintenanceMode } = useMaintenanceMode();
 
+  const Router = isTauri() ? HashRouter : BrowserRouter;
+
   useEffect(() => {
     if (isSmartTV) {
       console.log(`Smart TV detected: ${platform}`);
@@ -166,7 +169,7 @@ function AppContent() {
       <Sonner />
       {/* Offline banner lives at top level so it can be seen anywhere */}
       <OfflineBanner />
-      <BrowserRouter
+      <Router
         future={{
           v7_startTransition: true,
           v7_relativeSplatPath: true,
@@ -237,7 +240,7 @@ function AppContent() {
           <Route path="*" element={<NotFound />} />
         </Routes>
         <ConditionalFooter />
-      </BrowserRouter>
+      </Router>
     </>
   );
 }
