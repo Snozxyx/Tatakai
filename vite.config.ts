@@ -5,7 +5,10 @@ import { componentTagger } from "lovable-tagger";
 import packageJson from "./package.json";
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode }) => {
+  const isWebMode = mode === 'web';
+  
+  return {
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
     alias: {
@@ -22,10 +25,19 @@ export default defineConfig(({ mode }) => ({
         drop_debugger: mode === 'production',
       },
     },
+    // Webapp specific build config
+    rollupOptions: isWebMode ? {
+      output: {
+        // Don't generate service worker for webapp
+        entryFileNames: 'assets/[name].[hash].js',
+        chunkFileNames: 'assets/[name].[hash].js',
+        assetFileNames: 'assets/[name].[hash].[ext]'
+      }
+    } : undefined,
   },
   server: {
     host: "::",
-    port: 8080,
+    port: isWebMode ? 8081 : 8080, // Different port for webapp
     proxy: {
       // Proxy all calls starting with /api/proxy/aniwatch to the third-party API (dev only)
       '/api/proxy/aniwatch': {
@@ -38,5 +50,6 @@ export default defineConfig(({ mode }) => ({
   },
   define: {
     __APP_VERSION__: JSON.stringify(packageJson.version),
+    __WEBAPP_MODE__: isWebMode,
   },
-}));
+}});

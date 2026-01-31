@@ -10,7 +10,7 @@ import { TierListGrid } from '@/components/tierlist/TierListCard';
 import { usePublicProfile, usePublicWatchlist, usePublicWatchHistory } from '@/hooks/useProfileFeatures';
 import { useUserTierLists } from '@/hooks/useTierLists';
 import {
-  ArrowLeft, User, Clock, Heart, List, Trophy, Eye, EyeOff, Calendar, Play, Lock, Globe, UserPlus, UserMinus
+  ArrowLeft, User, Clock, Heart, List, Trophy, Eye, EyeOff, Calendar, Play, Lock, Globe, UserPlus, UserMinus, ShieldCheck, Shield
 } from 'lucide-react';
 import { useFollow } from '@/hooks/useFollow';
 import { useAuth } from '@/contexts/AuthContext';
@@ -19,11 +19,14 @@ import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 export default function PublicProfilePage() {
-  const { username: usernameParam, atUsername } = useParams<{ username?: string; atUsername?: string }>();
+  const { username: usernameParam, atUsername, slug } = useParams<{ username?: string; atUsername?: string; slug?: string }>();
   const navigate = useNavigate();
 
-  // Support both /user/:username and /@username routes
-  const username = usernameParam || (atUsername?.startsWith('@') ? atUsername.slice(1) : atUsername) || '';
+  // Support both /user/:username, /@username, and /:slug routes
+  const username = usernameParam ||
+    (atUsername?.startsWith('@') ? atUsername.slice(1) : atUsername) ||
+    (slug?.startsWith('@') ? slug.slice(1) : undefined) ||
+    '';
 
   const { data: profile, isLoading: loadingProfile, error } = usePublicProfile(username);
   const { data: watchlist = [], isLoading: loadingWatchlist } = usePublicWatchlist(profile?.id, profile?.is_public ?? false);
@@ -133,8 +136,20 @@ export default function PublicProfilePage() {
 
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
-                  <h1 className="font-display text-2xl md:text-3xl font-bold">
-                    {profile.username || 'Anonymous User'}
+                  <h1 className="text-2xl md:text-3xl font-black flex items-center gap-2">
+                    {profile?.display_name || username}
+                    {profile?.role === 'admin' && (
+                      <span className="flex items-center gap-1 px-3 py-1 rounded-full text-[12px] font-bold bg-violet-500/20 text-violet-400 border border-violet-500/30">
+                        <ShieldCheck className="w-4 h-4" />
+                        ADMIN
+                      </span>
+                    )}
+                    {profile?.role === 'moderator' && (
+                      <span className="flex items-center gap-1 px-3 py-1 rounded-full text-[12px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        <Shield className="w-4 h-4" />
+                        MODERATOR
+                      </span>
+                    )}
                   </h1>
                   <span title="Public Profile">
                     <Globe className="w-4 h-4 text-green-500" />

@@ -1,14 +1,17 @@
 import { motion } from "framer-motion";
 import { AlertCircle, RefreshCw, Home, Bug } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
 
 interface ErrorPageProps {
   error?: Error | null;
   resetError?: () => void;
+  errorId?: string | null;
 }
 
-const ErrorPage = ({ error, resetError }: ErrorPageProps) => {
+const ErrorPage = ({ error, resetError, errorId }: ErrorPageProps) => {
+  const handleGoHome = () => {
+    window.location.href = '/';
+  };
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4 overflow-hidden relative">
       {/* Glitch effect background */}
@@ -126,11 +129,9 @@ const ErrorPage = ({ error, resetError }: ErrorPageProps) => {
             <RefreshCw className="w-5 h-5" />
             Try Again
           </Button>
-          <Button asChild variant="outline" size="lg" className="gap-2">
-            <Link to="/">
-              <Home className="w-5 h-5" />
-              Go Home
-            </Link>
+          <Button onClick={handleGoHome} variant="outline" size="lg" className="gap-2">
+            <Home className="w-5 h-5" />
+            Go Home
           </Button>
         </motion.div>
 
@@ -141,7 +142,7 @@ const ErrorPage = ({ error, resetError }: ErrorPageProps) => {
           transition={{ delay: 1 }}
           className="mt-8 text-xs text-muted-foreground"
         >
-          Error ID: {Math.random().toString(36).substring(2, 10).toUpperCase()}
+          Error ID: {errorId ?? Math.random().toString(36).substring(2, 10).toUpperCase()}
         </motion.p>
       </motion.div>
     </div>

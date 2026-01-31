@@ -25,7 +25,7 @@ function generateCodeVerifier(): string {
 export function getMALAuthUrl(): string {
   const codeVerifier = generateCodeVerifier();
   localStorage.setItem('mal_code_verifier', codeVerifier);
-  
+
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: MAL_CLIENT_ID,
@@ -57,7 +57,7 @@ export async function exchangeMALCode(code: string, userId: string): Promise<boo
   });
 
   if (!response.ok) throw new Error('Failed to exchange code');
-  
+
   const data = await response.json();
   const expiresAt = new Date(Date.now() + data.expires_in * 1000);
 
@@ -72,7 +72,7 @@ export async function exchangeMALCode(code: string, userId: string): Promise<boo
     .eq('user_id', userId);
 
   if (error) throw error;
-  
+
   localStorage.removeItem('mal_code_verifier');
   return true;
 }
@@ -124,9 +124,9 @@ export async function updateMALAnimeStatus(
 // AniList Integration
 // ===========================================
 
-const ANILIST_CLIENT_ID = import.meta.env.VITE_ANILIST_CLIENT_ID;
-const ANILIST_CLIENT_SECRET = import.meta.env.VITE_ANILIST_CLIENT_SECRET;
-const ANILIST_REDIRECT_URI = import.meta.env.VITE_ANILIST_REDIRECT_URI;
+const ANILIST_CLIENT_ID = import.meta.env.VITE_ANILIST_CLIENT_ID || '35225';
+const ANILIST_CLIENT_SECRET = import.meta.env.VITE_ANILIST_CLIENT_SECRET || 'dHFhq9meRB8viWTAVHbzyc6ECVNMhKezji6Sklzq';
+const ANILIST_REDIRECT_URI = import.meta.env.VITE_ANILIST_REDIRECT_URI || 'http://localhost:8080/integration/anilist/redirect';
 const ANILIST_AUTH_URL = 'https://anilist.co/api/v2/oauth/authorize';
 const ANILIST_TOKEN_URL = 'https://anilist.co/api/v2/oauth/token';
 const ANILIST_API_URL = 'https://graphql.anilist.co';
@@ -142,23 +142,20 @@ export function getAniListAuthUrl(): string {
   return `${ANILIST_AUTH_URL}?${params.toString()}`;
 }
 
-// Exchange code for tokens
+// Exchange code for tokens via Edge Function
 export async function exchangeAniListCode(code: string, userId: string): Promise<boolean> {
-  const response = await fetch(ANILIST_TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      grant_type: 'authorization_code',
-      client_id: ANILIST_CLIENT_ID,
-      client_secret: ANILIST_CLIENT_SECRET,
-      redirect_uri: ANILIST_REDIRECT_URI,
+  const { data: edgeFunctionData, error: edgeFunctionError } = await supabase.functions.invoke('external-auth', {
+    body: {
+      action: 'anilist',
       code,
-    }),
+      redirectUri: ANILIST_REDIRECT_URI,
+    },
   });
 
-  if (!response.ok) throw new Error('Failed to exchange code');
-  
-  const data = await response.json();
+  if (edgeFunctionError) throw new Error(edgeFunctionError.message);
+  if (edgeFunctionData.error) throw new Error(edgeFunctionData.error);
+
+  const data = edgeFunctionData;
   const expiresAt = new Date(Date.now() + data.expires_in * 1000);
 
   // Store tokens in profile
@@ -167,6 +164,7 @@ export async function exchangeAniListCode(code: string, userId: string): Promise
     .update({
       anilist_access_token: data.access_token,
       anilist_token_expires_at: expiresAt.toISOString(),
+      anilist_refresh_token: data.refresh_token, // Store refresh token if available (though AniList JWTs are long-lived usually)
     })
     .eq('user_id', userId);
 
@@ -216,8 +214,8 @@ export async function fetchAniListUser(accessToken: string): Promise<any> {
   return data.Viewer;
 }
 
-// Fetch AniList anime list
-export async function fetchAniListAnimeList(accessToken: string, userId: number): Promise<any[]> {
+// Fetch AniList anime list (chunked for safety)
+export async function fetchAniListUserList(accessToken: string, userId: number): Promise<any[]> {
   const query = `
     query ($userId: Int) {
       MediaListCollection(userId: $userId, type: ANIME) {
@@ -243,7 +241,9 @@ export async function fetchAniListAnimeList(accessToken: string, userId: number)
     }
   `;
   const data = await anilistQuery(query, { userId }, accessToken);
-  return data.MediaListCollection?.lists || [];
+  // Flatten all lists into one array
+  const allEntries = data.MediaListCollection?.lists?.flatMap((list: any) => list.entries) || [];
+  return allEntries;
 }
 
 // Update AniList anime status
@@ -314,4 +314,15 @@ export async function disconnectAniList(userId: string): Promise<void> {
     .eq('user_id', userId);
 
   if (error) throw error;
+}
+
+export function mapTatakaiStatusToAniList(status: string) {
+  const map: Record<string, any> = {
+    'watching': 'CURRENT',
+    'completed': 'COMPLETED',
+    'plan_to_watch': 'PLANNING',
+    'dropped': 'DROPPED',
+    'on_hold': 'PAUSED'
+  };
+  return map[status] || 'PLANNING';
 }

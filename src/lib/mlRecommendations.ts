@@ -59,116 +59,127 @@ export async function analyzeTaste(
   let completedCount = 0;
   let totalWatchTime = 0;
 
-  // Analyze watch history
-  for (const item of watchHistory.slice(0, 50)) {
-    try {
-      const info = await fetchAnimeInfo(item.anime_id);
-      if (!info?.anime) continue;
+  // Analyze watch history in chunks to prevent blocking and respect rate limits
+  const CHUNK_SIZE = 5;
+  const historyToProcess = watchHistory.slice(0, 40); // Process up to 40 items for speed/accuracy balance
 
-      const anime = info.anime;
-      const moreInfo = anime.moreInfo || {};
+  for (let i = 0; i < historyToProcess.length; i += CHUNK_SIZE) {
+    const chunk = historyToProcess.slice(i, i + CHUNK_SIZE);
 
-      // Genres
-      (moreInfo.genres || []).forEach((genre: string) => {
-        genreCounts.set(genre, (genreCounts.get(genre) || 0) + 1);
-      });
+    await Promise.all(chunk.map(async (item) => {
+      try {
+        const info = await fetchAnimeInfo(item.anime_id);
+        if (!info?.anime) return;
 
-      // Type
-      const type = anime.info.type || 'TV';
-      typeCounts.set(type, (typeCounts.get(type) || 0) + 1);
+        const anime = info.anime;
+        const moreInfo = anime.moreInfo as any || {};
 
-      // Studios
-      (moreInfo.studios || []).forEach((studio: string) => {
-        studioCounts.set(studio, (studioCounts.get(studio) || 0) + 1);
-      });
+        // Genres - weighted more if completed
+        const weight = item.completed ? 1.5 : 1.0;
+        (moreInfo.genres || []).forEach((genre: string) => {
+          genreCounts.set(genre, (genreCounts.get(genre) || 0) + weight);
+        });
 
-      // Rating
-      if (anime.info.rating) {
-        const rating = parseFloat(anime.info.rating);
-        if (!isNaN(rating)) ratings.push(rating);
-      }
+        // Type
+        const type = anime.info.stats?.type || 'TV';
+        typeCounts.set(type, (typeCounts.get(type) || 0) + 1);
 
-      // Year
-      if (moreInfo.aired) {
-        const yearMatch = moreInfo.aired.match(/\d{4}/);
-        if (yearMatch) {
-          const year = parseInt(yearMatch[0]);
-          if (year > 1900 && year <= new Date().getFullYear()) {
-            years.push(year);
+        // Studios
+        if (moreInfo.studios) {
+          const studioList = Array.isArray(moreInfo.studios) ? moreInfo.studios : [moreInfo.studios];
+          studioList.forEach((studio: string) => {
+            studioCounts.set(studio, (studioCounts.get(studio) || 0) + 1);
+          });
+        }
+
+        // Rating
+        if (anime.info.stats?.rating) {
+          const rating = parseFloat(anime.info.stats.rating);
+          if (!isNaN(rating)) ratings.push(rating);
+        }
+
+        // Year
+        if (moreInfo.aired) {
+          const yearMatch = moreInfo.aired.match(/\d{4}/);
+          if (yearMatch) {
+            const year = parseInt(yearMatch[0]);
+            if (year > 1900 && year <= new Date().getFullYear()) {
+              years.push(year);
+            }
           }
         }
+
+        // Episodes
+        const episodes = anime.info.stats?.episodes?.sub || anime.info.stats?.episodes?.dub || 0;
+        if (episodes > 0) episodeCounts.push(episodes);
+
+        // Completion
+        if (item.completed) completedCount++;
+        if (item.progress_seconds) totalWatchTime += item.progress_seconds;
+      } catch (e) {
+        console.warn(`[ML] Failed to analyze anime ${item.anime_id}:`, e);
       }
-
-      // Episodes
-      const episodes = anime.info.episodes?.sub || anime.info.episodes?.dub || 0;
-      if (episodes > 0) episodeCounts.push(episodes);
-
-      // Completion
-      if (item.completed) completedCount++;
-      if (item.progress_seconds) totalWatchTime += item.progress_seconds;
-    } catch {
-      // Skip on error
-    }
+    }));
   }
 
   // Calculate weights (normalized)
-  const totalItems = watchHistory.length || 1;
+  const totalWeight = Array.from(genreCounts.values()).reduce((a, b) => a + b, 0) || 1;
   const preferredGenres = Array.from(genreCounts.entries())
-    .map(([genre, count]) => ({
+    .map(([genre, weight]) => ({
       genre,
-      weight: count / totalItems,
+      weight: weight / totalWeight,
     }))
     .sort((a, b) => b.weight - a.weight)
-    .slice(0, 10);
+    .slice(0, 12);
 
+  const totalTypes = Array.from(typeCounts.values()).reduce((a, b) => a + b, 0) || 1;
   const preferredTypes = Array.from(typeCounts.entries())
     .map(([type, count]) => ({
       type,
-      weight: count / totalItems,
+      weight: count / totalTypes,
     }))
     .sort((a, b) => b.weight - a.weight);
 
   const preferredStudios = Array.from(studioCounts.entries())
     .map(([studio, count]) => ({
       studio,
-      weight: count / totalItems,
+      weight: count / (historyToProcess.length || 1),
     }))
     .sort((a, b) => b.weight - a.weight)
-    .slice(0, 5);
+    .slice(0, 8);
 
-  // Calculate diversity score (based on unique genres/types)
+  // Calculate diversity score
   const uniqueGenres = genreCounts.size;
   const uniqueTypes = typeCounts.size;
-  const diversityScore = Math.min(1, (uniqueGenres / 20 + uniqueTypes / 5) / 2);
+  const diversityScore = Math.min(1, (uniqueGenres / 15 + uniqueTypes / 4) / 2);
 
-  // Calculate averages
   const avgRating = ratings.length > 0
     ? ratings.reduce((a, b) => a + b, 0) / ratings.length
-    : 7.0;
+    : 7.5;
   const avgYear = years.length > 0
     ? years.reduce((a, b) => a + b, 0) / years.length
-    : new Date().getFullYear() - 5;
+    : new Date().getFullYear() - 3;
   const avgEpisodes = episodeCounts.length > 0
     ? episodeCounts.reduce((a, b) => a + b, 0) / episodeCounts.length
     : 12;
 
   // Determine watch patterns
-  const completionRate = completedCount / totalItems;
-  const avgWatchTime = totalWatchTime / totalItems;
-  const prefersCompleted = completionRate > 0.7;
-  const bingeWatcher = avgWatchTime > 3600; // More than 1 hour average
+  const completionRate = completedCount / (historyToProcess.length || 1);
+  const avgWatchTime = totalWatchTime / (historyToProcess.length || 1);
+  const prefersCompleted = completionRate > 0.6;
+  const bingeWatcher = avgWatchTime > 3000;
 
   return {
     preferredGenres,
     preferredTypes,
     preferredRatings: {
-      min: Math.max(0, avgRating - 2),
-      max: Math.min(10, avgRating + 2),
+      min: Math.max(0, avgRating - 2.5),
+      max: Math.min(10, 10), // We want to show everything up to 10
       average: avgRating,
     },
     preferredYears: {
-      min: years.length > 0 ? Math.min(...years) : avgYear - 10,
-      max: years.length > 0 ? Math.max(...years) : avgYear + 5,
+      min: years.length > 0 ? Math.min(...years) - 2 : avgYear - 15,
+      max: years.length > 0 ? Math.max(...years) + 1 : avgYear + 5,
       average: avgYear,
     },
     preferredStudios,
@@ -302,6 +313,9 @@ export function calculateMLScore(
 /**
  * Generate ML-based recommendations
  */
+/**
+ * Generate ML-based recommendations
+ */
 export async function generateMLRecommendations(
   tasteProfile: TasteProfile,
   candidateAnime: AnimeCard[],
@@ -309,33 +323,46 @@ export async function generateMLRecommendations(
   limit = 20
 ): Promise<MLRecommendation[]> {
   const recommendations: MLRecommendation[] = [];
+  const CHUNK_SIZE = 8;
+  const processedIds = new Set<string>();
 
-  for (const anime of candidateAnime) {
-    if (excludeIds.has(anime.id)) continue;
+  // Process unique candidates not in history
+  const filteredCandidates = candidateAnime
+    .filter(a => !excludeIds.has(a.id))
+    .slice(0, 100); // Sample up to 100 candidates
 
-    try {
-      const info = await fetchAnimeInfo(anime.id);
-      if (!info?.anime) continue;
+  for (let i = 0; i < filteredCandidates.length; i += CHUNK_SIZE) {
+    const chunk = filteredCandidates.slice(i, i + CHUNK_SIZE);
 
-      const recommendation = calculateMLScore(anime, info, tasteProfile);
+    const results = await Promise.all(chunk.map(async (anime) => {
+      try {
+        if (processedIds.has(anime.id)) return null;
+        processedIds.add(anime.id);
 
-      if (recommendation.score > 30) {
-        // Only include if score is above threshold
-        recommendations.push(recommendation);
+        const info = await fetchAnimeInfo(anime.id);
+        if (!info?.anime) return null;
+
+        const recommendation = calculateMLScore(anime, info, tasteProfile);
+        return recommendation.score >= 25 ? recommendation : null;
+      } catch {
+        return null;
       }
-    } catch {
-      // Skip on error
-    }
+    }));
 
-    // Limit processing to prevent too many API calls
-    if (recommendations.length >= limit * 2) break;
+    results.forEach(res => {
+      if (res) recommendations.push(res);
+    });
+
+    // If we have enough high quality results, we can stop early
+    if (recommendations.filter(r => r.score > 60).length >= limit) break;
+    if (recommendations.length >= limit * 3) break;
   }
 
   // Sort by score and return top results
   return recommendations
     .sort((a, b) => {
       // Sort by score first, then confidence
-      if (b.score !== a.score) return b.score - a.score;
+      if (Math.abs(b.score - a.score) > 5) return b.score - a.score;
       return b.confidence - a.confidence;
     })
     .slice(0, limit);

@@ -22,7 +22,7 @@ export function useAnimeInfo(animeId: string | undefined) {
   return useQuery({
     queryKey: ["anime", animeId],
     queryFn: () => fetchAnimeInfo(animeId!),
-    enabled: !!animeId,
+    enabled: !!animeId && !animeId.startsWith('mal-'),
     staleTime: 10 * 60 * 1000,
   });
 }
@@ -31,7 +31,7 @@ export function useEpisodes(animeId: string | undefined) {
   return useQuery({
     queryKey: ["episodes", animeId],
     queryFn: () => fetchEpisodes(animeId!),
-    enabled: !!animeId,
+    enabled: !!animeId && !animeId.startsWith('mal-'),
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -78,7 +78,7 @@ export function useNextEpisodeSchedule(animeId: string | undefined) {
   return useQuery({
     queryKey: ["next-episode-schedule", animeId],
     queryFn: () => fetchNextEpisodeSchedule(animeId!),
-    enabled: !!animeId,
+    enabled: !!animeId && !animeId.startsWith('mal-'),
     staleTime: 5 * 60 * 1000,
     retry: false, // Don't retry if anime doesn't have schedule
   });

@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { motion } from 'framer-motion';
-import { 
+import {
   TrendingUp, Users, Eye, Play, Clock, Globe, MapPin,
   BarChart3, PieChart, Activity, ArrowUpRight
 } from 'lucide-react';
-import { 
+import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   AreaChart, Area, BarChart, Bar, PieChart as RePieChart, Pie, Cell
 } from 'recharts';
@@ -37,7 +37,7 @@ export function AnalyticsDashboard() {
         .from('page_visits')
         .select('session_id')
         .gte('created_at', startDate);
-      
+
       const uniqueSessions = new Set(data?.map(v => v.session_id) || []);
       return uniqueSessions.size;
     },
@@ -52,17 +52,17 @@ export function AnalyticsDashboard() {
         .from('page_visits')
         .select('user_id, session_id')
         .gte('created_at', startDate);
-      
+
       const sessions = new Map<string, boolean>();
       data?.forEach(v => {
         if (!sessions.has(v.session_id)) {
           sessions.set(v.session_id, !!v.user_id);
         }
       });
-      
+
       let guests = 0, loggedIn = 0;
       sessions.forEach(isLoggedIn => isLoggedIn ? loggedIn++ : guests++);
-      
+
       return { guests, loggedIn };
     },
   });
@@ -76,7 +76,7 @@ export function AnalyticsDashboard() {
         .from('watch_sessions')
         .select('watch_duration_seconds')
         .gte('created_at', startDate);
-      
+
       const totalSeconds = data?.reduce((acc, s) => acc + (s.watch_duration_seconds || 0), 0) || 0;
       return totalSeconds;
     },
@@ -92,7 +92,7 @@ export function AnalyticsDashboard() {
         .select('country, session_id')
         .gte('created_at', startDate)
         .not('country', 'is', null);
-      
+
       const countryCount = new Map<string, Set<string>>();
       data?.forEach(v => {
         if (v.country) {
@@ -102,7 +102,7 @@ export function AnalyticsDashboard() {
           countryCount.get(v.country)!.add(v.session_id);
         }
       });
-      
+
       return Array.from(countryCount.entries())
         .map(([name, sessions]) => ({ name, value: sessions.size }))
         .sort((a, b) => b.value - a.value)
@@ -119,7 +119,7 @@ export function AnalyticsDashboard() {
         .from('watch_sessions')
         .select('genres, watch_duration_seconds')
         .gte('created_at', startDate);
-      
+
       const genreTime = new Map<string, number>();
       data?.forEach(s => {
         if (s.genres && Array.isArray(s.genres)) {
@@ -128,7 +128,7 @@ export function AnalyticsDashboard() {
           });
         }
       });
-      
+
       const colors = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
       return Array.from(genreTime.entries())
         .map(([name, value], i) => ({ name, value: Math.round(value / 60), color: colors[i % colors.length] }))
@@ -142,13 +142,13 @@ export function AnalyticsDashboard() {
     queryKey: ['analytics_daily_stats', timeRange],
     queryFn: async () => {
       const stats = [];
-      
+
       for (let i = days - 1; i >= 0; i--) {
         const date = subDays(new Date(), i);
         const dayStart = startOfDay(date).toISOString();
         const dayEnd = endOfDay(date).toISOString();
-        
-        const [visitsResult, watchResult, usersResult] = await Promise.all([
+
+        const [visitsResult, watchResult, usersResult, loggedInResult] = await Promise.all([
           supabase
             .from('page_visits')
             .select('session_id, user_id')
@@ -164,19 +164,28 @@ export function AnalyticsDashboard() {
             .select('*', { count: 'exact', head: true })
             .gte('created_at', dayStart)
             .lte('created_at', dayEnd),
+          supabase
+            .from('page_visits')
+            .select('user_id')
+            .not('user_id', 'is', null)
+            .gte('created_at', dayStart)
+            .lte('created_at', dayEnd),
         ]);
 
         const uniqueSessions = new Set(visitsResult.data?.map(v => v.session_id) || []);
+        const uniqueLoggedIn = new Set(loggedInResult.data?.map(v => v.user_id) || []);
         const watchMinutes = (watchResult.data?.reduce((acc, s) => acc + (s.watch_duration_seconds || 0), 0) || 0) / 60;
 
         stats.push({
           date: format(date, timeRange === 'day' ? 'HH:mm' : 'MMM dd'),
           visitors: uniqueSessions.size,
+          dau: uniqueLoggedIn.size,
           watchTime: Math.round(watchMinutes),
           newUsers: usersResult.count || 0,
+          retention: uniqueSessions.size > 0 ? Math.round((uniqueLoggedIn.size / (uniqueSessions.size)) * 100) : 0
         });
       }
-      
+
       return stats;
     },
   });
@@ -190,19 +199,65 @@ export function AnalyticsDashboard() {
         .from('page_visits')
         .select('created_at')
         .gte('created_at', today);
-      
+
       const hourCounts = new Array(24).fill(0);
       data?.forEach(v => {
         const hour = new Date(v.created_at).getHours();
         hourCounts[hour]++;
       });
-      
+
       return hourCounts.map((count, i) => ({
         hour: `${i.toString().padStart(2, '0')}:00`,
         visits: count,
       }));
     },
   });
+
+  // Referrer channels
+  const { data: referrerChannels } = useQuery({
+    queryKey: ['analytics_referrer_channels', timeRange],
+    queryFn: async () => {
+      const startDate = subDays(new Date(), days).toISOString();
+      const { data } = await supabase
+        .from('page_visits')
+        .select('referrer, session_id')
+        .gte('created_at', startDate);
+
+      const channels = new Map<string, Set<string>>();
+      data?.forEach(v => {
+        let channel = 'Direct';
+        if (v.referrer) {
+          try {
+            const url = new URL(v.referrer);
+            if (url.hostname.includes('google') || url.hostname.includes('bing') || url.hostname.includes('yahoo')) {
+              channel = 'Search';
+            } else if (url.hostname.includes('facebook') || url.hostname.includes('twitter') || url.hostname.includes('t.co') || url.hostname.includes('instagram') || url.hostname.includes('reddit')) {
+              channel = 'Social';
+            } else {
+              channel = 'Referral';
+            }
+          } catch (e) {
+            channel = 'Direct';
+          }
+        }
+
+        if (!channels.has(channel)) {
+          channels.set(channel, new Set());
+        }
+        channels.get(channel)!.add(v.session_id);
+      });
+
+      const colors = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'];
+      return Array.from(channels.entries())
+        .map(([name, sessions], i) => ({
+          name,
+          value: sessions.size,
+          color: colors[i % colors.length]
+        }))
+        .sort((a, b) => b.value - a.value);
+    },
+  });
+
 
   const formatWatchTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -234,6 +289,13 @@ export function AnalyticsDashboard() {
       color: 'from-purple-500 to-purple-700',
     },
     {
+      title: 'DAU (Today)',
+      value: (dailyStats?.[dailyStats.length - 1]?.dau || 0).toLocaleString(),
+      subtitle: 'Daily Active Users',
+      icon: <Activity className="w-5 h-5" />,
+      color: 'from-pink-500 to-rose-700',
+    },
+    {
       title: 'Top Country',
       value: topCountries?.[0]?.name || 'N/A',
       subtitle: `${topCountries?.[0]?.value || 0} visitors`,
@@ -255,11 +317,10 @@ export function AnalyticsDashboard() {
             <button
               key={range}
               onClick={() => setTimeRange(range)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                timeRange === range 
-                  ? 'bg-primary text-primary-foreground' 
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${timeRange === range
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+                }`}
             >
               {range.charAt(0).toUpperCase() + range.slice(1)}
             </button>
@@ -413,74 +474,88 @@ export function AnalyticsDashboard() {
           )}
         </GlassPanel>
 
-        {/* Hourly Activity */}
+        {/* Referrer Channels */}
         <GlassPanel className="p-6">
           <h3 className="font-medium mb-4 flex items-center gap-2">
-            <Activity className="w-4 h-4 text-primary" />
-            Today's Activity
+            <Globe className="w-4 h-4 text-primary" />
+            Acquisition Channels
           </h3>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={hourlyActivity || []}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="hour" stroke="hsl(var(--muted-foreground))" fontSize={10} interval={3} />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px',
-                  }}
-                />
-                <Bar 
-                  dataKey="visits" 
-                  fill="hsl(var(--primary))" 
-                  radius={[4, 4, 0, 0]}
-                  name="Page Visits"
-                />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="h-48 flex items-center">
+            {referrerChannels && referrerChannels.length > 0 ? (
+              <>
+                <ResponsiveContainer width="50%" height="100%">
+                  <RePieChart>
+                    <Pie
+                      data={referrerChannels}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={40}
+                      outerRadius={70}
+                      paddingAngle={2}
+                      dataKey="value"
+                    >
+                      {referrerChannels.map((entry: any, index: number) => (
+                        <Cell key={index} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </RePieChart>
+                </ResponsiveContainer>
+                <div className="space-y-2 flex-1">
+                  {referrerChannels.map((item: any) => (
+                    <div key={item.name} className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                      <span className="text-xs flex-1">{item.name}</span>
+                      <span className="text-xs text-muted-foreground">{item.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="text-center w-full text-muted-foreground">No acquisition data yet</div>
+            )}
           </div>
         </GlassPanel>
       </div>
 
-      {/* Watch Time Chart */}
-      <GlassPanel className="p-6">
-        <h3 className="font-medium mb-4 flex items-center gap-2">
-          <Play className="w-4 h-4 text-primary" />
-          Daily Watch Time (minutes)
-        </h3>
-        <div className="h-48">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={dailyStats || []}>
-              <defs>
-                <linearGradient id="watchTimeGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: 'hsl(var(--card))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '8px',
-                }}
-              />
-              <Area
-                type="monotone"
-                dataKey="watchTime"
-                stroke="#8b5cf6"
-                fill="url(#watchTimeGrad)"
-                strokeWidth={2}
-                name="Watch Time (min)"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </GlassPanel>
+      {/* Retention and DAU Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <GlassPanel className="p-6">
+          <h3 className="font-medium mb-4 flex items-center gap-2">
+            <Users className="w-4 h-4 text-primary" />
+            User Engagement %
+          </h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={dailyStats || []}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} unit="%" />
+                <Tooltip />
+                <Area type="monotone" dataKey="retention" stroke="#10b981" fill="#10b981" fillOpacity={0.2} name="Logged-in Ratio" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </GlassPanel>
+
+        <GlassPanel className="p-6">
+          <h3 className="font-medium mb-4 flex items-center gap-2">
+            <Play className="w-4 h-4 text-primary" />
+            Daily Watch Time
+          </h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={dailyStats || []}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} unit="m" />
+                <Tooltip />
+                <Area type="monotone" dataKey="watchTime" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.2} name="Watch Mins" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </GlassPanel>
+      </div>
     </div>
   );
 }

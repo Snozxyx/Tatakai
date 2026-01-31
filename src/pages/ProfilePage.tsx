@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
+import { useIsNativeApp } from '@/hooks/useIsNativeApp';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,8 +26,10 @@ import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import {
   User, Settings, List, History, LogOut, Edit2, Save, X,
-  Play, Trash2, Clock, CheckCircle, Eye, Pause, XCircle, ArrowLeft, Camera, Shield, Sparkles, Globe, Lock, Share2, MessageSquare, AlertCircle, UserPlus, UserMinus
+  Play, Trash2, Clock, CheckCircle, Eye, Pause, XCircle, ArrowLeft, Camera, Shield, Sparkles, Globe, Lock, Share2, MessageSquare, AlertCircle, UserPlus, UserMinus, Bell, Check,
+  ShieldCheck, Loader2
 } from 'lucide-react';
+import { useNotifications } from '@/hooks/useNotifications';
 import { motion } from 'framer-motion';
 // import { StatusVideoBackground } from '@/components/layout/StatusVideoBackground';
 
@@ -40,11 +43,17 @@ const STATUS_LABELS: Record<string, { label: string; icon: React.ReactNode; colo
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const { username: usernameParam, atUsername } = useParams<{ username?: string; atUsername?: string }>();
+  const { username: usernameParam, atUsername, slug } = useParams<{ username?: string; atUsername?: string; slug?: string }>();
   const { user, profile: ownProfile, signOut, refreshProfile, isAdmin } = useAuth();
+  const isNative = useIsNativeApp();
+  const { data: notifications = [], unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
 
   // Determine if viewing someone else's profile
-  const viewingUsername = usernameParam || (atUsername?.startsWith('@') ? atUsername.slice(1) : atUsername);
+  // Supports /user/:username, /@username (via atUsername), and /:slug (where slug is @username)
+  const viewingUsername = usernameParam ||
+    (atUsername?.startsWith('@') ? atUsername.slice(1) : atUsername) ||
+    (slug?.startsWith('@') ? slug.slice(1) : undefined);
+
   const isViewingOther = !!viewingUsername && viewingUsername !== ownProfile?.username;
 
   // Fetch public profile if viewing other user
@@ -96,6 +105,14 @@ export default function ProfilePage() {
       setBio(ownProfile.bio || '');
     }
   }, [ownProfile, isViewingOther]);
+
+  // Refresh profile on mount to ensure latest MAL tokens
+  useEffect(() => {
+    if (user && !isViewingOther) {
+      console.log('[Profile] ProfilePage mounted for logged-in user, refreshing tokens...');
+      refreshProfile();
+    }
+  }, []);
 
   // If viewing other's profile that doesn't exist or is private
   if (isViewingOther && !loadingPublicProfile && (publicProfileError || !publicProfile)) {
@@ -205,9 +222,12 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       {/* <StatusVideoBackground overlayColor="from-background/95 via-background/90 to-background/80" /> */}
-      <Sidebar />
+      {!isNative && <Sidebar />}
 
-      <main className="relative z-10 pl-0 md:pl-20 lg:pl-24 w-full">
+      <main className={cn(
+        "relative z-10 w-full",
+        !isNative && "pl-0 md:pl-20 lg:pl-24"
+      )}>
         {/* Hero Banner */}
         <div className="h-[300px] md:h-[400px] relative w-full overflow-hidden group">
           {profile?.banner_url ? (
@@ -345,8 +365,20 @@ export default function ProfilePage() {
                   ) : (
                     <>
                       <div className="flex items-center gap-3 mb-1">
-                        <h1 className="text-3xl md:text-5xl font-black tracking-tighter mb-2 break-all drop-shadow-sm">
+                        <h1 className="text-3xl md:text-5xl font-black tracking-tighter mb-2 break-all drop-shadow-sm flex items-center gap-2">
                           {profile?.display_name || (profile?.username && profile?.username !== 'null' ? profile?.username : 'User')}
+                          {profile?.role === 'admin' && (
+                            <span className="flex items-center gap-1 px-3 py-1 rounded-full text-[12px] font-bold bg-violet-500/20 text-violet-400 border border-violet-500/30">
+                              <ShieldCheck className="w-4 h-4" />
+                              ADMIN
+                            </span>
+                          )}
+                          {profile?.role === 'moderator' && (
+                            <span className="flex items-center gap-1 px-3 py-1 rounded-full text-[12px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                              <Shield className="w-4 h-4" />
+                              MODERATOR
+                            </span>
+                          )}
                         </h1>
                         <div className="flex items-center gap-3 text-muted-foreground/80 bg-background/30 backdrop-blur-sm px-3 py-1 rounded-full border border-white/5 w-fit">
                           <span className="text-sm font-medium">@{profile?.username && profile?.username !== 'null' ? profile.username : 'anonymous'}</span>
@@ -423,10 +455,10 @@ export default function ProfilePage() {
                             Edit Profile
                           </Button>
                           <SocialLinksEditor
-                            currentLinks={(ownProfile?.social_links as SocialLinks) || {}}
+                            currentLinks={(ownProfile as any)?.social_links || {}}
                             isPublic={ownProfile?.is_public ?? false}
-                            showWatchlist={ownProfile?.show_watchlist ?? true}
-                            showHistory={ownProfile?.show_history ?? true}
+                            showWatchlist={(ownProfile as any)?.show_watchlist ?? true}
+                            showHistory={(ownProfile as any)?.show_history ?? true}
                             trigger={
                               <Button variant="outline" className="gap-2 bg-background/50 backdrop-blur-sm hover:bg-background/80">
                                 <Share2 className="w-4 h-4" />
@@ -448,6 +480,7 @@ export default function ProfilePage() {
                             <LogOut className="w-4 h-4" />
                             Sign Out
                           </Button>
+
                         </div>
                       )}
                     </>
@@ -750,12 +783,95 @@ export default function ProfilePage() {
                   )}
                 </GlassPanel>
               </TabsContent>
+              {!isViewingOther && (
+                <TabsContent value="notifications" className="mt-6">
+                  <GlassPanel className="p-6 md:p-8">
+                    <div className="flex items-center justify-between mb-8">
+                      <h2 className="text-2xl font-bold flex items-center gap-2">
+                        <Bell className="w-6 h-6 text-primary" />
+                        Notifications
+                      </h2>
+                      {notifications.length > 0 && (
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => markAllAsRead.mutate()}
+                            disabled={unreadCount === 0 || markAllAsRead.isPending}
+                          >
+                            Mark all as read
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+
+                    {notifications.length === 0 ? (
+                      <div className="text-center py-20 border-2 border-dashed border-white/5 rounded-2xl">
+                        <Bell className="w-16 h-16 mx-auto text-muted-foreground/30 mb-4" />
+                        <h3 className="text-xl font-bold mb-2">All caught up!</h3>
+                        <p className="text-muted-foreground">You have no new notifications.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {notifications.map((notification) => (
+                          <div
+                            key={notification.id}
+                            className={cn(
+                              "p-4 rounded-xl border transition-all flex justify-between items-start gap-4",
+                              notification.read
+                                ? "bg-white/5 border-white/5 opacity-70"
+                                : "bg-primary/5 border-primary/20 shadow-lg shadow-primary/5"
+                            )}
+                          >
+                            <div className="flex-1 min-w-0" onClick={() => !notification.read && markAsRead.mutate(notification.id)}>
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-bold text-lg leading-tight">{notification.title}</h4>
+                                {!notification.read && (
+                                  <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                                )}
+                              </div>
+                              <p className="text-muted-foreground text-sm leading-relaxed mb-2 break-words">
+                                {notification.body}
+                              </p>
+                              <span className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground/50">
+                                {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+                              </span>
+                            </div>
+                            <div className="flex gap-1 shrink-0">
+                              {!notification.read && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => markAsRead.mutate(notification.id)}
+                                  className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
+                                >
+                                  <Check className="w-4 h-4" />
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  if (confirm('Delete notification?')) deleteNotification.mutate(notification.id);
+                                }}
+                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </GlassPanel>
+                </TabsContent>
+              )}
             </Tabs>
           </div>
         </div>
       </main>
 
-      <MobileNav />
+      {!isNative && <MobileNav />}
     </div>
   );
 }

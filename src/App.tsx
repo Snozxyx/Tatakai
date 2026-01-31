@@ -1,17 +1,26 @@
-import { useEffect } from "react";
+import { useEffect, useState } from 'react';
+import { useIsNativeApp } from "@/hooks/useIsNativeApp";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
+import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams, useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { useSmartTV } from "@/hooks/useSmartTV";
 import { useTheme } from "@/hooks/useTheme";
 import { useMaintenanceMode } from "@/hooks/useAdminMessages";
 import { usePageTracking } from "@/hooks/useAnalytics";
+import { useActiveSession } from "@/hooks/useActiveSession";
 import { PopupDisplay } from "@/components/layout/PopupDisplay";
+import { Sidebar } from '@/components/layout/Sidebar';
 import { Footer } from "@/components/layout/Footer";
 import { OfflineBanner } from '@/components/layout/OfflineBanner';
+import { OfflineGate } from '@/components/layout/OfflineGate';
+import { V4AnnouncementPopup } from '@/components/layout/V4AnnouncementPopup';
+import { MobileNav } from '@/components/layout/MobileNav';
+import { Background } from '@/components/layout/Background';
 import Index from "./pages/Index";
 import AnimePage from "./pages/AnimePage";
 import WatchPage from "./pages/WatchPage";
@@ -21,6 +30,8 @@ import TrendingPage from "./pages/TrendingPage";
 import FavoritesPage from "./pages/FavoritesPage";
 import AuthPage from "./pages/AuthPage";
 import ProfilePage from "./pages/ProfilePage";
+import MalRedirectPage from "./pages/MalRedirectPage";
+import AniListRedirectPage from "./pages/AniListRedirectPage";
 
 import SettingsPage from "./pages/SettingsPage";
 import StatusPage from "./pages/StatusPage";
@@ -49,6 +60,8 @@ import WatchRoomPage from "./pages/WatchRoomPage";
 import AdminPage from "./pages/AdminPage";
 import RecommendationsPage from "./pages/RecommendationsPage";
 import OnboardingPage from "./pages/OnboardingPage";
+import LanguagesPage from "./pages/LanguagesPage";
+import LanguageAnimePage from "./pages/LanguageAnimePage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -59,16 +72,52 @@ const queryClient = new QueryClient({
   },
 });
 
-// Handler for /@username routes
-function AtUsernameHandler() {
-  const { atUsername } = useParams<{ atUsername: string }>();
+// Handler for /@username routes and custom redirects
+function CatchAllHandler() {
+  const { slug } = useParams<{ slug: string }>();
+  const [isRedirectLoading, setIsRedirectLoading] = useState(true);
 
-  // If the param starts with @, extract username and show profile
-  if (atUsername?.startsWith('@')) {
-    return <ProfilePage key={atUsername} />;
+  useEffect(() => {
+    if (slug?.startsWith('@')) {
+      setIsRedirectLoading(false);
+      return;
+    }
+
+    const checkRedirect = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('redirects')
+          .select('target_url')
+          .eq('slug', slug)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (data?.target_url) {
+          window.location.replace(data.target_url);
+        } else {
+          setIsRedirectLoading(false);
+        }
+      } catch (err) {
+        console.error('Redirect check failed:', err);
+        setIsRedirectLoading(false);
+      }
+    };
+
+    checkRedirect();
+  }, [slug]);
+
+  if (slug?.startsWith('@')) {
+    return <ProfilePage key={slug} />;
   }
 
-  // Otherwise, show 404
+  if (isRedirectLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return <NotFound />;
 }
 
@@ -79,19 +128,31 @@ function GlobalListeners() {
   const { user, isLoading } = useAuth();
 
   useEffect(() => {
-    if (isLoading) return; // Wait for auth to load
+    if (isLoading) return;
+
+    // Check for native app using multiple indicators
+    const isNative = !!(window as any).__TAURI_INTERNALS__ ||
+      !!(window as any).__TAURI__ ||
+      location.search.includes('tauri') ||
+      (window as any).navigator?.userAgent?.includes('Tauri');
 
     const onboardingComplete = localStorage.getItem('tatakai_onboarding_complete') === 'true';
+    const themeSelected = localStorage.getItem('tatakai_theme_selected_v2') === 'true';
 
-    // Show onboarding for authenticated users who haven't completed it
-    // Skip onboarding for auth pages and if already on onboarding
-    if (user && !onboardingComplete && !location.pathname.startsWith('/auth') && location.pathname !== '/onboarding') {
+    console.log("[Tatakai] Native Check:", { isNative, onboardingComplete, themeSelected, path: location.pathname });
+
+    // Show onboarding for all new users (both web and native)
+    const needsOnboarding = user && (!onboardingComplete || !themeSelected);
+
+    if (needsOnboarding && !location.pathname.startsWith('/auth') && location.pathname !== '/onboarding') {
+      console.log("[Tatakai] Redirecting to onboarding...");
       navigate('/onboarding', { replace: true });
     }
-  }, [navigate, location, user, isLoading]);
+  }, [navigate, location.pathname, user, isLoading]);
 
   return null;
 }
+
 
 // Protected route wrapper that checks for banned users and maintenance mode
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -133,6 +194,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+
 // Status page guard that only shows pages when user is in the appropriate state
 function StatusPageGuard({
   children,
@@ -150,9 +212,11 @@ function AppContent() {
   // Initialize theme and smart TV detection
   useTheme();
   usePageTracking(); // Track page visits for analytics
+  useActiveSession(); // Track real-time active users
   const { isSmartTV, platform } = useSmartTV();
   const { isBanned, isAdmin } = useAuth();
   const { isMaintenanceMode } = useMaintenanceMode();
+  const isNative = useIsNativeApp();
 
   useEffect(() => {
     if (isSmartTV) {
@@ -164,90 +228,125 @@ function AppContent() {
     <>
       <Toaster />
       <Sonner />
-      {/* Offline banner lives at top level so it can be seen anywhere */}
       <OfflineBanner />
+      {/* <AppDownloadBanner /> */}
       <BrowserRouter
         future={{
           v7_startTransition: true,
           v7_relativeSplatPath: true,
         }}
       >
-        <GlobalListeners />
-        <PopupDisplay />
-        <Routes>
-          {/* Status pages - only accessible when in appropriate state */}
-          <Route path="/maintenance" element={
-            <StatusPageGuard allowedWhen={isMaintenanceMode}>
-              <MaintenancePage />
-            </StatusPageGuard>
-          } />
-          <Route path="/banned" element={
-            <StatusPageGuard allowedWhen={isBanned}>
-              <BannedPage />
-            </StatusPageGuard>
-          } />
-          <Route path="/503" element={
-            <StatusPageGuard allowedWhen={false}>
-              <ServiceUnavailablePage />
-            </StatusPageGuard>
-          } />
-          <Route path="/error" element={
-            <StatusPageGuard allowedWhen={false}>
-              <ErrorPage />
-            </StatusPageGuard>
-          } />
-          <Route path="/char/:charname" element={<CharacterPage />} />
-          <Route path="/auth" element={<AuthPage />} />
-          <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
+        <OfflineGate>
+          <div
+            className={cn(
+              "min-h-screen relative flex flex-col transition-all duration-300",
+              isNative && "pl-20"
+            )}
+            style={isNative ? { '--titlebar-height': '2rem' } as React.CSSProperties : {}}
+          >
+            {isNative && <Background />}
+            {isNative && <Sidebar />}
+            <V4AnnouncementPopup />
+            <GlobalListeners />
+            <PopupDisplay />
 
-          {/* Protected routes */}
-          <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-          <Route path="/anime/:animeId" element={<ProtectedRoute><AnimePage /></ProtectedRoute>} />
-          <Route path="/watch/:episodeId" element={<ProtectedRoute><WatchPage /></ProtectedRoute>} />
-          <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
-          <Route path="/genre/:genre" element={<ProtectedRoute><GenrePage /></ProtectedRoute>} />
-          <Route path="/trending" element={<ProtectedRoute><TrendingPage /></ProtectedRoute>} />
-          <Route path="/collections" element={<ProtectedRoute><CollectionsPage /></ProtectedRoute>} />
-          <Route path="/favorites" element={<ProtectedRoute><FavoritesPage /></ProtectedRoute>} />
-          <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-          <Route path="/recommendations" element={<ProtectedRoute><RecommendationsPage /></ProtectedRoute>} />
-          {/* Admin Routes */}
-          <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
-          <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-          <Route path="/status" element={<ProtectedRoute><StatusPage /></ProtectedRoute>} />
-          <Route path="/suggestions" element={<ProtectedRoute><SuggestionsPage /></ProtectedRoute>} />
-          <Route path="/terms" element={<ProtectedRoute><TermsPage /></ProtectedRoute>} />
-          <Route path="/dmca" element={<ProtectedRoute><DMCAPage /></ProtectedRoute>} />
-          <Route path="/privacy" element={<ProtectedRoute><PrivacyPage /></ProtectedRoute>} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
-          <Route path="/update-password" element={<UpdatePasswordPage />} />
-          <Route path="/community" element={<ProtectedRoute><CommunityPage /></ProtectedRoute>} />
-          <Route path="/community/forum/new" element={<ProtectedRoute><ForumNewPostPage /></ProtectedRoute>} />
-          <Route path="/community/forum/:postId" element={<ProtectedRoute><ForumPostPage /></ProtectedRoute>} />
-          <Route path="/tierlists" element={<ProtectedRoute><TierListPage /></ProtectedRoute>} />
-          <Route path="/tierlist/:shareCode" element={<ProtectedRoute><TierListViewPage /></ProtectedRoute>} />
-          <Route path="/tierlists/edit/:id" element={<ProtectedRoute><TierListEditPage /></ProtectedRoute>} />
-          <Route path="/playlists" element={<ProtectedRoute><PlaylistsPage /></ProtectedRoute>} />
-          <Route path="/p/:shareSlug" element={<PublicPlaylistPage />} />
-          <Route path="/playlist/:playlistId" element={<ProtectedRoute><PlaylistViewPage /></ProtectedRoute>} />
-          <Route path="/isshoni" element={<ProtectedRoute><IsshoNiPage /></ProtectedRoute>} />
-          <Route path="/isshoni/room/:roomId" element={<ProtectedRoute><WatchRoomPage /></ProtectedRoute>} />
-          <Route path="/user/:username" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-          <Route path="/:atUsername" element={<ProtectedRoute><AtUsernameHandler /></ProtectedRoute>} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-        <ConditionalFooter />
+            <main className="flex-1 w-full relative z-10">
+              <Routes>
+                {/* Status pages - only accessible when in appropriate state */}
+                <Route path="/maintenance" element={
+                  <StatusPageGuard allowedWhen={isMaintenanceMode}>
+                    <MaintenancePage />
+                  </StatusPageGuard>
+                } />
+                <Route path="/banned" element={
+                  <StatusPageGuard allowedWhen={isBanned}>
+                    <BannedPage />
+                  </StatusPageGuard>
+                } />
+                <Route path="/503" element={
+                  <StatusPageGuard allowedWhen={false}>
+                    <ServiceUnavailablePage />
+                  </StatusPageGuard>
+                } />
+                <Route path="/error" element={
+                  <StatusPageGuard allowedWhen={false}>
+                    <ErrorPage />
+                  </StatusPageGuard>
+                } />
+                <Route path="/char/:charname" element={<CharacterPage />} />
+                <Route path="/auth" element={<AuthPage />} />
+                <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
+
+                {/* Protected routes */}
+                <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+                <Route path="/anime/:animeId" element={<ProtectedRoute><AnimePage /></ProtectedRoute>} />
+                <Route path="/watch/:episodeId" element={<ProtectedRoute><WatchPage /></ProtectedRoute>} />
+                <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
+                <Route path="/languages" element={<ProtectedRoute><LanguagesPage /></ProtectedRoute>} />
+                <Route path="/languages/:language" element={<ProtectedRoute><LanguageAnimePage /></ProtectedRoute>} />
+                <Route path="/genre/:genre" element={<ProtectedRoute><GenrePage /></ProtectedRoute>} />
+                <Route path="/trending" element={<ProtectedRoute><TrendingPage /></ProtectedRoute>} />
+                <Route path="/collections" element={<ProtectedRoute><CollectionsPage /></ProtectedRoute>} />
+                <Route path="/favorites" element={<ProtectedRoute><FavoritesPage /></ProtectedRoute>} />
+                <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+                <Route path="/integration/mal/redirect" element={<ProtectedRoute><MalRedirectPage /></ProtectedRoute>} />
+                <Route path="/integration/anilist/redirect" element={<ProtectedRoute><AniListRedirectPage /></ProtectedRoute>} />
+                <Route path="/recommendations" element={<ProtectedRoute><RecommendationsPage /></ProtectedRoute>} />
+                {/* Admin Routes */}
+                <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
+                <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+                <Route path="/status" element={<ProtectedRoute><StatusPage /></ProtectedRoute>} />
+                <Route path="/suggestions" element={<ProtectedRoute><SuggestionsPage /></ProtectedRoute>} />
+                <Route path="/terms" element={<ProtectedRoute><TermsPage /></ProtectedRoute>} />
+                <Route path="/dmca" element={<ProtectedRoute><DMCAPage /></ProtectedRoute>} />
+                <Route path="/privacy" element={<ProtectedRoute><PrivacyPage /></ProtectedRoute>} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
+                <Route path="/update-password" element={<UpdatePasswordPage />} />
+                <Route path="/community" element={<ProtectedRoute><CommunityPage /></ProtectedRoute>} />
+                <Route path="/community/forum/new" element={<ProtectedRoute><ForumNewPostPage /></ProtectedRoute>} />
+                <Route path="/community/forum/:postId" element={<ProtectedRoute><ForumPostPage /></ProtectedRoute>} />
+                <Route path="/tierlists" element={<ProtectedRoute><TierListPage /></ProtectedRoute>} />
+                <Route path="/tierlist/:shareCode" element={<ProtectedRoute><TierListViewPage /></ProtectedRoute>} />
+                <Route path="/tierlists/edit/:id" element={<ProtectedRoute><TierListEditPage /></ProtectedRoute>} />
+                <Route path="/playlists" element={<ProtectedRoute><PlaylistsPage /></ProtectedRoute>} />
+                <Route path="/p/:shareSlug" element={<PublicPlaylistPage />} />
+                <Route path="/playlist/:playlistId" element={<ProtectedRoute><PlaylistViewPage /></ProtectedRoute>} />
+                <Route path="/isshoni" element={<ProtectedRoute><IsshoNiPage /></ProtectedRoute>} />
+                <Route path="/isshoni/room/:roomId" element={<ProtectedRoute><WatchRoomPage /></ProtectedRoute>} />
+                <Route path="/user/:username" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+                <Route path="/:slug" element={<ProtectedRoute><CatchAllHandler /></ProtectedRoute>} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </main>
+
+            <ConditionalFooter />
+          </div>
+        </OfflineGate>
       </BrowserRouter>
     </>
   );
 }
 
+
 function ConditionalFooter() {
   const location = useLocation();
-  // Hide footer on admin pages, watch page (immersive mode), and onboarding page
-  if (location.pathname.startsWith('/admin') || location.pathname.startsWith('/watch/') || location.pathname === '/onboarding') {
-    return null;
-  }
+  const isNative = useIsNativeApp();
+
+  // Don't show footer in native apps or on certain pages
+  if (isNative) return null;
+
+  const hideFooter = [
+    '/watch/',
+    '/banned',
+    '/maintenance',
+    '/service-unavailable',
+    '/error',
+    '/auth',
+    '/mal-redirect',
+    '/anilist-redirect'
+  ].some(path => location.pathname.startsWith(path));
+
+  if (hideFooter) return null;
 
   return (
     <div className="mt-24">
@@ -265,5 +364,4 @@ const App = () => (
     </AuthProvider>
   </QueryClientProvider>
 );
-
 export default App;

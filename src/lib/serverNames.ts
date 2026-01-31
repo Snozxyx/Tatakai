@@ -7,8 +7,8 @@ export interface ServerNameInfo {
 export const ANIME_SERVER_NAMES: Record<string, ServerNameInfo> = {
   // TatakaiAPI / HiAnime servers - Main characters
   'hd-1': { name: 'Goku', description: 'Ultra HD Server' },
-  'hd-2': { name: 'Luffy ', description: 'HD Pro - Recommended' },
-  'hd-3': { name: 'Saitama ', description: 'HD Elite' },
+  'hd-2': { name: 'Luffy', description: 'HD Pro - Recommended' },
+  'hd-3': { name: 'Saitama', description: 'HD Elite' },
   'megacloud': { name: 'Domo', description: 'MegaCloud HLS Streaming' },
   'streamsb': { name: 'Oni', description: 'StreamSB Server' },
   'streamtape': { name: 'Shinigami', description: 'StreamTape Server' },

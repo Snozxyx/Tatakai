@@ -68,7 +68,7 @@ export function parseEpisodeUrl(urlOrSlug: string): ParsedEpisodeUrl | null {
       slug = pathMatch[1];
       fullUrl = urlOrSlug;
     } else {
-      fullUrl = `https://watchanimeworld.in/episode/${slug}/`;
+      fullUrl = `https://watchanimeworld.net/episode/${slug}/`;
     }
 
     // Extract season and episode: e.g., "naruto-shippuden-1x1"

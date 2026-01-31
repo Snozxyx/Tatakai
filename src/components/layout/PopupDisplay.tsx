@@ -29,7 +29,10 @@ interface Popup {
   frequency: 'once' | 'always' | 'daily' | 'weekly';
   priority: number;
   is_active: boolean;
+  use_theme_colors?: boolean;
 }
+
+import { cn } from '@/lib/utils';
 
 export function PopupDisplay() {
   const { user, profile } = useAuth();
@@ -153,11 +156,14 @@ export function PopupDisplay() {
       {banners.map(banner => (
         <div
           key={banner.id}
-          className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-3 shadow-lg"
-          style={{
+          style={banner.use_theme_colors ? {} : {
             backgroundColor: banner.background_color,
             color: banner.text_color,
           }}
+          className={cn(
+            "fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-3 shadow-lg transition-colors duration-500",
+            banner.use_theme_colors && "bg-card/95 backdrop-blur-xl border-b border-white/10 text-foreground"
+          )}
         >
           <div className="flex-1 flex items-center gap-4">
             {banner.image_url && (
@@ -192,11 +198,14 @@ export function PopupDisplay() {
       {modals.map(modal => (
         <Dialog key={modal.id} open={true} onOpenChange={() => handleDismiss(modal.id)}>
           <DialogContent
-            className="max-w-md"
-            style={{
+            style={modal.use_theme_colors ? {} : {
               backgroundColor: modal.background_color,
               color: modal.text_color,
             }}
+            className={cn(
+              "max-w-md",
+              modal.use_theme_colors && "bg-background/95 backdrop-blur-xl border-border/50 text-foreground"
+            )}
           >
             {modal.image_url && (
               <img src={modal.image_url} alt="" className="w-full rounded-lg mb-4" />

@@ -16,7 +16,7 @@ export function sanitizeHTML(dirty: string): string {
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#x27;');
   }
-  
+
   // Client-side: use DOMPurify
   return DOMPurify.sanitize(dirty, {
     ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p', 'br', 'ul', 'ol', 'li', 'code', 'pre'],
@@ -81,16 +81,16 @@ export function validateCSRFToken(token: string | null): boolean {
 export function redactPII(text: string): string {
   // Email
   text = text.replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, '[EMAIL_REDACTED]');
-  
+
   // Phone numbers
   text = text.replace(/\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g, '[PHONE_REDACTED]');
-  
+
   // Credit cards
   text = text.replace(/\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b/g, '[CARD_REDACTED]');
-  
+
   // IP addresses (optional - might want to keep for security)
   // text = text.replace(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g, '[IP_REDACTED]');
-  
+
   return text;
 }
 
@@ -101,26 +101,17 @@ export function validateInput(input: string, maxLength = 10000): { valid: boolea
   if (!input || typeof input !== 'string') {
     return { valid: false, sanitized: '', error: 'Invalid input type' };
   }
-  
+
   if (input.length > maxLength) {
     return { valid: false, sanitized: '', error: `Input exceeds maximum length of ${maxLength}` };
   }
-  
-  // Check for SQL injection patterns
-  const sqlPatterns = [
-    /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|EXECUTE|UNION|SCRIPT)\b)/gi,
-    /('|(\\')|(;)|(\\;)|(\|)|(\\|)|(\*)|(\\\*)|(%)|(\\%))/g,
-  ];
-  
-  for (const pattern of sqlPatterns) {
-    if (pattern.test(input)) {
-      return { valid: false, sanitized: '', error: 'Potentially malicious input detected' };
-    }
-  }
-  
+
+  // Check for common malicious patterns (script tags, etc.) - XSS is handle by sanitizeHTML below
+  // We remove the overly aggressive SQL patterns which were causing false positives for regular text
+
   // Sanitize HTML
   const sanitized = sanitizeHTML(input);
-  
+
   return { valid: true, sanitized };
 }
 

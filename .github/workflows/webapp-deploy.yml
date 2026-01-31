@@ -1,0 +1,107 @@
+name: Webapp Deployment
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'vite.config.ts'
+      - '.env.web'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'vite.config.ts'
+      - '.env.web'
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy Webapp
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Copy webapp environment
+      run: cp .env.web .env.production
+      
+    - name: Build webapp
+      run: npm run build:web
+      
+    - name: Optimize build
+      run: |
+        # Remove unnecessary files for webapp
+        rm -rf dist/sw.js
+        rm -rf dist/manifest.json
+        rm -rf dist/workbox-*
+        
+    - name: Deploy to Netlify (Preview)
+      if: github.ref == 'refs/heads/develop'
+      uses: nwtgck/actions-netlify@v2
+      with:
+        publish-dir: './dist'
+        production-branch: develop
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        deploy-message: "Deploy from GitHub Actions"
+        enable-pull-request-comment: true
+        enable-commit-comment: true
+      env:
+        NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+        NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        
+    - name: Deploy to Netlify (Production)
+      if: github.ref == 'refs/heads/main'
+      uses: nwtgck/actions-netlify@v2
+      with:
+        publish-dir: './dist'
+        production-branch: main
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        deploy-message: "Production deploy from GitHub Actions"
+        enable-pull-request-comment: false
+        enable-commit-comment: true
+      env:
+        NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+        NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+
+  lighthouse-audit:
+    name: Lighthouse Performance Audit
+    runs-on: ubuntu-latest
+    needs: build-and-deploy
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Build webapp
+      run: npm run build:web
+      
+    - name: Run Lighthouse CI
+      uses: treosh/lighthouse-ci-action@v10
+      with:
+        configPath: '.lighthouserc.json'
+        uploadArtifacts: true
+        temporaryPublicStorage: true
+      env:
+        LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}

@@ -5,7 +5,7 @@ import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
 import { AnimeCard, getProxiedImageUrl } from '@/lib/api';
 import { useInfiniteHomeSections, type HomeSection, type SectionLayout } from '@/hooks/useInfiniteHomeSections';
-import { Play, Star, Loader2, ChevronRight, Sparkles, LayoutGrid, Heart, Flame, Zap } from 'lucide-react';
+import { Play, Star, Loader2, ChevronRight, Sparkles, LayoutGrid, Heart, Flame, Zap, ArrowRight, ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AnimeCardWithPreview } from './AnimeCardWithPreview';
 
@@ -256,6 +256,7 @@ function HomeSection({ section }: { section: HomeSection }) {
 
 // Main infinite sections component
 export function InfiniteHomeSections() {
+  const navigate = useNavigate();
   const {
     data,
     fetchNextPage,
@@ -278,7 +279,7 @@ export function InfiniteHomeSections() {
   useEffect(() => {
     const observer = new IntersectionObserver(handleObserver, {
       root: null,
-      rootMargin: '400px', // Preload sooner for smoother experience
+      rootMargin: '800px', // Preload sooner for smoother experience
       threshold: 0.1,
     });
 
@@ -329,8 +330,38 @@ export function InfiniteHomeSections() {
       )}
 
       {/* Rendered sections */}
-      {allSections.map((section) => (
-        <HomeSection key={section.id} section={section} />
+      {allSections.map((section, index) => (
+        <div key={section.id}>
+          <HomeSection section={section} />
+          {/* Insert dynamic banner every 3 sections */}
+          {(index + 1) % 3 === 0 && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              className="mb-20 px-2"
+            >
+              <GlassPanel className="p-10 relative overflow-hidden bg-gradient-to-br from-primary/20 via-background to-purple-500/10 border-primary/20 group">
+                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <Sparkles className="w-32 h-32 text-primary" />
+                </div>
+                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+                  <div className="text-center md:text-left">
+                    <h3 className="text-2xl md:text-3xl font-black mb-3">Tatakai is better with your voice</h3>
+                    <p className="text-muted-foreground max-w-lg">Got a feature in mind? Want to see a specific anime? Our community shapes the future of Tatakai.</p>
+                  </div>
+                  <Button
+                    onClick={() => navigate('/suggestions')}
+                    className="px-8 py-6 rounded-2xl font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-xl shadow-primary/20"
+                  >
+                    Send a Suggestion
+                    <ArrowRight className="ml-2 w-5 h-5" />
+                  </Button>
+                </div>
+              </GlassPanel>
+            </motion.div>
+          )}
+        </div>
       ))}
 
       {/* Load more trigger */}

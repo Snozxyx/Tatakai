@@ -3,15 +3,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { 
-  useAdminPopups, 
-  useCreatePopup, 
-  useUpdatePopup, 
+import {
+  useAdminPopups,
+  useCreatePopup,
+  useUpdatePopup,
   useDeletePopup,
-  type Popup 
+  type Popup
 } from '@/hooks/useAdminFeatures';
+import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { 
+import {
   Megaphone, Plus, X, Trash2, Eye, EyeOff, Loader2,
   Monitor, Smartphone, Edit2
 } from 'lucide-react';
@@ -41,6 +42,7 @@ const FREQUENCIES = [
 export function PopupBuilder() {
   const [showForm, setShowForm] = useState(false);
   const [editingPopup, setEditingPopup] = useState<Popup | null>(null);
+  const [newPageInput, setNewPageInput] = useState('');
   const [formData, setFormData] = useState({
     title: '',
     content: '',
@@ -61,6 +63,7 @@ export function PopupBuilder() {
     frequency: 'once' as Popup['frequency'],
     priority: 1,
     is_active: true,
+    use_theme_colors: false,
   });
 
   const { data: popups = [], isLoading } = useAdminPopups();
@@ -89,6 +92,7 @@ export function PopupBuilder() {
       frequency: 'once',
       priority: 1,
       is_active: true,
+      use_theme_colors: false,
     });
     setEditingPopup(null);
   };
@@ -114,6 +118,7 @@ export function PopupBuilder() {
       frequency: popup.frequency,
       priority: popup.priority,
       is_active: popup.is_active,
+      use_theme_colors: popup.use_theme_colors || false,
     });
     setEditingPopup(popup);
     setShowForm(true);
@@ -128,8 +133,12 @@ export function PopupBuilder() {
     try {
       const data = {
         ...formData,
-        start_date: formData.start_date ? new Date(formData.start_date).toISOString() : null,
-        end_date: formData.end_date ? new Date(formData.end_date).toISOString() : null,
+        start_date: (formData.start_date && !isNaN(new Date(formData.start_date).getTime()))
+          ? new Date(formData.start_date).toISOString()
+          : null,
+        end_date: (formData.end_date && !isNaN(new Date(formData.end_date).getTime()))
+          ? new Date(formData.end_date).toISOString()
+          : null,
         content: formData.content || null,
         image_url: formData.image_url || null,
         action_text: formData.action_text || null,
@@ -152,7 +161,7 @@ export function PopupBuilder() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this popup?')) return;
-    
+
     try {
       await deletePopup.mutateAsync(id);
       toast.success('Popup deleted');
@@ -163,9 +172,9 @@ export function PopupBuilder() {
 
   const handleToggleActive = async (popup: Popup) => {
     try {
-      await updatePopup.mutateAsync({ 
-        id: popup.id, 
-        updates: { is_active: !popup.is_active } 
+      await updatePopup.mutateAsync({
+        id: popup.id,
+        updates: { is_active: !popup.is_active }
       });
       toast.success(popup.is_active ? 'Popup deactivated' : 'Popup activated');
     } catch (error) {
@@ -226,11 +235,10 @@ export function PopupBuilder() {
                     <button
                       key={type.value}
                       onClick={() => setFormData(prev => ({ ...prev, popup_type: type.value as Popup['popup_type'] }))}
-                      className={`p-3 rounded-lg border text-left transition-all ${
-                        formData.popup_type === type.value
-                          ? 'border-primary bg-primary/10'
-                          : 'border-muted hover:border-foreground/30'
-                      }`}
+                      className={`p-3 rounded-lg border text-left transition-all ${formData.popup_type === type.value
+                        ? 'border-primary bg-primary/10'
+                        : 'border-muted hover:border-foreground/30'
+                        }`}
                     >
                       <p className="font-medium text-sm">{type.label}</p>
                       <p className="text-xs text-muted-foreground">{type.description}</p>
@@ -294,6 +302,50 @@ export function PopupBuilder() {
             {/* Right column */}
             <div className="space-y-4">
               <div>
+                <label className="text-sm font-medium mb-2 block">Target Pages (Empty for all)</label>
+                <div className="flex gap-2 mb-2">
+                  <Input
+                    value={newPageInput}
+                    onChange={(e) => setNewPageInput(e.target.value)}
+                    placeholder="e.g. /watch or anime/*"
+                    className="bg-muted/50"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (newPageInput && !formData.target_pages.includes(newPageInput)) {
+                        setFormData(prev => ({
+                          ...prev,
+                          target_pages: [...prev.target_pages, newPageInput]
+                        }));
+                        setNewPageInput('');
+                      }
+                    }}
+                  >
+                    Add
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {formData.target_pages.map(page => (
+                    <Badge key={page} variant="secondary" className="gap-1 pl-2 pr-1">
+                      {page}
+                      <button
+                        onClick={() => setFormData(prev => ({
+                          ...prev,
+                          target_pages: prev.target_pages.filter(p => p !== page)
+                        }))}
+                        className="hover:text-destructive"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              <div>
                 <label className="text-sm font-medium mb-2 block">Image URL</label>
                 <Input
                   value={formData.image_url}
@@ -331,11 +383,10 @@ export function PopupBuilder() {
                     <button
                       key={type.value}
                       onClick={() => setFormData(prev => ({ ...prev, target_user_type: type.value as Popup['target_user_type'] }))}
-                      className={`px-3 py-1.5 rounded-lg text-sm transition-all ${
-                        formData.target_user_type === type.value
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted/30 text-muted-foreground hover:bg-muted/50'
-                      }`}
+                      className={`px-3 py-1.5 rounded-lg text-sm transition-all ${formData.target_user_type === type.value
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted/30 text-muted-foreground hover:bg-muted/50'
+                        }`}
                     >
                       {type.label}
                     </button>
@@ -350,11 +401,10 @@ export function PopupBuilder() {
                     <button
                       key={freq.value}
                       onClick={() => setFormData(prev => ({ ...prev, frequency: freq.value as Popup['frequency'] }))}
-                      className={`px-3 py-1.5 rounded-lg text-sm transition-all ${
-                        formData.frequency === freq.value
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted/30 text-muted-foreground hover:bg-muted/50'
-                      }`}
+                      className={`px-3 py-1.5 rounded-lg text-sm transition-all ${formData.frequency === freq.value
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted/30 text-muted-foreground hover:bg-muted/50'
+                        }`}
                     >
                       {freq.label}
                     </button>
@@ -383,7 +433,7 @@ export function PopupBuilder() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-6">
+              <div className="flex flex-wrap items-center gap-4">
                 <div className="flex items-center gap-2">
                   <Switch
                     checked={formData.show_on_desktop}
@@ -407,6 +457,13 @@ export function PopupBuilder() {
                   />
                   <span className="text-sm">Active</span>
                 </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={formData.use_theme_colors}
+                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, use_theme_colors: checked }))}
+                  />
+                  <span className="text-sm">Themed</span>
+                </div>
               </div>
             </div>
           </div>
@@ -414,18 +471,18 @@ export function PopupBuilder() {
           {/* Preview */}
           <div>
             <label className="text-sm font-medium mb-2 block">Preview</label>
-            <div 
+            <div
               className="p-4 rounded-lg border"
-              style={{ 
-                backgroundColor: formData.background_color, 
+              style={{
+                backgroundColor: formData.background_color,
                 color: formData.text_color,
-                borderColor: formData.accent_color 
+                borderColor: formData.accent_color
               }}
             >
               <h4 className="font-semibold">{formData.title || 'Popup Title'}</h4>
               {formData.content && <p className="text-sm mt-1 opacity-80">{formData.content}</p>}
               {formData.action_text && (
-                <button 
+                <button
                   className="mt-3 px-4 py-2 rounded-lg text-sm font-medium"
                   style={{ backgroundColor: formData.accent_color, color: formData.text_color }}
                 >
@@ -435,12 +492,12 @@ export function PopupBuilder() {
             </div>
           </div>
 
-          <div className="flex gap-2">
-            <Button onClick={handleSave} disabled={createPopup.isPending || updatePopup.isPending} className="gap-2">
+          <div className="flex flex-wrap gap-3">
+            <Button onClick={handleSave} disabled={createPopup.isPending || updatePopup.isPending} className="gap-2 flex-1 md:flex-none justify-center">
               {(createPopup.isPending || updatePopup.isPending) && <Loader2 className="w-4 h-4 animate-spin" />}
               {editingPopup ? 'Update Popup' : 'Create Popup'}
             </Button>
-            <Button variant="outline" onClick={() => { setShowForm(false); resetForm(); }}>
+            <Button variant="outline" onClick={() => { setShowForm(false); resetForm(); }} className="flex-1 md:flex-none justify-center">
               Cancel
             </Button>
           </div>
@@ -460,9 +517,8 @@ export function PopupBuilder() {
           {popups.map((popup) => (
             <div
               key={popup.id}
-              className={`p-4 rounded-xl border transition-all ${
-                popup.is_active ? 'border-primary/50' : 'border-muted opacity-60'
-              }`}
+              className={`p-4 rounded-xl border transition-all ${popup.is_active ? 'border-primary/50' : 'border-muted opacity-60'
+                }`}
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">

@@ -9,6 +9,8 @@ interface CommentProfile {
   display_name: string | null;
   avatar_url: string | null;
   username: string | null;
+  is_admin: boolean | null;
+  role: string | null;
 }
 
 interface Comment {
@@ -29,7 +31,7 @@ interface Comment {
 
 export function useComments(animeId: string | undefined, episodeId?: string) {
   const { user } = useAuth();
-  
+
   return useQuery({
     queryKey: ['comments', animeId, episodeId],
     queryFn: async () => {
@@ -39,25 +41,25 @@ export function useComments(animeId: string | undefined, episodeId?: string) {
         .eq('anime_id', animeId!)
         .is('parent_id', null)
         .order('created_at', { ascending: false });
-      
+
       if (episodeId) {
         query = query.eq('episode_id', episodeId);
       }
-      
+
       const { data: comments, error } = await query;
-      
+
       if (error) throw error;
       if (!comments || comments.length === 0) return [] as Comment[];
-      
+
       // Fetch profiles for all commenters
       const userIds = [...new Set(comments.map(c => c.user_id))];
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('user_id, display_name, avatar_url, username')
+        .select('user_id, display_name, avatar_url, username, is_admin, role')
         .in('user_id', userIds);
-      
+
       const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
-      
+
       // Check if user has liked each comment
       let likedIds = new Set<string>();
       if (user) {
@@ -66,10 +68,10 @@ export function useComments(animeId: string | undefined, episodeId?: string) {
           .select('comment_id')
           .eq('user_id', user.id)
           .in('comment_id', comments.map(c => c.id));
-        
+
         likedIds = new Set(likes?.map(l => l.comment_id) || []);
       }
-      
+
       return comments.map(c => ({
         ...c,
         profile: profileMap.get(c.user_id),
@@ -82,7 +84,7 @@ export function useComments(animeId: string | undefined, episodeId?: string) {
 
 export function useReplies(parentId: string | undefined) {
   const { user } = useAuth();
-  
+
   return useQuery({
     queryKey: ['replies', parentId],
     queryFn: async () => {
@@ -91,18 +93,18 @@ export function useReplies(parentId: string | undefined) {
         .select('*')
         .eq('parent_id', parentId!)
         .order('created_at', { ascending: true });
-      
+
       if (error) throw error;
       if (!comments || comments.length === 0) return [] as Comment[];
-      
+
       const userIds = [...new Set(comments.map(c => c.user_id))];
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('user_id, display_name, avatar_url, username')
+        .select('user_id, display_name, avatar_url, username, is_admin, role')
         .in('user_id', userIds);
-      
+
       const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
-      
+
       let likedIds = new Set<string>();
       if (user) {
         const { data: likes } = await supabase
@@ -110,10 +112,10 @@ export function useReplies(parentId: string | undefined) {
           .select('comment_id')
           .eq('user_id', user.id)
           .in('comment_id', comments.map(c => c.id));
-        
+
         likedIds = new Set(likes?.map(l => l.comment_id) || []);
       }
-      
+
       return comments.map(c => ({
         ...c,
         profile: profileMap.get(c.user_id),
@@ -127,7 +129,7 @@ export function useReplies(parentId: string | undefined) {
 export function useAddComment() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  
+
   return useMutation({
     mutationFn: async ({
       animeId,
@@ -144,10 +146,10 @@ export function useAddComment() {
     }) => {
       // Sanitize first
       const sanitized = sanitizeComment(content);
-      
+
       // Auto-moderate content
       const moderation = moderateContent(sanitized);
-      
+
       if (!moderation.isAllowed) {
         throw new Error(getViolationMessage(moderation.violations));
       }
@@ -164,7 +166,7 @@ export function useAddComment() {
         })
         .select()
         .single();
-      
+
       if (error) throw error;
       return data;
     },
@@ -183,14 +185,14 @@ export function useAddComment() {
 
 export function useDeleteComment() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (commentId: string) => {
       const { error } = await supabase
         .from('comments')
         .delete()
         .eq('id', commentId);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -207,7 +209,7 @@ export function useDeleteComment() {
 export function useLikeComment() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  
+
   return useMutation({
     mutationFn: async ({ commentId, liked }: { commentId: string; liked: boolean }) => {
       if (liked) {
@@ -216,7 +218,7 @@ export function useLikeComment() {
           .delete()
           .eq('comment_id', commentId)
           .eq('user_id', user!.id);
-        
+
         if (error) throw error;
       } else {
         const { error } = await supabase
@@ -225,7 +227,7 @@ export function useLikeComment() {
             user_id: user!.id,
             comment_id: commentId,
           });
-        
+
         if (error) throw error;
       }
     },
@@ -240,7 +242,7 @@ export function useLikeComment() {
 export function usePinComment() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  
+
   return useMutation({
     mutationFn: async ({ commentId, isPinned, isAdmin }: { commentId: string; isPinned: boolean; isAdmin: boolean }) => {
       if (!user || !isAdmin) throw new Error('Admin access required');

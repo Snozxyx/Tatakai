@@ -1,5 +1,6 @@
 import React from 'react';
 import { logClientError } from '@/lib/errorLogger';
+import ErrorPage from '@/pages/ErrorPage';
 
 interface Props {
   children: React.ReactNode;
@@ -7,16 +8,16 @@ interface Props {
 
 interface State {
   hasError: boolean;
+  error: Error | null;
   errorId?: string | null;
 }
 
 export class ErrorBoundary extends React.Component<Props, State> {
-  state: State = { hasError: false, errorId: null };
+  state: State = { hasError: false, error: null, errorId: null };
 
   async componentDidCatch(error: Error, info: React.ErrorInfo) {
-    this.setState({ hasError: true });
+    this.setState({ hasError: true, error });
     try {
-      // Log to our admin table and capture in Sentry
       const res = await logClientError(error, { reactInfo: info });
       this.setState({ errorId: res?.errorId ?? null });
       try {
@@ -26,21 +27,20 @@ export class ErrorBoundary extends React.Component<Props, State> {
     } catch {}
   }
 
+  resetError = () => {
+    this.setState({ hasError: false, error: null, errorId: null });
+  };
+
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center p-6 text-center">
-          <div>
-            <h1 className="text-2xl font-bold text-white mb-2">Something went wrong</h1>
-            <p className="text-sm text-gray-400 mb-4">Our team has been notified.</p>
-            {this.state.errorId && (
-              <p className="text-xs text-gray-500 font-mono">Error ID: {this.state.errorId}</p>
-            )}
-          </div>
-        </div>
+        <ErrorPage
+          error={this.state.error}
+          resetError={this.resetError}
+          errorId={this.state.errorId}
+        />
       );
     }
-
     return this.props.children;
   }
 }

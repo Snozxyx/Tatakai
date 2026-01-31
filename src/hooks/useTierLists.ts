@@ -299,7 +299,6 @@ export function useLikeTierList() {
       if (!user) throw new Error('Must be logged in');
 
       if (liked) {
-        // Unlike
         const { error } = await supabase
           .from('tier_list_likes')
           .delete()
@@ -307,11 +306,16 @@ export function useLikeTierList() {
           .eq('tier_list_id', tierListId);
         if (error) throw error;
       } else {
-        // Like
         const { error } = await supabase
           .from('tier_list_likes')
           .insert({ user_id: user.id, tier_list_id: tierListId });
-        if (error) throw error;
+        if (error) {
+          if (error.code === '23505') {
+            // Unique violation: already liked. Treat as no-op and refresh.
+            return;
+          }
+          throw error;
+        }
       }
     },
     onSuccess: () => {

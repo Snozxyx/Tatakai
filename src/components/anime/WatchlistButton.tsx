@@ -16,6 +16,8 @@ interface WatchlistButtonProps {
   animeName: string;
   animePoster?: string;
   variant?: 'default' | 'icon';
+  malId?: number | null;
+  anilistId?: number | null;
 }
 
 const STATUS_OPTIONS: { value: WatchlistStatus; label: string }[] = [
@@ -26,11 +28,11 @@ const STATUS_OPTIONS: { value: WatchlistStatus; label: string }[] = [
   { value: 'dropped', label: 'Dropped' },
 ];
 
-export function WatchlistButton({ animeId, animeName, animePoster, variant = 'default' }: WatchlistButtonProps) {
+export function WatchlistButton({ animeId, animeName, animePoster, variant = 'default', malId, anilistId }: WatchlistButtonProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
-  
+
   const { data: watchlistItem, isLoading } = useWatchlistItem(animeId);
   const addToWatchlist = useAddToWatchlist();
   const removeFromWatchlist = useRemoveFromWatchlist();
@@ -41,6 +43,8 @@ export function WatchlistButton({ animeId, animeName, animePoster, variant = 'de
       animeName,
       animePoster,
       status,
+      malId,
+      anilistId,
     });
     setIsOpen(false);
   };
@@ -89,9 +93,8 @@ export function WatchlistButton({ animeId, animeName, animePoster, variant = 'de
         <Button
           variant={watchlistItem ? 'default' : variant === 'icon' ? 'outline' : 'secondary'}
           size={variant === 'icon' ? 'icon' : 'default'}
-          className={`${variant === 'icon' ? 'h-14 w-14 rounded-full' : ''} ${
-            watchlistItem ? 'bg-primary hover:bg-primary/90' : ''
-          }`}
+          className={`${variant === 'icon' ? 'h-14 w-14 rounded-full' : ''} ${watchlistItem ? 'bg-primary hover:bg-primary/90' : ''
+            }`}
         >
           {watchlistItem ? (
             variant === 'icon' ? (

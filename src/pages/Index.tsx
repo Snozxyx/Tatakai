@@ -3,6 +3,8 @@ import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { Header } from "@/components/layout/Header";
+import { useIsNativeApp } from "@/hooks/useIsNativeApp";
+import { cn } from "@/lib/utils";
 import { HeroSection } from "@/components/anime/HeroSection";
 import { TrendingGrid } from "@/components/anime/TrendingGrid";
 import { LatestEpisodes } from "@/components/anime/LatestEpisodes";
@@ -16,13 +18,27 @@ import { UpcomingAnimeSection } from "@/components/anime/UpcomingAnimeSection";
 import { InfiniteHomeSections } from "@/components/anime/InfiniteHomeSections";
 import { TrendingForumSection } from "@/components/anime/TrendingForumSection";
 import { WatchRoomSection } from "@/components/home/WatchRoomSection";
-import { DiscordSection } from "@/components/home/DiscordSection";
-import { AppDownloadSection } from "@/components/home/AppDownloadSection";
 import { HeroSkeleton, CardSkeleton } from "@/components/ui/skeleton-custom";
+import { AIRecommendationBanner } from "@/components/anime/AIRecommendationBanner";
+import { TierlistSection } from "@/components/home/TierlistSection";
+import { ReviewPopup } from "@/components/ui/ReviewPopup";
+import { LanguagesSection } from "@/components/anime/LanguagesSection";
 import { Heart, Sparkles } from "lucide-react";
+
+import { useEffect } from "react";
 
 const Index = () => {
   const { data, isLoading, error } = useHomeData();
+  const isNative = useIsNativeApp();
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).electron) {
+      (window as any).electron.updateRPC({
+        details: 'Browsing Anime',
+        state: 'Main Menu'
+      });
+    }
+  }, []);
 
   if (error) {
     return (
@@ -37,10 +53,13 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-      <Background />
-      <Sidebar />
+      {!isNative && <Background />}
+      {!isNative && <Sidebar />}
 
-      <main className="relative z-10 pl-6 md:pl-32 pr-6 py-6 max-w-[1800px] mx-auto pb-24 md:pb-6">
+      <main className={cn(
+        "relative z-10 pr-6 py-6 max-w-[1800px] mx-auto pb-24 md:pb-6",
+        isNative ? "p-6" : "pl-6 md:pl-32"
+      )}>
         <Header />
 
         {isLoading ? (
@@ -62,6 +81,9 @@ const Index = () => {
               />
             )}
 
+
+            <TierlistSection />
+
             {/* Continue Watching - Database backed for logged in users */}
             <ContinueWatching />
 
@@ -73,6 +95,12 @@ const Index = () => {
 
             {/* Latest Episodes */}
             <LatestEpisodes animes={data.latestEpisodeAnimes} />
+            <AIRecommendationBanner />
+
+
+
+            {/* Languages Section */}
+            <LanguagesSection />
 
             {/* Trending Grid */}
             <TrendingGrid animes={data.trendingAnimes} />
@@ -103,10 +131,6 @@ const Index = () => {
             {/* Watch Together Rooms */}
             <WatchRoomSection />
 
-            {/* Join Discord */}
-            <div className="mb-24">
-              <DiscordSection />
-            </div>
 
             {/* Most Favorite */}
             <AnimeGrid
@@ -115,18 +139,15 @@ const Index = () => {
               icon={<Sparkles className="w-5 h-5 text-amber" />}
             />
 
-            {/* Download App - Always show for web */}
-            <div className="mb-24">
-              <AppDownloadSection />
-            </div>
-
             {/* Infinite Scrolling Genre Sections */}
             <InfiniteHomeSections />
+
+            <ReviewPopup />
           </>
         ) : null}
       </main>
 
-      <MobileNav />
+      {!isNative && <MobileNav />}
     </div>
   );
 };

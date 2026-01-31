@@ -7,14 +7,17 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
-import { 
-  Trash2, Search, MessageSquare, Music2, Layers, 
-  Eye, AlertTriangle, ExternalLink 
+import {
+  Trash2, Search, MessageSquare, Music2, Layers,
+  Eye, AlertTriangle, ExternalLink, Pin
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { usePinForumPost } from '@/hooks/useForum';
+import { cn } from '@/lib/utils';
 
 export function ContentModerationManager() {
   const queryClient = useQueryClient();
+  const pinPost = usePinForumPost();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('forum');
 
@@ -27,19 +30,19 @@ export function ContentModerationManager() {
         .select('*')
         .order('created_at', { ascending: false })
         .limit(100);
-      
+
       if (error) throw error;
-      
+
       if (!data || data.length === 0) return [];
-      
+
       const userIds = [...new Set(data.map(p => p.user_id))];
       const { data: profiles } = await supabase
         .from('profiles')
         .select('user_id, display_name, username')
         .in('user_id', userIds);
-      
+
       const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
-      
+
       return data.map(p => ({
         ...p,
         profile: profileMap.get(p.user_id),
@@ -56,19 +59,19 @@ export function ContentModerationManager() {
         .select('*')
         .order('created_at', { ascending: false })
         .limit(100);
-      
+
       if (error) throw error;
-      
+
       if (!data || data.length === 0) return [];
-      
+
       const userIds = [...new Set(data.map(p => p.user_id))];
       const { data: profiles } = await supabase
         .from('profiles')
         .select('user_id, display_name, username')
         .in('user_id', userIds);
-      
+
       const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
-      
+
       return data.map(p => ({
         ...p,
         profile: profileMap.get(p.user_id),
@@ -85,19 +88,19 @@ export function ContentModerationManager() {
         .select('*')
         .order('created_at', { ascending: false })
         .limit(100);
-      
+
       if (error) throw error;
-      
+
       if (!data || data.length === 0) return [];
-      
+
       const userIds = [...new Set(data.map(t => t.user_id))];
       const { data: profiles } = await supabase
         .from('profiles')
         .select('user_id, display_name, username')
         .in('user_id', userIds);
-      
+
       const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
-      
+
       return data.map(t => ({
         ...t,
         profile: profileMap.get(t.user_id),
@@ -248,6 +251,21 @@ export function ContentModerationManager() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            await pinPost.mutateAsync({ postId: post.id, isPinned: !post.is_pinned });
+                            toast.success(post.is_pinned ? 'Post unpinned' : 'Post pinned');
+                          } catch (e) {
+                            toast.error('Failed to update pin status');
+                          }
+                        }}
+                        className={post.is_pinned ? "text-primary" : "text-muted-foreground"}
+                      >
+                        <Pin className={cn("w-4 h-4", post.is_pinned && "fill-current")} />
+                      </Button>
                       <Link to={`/community/forum/${post.id}`} target="_blank">
                         <Button variant="ghost" size="sm">
                           <ExternalLink className="w-4 h-4" />

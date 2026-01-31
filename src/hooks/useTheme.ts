@@ -23,11 +23,15 @@ export type Theme =
   | 'synthwave'
   | 'vampire'
   | 'matcha-light'
-  | 'ocean-breeze';
+  | 'ocean-breeze'
+  | 'ultra-lite'
+  | 'lite';
 
 interface ThemeColors {
   primary: string;
+  primaryForeground?: string;
   secondary: string;
+  secondaryForeground?: string;
   accent: string;
   background: string;
   foreground: string;
@@ -45,12 +49,17 @@ interface ThemeColors {
   sidebarBorder: string;
   isLight?: boolean;
   isBrutalism?: boolean;
+  isUltraLite?: boolean;
+  reduceMotion?: boolean;
+  highContrast?: boolean;
 }
 
 export const THEME_COLORS: Record<Theme, ThemeColors> = {
   'midnight': {
     primary: '239 84% 67%',
+    primaryForeground: '0 0% 100%',
     secondary: '270 60% 50%',
+    secondaryForeground: '0 0% 100%',
     accent: '280 70% 55%',
     background: '240 10% 4%',
     foreground: '0 0% 98%',
@@ -454,7 +463,9 @@ export const THEME_COLORS: Record<Theme, ThemeColors> = {
   },
   'matcha-light': {
     primary: '140 50% 40%',
+    primaryForeground: '0 0% 100%',
     secondary: '60 30% 90%',
+    secondaryForeground: '140 50% 10%',
     accent: '140 60% 35%',
     background: '60 30% 97%',
     foreground: '140 20% 15%',
@@ -474,7 +485,9 @@ export const THEME_COLORS: Record<Theme, ThemeColors> = {
   },
   'ocean-breeze': {
     primary: '200 80% 50%',
+    primaryForeground: '0 0% 100%',
     secondary: '190 30% 90%',
+    secondaryForeground: '200 30% 15%',
     accent: '210 90% 45%',
     background: '190 30% 98%',
     foreground: '200 30% 15%',
@@ -490,6 +503,50 @@ export const THEME_COLORS: Record<Theme, ThemeColors> = {
     surfaceHover: '200 10% 90%',
     sidebarBackground: '190 30% 96%',
     sidebarBorder: '200 20% 90%',
+    isLight: true,
+  },
+  'ultra-lite': {
+    primary: '0 0% 0%',
+    primaryForeground: '0 0% 100%',
+    secondary: '0 0% 90%',
+    secondaryForeground: '0 0% 0%',
+    accent: '0 0% 10%',
+    background: '0 0% 100%',
+    foreground: '0 0% 0%',
+    card: '0 0% 100%',
+    cardForeground: '0 0% 0%',
+    muted: '0 0% 96%',
+    mutedForeground: '0 0% 40%',
+    border: '0 0% 85%',
+    glass: '0 0% 100%',
+    glowPrimary: '0 0% 0%',
+    glowSecondary: '0 0% 80%',
+    surface: '0 0% 98%',
+    surfaceHover: '0 0% 95%',
+    sidebarBackground: '0 0% 100%',
+    sidebarBorder: '0 0% 90%',
+    isUltraLite: true,
+  },
+  'lite': {
+    primary: '220 90% 50%',
+    primaryForeground: '0 0% 100%',
+    secondary: '220 10% 90%',
+    secondaryForeground: '220 90% 10%',
+    accent: '220 90% 40%',
+    background: '0 0% 100%',
+    foreground: '220 15% 10%',
+    card: '0 0% 100%',
+    cardForeground: '220 15% 10%',
+    muted: '220 10% 96%',
+    mutedForeground: '220 10% 45%',
+    border: '220 10% 90%',
+    glass: '0 0% 100%',
+    glowPrimary: '220 90% 50%',
+    glowSecondary: '220 10% 80%',
+    surface: '220 10% 98%',
+    surfaceHover: '220 10% 95%',
+    sidebarBackground: '220 15% 98%',
+    sidebarBorder: '220 10% 92%',
     isLight: true,
   },
 };
@@ -656,6 +713,20 @@ export const THEME_INFO: Record<Theme, { name: string; gradient: string; descrip
     icon: '🌬️',
     category: 'light',
   },
+  'ultra-lite': {
+    name: 'Ultra Lite',
+    gradient: 'from-gray-900 via-gray-800 to-black',
+    description: 'Minimal resources, no animations, max speed',
+    icon: '⚡',
+    category: 'dark',
+  },
+  'lite': {
+    name: 'Lite',
+    gradient: 'from-blue-100 via-sky-100 to-indigo-50',
+    description: 'Ultra-lightweight theme for maximum battery saving and performance',
+    icon: '🔋',
+    category: 'light',
+  },
 };
 
 const THEME_KEY = 'anime-theme';
@@ -664,9 +735,32 @@ export function useTheme() {
   const [theme, setThemeState] = useState<Theme>(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem(THEME_KEY) as Theme | null;
-      return stored && THEME_COLORS[stored] ? stored : 'cherry-blossom';
+      if (stored && THEME_COLORS[stored]) return stored;
+
+      // Auto-detect low-end device/mobile for lite theme default
+      const isLowEnd = (
+        (navigator as any).deviceMemory !== undefined && (navigator as any).deviceMemory < 4
+      ) || (
+          /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+        );
+
+      return isLowEnd ? 'lite' : 'cherry-blossom';
     }
     return 'cherry-blossom';
+  });
+
+  const [reduceMotion, setReduceMotionState] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('tatakai_reduce_motion') === 'true';
+    }
+    return false;
+  });
+
+  const [highContrast, setHighContrastState] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('tatakai_high_contrast') === 'true';
+    }
+    return false;
   });
 
   const applyTheme = useCallback((themeName: Theme) => {
@@ -703,6 +797,18 @@ export function useTheme() {
     root.style.setProperty('--popover', colors.card);
     root.style.setProperty('--popover-foreground', colors.cardForeground);
 
+    if (colors.primaryForeground) {
+      root.style.setProperty('--primary-foreground', colors.primaryForeground);
+    } else {
+      root.style.setProperty('--primary-foreground', colors.isLight ? '220 15% 10%' : '0 0% 100%');
+    }
+
+    if (colors.secondaryForeground) {
+      root.style.setProperty('--secondary-foreground', colors.secondaryForeground);
+    } else {
+      root.style.setProperty('--secondary-foreground', colors.isLight ? '220 15% 10%' : '0 0% 100%');
+    }
+
     // Add light theme class for special styling
     if (colors.isLight) {
       document.body.classList.add('light-theme');
@@ -719,9 +825,29 @@ export function useTheme() {
       document.body.classList.remove('brutalism-theme');
     }
 
+    // Add ultra-lite class for special styling
+    if (colors.isUltraLite) {
+      document.body.classList.add('ultra-lite-theme');
+    } else {
+      document.body.classList.remove('ultra-lite-theme');
+    }
+
+    // Add display settings classes
+    if (reduceMotion) {
+      document.body.classList.add('reduce-motion');
+    } else {
+      document.body.classList.remove('reduce-motion');
+    }
+
+    if (highContrast) {
+      document.body.classList.add('high-contrast');
+    } else {
+      document.body.classList.remove('high-contrast');
+    }
+
     // Set data-theme attribute for theme-specific CSS
     document.body.setAttribute('data-theme', themeName);
-  }, []);
+  }, [reduceMotion, highContrast]);
 
   useEffect(() => {
     applyTheme(theme);
@@ -732,13 +858,28 @@ export function useTheme() {
     localStorage.setItem(THEME_KEY, newTheme);
   }, []);
 
+  const setReduceMotion = useCallback((value: boolean) => {
+    setReduceMotionState(value);
+    localStorage.setItem('tatakai_reduce_motion', value.toString());
+  }, []);
+
+  const setHighContrast = useCallback((value: boolean) => {
+    setHighContrastState(value);
+    localStorage.setItem('tatakai_high_contrast', value.toString());
+  }, []);
+
   const isLightTheme = THEME_COLORS[theme]?.isLight ?? false;
 
   return {
     theme,
     setTheme,
+    reduceMotion,
+    setReduceMotion,
+    highContrast,
+    setHighContrast,
     themes: Object.keys(THEME_COLORS) as Theme[],
     themeInfo: THEME_INFO,
     isLightTheme,
+    isUltraLite: THEME_COLORS[theme]?.isUltraLite ?? false,
   };
 }

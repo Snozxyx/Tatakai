@@ -83,7 +83,7 @@ serve(async (req) => {
     const response = await fetchWithRetry(targetUrl, { method: "GET", headers: fetchHeaders });
 
     // Video streaming: rewrite manifests so segments also flow through this proxy
-    if (type === "video") {
+    if (type === "video" || type === "m3u8") {
       const upstreamContentType = response.headers.get("content-type") || "application/octet-stream";
       const isManifest =
         targetUrl.includes(".m3u8") || upstreamContentType.includes("mpegurl") || upstreamContentType.includes("m3u8");
@@ -100,8 +100,8 @@ serve(async (req) => {
         }
 
         const baseUrl = targetUrl.substring(0, targetUrl.lastIndexOf("/") + 1);
-        const supabaseUrl = Deno.env.get("SUPABASE_URL") || new URL(req.url).origin;
-        const proxyBase = supabaseUrl.replace(/\/+$/, "") + "/functions/v1/video-proxy-v2";
+        const reqUrl = new URL(req.url);
+        const proxyBase = reqUrl.origin + reqUrl.pathname;
         const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
         const keyParam = anonKey ? `&apikey=${encodeURIComponent(anonKey)}` : "";
         const refererQuery = refererParam ? `&referer=${encodeURIComponent(refererParam)}` : "";

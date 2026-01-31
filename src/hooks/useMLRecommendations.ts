@@ -4,9 +4,10 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { useWatchHistory } from './useWatchHistory';
 import { useWatchlist } from './useWatchlist';
-import { fetchHome, searchAnime } from '@/lib/api';
+import { fetchHome, searchAnime, fetchAnimeInfo } from '@/lib/api';
 import {
   analyzeTaste,
   generateMLRecommendations,
@@ -74,8 +75,25 @@ export function useMLRecommendations(limit = 20) {
         }));
       }
 
-      // Get candidate anime from top genres
-      const topGenres = tasteProfile.preferredGenres.slice(0, 3).map((g) => g.genre);
+      // Check Supabase Cache first
+      const queryParams = {
+        userId: user.id,
+        genreWeight: tasteProfile.diversityScore,
+        limit
+      };
+
+      const { data: cached } = await supabase
+        .from('ai_recommendation_cache')
+        .select('result, expires_at')
+        .eq('query_params', JSON.stringify(queryParams))
+        .single();
+
+      if (cached && new Date(cached.expires_at) > new Date()) {
+        return cached.result as MLRecommendation[];
+      }
+
+      // Get candidate anime from various sources
+      const topGenres = tasteProfile.preferredGenres.slice(0, 4).map((g) => g.genre);
       const watchedIds = new Set([
         ...(watchHistory.map((h) => h.anime_id)),
         ...(watchlist?.map((w) => w.anime_id) || []),
@@ -83,40 +101,71 @@ export function useMLRecommendations(limit = 20) {
 
       const candidateAnime: any[] = [];
 
-      // Search by top genres
-      for (const genre of topGenres) {
-        try {
-          const results = await searchAnime(genre);
-          if (results?.animes) {
-            candidateAnime.push(...results.animes.slice(0, 30));
-          }
-        } catch {
-          // Skip on error
-        }
-      }
+      // 1. Search by top genres
+      const searchPromises = topGenres.map(genre => searchAnime(genre).catch(() => null));
+      const searchResults = await Promise.all(searchPromises);
+      searchResults.forEach(res => {
+        if (res?.animes) candidateAnime.push(...res.animes.slice(0, 25));
+      });
 
-      // Also get trending anime as candidates
+      // 2. Get trending and popular anime
       try {
         const homepage = await fetchHome();
-        if (homepage?.spotlightAnimes) {
-          candidateAnime.push(...homepage.spotlightAnimes.slice(0, 20));
+        if (homepage) {
+          if (homepage.spotlightAnimes) candidateAnime.push(...homepage.spotlightAnimes);
+          if (homepage.trendingAnimes) candidateAnime.push(...homepage.trendingAnimes);
+          if (homepage.mostPopularAnimes) candidateAnime.push(...homepage.mostPopularAnimes);
         }
-      } catch {
-        // Skip on error
+      } catch (e) {
+        console.warn('[ML] Failed to fetch homepage candidates:', e);
       }
 
-      // Remove duplicates
-      const uniqueAnime = Array.from(
-        new Map(candidateAnime.map((a) => [a.id, a])).values()
-      );
+      // 3. Get related anime from top watch history
+      const topHistory = watchHistory.slice(0, 5);
+      const relatedPromises = topHistory.map(h => fetchAnimeInfo(h.anime_id).catch(() => null));
+      const relatedResults = await Promise.all(relatedPromises);
+      relatedResults.forEach(res => {
+        if (res?.recommendedAnimes) candidateAnime.push(...res.recommendedAnimes);
+        if (res?.relatedAnimes) candidateAnime.push(...res.relatedAnimes);
+      });
+
+      // Remove duplicates and ensure objects are valid AnimeCard
+      const uniqueMap = new Map();
+      candidateAnime.filter(Boolean).forEach(a => {
+        if (!uniqueMap.has(a.id)) {
+          uniqueMap.set(a.id, {
+            id: a.id,
+            name: a.name || a.title || 'Unknown',
+            poster: a.poster || a.image || '',
+            type: a.type || 'TV',
+            episodes: a.episodes || { sub: 0, dub: 0 },
+            rating: a.rating || undefined
+          });
+        }
+      });
+
+      const uniqueAnimeList = Array.from(uniqueMap.values());
 
       // Generate ML recommendations
-      return generateMLRecommendations(
+      const resultData = await generateMLRecommendations(
         tasteProfile,
-        uniqueAnime,
+        uniqueAnimeList,
         watchedIds,
         limit
       );
+
+      // Store in Supabase Cache
+      try {
+        await supabase.from('ai_recommendation_cache').upsert({
+          query_params: JSON.stringify(queryParams),
+          result: resultData,
+          expires_at: new Date(Date.now() + 86400000).toISOString(), // 24 hour cache
+        });
+      } catch (e) {
+        console.warn('[ML] Failed to cache recommendations:', e);
+      }
+
+      return resultData;
     },
     enabled: !!user && !!tasteProfile && !!watchHistory,
     staleTime: 1800000, // 30 minutes cache

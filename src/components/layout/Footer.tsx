@@ -21,7 +21,7 @@ const FOOTER_LINKS = {
     { label: 'DMCA', path: '/dmca' },
   ],
   Socials: [
-    { label: 'Discord', path: 'https://discord.gg/Vr5GZFJszp', isExternal: true },
+    { label: 'Discord', path: '/discord', isExternal: true },
     { label: 'Github', path: 'https://github.com/snozxyx/tatakai', isExternal: true },
   ]
 };

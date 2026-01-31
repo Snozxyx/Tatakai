@@ -16,6 +16,8 @@ const DD_SERVICE = 'tatakai-web';
 class AnalyticsService {
     private static instance: AnalyticsService;
     private initialized = false;
+    private datadogDisabled = false;
+    private errorCount = 0;
 
     private constructor() { }
 
@@ -58,7 +60,7 @@ class AnalyticsService {
 
     private initDatadog() {
         // Only initialize if token is provided
-        if (!DD_CLIENT_TOKEN) {
+        if (!DD_CLIENT_TOKEN || true) { // Force disable for now
             return; // Silently skip if not configured
         }
 
@@ -72,7 +74,13 @@ class AnalyticsService {
                 beforeSend: (log) => {
                     // Filter out 403 errors from Datadog API itself
                     if (log.message?.includes('403') || log.message?.includes('Forbidden')) {
-                        return false; // Don't send to avoid infinite loops
+                        // If we see 403s effectively from Datadog or related to it, disable calls
+                        this.errorCount++;
+                        if (this.errorCount > 3) {
+                            console.warn('[Analytics] Disabling Datadog logging due to auth errors');
+                            this.datadogDisabled = true;
+                        }
+                        return false;
                     }
                     return true;
                 },
@@ -94,7 +102,13 @@ class AnalyticsService {
         }
 
         // Log meaningful page views to Datadog
-        datadogLogs.logger.info(`Page View: ${path}`, { path, title });
+        if (!this.datadogDisabled) {
+            try {
+                datadogLogs.logger.info(`Page View: ${path}`, { path, title });
+            } catch (e) {
+                // Ignore
+            }
+        }
     }
 
     public trackEvent(eventName: string, params?: Record<string, any>) {
@@ -102,11 +116,23 @@ class AnalyticsService {
             window.gtag('event', eventName, params);
         }
 
-        datadogLogs.logger.info(`Event: ${eventName}`, { ...params });
+        if (!this.datadogDisabled) {
+            try {
+                datadogLogs.logger.info(`Event: ${eventName}`, { ...params });
+            } catch (e) {
+                // Ignore
+            }
+        }
     }
 
     public trackError(error: Error, context?: Record<string, any>) {
-        datadogLogs.logger.error(error.message, { error, ...context });
+        if (!this.datadogDisabled) {
+            try {
+                datadogLogs.logger.error(error.message, { error, ...context });
+            } catch (e) {
+                // Ignore
+            }
+        }
 
         if (typeof window.gtag === 'function') {
             window.gtag('event', 'exception', {

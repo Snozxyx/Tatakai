@@ -3,6 +3,7 @@ import { GlassPanel } from "@/components/ui/GlassPanel";
 import { AnimeCard, getProxiedImageUrl } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 import { AnimeCardWithPreview } from "./AnimeCardWithPreview";
+import { useTheme } from "@/hooks/useTheme";
 
 interface AnimeGridProps {
   animes: AnimeCard[];
@@ -13,6 +14,7 @@ interface AnimeGridProps {
 
 export function AnimeGrid({ animes, title, icon, enablePreview = false }: AnimeGridProps) {
   const navigate = useNavigate();
+  const { isUltraLite } = useTheme();
 
   return (
     <section className="mb-24">
@@ -32,7 +34,7 @@ export function AnimeGrid({ animes, title, icon, enablePreview = false }: AnimeG
           ) : (
             <GlassPanel
               key={anime.id}
-              hoverEffect
+              hoverEffect={!isUltraLite}
               className="group cursor-pointer overflow-hidden"
               onClick={() => navigate(`/anime/${anime.id}`)}
             >
@@ -40,10 +42,12 @@ export function AnimeGrid({ animes, title, icon, enablePreview = false }: AnimeG
                 <img
                   src={getProxiedImageUrl(anime.poster)}
                   alt={anime.name}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  loading="lazy"
+                  decoding="async"
+                  className={`w-full h-full object-cover ${!isUltraLite ? 'transition-transform duration-500 group-hover:scale-110' : ''}`}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
-                
+
                 {/* Type Badge */}
                 {anime.type && (
                   <div className="absolute top-3 left-3 px-2 py-1 rounded-md bg-primary/80 text-primary-foreground text-xs font-bold">
