@@ -40,12 +40,25 @@ import { toast } from "sonner";
 
 import { useVideoSettings } from "@/hooks/useVideoSettings";
 import { useIsNativeApp } from "@/hooks/useIsNativeApp";
+import { useDownload } from "@/hooks/useDownload";
 
 import { VideoSettingsPanel } from "./VideoSettingsPanel";
 
 import { useAniskip } from "@/hooks/useAniskip";
 
 import { getProxiedImageUrl, getProxiedVideoUrl, getProxiedSubtitleUrl, trackEvent } from "@/lib/api";
+
+// Helper function to convert local file paths to file:// URLs
+function convertFileSrc(filePath: string): string {
+  if (!filePath) return filePath;
+  // Already a proper URL
+  if (filePath.startsWith('http://') || filePath.startsWith('https://') || filePath.startsWith('file://')) {
+    return filePath;
+  }
+  // Convert Windows path to file:// URL
+  const normalized = filePath.replace(/\\/g, '/');
+  return `file:///${normalized}`;
+}
 
 
 
@@ -263,11 +276,7 @@ export function VideoPlayer({
   const [downloads, setDownloads] = useState<Record<string, any>>({});
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const isNative = useIsNativeApp();
-
-  // Stub for startDownload since download system was removed
-  const startDownload = (id: string, url: string, quality?: string, options?: any) => {
-    toast.info("Download system has been removed");
-  };
+  const { startDownload, downloadStates } = useDownload();
 
   const handleCustomSubtitleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -344,16 +353,34 @@ export function VideoPlayer({
 
 
   useEffect(() => {
-
     if (videoRef.current && !isMuted) {
-
       videoRef.current.volume = settings.volume;
-
       setVolume(settings.volume);
-
     }
-
   }, [settings.volume]);
+
+  // Sync with Discord RPC
+  const lastRpcUpdateRef = useRef(0);
+  useEffect(() => {
+    if (isNative && (window as any).electron && animeName) {
+      const now = Date.now();
+      if (now - lastRpcUpdateRef.current < 5000) return; // Throttle 5s
+      lastRpcUpdateRef.current = now;
+
+      const extra: any = {
+        startTime: isPlaying ? new Date(Date.now() - currentTime * 1000) : undefined,
+        endTime: isPlaying && duration > 0 ? new Date(Date.now() + (duration - currentTime) * 1000) : undefined,
+        smallImageKey: isPlaying ? 'play_icon' : 'pause_icon',
+        smallImageText: isPlaying ? 'Playing' : 'Paused'
+      };
+
+      (window as any).electron.updateRPC({
+        details: `Watching ${animeName}`,
+        state: `Episode ${episodeNumber || '...'}`,
+        extra
+      });
+    }
+  }, [isNative, isPlaying, animeName, episodeNumber, currentTime, duration]);
 
 
 
@@ -488,21 +515,20 @@ export function VideoPlayer({
         try {
           // Check if local asset
           const isLocalSub = sub.url.startsWith('asset://') || sub.url.includes('asset.localhost');
-          
+
           if (isLocalSub) {
-             if (mounted) setSubtitleBlobs(prev => ({ ...prev, [sub.url]: sub.url }));
-             continue;
+            if (mounted) setSubtitleBlobs(prev => ({ ...prev, [sub.url]: sub.url }));
+            continue;
           }
 
-          const proxied = getProxiedSubtitleUrl(sub.url);
-
-          const res = await fetch(proxied, {
+          const res = await fetch(sub.url, {
 
             headers: {
 
-              apikey: apikey || '',
-
               Accept: 'text/vtt, text/plain, */*',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Referer': 'https://megacloud.blog/',
+              'Origin': 'https://megacloud.blog'
 
             }
 
@@ -781,11 +807,11 @@ export function VideoPlayer({
 
 
       // Check if we have a local download for this episode
-      const downloadId = `${animeId}-${episodeNumber}`; 
+      const downloadId = `${animeId}-${episodeNumber}`;
       const download = downloads[downloadId];
 
       let videoUrl = currentSource.url;
-      
+
       // Only check download status if NOT in offline mode
       // If isOffline is true, we trust the source passed to us (which is the local file)
       if (!isOffline && download?.status === 'completed' && download.localUri) {
@@ -803,11 +829,11 @@ export function VideoPlayer({
       // Use our backend proxy if not local and not already proxied
       // CRITICAL FIX: Do not proxy local assets (asset:// or asset.localhost)
       const isLocal = videoUrl.startsWith('asset://') || videoUrl.includes('asset.localhost') || videoUrl.startsWith('http://asset.localhost');
-      
+
       // If offline/local, strictly use the provided URL without proxy
       // Also ensure we handle encoded spaces correctly for local files
-      const proxiedUrl = (isLocal || isOffline) 
-        ? videoUrl 
+      const proxiedUrl = (isLocal || isOffline)
+        ? videoUrl
         : (videoUrl.startsWith('http') ? getProxiedVideoUrl(videoUrl, referer, userAgent) : videoUrl);
 
       console.log('Loading video:', { original: videoUrl, final: proxiedUrl, isLocal, isOffline });
@@ -1313,50 +1339,50 @@ export function VideoPlayer({
     };
 
     const handleEnded = () => {
-        // Final save marking completed
-        const dur = Math.floor(videoRef.current?.duration || 0) || undefined;
-        const finalPos = Math.floor(videoRef.current?.currentTime || 0);
-        if (onProgressUpdate) {
-          onProgressUpdate(dur ?? finalPos, dur, true);
-        }
+      // Final save marking completed
+      const dur = Math.floor(videoRef.current?.duration || 0) || undefined;
+      const finalPos = Math.floor(videoRef.current?.currentTime || 0);
+      if (onProgressUpdate) {
+        onProgressUpdate(dur ?? finalPos, dur, true);
+      }
 
-        if (settings.autoNextEpisode && onEpisodeEnd) {
-          onEpisodeEnd();
-        }
-      };
-      
-      const handleError = (e: any) => {
-        console.error('Video Error:', e);
-        const err = videoRef.current?.error;
-        if (err) {
-             console.error('Video Error Code:', err.code, err.message);
-             setVideoError(`Playback Error (${err.code}): ${err.message || 'Unknown error'}`);
-        } else {
-            setVideoError('Playback failed');
-        }
-      };
+      if (settings.autoNextEpisode && onEpisodeEnd) {
+        onEpisodeEnd();
+      }
+    };
 
-      video.addEventListener("timeupdate", handleTimeUpdate);
-      video.addEventListener("durationchange", handleDurationChange);
-      video.addEventListener("play", handlePlay);
-      video.addEventListener("pause", handlePause);
-      video.addEventListener("waiting", handleWaiting);
-      video.addEventListener("playing", handlePlaying);
-      video.addEventListener("progress", handleProgress);
-      video.addEventListener("ended", handleEnded);
-      video.addEventListener("error", handleError);
+    const handleError = (e: any) => {
+      console.error('Video Error:', e);
+      const err = videoRef.current?.error;
+      if (err) {
+        console.error('Video Error Code:', err.code, err.message);
+        setVideoError(`Playback Error (${err.code}): ${err.message || 'Unknown error'}`);
+      } else {
+        setVideoError('Playback failed');
+      }
+    };
 
-      return () => {
-        video.removeEventListener("timeupdate", handleTimeUpdate);
-        video.removeEventListener("durationchange", handleDurationChange);
-        video.removeEventListener("play", handlePlay);
-        video.removeEventListener("pause", handlePause);
-        video.removeEventListener("waiting", handleWaiting);
-        video.removeEventListener("playing", handlePlaying);
-        video.removeEventListener("progress", handleProgress);
-        video.removeEventListener("ended", handleEnded);
-        video.removeEventListener("error", handleError);
-      };
+    video.addEventListener("timeupdate", handleTimeUpdate);
+    video.addEventListener("durationchange", handleDurationChange);
+    video.addEventListener("play", handlePlay);
+    video.addEventListener("pause", handlePause);
+    video.addEventListener("waiting", handleWaiting);
+    video.addEventListener("playing", handlePlaying);
+    video.addEventListener("progress", handleProgress);
+    video.addEventListener("ended", handleEnded);
+    video.addEventListener("error", handleError);
+
+    return () => {
+      video.removeEventListener("timeupdate", handleTimeUpdate);
+      video.removeEventListener("durationchange", handleDurationChange);
+      video.removeEventListener("play", handlePlay);
+      video.removeEventListener("pause", handlePause);
+      video.removeEventListener("waiting", handleWaiting);
+      video.removeEventListener("playing", handlePlaying);
+      video.removeEventListener("progress", handleProgress);
+      video.removeEventListener("ended", handleEnded);
+      video.removeEventListener("error", handleError);
+    };
 
   }, [settings.autoNextEpisode, onEpisodeEnd]);
 
@@ -1840,8 +1866,8 @@ export function VideoPlayer({
             <p className="text-base md:text-lg text-white font-semibold">{videoError}</p>
             {isOffline && (
               <div className="text-xs text-white/50 bg-black/50 p-2 rounded mt-2 font-mono break-all max-w-[300px]">
-                 Debug: {videoRef.current?.currentSrc || 'No Source'} <br/>
-                 Error: {videoRef.current?.error?.message || videoRef.current?.error?.code || 'Unknown'}
+                Debug: {videoRef.current?.currentSrc || 'No Source'} <br />
+                Error: {videoRef.current?.error?.message || videoRef.current?.error?.code || 'Unknown'}
               </div>
             )}
 
@@ -2199,7 +2225,7 @@ export function VideoPlayer({
 
                 {showSubtitleMenu && (
 
-                  <div className="absolute bottom-full right-0 mb-2 bg-background/95 backdrop-blur-sm border border-border rounded-xl p-2 min-w-[120px] md:min-w-[150px] pointer-events-auto">
+                  <div className="absolute bottom-full right-0 mb-2 bg-background/95 backdrop-blur-sm border border-border rounded-xl p-2 min-w-[120px] md:min-w-[150px] max-h-[400px] overflow-y-auto pointer-events-auto">
 
                     <div className="text-xs text-muted-foreground px-2 py-1 mb-1">
 
@@ -2355,131 +2381,36 @@ export function VideoPlayer({
 
 
 
-            {/* Download Button (Native only) */}
-
-            {isNative && serverName === 'Luffy' && (
-
+            {/* Download Button (Native only, not in offline mode) */}
+            {isNative && !isOffline && serverName?.includes('Luffy') && (
               <div className="relative group/download">
-
                 <button
-
-                  onClick={() => setShowDownloadMenu(!showDownloadMenu)}
-
-                  disabled={downloads[`${animeId}-${episodeNumber}`]?.status === 'downloading'}
-
+                  onClick={async () => {
+                    await startDownload({
+                      episodeId: animeId + '?ep=' + episodeNumber, // Simplified, verify ID format
+                      animeName: animeName,
+                      episodeNumber: episodeNumber || 1,
+                      posterUrl: poster || '',
+                    });
+                  }}
+                  disabled={downloadStates[animeId + '?ep=' + episodeNumber]?.status === 'downloading'}
                   className="p-2 rounded-lg hover:bg-white/10 transition-colors relative"
-
-                  title="Download Options"
-
+                  title="Download Episode"
                 >
-
-                  {downloads[`${animeId}-${episodeNumber}`]?.status === 'completed' ? (
-
+                  {downloadStates[animeId + '?ep=' + episodeNumber]?.status === 'completed' ? (
                     <CheckCircle2 className="w-4 h-4 md:w-5 md:h-5 text-green-500" />
-
-                  ) : downloads[`${animeId}-${episodeNumber}`]?.status === 'downloading' ? (
-
-                    <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin text-primary" />
-
-                  ) : (
-
-                    <Download className="w-4 h-4 md:w-5 md:h-5" />
-
-                  )}
-
-
-
-                  {/* Progress Mini-overlay */}
-
-                  {downloads[`${animeId}-${episodeNumber}`]?.status === 'downloading' && (
-
-                    <span className="absolute -top-1 -right-1 bg-primary text-[8px] px-1 rounded-full text-white">
-
-                      DL
-
-                    </span>
-
-                  )}
-
-                </button>
-
-
-
-                {showDownloadMenu && (
-
-                  <div
-
-                    className="absolute bottom-full right-0 mb-2 bg-background/95 backdrop-blur-sm border border-border rounded-xl p-2 min-w-[160px] md:min-w-[200px] z-50 shadow-2xl"
-
-                    onMouseLeave={() => setShowDownloadMenu(false)}
-
-                  >
-
-                    <div className="text-[10px] uppercase font-bold text-muted-foreground px-2 py-1 mb-1 border-b border-white/5">
-
-                      Select Server to Download
-
+                  ) : downloadStates[animeId + '?ep=' + episodeNumber]?.status === 'downloading' ? (
+                    <div className="relative flex items-center justify-center">
+                      <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin text-primary" />
+                      <span className="absolute text-[6px] font-bold">
+                        {Math.round(downloadStates[animeId + '?ep=' + episodeNumber]?.progress || 0)}
+                      </span>
                     </div>
-
-                    {sources.map((source, idx) => (
-
-                      <button
-
-                        key={idx}
-
-                        onClick={() => {
-                          const downloadId = `${animeId}-${episodeNumber}`;
-                          const download = downloads[downloadId];
-
-                          if (!download || download.status === 'failed') {
-                            startDownload(
-                              downloadId,
-                              source.url,
-                              undefined,
-                              {
-                                isM3U8: source.isM3U8,
-                                animeTitle: animeName,
-                                episodeTitle: episodeTitle,
-                                animePoster: poster || animePoster,
-                                headers: headers as any
-                              }
-                            );
-                            setShowDownloadMenu(false);
-                          }
-                        }}
-
-                        className="w-full flex items-center justify-between px-3 py-2 text-left text-xs md:text-sm rounded-lg hover:bg-white/5 transition-colors text-foreground group/item"
-
-                      >
-
-                        <div className="flex flex-col">
-
-                          <span className="font-medium group-hover/item:text-primary transition-colors">
-
-                            {source.quality || 'Original Quality'}
-
-                          </span>
-
-                          <span className="text-[10px] text-muted-foreground">
-
-                            {source.isM3U8 ? 'HLS (Better compatibility)' : 'MP4 (Direct Download)'}
-
-                          </span>
-
-                        </div>
-
-                        <DownloadCloud className="w-4 h-4 text-muted-foreground group-hover/item:text-primary transition-colors" />
-
-                      </button>
-
-                    ))}
-
-                  </div>
-
-                )}
-
+                  ) : (
+                    <Download className="w-4 h-4 md:w-5 md:h-5" />
+                  )}
+                </button>
               </div>
-
             )}
 
 

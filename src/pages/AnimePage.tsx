@@ -20,6 +20,7 @@ import { getProxiedImageUrl, searchAnime } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { Loader2, Search, ArrowLeft, Play, Star, Calendar, Clock, Film, Tv, Layers, Users, Download, CloudDownload } from "lucide-react";
+import { SeasonDownloadModal } from "@/components/anime/SeasonDownloadModal";
 import { Helmet } from "react-helmet-async";
 import {
   ContextMenu,
@@ -42,6 +43,7 @@ export default function AnimePage() {
   const [isResolving, setIsResolving] = useState(false);
   const isNative = useIsNativeApp();
   const [resolutionStatus, setResolutionStatus] = useState<string>("");
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
   // handleDownloadEpisode removed as per user request to only keep season download here
 
@@ -351,6 +353,15 @@ export default function AnimePage() {
                     <Users className="w-5 h-5 text-white" />
                   </button>
 
+                  {isNative && (
+                    <button
+                      onClick={() => setIsDownloadModalOpen(true)}
+                      className="h-14 w-14 rounded-full bg-primary/20 hover:bg-primary/30 text-primary flex items-center justify-center transition-all hover:scale-105"
+                      title="Download Season"
+                    >
+                      <Download className="w-6 h-6" />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -478,6 +489,16 @@ export default function AnimePage() {
         </main>
 
         {!isNative && <MobileNav />}
+
+        {isNative && episodesData && (
+          <SeasonDownloadModal
+            isOpen={isDownloadModalOpen}
+            onClose={() => setIsDownloadModalOpen(false)}
+            episodes={episodesData.episodes}
+            animeName={info.name}
+            posterUrl={info.poster}
+          />
+        )}
       </div>
     </>
   );

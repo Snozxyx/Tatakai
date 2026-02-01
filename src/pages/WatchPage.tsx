@@ -56,9 +56,15 @@ export default function WatchPage() {
   const { settings } = useVideoSettings();
   const isNative = useIsNativeApp();
 
-  const offlineData = useMemo(() => {
-    return (location.state as any)?.offlineMode ? (location.state as any) : null;
-  }, [location.state]);
+  const isOfflineMode = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('offline') === 'true';
+  }, [location.search]);
+
+  const offlinePath = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('path') || '';
+  }, [location.search]);
 
   const initialSeekSeconds = useMemo(() => {
     try {
@@ -114,6 +120,9 @@ export default function WatchPage() {
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isMarketplaceModalOpen, setIsMarketplaceModalOpen] = useState(false);
   const [isMarketplaceListVisible, setIsMarketplaceListVisible] = useState(false);
+  const [offlineSources, setOfflineSources] = useState<any[]>([]);
+  const [offlineManifest, setOfflineManifest] = useState<any>(null);
+  const [offlineSubtitles, setOfflineSubtitles] = useState<Array<{ lang: string; url: string; label?: string }>>([]);
 
   const { data: serversData, isLoading: loadingServers } =
     useEpisodeServers(decodedEpisodeId);
@@ -123,6 +132,47 @@ export default function WatchPage() {
   // View tracking
   const { data: viewCount } = useAnimeViewCount(animeId);
   useViewTracker(animeId, decodedEpisodeId);
+
+  useEffect(() => {
+    if (isOfflineMode && offlinePath) {
+      const loadOfflineContent = async () => {
+        try {
+          // In Offline mode, we need to read the manifest.json from the path
+          // Since we are in the frontend, we use Electron IPC
+          const response = await fetch(`file://${offlinePath}/manifest.json`);
+          const manifest = await response.json();
+          setOfflineManifest(manifest);
+
+          const ep = manifest.episodes.find((e: any) => e.id === decodedEpisodeId);
+          if (ep) {
+            setOfflineSources([{
+              url: `file://${offlinePath}/${ep.file}`,
+              isM3U8: false,
+              quality: 'Downloaded'
+            }]);
+            
+            // Load subtitles if available in manifest
+            if (ep.subtitles && Array.isArray(ep.subtitles)) {
+              const subs = ep.subtitles.map((sub: any) => ({
+                lang: sub.lang,
+                label: sub.label || sub.lang,
+                url: `file://${offlinePath}/${sub.file}`
+              }));
+              setOfflineSubtitles(subs);
+              console.log('Loaded offline subtitles:', subs);
+            } else {
+              // Try to find subtitle files by pattern (Episode_X_*.vtt)
+              // This is a fallback for older downloads without manifest subtitles
+              setOfflineSubtitles([]);
+            }
+          }
+        } catch (err) {
+          console.error('Failed to load offline manifest:', err);
+        }
+      };
+      loadOfflineContent();
+    }
+  }, [isOfflineMode, offlinePath, decodedEpisodeId]);
 
   // Watch time analytics tracking
   const watchMetadata = useMemo(() => ({
@@ -210,20 +260,26 @@ export default function WatchPage() {
 
   // Find current episode BEFORE using it in hooks
   const currentEpisodeIndex = useMemo(() => {
-    return episodesData?.episodes.findIndex(
-      (ep) => ep.episodeId === decodedEpisodeId
+    const list = isOfflineMode ? offlineManifest?.episodes : episodesData?.episodes;
+    return list?.findIndex(
+      (ep: any) => (ep.episodeId || ep.id) === decodedEpisodeId
     ) ?? -1;
-  }, [episodesData, decodedEpisodeId]);
+  }, [isOfflineMode, offlineManifest, episodesData, decodedEpisodeId]);
 
-  const currentEpisode = episodesData?.episodes[currentEpisodeIndex];
-  const prevEpisode =
-    currentEpisodeIndex > 0
-      ? episodesData?.episodes[currentEpisodeIndex - 1]
-      : null;
-  const nextEpisode =
-    currentEpisodeIndex < (episodesData?.episodes.length ?? 0) - 1
-      ? episodesData?.episodes[currentEpisodeIndex + 1]
-      : null;
+  const currentEpisode = useMemo(() => {
+    const list = isOfflineMode ? offlineManifest?.episodes : episodesData?.episodes;
+    return list?.[currentEpisodeIndex];
+  }, [isOfflineMode, offlineManifest, episodesData, currentEpisodeIndex]);
+
+  const prevEpisode = useMemo(() => {
+    const list = isOfflineMode ? offlineManifest?.episodes : episodesData?.episodes;
+    return currentEpisodeIndex > 0 ? list?.[currentEpisodeIndex - 1] : null;
+  }, [isOfflineMode, offlineManifest, episodesData, currentEpisodeIndex]);
+
+  const nextEpisode = useMemo(() => {
+    const list = isOfflineMode ? offlineManifest?.episodes : episodesData?.episodes;
+    return currentEpisodeIndex < (list?.length ?? 0) - 1 ? list?.[currentEpisodeIndex + 1] : null;
+  }, [isOfflineMode, offlineManifest, episodesData, currentEpisodeIndex]);
 
   const discordDetails = animeData?.anime?.info?.name ?? null;
 
@@ -243,6 +299,7 @@ export default function WatchPage() {
 
   // Get next episode estimates for current source
   const getNextEpisodeEstimate = (source: any): string | null => {
+    if (isOfflineMode) return null;
     if (!sourcesData?.nextEpisodeEstimates || !source) return null;
 
     // Find estimate matching this source's language/server
@@ -449,16 +506,29 @@ export default function WatchPage() {
     return () => clearTimeout(timeout);
   }, [user, animeData, currentEpisode, animeId, decodedEpisodeId, updateWatchHistory, sourcesData]);
 
-  // Discord RPC Update
+  // Update Discord RPC
   useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).electron && animeData?.anime?.info?.name) {
-      const episodeNum = serversData?.episodeNo || currentEpisode?.number || "";
+    if (isNative && (window as any).electron && animeData) {
+      const details = `Watching ${animeData.anime.info.name}`;
+      const state = `Episode ${currentEpisode?.number || '...'}`;
+
+      const extra: any = {
+        startTime: new Date(),
+        smallImageKey: 'play_icon',
+        smallImageText: 'Playing'
+      };
+
+      // If we have duration, we can show end time
+      // But we don't have it easily here without the player ref
+      // We'll update it from the Player component instead for better accuracy
+
       (window as any).electron.updateRPC({
-        details: `Watching ${animeData.anime.info.name}`,
-        state: episodeNum ? `Episode ${episodeNum}` : 'Browsing episodes'
+        details,
+        state,
+        extra
       });
     }
-  }, [animeData, currentEpisode, serversData]);
+  }, [isNative, animeData, currentEpisode]);
 
   // Auto-switch to next working server on error
   const errorThrottleRef = useRef(0);
@@ -544,7 +614,11 @@ export default function WatchPage() {
 
   const handleEpisodeChange = (epId: string) => {
     setFailedServers(new Set());
-    navigate(`/watch/${encodeURIComponent(epId)}`);
+    if (isOfflineMode) {
+      navigate(`/watch/${encodeURIComponent(epId)}?offline=true&path=${encodeURIComponent(offlinePath)}`);
+    } else {
+      navigate(`/watch/${encodeURIComponent(epId)}`);
+    }
   };
 
   // Reset failed servers when category changes - also reset to find hd-1 again
@@ -568,7 +642,7 @@ export default function WatchPage() {
         {/* Header */}
         <div className="flex items-center justify-between gap-2 mb-4 md:mb-6">
           <button
-            onClick={() => offlineData ? navigate('/downloads') : navigate(`/anime/${animeId}`)}
+            onClick={() => isOfflineMode ? navigate('/offline') : navigate(`/anime/${animeId}`)}
             className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors group"
           >
             <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
@@ -578,7 +652,7 @@ export default function WatchPage() {
           {animeData && (
             <div className="flex-1 min-w-0 text-right flex flex-col items-end gap-2">
               <span className="font-medium text-foreground text-sm md:text-base truncate block">
-                {animeData?.anime.info.name || offlineData?.animeTitle}
+                {animeData?.anime.info.name || offlineManifest?.animeName}
               </span>
               <div className="flex items-center gap-4">
                 {viewCount !== undefined && viewCount > 0 && (
@@ -610,30 +684,31 @@ export default function WatchPage() {
               ) : (
                 <VideoPlayer
                   sources={
-                    offlineData?.localUri
-                      ? [{ url: offlineData.localUri, isM3U8: !!offlineData.isM3U8, quality: 'Downloaded' }]
+                    isOfflineMode
+                      ? offlineSources
                       : (selectedSource && !selectedSource.isEmbed
                         ? [selectedSource]
                         : (sourcesData?.sources || []))
                   }
-                  subtitles={normalizedSubtitles}
+                  subtitles={isOfflineMode ? offlineSubtitles : normalizedSubtitles}
                   headers={sourcesData?.headers}
-                  poster={animeData?.anime.info.poster || offlineData?.poster}
+                  poster={animeData?.anime.info.poster || (isOfflineMode ? `file://${offlinePath}/poster.jpg` : undefined)}
                   onError={handleVideoError}
                   onServerSwitch={handleServerSwitch}
-                  isLoading={!offlineData && loadingSources}
-                  serverName={selectedSource?.providerName || (currentServer ? getFriendlyServerName(currentServer.serverName) : (offlineData ? 'Offline' : undefined))}
+                  isLoading={!isOfflineMode && loadingSources}
+                  serverName={selectedSource?.providerName || (currentServer ? getFriendlyServerName(currentServer.serverName) : (isOfflineMode ? 'Offline' : undefined))}
                   malId={sourcesData?.malID || animeData?.anime?.moreInfo?.malId}
-                  episodeNumber={serversData?.episodeNo || currentEpisode?.number || offlineData?.episodeNumber}
+                  episodeNumber={serversData?.episodeNo || currentEpisode?.number || (isOfflineMode ? offlineManifest?.episodes.find((e: any) => e.id === decodedEpisodeId)?.number : undefined)}
                   initialSeekSeconds={initialSeekSeconds}
                   viewCount={viewCount}
                   onProgressUpdate={handleProgressUpdate}
-                  animeId={animeId || offlineData?.animeId}
-                  animeName={animeData?.anime.info.name || offlineData?.animeTitle}
-                  animePoster={animeData?.anime.info.poster || offlineData?.poster}
-                  episodeTitle={currentEpisode?.title || offlineData?.episodeTitle}
-                  episodeId={decodedEpisodeId || offlineData?.episodeId}
+                  animeId={animeId}
+                  animeName={animeData?.anime.info.name || (isOfflineMode ? offlineManifest?.animeName : '')}
+                  animePoster={animeData?.anime.info.poster || (isOfflineMode ? `file://${offlinePath}/poster.jpg` : undefined)}
+                  episodeTitle={currentEpisode?.title || (isOfflineMode ? offlineManifest?.episodes.find((e: any) => e.id === decodedEpisodeId)?.title : undefined)}
+                  episodeId={decodedEpisodeId}
                   onEpisodeEnd={handleEpisodeEnd}
+                  isOffline={isOfflineMode}
                 />
               )}
             </div>
@@ -642,7 +717,7 @@ export default function WatchPage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
                 <h1 className="font-display text-lg md:text-2xl font-bold">
-                  Episode {serversData?.episodeNo || currentEpisode?.number || "?"}
+                  Episode {serversData?.episodeNo || currentEpisode?.number || (isOfflineMode ? offlineManifest?.episodes.find((e: any) => e.id === decodedEpisodeId)?.number : "?")}
                 </h1>
                 {currentEpisode?.title && (
                   <p className="text-muted-foreground text-sm mt-1 line-clamp-1">
@@ -689,7 +764,8 @@ export default function WatchPage() {
               </div>
             </div>
 
-            {/* Server & Category Selection */}
+            {/* Server & Category Selection - Hide in offline mode */}
+            {!isOfflineMode && (
             <GlassPanel className="p-4 md:p-5">
               <div className="flex flex-col gap-4 md:gap-6">
                 {/* Category Toggle */}
@@ -905,6 +981,7 @@ export default function WatchPage() {
                 </div>
               </div>
             </GlassPanel>
+            )}
           </div>
 
           {/* Sidebar - Episode List */}
@@ -977,12 +1054,18 @@ export default function WatchPage() {
               )}
 
               <div id="episode-list-container" className="flex-1 overflow-y-auto space-y-1.5 md:space-y-2 pr-2 scrollbar-thin">
-                {episodesData?.episodes.map((ep) => (
+                {(isOfflineMode ? offlineManifest?.episodes : episodesData?.episodes)?.map((ep: any) => (
                   <button
-                    key={ep.episodeId}
-                    id={`ep-${ep.episodeId}`}
-                    onClick={() => handleEpisodeChange(ep.episodeId)}
-                    className={`w-full text-left p-2.5 md:p-3 rounded-xl transition-all text-sm ${ep.episodeId === decodedEpisodeId
+                    key={ep.episodeId || ep.id}
+                    id={`ep-${ep.episodeId || ep.id}`}
+                    onClick={() => {
+                      if (isOfflineMode) {
+                        navigate(`/watch/${encodeURIComponent(ep.id)}?offline=true&path=${encodeURIComponent(offlinePath)}`);
+                      } else {
+                        handleEpisodeChange(ep.episodeId);
+                      }
+                    }}
+                    className={`w-full text-left p-2.5 md:p-3 rounded-xl transition-all text-sm ${(ep.episodeId || ep.id) === decodedEpisodeId
                       ? "bg-primary text-primary-foreground"
                       : ep.isFiller
                         ? "bg-orange/10 border border-orange/30 hover:bg-orange/20"
@@ -996,13 +1079,13 @@ export default function WatchPage() {
                           Filler
                         </span>
                       )}
-                      {ep.episodeId === decodedEpisodeId && (
+                      {(ep.episodeId || ep.id) === decodedEpisodeId && (
                         <span className="text-xs">▶</span>
                       )}
                     </div>
-                    {ep.title && (
+                    {(ep.title || ep.name) && (
                       <p className="text-xs mt-1 opacity-80 line-clamp-1">
-                        {ep.title}
+                        {ep.title || ep.name}
                       </p>
                     )}
                   </button>
@@ -1021,8 +1104,8 @@ export default function WatchPage() {
           <ReviewPopup
             isOpen={showReviewPopup}
             onClose={() => setShowReviewPopup(false)}
-            animeId={animeId || offlineData?.animeId}
-            animeName={animeData?.anime.info.name || offlineData?.animeTitle}
+            animeId={animeId}
+            animeName={animeData?.anime.info.name || (isOfflineMode ? offlineManifest?.animeName : '')}
             userId={user?.id}
           />
         )
@@ -1032,15 +1115,15 @@ export default function WatchPage() {
         isOpen={isReportModalOpen}
         onClose={() => setIsReportModalOpen(false)}
         targetType="server"
-        targetId={decodedEpisodeId || offlineData?.episodeId || animeId || "unknown"}
-        targetName={`${animeData?.anime.info.name || offlineData?.animeTitle}${serversData?.episodeNo ? ` - Ep ${serversData.episodeNo}` : ''}`}
+        targetId={decodedEpisodeId || animeId || "unknown"}
+        targetName={`${animeData?.anime.info.name || (isOfflineMode ? offlineManifest?.animeName : '')}${serversData?.episodeNo ? ` - Ep ${serversData.episodeNo}` : ''}`}
       />
 
       <MarketplaceSubmitModal
         isOpen={isMarketplaceModalOpen}
         onClose={() => setIsMarketplaceModalOpen(false)}
         animeId={animeId || ""}
-        animeName={animeData?.anime.info.name || offlineData?.animeTitle || ""}
+        animeName={animeData?.anime.info.name || (isOfflineMode ? offlineManifest?.animeName : '') || ""}
         episodeNumber={serversData?.episodeNo || currentEpisode?.number}
       />
 
@@ -1048,7 +1131,7 @@ export default function WatchPage() {
         isOpen={isMarketplaceListVisible}
         onClose={() => setIsMarketplaceListVisible(false)}
         sources={marketplaceSources}
-        animeName={animeData?.anime.info.name || offlineData?.animeTitle || ""}
+        animeName={animeData?.anime.info.name || (isOfflineMode ? offlineManifest?.animeName : '') || ""}
         episodeNumber={serversData?.episodeNo || currentEpisode?.number || 1}
         onSelectSource={(source) => {
           setSelectedServerIndex(-4);

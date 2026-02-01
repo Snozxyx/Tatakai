@@ -21,10 +21,15 @@ import { OfflineGate } from '@/components/layout/OfflineGate';
 import { V4AnnouncementPopup } from '@/components/layout/V4AnnouncementPopup';
 import { MobileNav } from '@/components/layout/MobileNav';
 import { Background } from '@/components/layout/Background';
+import { TitleBar } from "@/components/layout/TitleBar";
+import { DownloadIndicator } from "@/components/layout/DownloadIndicator";
+import { LogViewer } from "@/components/debug/LogViewer";
+import { DownloadProvider } from "@/contexts/DownloadContext";
+import { AppDownloadPopup } from '@/components/layout/AppDownloadPopup';
 import Index from "./pages/Index";
 import AnimePage from "./pages/AnimePage";
 import WatchPage from "./pages/WatchPage";
-import SearchPage from "./pages/SearchPage";
+import OfflineLibraryPage from "./pages/OfflineLibraryPage";
 import GenrePage from "./pages/GenrePage";
 import TrendingPage from "./pages/TrendingPage";
 import FavoritesPage from "./pages/FavoritesPage";
@@ -32,7 +37,6 @@ import AuthPage from "./pages/AuthPage";
 import ProfilePage from "./pages/ProfilePage";
 import MalRedirectPage from "./pages/MalRedirectPage";
 import AniListRedirectPage from "./pages/AniListRedirectPage";
-
 import SettingsPage from "./pages/SettingsPage";
 import StatusPage from "./pages/StatusPage";
 import NotFound from "./pages/NotFound";
@@ -62,6 +66,8 @@ import RecommendationsPage from "./pages/RecommendationsPage";
 import OnboardingPage from "./pages/OnboardingPage";
 import LanguagesPage from "./pages/LanguagesPage";
 import LanguageAnimePage from "./pages/LanguageAnimePage";
+import SearchPage from "./pages/SearchPage";
+import SetupPage from "./pages/SetupPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -126,15 +132,22 @@ function GlobalListeners() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isLoading } = useAuth();
+  const isSetupComplete = localStorage.getItem('tatakai_setup_complete') === 'true';
+  const isNative = useIsNativeApp();
+
+  useEffect(() => {
+    if (isNative && !isSetupComplete && location.pathname !== '/setup') {
+      navigate('/setup');
+    }
+  }, [isNative, isSetupComplete, navigate, location.pathname]);
+
+  useEffect(() => {
+    // Scroll to top on route change
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
 
   useEffect(() => {
     if (isLoading) return;
-
-    // Check for native app using multiple indicators
-    const isNative = !!(window as any).__TAURI_INTERNALS__ ||
-      !!(window as any).__TAURI__ ||
-      location.search.includes('tauri') ||
-      (window as any).navigator?.userAgent?.includes('Tauri');
 
     const onboardingComplete = localStorage.getItem('tatakai_onboarding_complete') === 'true';
     const themeSelected = localStorage.getItem('tatakai_theme_selected_v2') === 'true';
@@ -148,7 +161,22 @@ function GlobalListeners() {
       console.log("[Tatakai] Redirecting to onboarding...");
       navigate('/onboarding', { replace: true });
     }
-  }, [navigate, location.pathname, user, isLoading]);
+  }, [navigate, location.pathname, user, isLoading, isNative]);
+
+  return null;
+}
+
+function DeepLinkHandler() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).electron) {
+      (window as any).electron.onNavigate((path: string) => {
+        console.log('[DeepLink] Navigating to:', path);
+        navigate(path);
+      });
+    }
+  }, [navigate]);
 
   return null;
 }
@@ -170,7 +198,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isBannedAllowedPath = bannedAllowedPaths.some(path => location.pathname.startsWith(path));
 
   // Allow access to certain pages regardless of status
-  const publicPaths = ['/banned', '/maintenance', '/auth', '/error'];
+  const publicPaths = ['/banned', '/maintenance', '/auth', '/error', '/setup'];
   const isPublicPath = publicPaths.some(path => location.pathname.startsWith(path));
 
   if (isLoading) {
@@ -236,19 +264,24 @@ function AppContent() {
           v7_relativeSplatPath: true,
         }}
       >
+        <DownloadProvider>
         <OfflineGate>
           <div
             className={cn(
               "min-h-screen relative flex flex-col transition-all duration-300",
-              isNative && "pl-20"
+              isNative && "pl-20 pt-8" // pt-8 = 32px for titlebar height
             )}
-            style={isNative ? { '--titlebar-height': '2rem' } as React.CSSProperties : {}}
           >
             {isNative && <Background />}
+            {isNative && <TitleBar />}
             {isNative && <Sidebar />}
             <V4AnnouncementPopup />
             <GlobalListeners />
             <PopupDisplay />
+            <AppDownloadPopup />
+            <DownloadIndicator />
+            <LogViewer />
+            <DeepLinkHandler />
 
             <main className="flex-1 w-full relative z-10">
               <Routes>
@@ -276,11 +309,14 @@ function AppContent() {
                 <Route path="/char/:charname" element={<CharacterPage />} />
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
+                <Route path="/setup" element={<SetupPage />} />
 
                 {/* Protected routes */}
                 <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                 <Route path="/anime/:animeId" element={<ProtectedRoute><AnimePage /></ProtectedRoute>} />
                 <Route path="/watch/:episodeId" element={<ProtectedRoute><WatchPage /></ProtectedRoute>} />
+                <Route path="/offline-library" element={<ProtectedRoute><OfflineLibraryPage /></ProtectedRoute>} />
+                <Route path="/offline" element={<ProtectedRoute><OfflineLibraryPage /></ProtectedRoute>} />
                 <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
                 <Route path="/languages" element={<ProtectedRoute><LanguagesPage /></ProtectedRoute>} />
                 <Route path="/languages/:language" element={<ProtectedRoute><LanguageAnimePage /></ProtectedRoute>} />
@@ -322,6 +358,7 @@ function AppContent() {
             <ConditionalFooter />
           </div>
         </OfflineGate>
+        </DownloadProvider>
       </BrowserRouter>
     </>
   );

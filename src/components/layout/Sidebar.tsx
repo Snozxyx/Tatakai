@@ -68,8 +68,8 @@ export function Sidebar() {
         {isNative && (
           <NavIcon
             icon={Download}
-            active={isActive("/downloads")}
-            onClick={() => navigate("/downloads")}
+            active={isActive("/offline")}
+            onClick={() => navigate("/offline")}
             label="Downloads"
           />
         )}

@@ -23,6 +23,7 @@ import { AIRecommendationBanner } from "@/components/anime/AIRecommendationBanne
 import { TierlistSection } from "@/components/home/TierlistSection";
 import { ReviewPopup } from "@/components/ui/ReviewPopup";
 import { LanguagesSection } from "@/components/anime/LanguagesSection";
+import { AppDownloadSection } from "@/components/layout/AppDownloadSection";
 import { Heart, Sparkles } from "lucide-react";
 
 import { useEffect } from "react";
@@ -141,6 +142,12 @@ const Index = () => {
 
             {/* Infinite Scrolling Genre Sections */}
             <InfiniteHomeSections />
+
+            {!isNative && (
+              <div className="mt-24">
+                <AppDownloadSection />
+              </div>
+            )}
 
             <ReviewPopup />
           </>

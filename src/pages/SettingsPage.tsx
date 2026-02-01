@@ -25,7 +25,7 @@ import { getAniListAuthUrl, disconnectAniList, fetchAniListUserList, updateAniLi
 import { toast } from 'sonner';
 import { cn } from "@/lib/utils";
 import {
-  ArrowLeft, Palette, Film, Monitor, Info, Link2, Eye, EyeOff, Globe, CheckCircle, ExternalLink, Shield, History, Trash2, Search, Bell, MessageCircle
+  ArrowLeft, Palette, Film, Monitor, Info, Link2, Eye, EyeOff, Globe, CheckCircle, ExternalLink, Shield, History, Trash2, Search, Bell, MessageCircle, Laptop
 } from 'lucide-react';
 
 // Fallback changelog entries if database is empty
@@ -83,8 +83,12 @@ const FALLBACK_CHANGELOG = [
   },
 ];
 
+import { DesktopSettings } from '@/components/settings/DesktopSettings';
+import { useIsNativeApp } from '@/hooks/useIsNativeApp';
+
 export default function SettingsPage() {
   const [searchParams] = useSearchParams();
+  const isNative = useIsNativeApp();
   const requestedTab = searchParams.get('tab');
 
   const { user, profile, refreshProfile } = useAuth();
@@ -647,6 +651,12 @@ export default function SettingsPage() {
               <Palette className="w-4 h-4" />
               Appearance
             </TabsTrigger>
+            {isNative && (
+              <TabsTrigger value="desktop" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Laptop className="w-4 h-4" />
+                Desktop App
+              </TabsTrigger>
+            )}
             <TabsTrigger value="player" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Film className="w-4 h-4" />
               Video Player
@@ -676,6 +686,11 @@ export default function SettingsPage() {
           {/* Appearance Tab */}
           <TabsContent value="appearance">
             <ThemeSelector />
+          </TabsContent>
+
+          {/* Desktop Tab */}
+          <TabsContent value="desktop">
+            <DesktopSettings />
           </TabsContent>
 
           {/* Video Player Tab */}
