@@ -67,6 +67,23 @@ jobs:
         if: ${{ !startsWith(github.ref, 'refs/tags/') && !(github.event_name == 'workflow_dispatch' && inputs.publish) }}
         run: npx electron-builder --publish never
 
+      - name: Debug — list `dist_electron` contents
+        shell: bash
+        run: |
+          echo "=== dist_electron contents ==="
+          ls -la dist_electron || echo "dist_electron directory not found"
+
+      - name: Validate desktop artifacts exist
+        shell: bash
+        run: |
+          set -e
+          matches=$(ls dist_electron/*.{exe,dmg,zip,AppImage,deb,yml,blockmap} 2>/dev/null || true)
+          if [ -z "$matches" ]; then
+            echo "No desktop artifacts were produced. Failing to surface the problem."
+            ls -la dist_electron || true
+            exit 1
+          fi
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -128,6 +145,24 @@ jobs:
           for f in "$APK_DIR"/*.apk; do
             mv "$f" "$APK_DIR/Tatakai-${VERSION}-android.apk"
           done
+
+      - name: Debug — list APK output folder
+        shell: bash
+        run: |
+          echo "=== android APK output ==="
+          ls -la android/app/build/outputs/apk/release || echo "APK output folder not present"
+
+      - name: Validate APK artifact exists
+        shell: bash
+        run: |
+          set -e
+          shopt -s nullglob || true
+          apks=(android/app/build/outputs/apk/release/*.apk)
+          if [ "${#apks[@]}" -eq 0 ]; then
+            echo "No APKs found in android/app/build/outputs/apk/release — failing to surface issue"
+            ls -la android/app/build/outputs/apk/release || true
+            exit 1
+          fi
 
       - name: Decode keystore
         if: ${{ env.ANDROID_KEYSTORE != '' }}
