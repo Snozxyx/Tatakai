@@ -1,9 +1,12 @@
 {
   "name": "tatakai",
   "private": true,
-  "version": "4.1.3",
+  "version": "4.1.5",
   "description": "Tatakai - Watch anime online",
-  "author": "Tatakai",
+  "author": {
+    "name": "Tatakai",
+    "email": "noreply@github.com"
+  },
   "license": "MIT",
   "homepage": "https://ggmp.me",
   "main": "desktop/main.cjs",
@@ -196,6 +199,7 @@
         "AppImage",
         "deb"
       ],
+      "maintainer": "Tatakai <noreply@github.com>",
       "icon": "resources/icon.png",
       "category": "AudioVideo",
       "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
