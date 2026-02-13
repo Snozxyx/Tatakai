@@ -128,13 +128,13 @@ jobs:
           done
 
       - name: Decode keystore
-        if: ${{ env.ANDROID_KEYSTORE != '' }}
+        if: ${{ secrets.ANDROID_KEYSTORE }}
         run: echo "$ANDROID_KEYSTORE" | base64 -d > android/app/release.keystore
         env:
           ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
 
       - name: Build signed APK
-        if: ${{ secrets.ANDROID_KEYSTORE != '' }}
+        if: ${{ secrets.ANDROID_KEYSTORE }}
         run: |
           cd android && ./gradlew assembleRelease \
             -Pandroid.injected.signing.store.file=${{ github.workspace }}/android/app/release.keystore \
