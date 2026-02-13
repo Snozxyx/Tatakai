@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, shell, Notification, dialog, Tray, Menu, gl
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const logger = require('./logger.cjs');
 const isDev = !app.isPackaged;
 const DiscordRPC = require('discord-rpc');
@@ -13,6 +14,22 @@ let mainWindow;
 let splash;
 let tray;
 const clientId = '1466113024929697836';
+
+// ── Client ID (CID) — persistent device identifier for rate limiting ──
+function getOrCreateCID() {
+    const cidPath = path.join(app.getPath('userData'), '.tatakai-cid');
+    try {
+        if (fs.existsSync(cidPath)) {
+            const existing = fs.readFileSync(cidPath, 'utf-8').trim();
+            if (existing && existing.length >= 32) return existing;
+        }
+    } catch {}
+    const cid = `electron-${crypto.randomUUID()}`;
+    try { fs.writeFileSync(cidPath, cid, 'utf-8'); } catch (e) { logger.error('Failed to write CID:', e); }
+    return cid;
+}
+const appCID = getOrCreateCID();
+logger.info(`[CID] Device ID: ${appCID}`);
 
 // Register Deep Linking
 if (process.defaultApp) {
@@ -379,7 +396,7 @@ async function setActivity(details, state, extra = {}) {
         largeImageText: 'Tatakai - Watch Anime Online',
         instance: false,
         buttons: [
-            { label: 'Watch with me!', url: 'https://tatakai.gabhasti.tech' }
+            { label: 'Watch with me!', url: 'https://ggmp.me' }
         ]
     };
 
@@ -1193,6 +1210,8 @@ if (!isDev) {
         owner: 'snozxyx',
         repo: 'Tatakai'
     });
+    // Include CID in update request headers for per-device tracking
+    autoUpdater.requestHeaders = { 'X-Client-Id': appCID };
 }
 
 ipcMain.handle('check-for-updates', async () => {
@@ -1334,6 +1353,9 @@ ipcMain.handle('get-system-info', async () => {
         nodeVersion: process.versions.node,
         totalMemory: Math.round(os.totalmem() / 1024 / 1024 / 1024 * 100) / 100,
         freeMemory: Math.round(os.freemem() / 1024 / 1024 / 1024 * 100) / 100,
-        cpus: os.cpus().length
+        cpus: os.cpus().length,
+        cid: appCID
     };
 });
+
+ipcMain.handle('get-client-id', () => appCID);

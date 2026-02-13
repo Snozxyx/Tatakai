@@ -26,6 +26,25 @@ export const ANIME_SERVER_NAMES: Record<string, ServerNameInfo> = {
   'berlin': { name: 'Madara (Hindi)', description: 'Berlin Server - Hindi Dubbed' },
   'madrid': { name: 'Itachi (Hindi)', description: 'Madrid Server - Hindi Dubbed' },
   'abyss': { name: 'Stream', description: 'Abyss Server' },
+  'filemoon': { name: 'Filemoon', description: 'Filemoon Embed Server' },
+  'servabyss': { name: 'Servabyss', description: 'Servabyss Embed Server' },
+  'vidgroud': { name: 'Vidgroud', description: 'Vidgroud Embed Server' },
+
+  // ToonStream - Hindi/Multi-language servers
+  'toonstream-short': { name: 'Short', description: 'ToonStream Short Server' },
+  'toonstream-ruby': { name: 'Ruby', description: 'ToonStream Ruby Server' },
+  'toonstream-cloudy': { name: 'Cloudy', description: 'ToonStream Cloudy Server' },
+  'toonstream-strmup': { name: 'Strmup', description: 'ToonStream Strmup Server' },
+  'toonstream-watch/dl': { name: 'Watch/DL', description: 'ToonStream Watch/Download Server' },
+  'toonstream-turbo': { name: 'Turbo', description: 'ToonStream Turbo Server' },
+  'toonstream-moly': { name: 'Moly', description: 'ToonStream Moly Server' },
+
+  // HindiAPI (TechInMind) - Provider-based
+  'hindiapi-upns': { name: 'UPNS', description: 'HindiAPI UPNS Server (HLS)' },
+  'hindiapi-strmup': { name: 'StrmUp', description: 'HindiAPI StrmUp Server' },
+  'hindiapi-dropload': { name: 'DropLoad', description: 'HindiAPI DropLoad Server' },
+  'hindiapi-plrx': { name: 'PlrX', description: 'HindiAPI PlrX Server' },
+  'hindiapi-strmrb': { name: 'StrmRb', description: 'HindiAPI StrmRb Server' },
 
   // Animelok - Server-based names
   'animelok-bato': { name: 'Totoro', description: 'Animelok Bato Server' },

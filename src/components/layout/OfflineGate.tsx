@@ -9,7 +9,7 @@ export function OfflineGate({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   
   // In native app, allow offline library access and offline watch even when offline
-  const offlinePaths = ['/offline-library'];
+  const offlinePaths = ['/offline-library', '/offline', '/downloads'];
   const isOfflineWatch = location.pathname.startsWith('/watch') && location.search.includes('offline=true');
   const isOfflinePath = offlinePaths.some(p => location.pathname.startsWith(p)) || isOfflineWatch;
   

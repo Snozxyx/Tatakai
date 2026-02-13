@@ -23,6 +23,8 @@ export function useCombinedSources(
     hasAnimeya: boolean;
     hasDesidubanime: boolean;
     hasAniworld: boolean;
+    hasToonStream: boolean;
+    hasHindiApi: boolean;
     malID?: number | null;
     anilistID?: number | null;
     nextEpisodeEstimates?: Array<{ lang?: string, server?: string, label: string }>;
@@ -31,11 +33,18 @@ export function useCombinedSources(
     queryFn: async () => {
       const data = await fetchCombinedSources(episodeId, animeName, episodeNumber, server, category, currentUserId);
 
-      // Debug log MAL/AniList IDs from the combined sources
-      console.debug('[useCombinedSources] Received data:', {
+      // Debug log sources breakdown
+      const hindiApiSources = data.sources.filter(s => s.langCode?.startsWith('hindiapi'));
+      const toonStreamSources = data.sources.filter(s => s.langCode?.startsWith('toonstream'));
+      const hindiDubbedSources = data.sources.filter(s => s.langCode?.startsWith('animehindidubbed'));
+      console.debug('[useCombinedSources] Sources breakdown:', {
+        total: data.sources?.length,
         malID: data.malID,
         anilistID: data.anilistID,
-        sourcesCount: data.sources?.length
+        hindiApi: hindiApiSources.length,
+        toonStream: toonStreamSources.length,
+        hindiDubbed: hindiDubbedSources.length,
+        hindiApiProviders: hindiApiSources.map(s => s.providerName),
       });
 
       return {
@@ -53,6 +62,8 @@ export function useCombinedSources(
         hasAnimeya: data.sources.some(s => s.providerName?.includes('Animeya') || s.providerName?.includes('Bebop') || s.langCode?.startsWith('animeya')),
         hasDesidubanime: data.sources.some(s => s.langCode?.startsWith('desidubanime')),
         hasAniworld: data.sources.some(s => s.langCode?.startsWith('aniworld')),
+        hasToonStream: data.sources.some(s => s.langCode?.startsWith('toonstream') || s.providerName?.includes('ToonStream')),
+        hasHindiApi: data.sources.some(s => s.langCode?.startsWith('hindiapi')),
       };
     },
     enabled: !!episodeId,

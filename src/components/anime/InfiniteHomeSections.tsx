@@ -8,6 +8,7 @@ import { useInfiniteHomeSections, type HomeSection, type SectionLayout } from '@
 import { Play, Star, Loader2, ChevronRight, Sparkles, LayoutGrid, Heart, Flame, Zap, ArrowRight, ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AnimeCardWithPreview } from './AnimeCardWithPreview';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 function SectionSkeleton({ layout }: { layout: SectionLayout }) {
   return (
@@ -47,15 +48,18 @@ function SectionSkeleton({ layout }: { layout: SectionLayout }) {
 
 
 // Grid layout - standard 6 column grid
-function GridLayout({ animes }: { animes: AnimeCard[] }) {
+function GridLayout({ animes, isMobile }: { animes: AnimeCard[]; isMobile: boolean }) {
+  const delayStep = isMobile ? 0.03 : 0.05;
+  const duration = isMobile ? 0.25 : 0.35;
+  const items = animes.slice(0, isMobile ? 4 : 6);
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-x-4 gap-y-8 md:gap-x-6 md:gap-y-10">
-      {animes.slice(0, 6).map((anime, i) => (
+      {items.map((anime, i) => (
         <motion.div
           key={anime.id}
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: i * 0.05 }}
+          transition={{ delay: i * delayStep, duration }}
         >
           <AnimeCardWithPreview anime={anime} />
         </motion.div>
@@ -65,15 +69,18 @@ function GridLayout({ animes }: { animes: AnimeCard[] }) {
 }
 
 // Carousel layout - horizontal scrolling
-function CarouselLayout({ animes }: { animes: AnimeCard[] }) {
+function CarouselLayout({ animes, isMobile }: { animes: AnimeCard[]; isMobile: boolean }) {
+  const delayStep = isMobile ? 0.02 : 0.05;
+  const duration = isMobile ? 0.25 : 0.35;
+  const items = animes.slice(0, isMobile ? 7 : 10);
   return (
     <div className="flex gap-4 md:gap-6 overflow-x-auto pb-6 snap-x snap-mandatory scrollbar-none mask-fade-right">
-      {animes.slice(0, 10).map((anime, i) => (
+      {items.map((anime, i) => (
         <motion.div
           key={anime.id}
-          initial={{ opacity: 0, x: 30 }}
+          initial={{ opacity: 0, x: isMobile ? 18 : 30 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: i * 0.05 }}
+          transition={{ delay: i * delayStep, duration }}
           className="flex-shrink-0 w-40 md:w-56 snap-start"
         >
           <AnimeCardWithPreview anime={anime} />
@@ -84,9 +91,10 @@ function CarouselLayout({ animes }: { animes: AnimeCard[] }) {
 }
 
 // Featured layout - 1 large + 4 small
-function FeaturedLayout({ animes }: { animes: AnimeCard[] }) {
+function FeaturedLayout({ animes, isMobile }: { animes: AnimeCard[]; isMobile: boolean }) {
   const navigate = useNavigate();
   if (animes.length === 0) return null;
+  const duration = isMobile ? 0.25 : 0.4;
 
   const featured = animes[0];
   const rest = animes.slice(1, 5);
@@ -97,6 +105,7 @@ function FeaturedLayout({ animes }: { animes: AnimeCard[] }) {
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration }}
         className="md:col-span-1 lg:row-span-2 h-full"
       >
         <div
@@ -141,9 +150,9 @@ function FeaturedLayout({ animes }: { animes: AnimeCard[] }) {
         {rest.map((anime, i) => (
           <motion.div
             key={anime.id}
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: isMobile ? 12 : 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 + i * 0.05 }}
+            transition={{ delay: 0.1 + i * (isMobile ? 0.03 : 0.05), duration }}
           >
             <AnimeCardWithPreview anime={anime} />
           </motion.div>
@@ -154,15 +163,18 @@ function FeaturedLayout({ animes }: { animes: AnimeCard[] }) {
 }
 
 // Compact layout - small cards in a tight grid
-function CompactLayout({ animes }: { animes: AnimeCard[] }) {
+function CompactLayout({ animes, isMobile }: { animes: AnimeCard[]; isMobile: boolean }) {
+  const delayStep = isMobile ? 0.02 : 0.03;
+  const duration = isMobile ? 0.22 : 0.3;
+  const items = animes.slice(0, isMobile ? 6 : 8);
   return (
     <div className="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-8 gap-x-3 gap-y-8 md:gap-x-4 md:gap-y-10">
-      {animes.slice(0, 8).map((anime, i) => (
+      {items.map((anime, i) => (
         <motion.div
           key={anime.id}
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 0, y: isMobile ? 8 : 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: i * 0.03 }}
+          transition={{ delay: i * delayStep, duration }}
         >
           <AnimeCardWithPreview anime={anime} />
         </motion.div>
@@ -172,19 +184,22 @@ function CompactLayout({ animes }: { animes: AnimeCard[] }) {
 }
 
 // Masonry-like layout - varied sizes
-function MasonryLayout({ animes }: { animes: AnimeCard[] }) {
-  if (animes.length < 6) return <GridLayout animes={animes} />;
+function MasonryLayout({ animes, isMobile }: { animes: AnimeCard[]; isMobile: boolean }) {
+  if (animes.length < 6) return <GridLayout animes={animes} isMobile={isMobile} />;
+  const delayStep = isMobile ? 0.03 : 0.05;
+  const duration = isMobile ? 0.25 : 0.35;
+  const items = animes.slice(0, isMobile ? 4 : 6);
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-x-4 gap-y-10 md:gap-x-6 md:gap-y-12 h-auto">
-      {animes.slice(0, 6).map((anime, i) => {
+      {items.map((anime, i) => {
         const isLarge = i === 0 || i === 3;
         return (
           <motion.div
             key={anime.id}
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: isMobile ? 12 : 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05 }}
+            transition={{ delay: i * delayStep, duration }}
             className={cn(
               isLarge && 'row-span-2 col-span-1 md:col-span-2'
             )}
@@ -215,6 +230,7 @@ function getLayoutComponent(layout: SectionLayout) {
 
 // Single section component
 function HomeSection({ section }: { section: HomeSection }) {
+  const isMobile = useIsMobile();
   const navigate = useNavigate();
   const LayoutComponent = getLayoutComponent(section.layout);
   const IconComponent = section.icon;
@@ -223,9 +239,9 @@ function HomeSection({ section }: { section: HomeSection }) {
 
   return (
     <motion.section
-      initial={{ opacity: 0, y: 40 }}
+      initial={{ opacity: 0, y: isMobile ? 24 : 40 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-100px" }}
+      viewport={{ once: true, margin: isMobile ? "-60px" : "-100px" }}
       className="mb-20"
     >
       <div className="flex items-center justify-between mb-8 px-2">
@@ -249,13 +265,14 @@ function HomeSection({ section }: { section: HomeSection }) {
         </Button>
       </div>
 
-      <LayoutComponent animes={section.animes} />
+      <LayoutComponent animes={section.animes} isMobile={isMobile} />
     </motion.section>
   );
 }
 
 // Main infinite sections component
 export function InfiniteHomeSections() {
+  const isMobile = useIsMobile();
   const navigate = useNavigate();
   const {
     data,
@@ -279,8 +296,8 @@ export function InfiniteHomeSections() {
   useEffect(() => {
     const observer = new IntersectionObserver(handleObserver, {
       root: null,
-      rootMargin: '800px', // Preload sooner for smoother experience
-      threshold: 0.1,
+      rootMargin: isMobile ? '400px' : '800px', // Preload sooner for smoother experience
+      threshold: isMobile ? 0.2 : 0.1,
     });
 
     if (loadMoreRef.current) {
@@ -338,7 +355,8 @@ export function InfiniteHomeSections() {
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
+              viewport={{ once: true, margin: isMobile ? "-40px" : "-80px" }}
+              transition={{ duration: isMobile ? 0.25 : 0.4 }}
               className="mb-20 px-2"
             >
               <GlassPanel className="p-10 relative overflow-hidden bg-gradient-to-br from-primary/20 via-background to-purple-500/10 border-primary/20 group">

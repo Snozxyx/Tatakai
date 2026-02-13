@@ -297,12 +297,19 @@ async function getAnimePage(slug: string, requestedEpisode?: string): Promise<An
     list.forEach(item => {
       // Extract episode number
       let epNum = 0;
-      const numMatch = item.name.match(/(\d+)/);
-      if (numMatch) {
-        epNum = parseInt(numMatch[1], 10);
+
+      // Try S{season}E{episode} format first (e.g. "S5E12", "S1E1")
+      const seMatch = item.name.match(/S(\d+)E(\d+)/i);
+      if (seMatch) {
+        epNum = parseInt(seMatch[2], 10); // Use EPISODE number, not season
       } else {
-        // Try to parse "Episode X", "Ep X", or just assume it's sequential if possible (but names are usually explicit)
-        return; // Skip if cant parse number
+        // Fallback: plain number like "01", "02", "Episode 3"
+        const numMatch = item.name.match(/(\d+)/);
+        if (numMatch) {
+          epNum = parseInt(numMatch[1], 10);
+        } else {
+          return; // Skip if can't parse number
+        }
       }
 
       if (!episodeMap.has(epNum)) {
@@ -404,7 +411,7 @@ serve(async (req) => {
 
     if (action === 'anime') {
       const slug = url.searchParams.get('slug');
-      const ep = url.searchParams.get('ep'); // Support filtering by episode
+      const ep = url.searchParams.get('ep') || url.searchParams.get('episode'); // Support both param names
 
       if (!slug) {
         return new Response(

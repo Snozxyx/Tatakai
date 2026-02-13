@@ -63,6 +63,19 @@ export function AdminLogs() {
     }
   };
 
+  const handleCleanupOld = async () => {
+    const cutoff = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+    const confirmMsg = 'Delete logs older than 2 days? This action cannot be undone.';
+    if (!confirm(confirmMsg)) return;
+
+    try {
+      await deleteMutation.mutateAsync({ created_before: cutoff });
+      toast({ title: 'Cleanup complete', description: 'Old logs deleted.' });
+    } catch (e: any) {
+      toast({ title: 'Cleanup failed', description: e?.message || String(e) });
+    }
+  };
+
   const getActionIcon = (action: string) => {
     if (action.includes('delete') || action.includes('remove')) return <Trash2 className="w-4 h-4 text-red-400" />;
     if (action.includes('approve')) return <CheckCircle className="w-4 h-4 text-green-400" />;
@@ -111,6 +124,16 @@ export function AdminLogs() {
           >
             <Trash2 className="w-4 h-4" />
             Delete
+          </Button>
+
+          <Button
+            onClick={handleCleanupOld}
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            disabled={deleteMutation.isPending}
+          >
+            Clean 2+ days
           </Button>
         </div>
       </div>

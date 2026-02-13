@@ -11,6 +11,7 @@ import { MobileNav } from "@/components/layout/MobileNav";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import { Skeleton } from "@/components/ui/skeleton-custom";
 import { VideoPlayer } from "@/components/video/VideoPlayer";
+import { MobileVideoPlayer } from "@/components/video/MobileVideoPlayer";
 import { EmbedPlayer } from "@/components/video/EmbedPlayer";
 import {
   ArrowLeft,
@@ -32,7 +33,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useVideoSettings } from "@/hooks/useVideoSettings";
-import { useIsNativeApp } from "@/hooks/useIsNativeApp";
+import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from "@/hooks/useIsNativeApp";
 import { getFriendlyServerName, getAnimeServerName } from "@/lib/serverNames";
 import { updateLocalContinueWatching, getLocalContinueWatching } from "@/lib/localStorage";
 import { useAuth } from "@/contexts/AuthContext";
@@ -55,6 +56,8 @@ export default function WatchPage() {
   const { user } = useAuth();
   const { settings } = useVideoSettings();
   const isNative = useIsNativeApp();
+  const isDesktop = useIsDesktopApp(); // Only Electron/Tauri
+  const isMobileApp = useIsMobileApp(); // Only Capacitor
 
   const isOfflineMode = useMemo(() => {
     const params = new URLSearchParams(location.search);
@@ -133,6 +136,16 @@ export default function WatchPage() {
   const { data: viewCount } = useAnimeViewCount(animeId);
   useViewTracker(animeId, decodedEpisodeId);
 
+  // Reset offline state when path or episode changes
+  useEffect(() => {
+    if (isOfflineMode) {
+      // Reset states to prevent stale data from previous navigation
+      setOfflineSources([]);
+      setOfflineManifest(null);
+      setOfflineSubtitles([]);
+    }
+  }, [isOfflineMode, offlinePath, decodedEpisodeId]);
+
   useEffect(() => {
     if (isOfflineMode && offlinePath) {
       const loadOfflineContent = async () => {
@@ -143,8 +156,28 @@ export default function WatchPage() {
           const manifest = await response.json();
           setOfflineManifest(manifest);
 
-          const ep = manifest.episodes.find((e: any) => e.id === decodedEpisodeId);
+          // Try to find episode by ID first
+          let ep = manifest.episodes.find((e: any) => e.id === decodedEpisodeId);
+          
+          // If not found by ID, try to find by episode number (fallback for older downloads)
+          if (!ep && manifest.episodes.length > 0) {
+            // Extract episode number from ID if possible (e.g., "anime-ep-1" -> 1)
+            const epNumMatch = decodedEpisodeId.match(/ep[_-]?(\d+)/i) || decodedEpisodeId.match(/(\d+)$/);
+            const epNum = epNumMatch ? parseInt(epNumMatch[1]) : null;
+            
+            if (epNum !== null) {
+              ep = manifest.episodes.find((e: any) => e.number === epNum);
+            }
+            
+            // Last resort: use first episode if this is the first navigation
+            if (!ep) {
+              console.warn(`Episode ID "${decodedEpisodeId}" not found in manifest. Using first episode.`);
+              ep = manifest.episodes[0];
+            }
+          }
+
           if (ep) {
+            console.log(`Loading offline episode: ${ep.id || ep.number} from ${offlinePath}/${ep.file}`);
             setOfflineSources([{
               url: `file://${offlinePath}/${ep.file}`,
               isM3U8: false,
@@ -161,13 +194,19 @@ export default function WatchPage() {
               setOfflineSubtitles(subs);
               console.log('Loaded offline subtitles:', subs);
             } else {
-              // Try to find subtitle files by pattern (Episode_X_*.vtt)
-              // This is a fallback for older downloads without manifest subtitles
+              // No subtitles available
               setOfflineSubtitles([]);
             }
+          } else {
+            console.error('No episodes found in offline manifest');
+            setOfflineSources([]);
+            setOfflineSubtitles([]);
           }
         } catch (err) {
           console.error('Failed to load offline manifest:', err);
+          setOfflineSources([]);
+          setOfflineManifest(null);
+          setOfflineSubtitles([]);
         }
       };
       loadOfflineContent();
@@ -681,6 +720,35 @@ export default function WatchPage() {
                   language={selectedSource.language}
                   onError={handleVideoError}
                 />
+              ) : isMobileApp ? (
+                <MobileVideoPlayer
+                  sources={
+                    isOfflineMode
+                      ? offlineSources
+                      : (selectedSource && !selectedSource.isEmbed
+                        ? [selectedSource]
+                        : (sourcesData?.sources || []))
+                  }
+                  subtitles={isOfflineMode ? offlineSubtitles : normalizedSubtitles}
+                  headers={sourcesData?.headers}
+                  poster={animeData?.anime.info.poster || (isOfflineMode ? `file://${offlinePath}/poster.jpg` : undefined)}
+                  onError={handleVideoError}
+                  onServerSwitch={handleServerSwitch}
+                  isLoading={!isOfflineMode && loadingSources}
+                  serverName={selectedSource?.providerName || (currentServer ? getFriendlyServerName(currentServer.serverName) : (isOfflineMode ? 'Offline' : undefined))}
+                  malId={sourcesData?.malID || animeData?.anime?.moreInfo?.malId}
+                  episodeNumber={serversData?.episodeNo || currentEpisode?.number || (isOfflineMode ? offlineManifest?.episodes.find((e: any) => e.id === decodedEpisodeId)?.number : undefined)}
+                  initialSeekSeconds={initialSeekSeconds}
+                  onProgressUpdate={handleProgressUpdate}
+                  animeId={animeId}
+                  animeName={animeData?.anime.info.name || (isOfflineMode ? offlineManifest?.animeName : '')}
+                  animePoster={animeData?.anime.info.poster || (isOfflineMode ? `file://${offlinePath}/poster.jpg` : undefined)}
+                  episodeTitle={currentEpisode?.title || (isOfflineMode ? offlineManifest?.episodes.find((e: any) => e.id === decodedEpisodeId)?.title : undefined)}
+                  episodeId={decodedEpisodeId}
+                  onEpisodeEnd={handleEpisodeEnd}
+                  onBack={() => navigate(-1)}
+                  isOffline={isOfflineMode}
+                />
               ) : (
                 <VideoPlayer
                   sources={
@@ -1096,7 +1164,7 @@ export default function WatchPage() {
         </div>
       </main >
 
-      {!isNative && <MobileNav />
+      {!isDesktop && <MobileNav />
       }
 
       {

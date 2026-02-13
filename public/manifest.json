@@ -4,42 +4,111 @@
   "description": "Watch your favorite anime online for free in HD quality. Stream the latest anime episodes, movies, and series with English subtitles and dub.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0a0f",
+  "background_color": "#09090b",
   "theme_color": "#6366f1",
   "orientation": "any",
   "icons": [
     {
-      "src": "/tatakai-logo-square.png",
-      "sizes": "192x192",
+      "src": "../icons/icon-48.webp",
       "type": "image/png",
+      "sizes": "48x48",
       "purpose": "any maskable"
     },
     {
-      "src": "/tatakai-logo-square.png",
-      "sizes": "512x512",
+      "src": "../icons/icon-72.webp",
       "type": "image/png",
+      "sizes": "72x72",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "../icons/icon-96.webp",
+      "type": "image/png",
+      "sizes": "96x96",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "../icons/icon-128.webp",
+      "type": "image/png",
+      "sizes": "128x128",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "../icons/icon-192.webp",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "../icons/icon-256.webp",
+      "type": "image/png",
+      "sizes": "256x256",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "../icons/icon-512.webp",
+      "type": "image/png",
+      "sizes": "512x512",
       "purpose": "any maskable"
     }
   ],
-  "categories": ["entertainment", "video"],
+  "categories": [
+    "entertainment",
+    "video"
+  ],
   "lang": "en-US",
   "dir": "ltr",
   "scope": "/",
   "prefer_related_applications": false,
+  "screenshots": [
+    {
+      "src": "/tatakai-logo-square.png",
+      "sizes": "540x720",
+      "type": "image/png",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "/tatakai-logo-square.png",
+      "sizes": "720x540",
+      "type": "image/png",
+      "form_factor": "wide"
+    }
+  ],
   "shortcuts": [
     {
       "name": "Home",
       "short_name": "Home",
       "description": "Go to homepage",
       "url": "/",
-      "icons": [{ "src": "/tatakai-logo-square.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "/tatakai-logo-square.png",
+          "sizes": "192x192"
+        }
+      ]
     },
     {
       "name": "Search",
       "short_name": "Search",
       "description": "Search anime",
       "url": "/search",
-      "icons": [{ "src": "/tatakai-logo-square.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "/tatakai-logo-square.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Downloads",
+      "short_name": "Downloads",
+      "description": "View offline library",
+      "url": "/offline-library",
+      "icons": [
+        {
+          "src": "/tatakai-logo-square.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }

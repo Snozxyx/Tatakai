@@ -1,18 +1,24 @@
 import { useIsNativeApp } from "@/hooks/useIsNativeApp";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import { Minus, Square, X, Copy } from "lucide-react";
-import { useDownload } from "@/contexts/DownloadContext";
+import { useDownload } from "@/hooks/useDownload";
 
 export function TitleBar() {
   const isNative = useIsNativeApp();
   const [title, setTitle] = useState("Tatakai");
   const [isMaximized, setIsMaximized] = useState(false);
   const location = useLocation();
-  const { downloadStates } = useDownload();
+  const { downloadStates = {} } = useDownload();
 
-  const activeDownloads = Object.values(downloadStates).filter(d => d.status === 'downloading');
-  const queuedDownloads = Object.values(downloadStates).filter(d => d.status === 'queued');
+  const activeDownloads = useMemo(() => 
+    Object.values(downloadStates).filter(d => d.status === 'downloading'), 
+    [downloadStates]
+  );
+  const queuedDownloads = useMemo(() => 
+    Object.values(downloadStates).filter(d => d.status === 'queued'),
+    [downloadStates]
+  );
 
   useEffect(() => {
     const updateTitle = () => {

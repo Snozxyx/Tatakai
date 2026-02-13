@@ -61,12 +61,15 @@ export function V4AnnouncementPopup() {
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-            <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden bg-background/40 backdrop-blur-2xl border-white/10 shadow-2xl rounded-3xl animate-in fade-in zoom-in duration-500">
+            <DialogContent 
+                className="sm:max-w-[600px] p-0 overflow-hidden bg-background/40 border-white/10 shadow-2xl rounded-3xl animate-in fade-in zoom-in duration-500"
+                style={{ backdropFilter: 'blur(40px)' }}
+            >
                 {/* Header/Banner */}
                 <div className="relative h-48 w-full overflow-hidden bg-gradient-to-br from-primary/20 via-primary/5 to-transparent">
                     <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1578632738981-43c9ad4698d8?q=80&w=1000&auto=format&fit=crop')] bg-cover bg-center opacity-20 mix-blend-overlay" />
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 bg-gradient-to-t from-background/80 to-transparent">
-                        <Badge variant="outline" className="mb-3 border-primary/50 text-primary bg-primary/10 backdrop-blur-md px-3 py-1 font-black uppercase tracking-[0.2em] text-[10px]">
+                        <Badge variant="outline" className="mb-3 border-primary/50 text-primary bg-primary/10 px-3 py-1 font-black uppercase tracking-[0.2em] text-[10px]" style={{ backdropFilter: 'blur(12px)' }}>
                             Major Update
                         </Badge>
                         <h1 className="text-5xl font-black tracking-tighter text-foreground drop-shadow-2xl">

@@ -21,6 +21,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { useDebounce } from "@/hooks/useDebounce";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useRef, useCallback } from 'react';
 
 // Reusable Room Card Component
@@ -122,6 +123,7 @@ export default function IsshoNiPage() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const { user } = useAuth();
+    const isMobile = useIsMobile();
     const [isCreateOpen, setIsCreateOpen] = useState(false);
 
     // Anime Search
@@ -170,12 +172,15 @@ export default function IsshoNiPage() {
         if (loadingPublic) return;
         if (observer.current) observer.current.disconnect();
         observer.current = new IntersectionObserver(entries => {
-            if (entries[0].isIntersecting && hasNextPage) {
+            if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
                 fetchNextPage();
             }
+        }, {
+            rootMargin: isMobile ? '300px' : '600px',
+            threshold: isMobile ? 0.2 : 0.1,
         });
         if (node) observer.current.observe(node);
-    }, [loadingPublic, hasNextPage, fetchNextPage]);
+    }, [loadingPublic, hasNextPage, isFetchingNextPage, fetchNextPage, isMobile]);
 
     // Auto-open create dialog if anime params are present
     useEffect(() => {

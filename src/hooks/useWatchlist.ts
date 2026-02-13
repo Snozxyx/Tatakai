@@ -109,32 +109,74 @@ export function useAddToWatchlist() {
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['watchlist'] });
+      queryClient.invalidateQueries({ queryKey: ['external-ids', variables.animeId] }); // Refresh external IDs cache
       toast.success('Updated watchlist');
+
+      console.log('[Watchlist Sync] ===== SYNC DEBUG START =====');
+      console.log('[Watchlist Sync] Anime:', variables.animeName);
+      console.log('[Watchlist Sync] Anime ID:', variables.animeId);
+      console.log('[Watchlist Sync] Status:', variables.status);
+      console.log('[Watchlist Sync] Provided MAL ID:', variables.malId);
+      console.log('[Watchlist Sync] Provided AniList ID:', variables.anilistId);
+      console.log('[Watchlist Sync] DB Response mal_id:', data?.mal_id);
+      console.log('[Watchlist Sync] DB Response anilist_id:', data?.anilist_id);
+      console.log('[Watchlist Sync] MAL Token exists:', !!profile?.mal_access_token);
+      console.log('[Watchlist Sync] AniList Token exists:', !!profile?.anilist_access_token);
 
       // Auto-sync to MAL if linked
       if (profile?.mal_access_token) {
-        console.log('[useWatchlist] Automatic MAL sync starting for animeId:', variables.animeId);
-        updateMalAnimeStatus(variables.animeId, variables.status || 'plan_to_watch')
-          .then(() => console.log('[useWatchlist] Automatic MAL sync successful'))
-          .catch(err => console.warn('[useWatchlist] Automatic MAL sync background fail:', err));
+        // Use malId from variables first, then from DB response
+        const targetMalId = variables.malId || data?.mal_id;
+        
+        if (targetMalId) {
+          console.log('[Watchlist Sync] ✓ Starting MAL sync with MAL ID:', targetMalId);
+          updateMalAnimeStatus(targetMalId, variables.status || 'plan_to_watch')
+            .then(() => {
+              console.log('[Watchlist Sync] ✓ MAL sync SUCCESSFUL for MAL ID:', targetMalId);
+              toast.success('Synced to MyAnimeList');
+            })
+            .catch(err => {
+              console.error('[Watchlist Sync] ✗ MAL sync FAILED:', err);
+              toast.error('Failed to sync to MyAnimeList');
+            });
+        } else {
+          console.warn('[Watchlist Sync] ✗ Skipping MAL sync: No MAL ID available, falling back to animeId');
+          // Fallback to animeId - the updateMalAnimeStatus will try to resolve it
+          updateMalAnimeStatus(variables.animeId, variables.status || 'plan_to_watch')
+            .then(() => console.log('[Watchlist Sync] ✓ MAL sync (via fallback) SUCCESSFUL'))
+            .catch(err => console.warn('[Watchlist Sync] ✗ MAL sync (via fallback) FAILED:', err));
+        }
+      } else {
+        console.log('[Watchlist Sync] - MAL not linked, skipping sync');
       }
 
       // Auto-sync to AniList if linked
       if (profile?.anilist_access_token) {
-        // We need an AniList ID. If we don't have one in variables, we check the query cache or the response
+        // Use anilistId from variables first, then from DB response
         const targetAnilistId = variables.anilistId || data?.anilist_id;
 
         if (targetAnilistId) {
-          console.log('[useWatchlist] Automatic AniList sync starting for:', targetAnilistId);
+          console.log('[Watchlist Sync] ✓ Starting AniList sync with AniList ID:', targetAnilistId);
           const aniStatus = mapTatakaiStatusToAniList(variables.status || 'plan_to_watch');
+          console.log('[Watchlist Sync] AniList status mapped to:', aniStatus);
 
           updateAniListAnimeStatus(profile.anilist_access_token, Number(targetAnilistId), aniStatus)
-            .then(() => console.log('[useWatchlist] Automatic AniList sync successful'))
-            .catch(err => console.warn('[useWatchlist] Automatic AniList sync failed:', err));
+            .then(() => {
+              console.log('[Watchlist Sync] ✓ AniList sync SUCCESSFUL for AniList ID:', targetAnilistId);
+              toast.success('Synced to AniList');
+            })
+            .catch(err => {
+              console.error('[Watchlist Sync] ✗ AniList sync FAILED:', err);
+              toast.error('Failed to sync to AniList');
+            });
         } else {
-          console.warn('[useWatchlist] Skipping AniList sync: No AniList ID available for this item');
+          console.warn('[Watchlist Sync] ✗ Skipping AniList sync: No AniList ID available');
         }
+      } else {
+        console.log('[Watchlist Sync] - AniList not linked, skipping sync');
       }
+      
+      console.log('[Watchlist Sync] ===== SYNC DEBUG END =====');
     },
     onError: (error: any) => {
       console.error('[useWatchlist] Mutation failed:', error);
@@ -145,7 +187,7 @@ export function useAddToWatchlist() {
 
 export function useRemoveFromWatchlist() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   return useMutation({
     mutationFn: async (animeId: string) => {
@@ -161,6 +203,7 @@ export function useRemoveFromWatchlist() {
       queryClient.invalidateQueries({ queryKey: ['watchlist'] });
       // Explicitly invalidate the specific item query as well
       queryClient.invalidateQueries({ queryKey: ['watchlist', user?.id, animeId] });
+      queryClient.invalidateQueries({ queryKey: ['external-ids', animeId] }); // Refresh external IDs cache
 
       // Sync removal to MAL if linked AND auto-delete is enabled (Dangerous feature)
       if (profile?.mal_access_token && profile?.mal_auto_delete) {

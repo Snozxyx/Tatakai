@@ -96,6 +96,179 @@
   ::-webkit-scrollbar-thumb:hover {
     @apply bg-muted-foreground/50;
   }
+
+  /* Safe Area Support for Mobile Devices */
+  html {
+    --sat: env(safe-area-inset-top);
+    --sar: env(safe-area-inset-right);
+    --sab: env(safe-area-inset-bottom);
+    --sal: env(safe-area-inset-left);
+  }
+}
+
+/* Safe Area Utility Classes */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-area-left {
+  padding-left: env(safe-area-inset-left);
+}
+
+.safe-area-right {
+  padding-right: env(safe-area-inset-right);
+}
+
+.safe-area-inset {
+  padding-top: env(safe-area-inset-top);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+}
+
+/* Accessibility - Reduce Motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Custom Accessibility Classes for Mobile Settings */
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Fast Animation Mode - Snappy UI */
+html.fast-animations * {
+  animation-duration: 0.1s !important;
+  transition-duration: 0.1s !important;
+}
+
+html.fast-animations *::before,
+html.fast-animations *::after {
+  animation-duration: 0.1s !important;
+  transition-duration: 0.1s !important;
+}
+
+/* Quality Animation Mode - Smooth 60fps */
+html.quality-animations * {
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
+  will-change: transform, opacity;
+}
+
+/* Mobile Performance Optimizations */
+@media (max-width: 768px) {
+  /* Enable hardware acceleration for smoother scrolling */
+  .scroll-container,
+  [data-scroll],
+  main {
+    -webkit-overflow-scrolling: touch;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+  
+  /* Optimize images for mobile */
+  img {
+    content-visibility: auto;
+    contain-intrinsic-size: 200px 300px;
+  }
+  
+  /* Reduce repaints on scroll */
+  .glass-panel {
+    contain: layout paint;
+  }
+  
+  /* Smoother list rendering */
+  .anime-grid,
+  .episode-list {
+    contain: content;
+  }
+}
+
+/* Native App Specific Optimizations */
+.capacitor-native {
+  /* Disable text selection for app-like feel */
+  -webkit-user-select: none;
+  user-select: none;
+  
+  /* Disable tap highlight */
+  -webkit-tap-highlight-color: transparent;
+  
+  /* Prevent overscroll */
+  overscroll-behavior: none;
+}
+
+.capacitor-native input,
+.capacitor-native textarea {
+  -webkit-user-select: auto;
+  user-select: auto;
+}
+
+/* Smooth skeleton loading */
+@keyframes mobile-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.mobile-skeleton {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 25%,
+    hsl(var(--muted-foreground) / 0.1) 50%,
+    hsl(var(--muted)) 75%
+  );
+  background-size: 200% 100%;
+  animation: mobile-shimmer 1.5s ease-in-out infinite;
+}
+
+html.large-text {
+  font-size: 18px !important;
+}
+
+html.large-text body {
+  font-size: 1rem;
+}
+
+html.high-contrast {
+  --border: 240 10% 50%;
+  --muted-foreground: 240 5% 85%;
+}
+
+html.high-contrast .glass-panel {
+  border-width: 2px;
+}
+
+html.high-contrast button,
+html.high-contrast a {
+  text-decoration: underline;
+  font-weight: 600;
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+  :root {
+    --border: 240 10% 40%;
+    --muted-foreground: 240 5% 80%;
+  }
 }
 
 @layer components {
@@ -233,6 +406,25 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+@keyframes ping-once {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+.animate-ping-once {
+  animation: ping-once 0.5s ease-out forwards;
 }
 
 .animate-fade-in {
@@ -850,6 +1042,53 @@ body[data-theme="harvest"] .glass-panel {
   transition-duration: 0.001ms !important;
   scroll-behavior: auto !important;
 }
+
+/* Native app performance optimizations */
+.native-app {
+  /* Reduce blur effects for better performance */
+  --blur-strength: 8px;
+}
+
+.native-app .backdrop-blur-xl,
+.native-app .backdrop-blur-2xl,
+.native-app .backdrop-blur-3xl {
+  backdrop-filter: blur(var(--blur-strength)) !important;
+  -webkit-backdrop-filter: blur(var(--blur-strength)) !important;
+}
+
+.native-app .glass-panel {
+  backdrop-filter: blur(var(--blur-strength)) saturate(1.2) !important;
+  -webkit-backdrop-filter: blur(var(--blur-strength)) saturate(1.2) !important;
+}
+
+/* Reduce animations on native for better performance (optional - controlled by settings) */
+.native-app.fast-animations .animate-in {
+  animation-duration: 150ms !important;
+}
+
+.native-app.fast-animations .transition-all {
+  transition-duration: 100ms !important;
+}
+
+/* Quality animations - smoother, longer duration */
+.native-app.quality-animations .animate-in {
+  animation-duration: 400ms !important;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.native-app.quality-animations .transition-all {
+  transition-duration: 300ms !important;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Hardware acceleration hints - apply only to non-fixed elements to avoid breaking modal centering */
+.native-app .glass-panel {
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+/* Don't apply transform to elements with backdrop-blur that use fixed positioning */
+/* This prevents breaking the centering of modals/dialogs */
 
 .high-contrast {
   --border: 0 0% 100% !important;

@@ -35,4 +35,4 @@ Allow: /
 Crawl-delay: 1
 
 # Sitemap location
-Sitemap: https://tatakai.gabhasti.tech/sitemap.xml
+Sitemap: https://ggmp.me/sitemap.xml

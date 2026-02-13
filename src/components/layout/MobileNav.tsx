@@ -3,11 +3,13 @@ import { NavIcon } from "@/components/ui/NavIcon";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/hooks/useNotifications";
-import { useIsNativeApp } from "@/hooks/useIsNativeApp";
+import { useIsMobileApp } from "@/hooks/useIsNativeApp";
+import { useHaptics } from "@/hooks/useHaptics";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { NotificationModal } from "@/components/profile/NotificationModal";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,22 +22,53 @@ export function MobileNav() {
   const navigate = useNavigate();
   const { user, profile, isBanned, isModerator } = useAuth();
   const { unreadCount } = useNotifications();
-  const isNative = useIsNativeApp();
+  const isMobileNative = useIsMobileApp(); // Only Capacitor Android/iOS
+  const { impact } = useHaptics();
   const [showNotifications, setShowNotifications] = useState(false);
 
   const isActive = (path: string) => location.pathname === path;
 
-  return (
-    <div className="md:hidden fixed bottom-6 left-6 right-6 h-16 bg-card/90 backdrop-blur-2xl border border-border/30 rounded-2xl flex items-center justify-around px-2 z-50 shadow-2xl">
+  // Haptic navigation handler
+  const handleNavigate = useCallback((path: string) => {
+    impact('light');
+    navigate(path);
+  }, [navigate, impact]);
+
+  // Check if haptics are enabled from localStorage
+  const getHapticEnabled = () => {
+    try {
+      const config = localStorage.getItem('tatakai_mobile_config');
+      if (config) {
+        return JSON.parse(config).hapticFeedback !== false;
+      }
+    } catch (e) {}
+    return true;
+  };
+
+  const hapticNavigate = useCallback((path: string) => {
+    if (getHapticEnabled()) {
+      impact('light');
+    }
+    navigate(path);
+  }, [navigate, impact]);
+
+  const navContent = (
+    <div 
+      className="md:hidden fixed bottom-6 left-6 right-6 h-16 bg-card/90 backdrop-blur-2xl border border-border/30 rounded-2xl flex items-center justify-around px-2 z-[60] shadow-2xl safe-area-bottom"
+      role="navigation"
+      aria-label="Main navigation"
+    >
       <NavIcon
         icon={LayoutGrid}
         active={isActive("/")}
-        onClick={() => navigate("/")}
+        onClick={() => hapticNavigate("/")}
+        aria-label="Home"
       />
       <NavIcon
         icon={Search}
         active={isActive("/search")}
-        onClick={() => navigate("/search")}
+        onClick={() => hapticNavigate("/search")}
+        aria-label="Search"
       />
 
       {/* Favorites/Trending Dropdown */}
@@ -44,34 +77,39 @@ export function MobileNav() {
           <div className="nav-icon group relative cursor-pointer focus:outline-none">
             <Heart className={cn(
               "w-5 h-5",
-              isActive("/favorites") || isActive("/trending") || (isNative && isActive("/downloads"))
+              isActive("/favorites") || isActive("/trending")
                 ? "text-primary"
                 : "text-muted-foreground hover:text-foreground"
             )} />
           </div>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="center" side="top" className="mb-2">
-          <DropdownMenuItem onClick={() => navigate("/favorites")}>
+          <DropdownMenuItem onClick={() => hapticNavigate("/favorites")}>
             <Heart className="w-4 h-4 mr-2" />
             Favorites
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => navigate("/trending")}>
+          <DropdownMenuItem onClick={() => hapticNavigate("/trending")}>
             <TrendingUp className="w-4 h-4 mr-2" />
             Trending
           </DropdownMenuItem>
-          {isNative && (
-            <DropdownMenuItem onClick={() => navigate("/downloads")}>
-              <Download className="w-4 h-4 mr-2" />
-              Downloads
-            </DropdownMenuItem>
-          )}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {/* Downloads - Shown on both mobile app and desktop app */}
+      {(isMobileNative || (typeof window !== 'undefined' && (window as any).electron)) && (
+        <NavIcon
+          icon={Download}
+          active={isActive("/downloads")}
+          onClick={() => hapticNavigate("/downloads")}
+          aria-label="Downloads"
+        />
+      )}
 
       <NavIcon
         icon={Users}
         active={isActive("/community")}
-        onClick={() => navigate("/community")}
+        onClick={() => hapticNavigate("/community")}
+        aria-label="Community"
       />
 
       {/* Profile/Settings Dropdown */}
@@ -93,7 +131,7 @@ export function MobileNav() {
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" side="top" className="mb-2">
-            <DropdownMenuItem onClick={() => navigate(profile?.username ? `/@${profile.username}` : '/profile')}>
+            <DropdownMenuItem onClick={() => hapticNavigate(profile?.username ? `/@${profile.username}` : '/profile')}>
               <User className="w-4 h-4 mr-2" />
               Profile
             </DropdownMenuItem>
@@ -107,12 +145,12 @@ export function MobileNav() {
               )}
             </DropdownMenuItem>
             {isModerator && (
-              <DropdownMenuItem onClick={() => navigate("/admin")}>
+              <DropdownMenuItem onClick={() => hapticNavigate("/admin")}>
                 <Shield className="w-4 h-4 mr-2 text-primary" />
                 Admin Panel
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem onClick={() => navigate("/settings")}>
+            <DropdownMenuItem onClick={() => hapticNavigate("/settings")}>
               <Settings className="w-4 h-4 mr-2" />
               Settings
             </DropdownMenuItem>
@@ -122,10 +160,14 @@ export function MobileNav() {
         <NavIcon
           icon={LogIn}
           active={isActive("/auth")}
-          onClick={() => navigate("/auth")}
+          onClick={() => hapticNavigate("/auth")}
+          aria-label="Sign in"
         />
       )}
       <NotificationModal open={showNotifications} onOpenChange={setShowNotifications} />
     </div>
   );
+
+  // Render using portal to ensure it's at the body level
+  return typeof document !== 'undefined' ? createPortal(navContent, document.body) : navContent;
 }

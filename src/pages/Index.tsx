@@ -3,7 +3,9 @@ import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { Header } from "@/components/layout/Header";
-import { useIsNativeApp } from "@/hooks/useIsNativeApp";
+import { useIsNativeApp, useIsDesktopApp } from "@/hooks/useIsNativeApp";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Capacitor } from '@capacitor/core';
 import { cn } from "@/lib/utils";
 import { HeroSection } from "@/components/anime/HeroSection";
 import { TrendingGrid } from "@/components/anime/TrendingGrid";
@@ -25,12 +27,18 @@ import { ReviewPopup } from "@/components/ui/ReviewPopup";
 import { LanguagesSection } from "@/components/anime/LanguagesSection";
 import { AppDownloadSection } from "@/components/layout/AppDownloadSection";
 import { Heart, Sparkles } from "lucide-react";
-
+import { DiscordSection } from "@/components/home/DiscordSection";
 import { useEffect } from "react";
 
 const Index = () => {
   const { data, isLoading, error } = useHomeData();
   const isNative = useIsNativeApp();
+  const isDesktopApp = useIsDesktopApp(); // Only Electron/Tauri
+  const isMobile = useIsMobile();
+  const isMobileApp = Capacitor.isNativePlatform();
+  
+  // Show sidebar on desktop (web or app), but not on mobile (web or app)
+  const showSidebar = !isMobile && !isMobileApp;
 
   useEffect(() => {
     if (typeof window !== 'undefined' && (window as any).electron) {
@@ -54,12 +62,12 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-      {!isNative && <Background />}
-      {!isNative && <Sidebar />}
+      {!showSidebar && <Background />}
+      {showSidebar && <Sidebar />}
 
       <main className={cn(
         "relative z-10 pr-6 py-6 max-w-[1800px] mx-auto pb-24 md:pb-6",
-        isNative ? "p-6" : "pl-6 md:pl-32"
+        isDesktopApp ? "pl-6" : "pl-6 md:pl-32" // Original web padding
       )}>
         <Header />
 
@@ -83,7 +91,6 @@ const Index = () => {
             )}
 
 
-            <TierlistSection />
 
             {/* Continue Watching - Database backed for logged in users */}
             <ContinueWatching />
@@ -105,6 +112,7 @@ const Index = () => {
 
             {/* Trending Grid */}
             <TrendingGrid animes={data.trendingAnimes} />
+            <TierlistSection />
 
             {/* Upcoming Anime - From Jikan API */}
             <UpcomingAnimeSection />
@@ -115,6 +123,10 @@ const Index = () => {
               week={data.top10Animes.week}
               month={data.top10Animes.month}
             />
+            {/* Join Discord */}
+            <div className="mb-24">
+              <DiscordSection />
+            </div>
 
             {/* Most Popular */}
             <AnimeGrid
@@ -122,7 +134,11 @@ const Index = () => {
               title="Most Popular"
               icon={<Heart className="w-5 h-5 text-destructive fill-destructive" />}
             />
-
+   {!showSidebar && (
+              <div className="mt-24">
+                <AppDownloadSection />
+              </div>
+            )}
             {/* Genre Cloud */}
             <GenreCloud genres={data.genres} />
 
@@ -143,18 +159,14 @@ const Index = () => {
             {/* Infinite Scrolling Genre Sections */}
             <InfiniteHomeSections />
 
-            {!isNative && (
-              <div className="mt-24">
-                <AppDownloadSection />
-              </div>
-            )}
+         
 
             <ReviewPopup />
           </>
         ) : null}
       </main>
 
-      {!isNative && <MobileNav />}
+      {!showSidebar && <MobileNav />}
     </div>
   );
 };

@@ -33,11 +33,26 @@ export function WatchlistButton({ animeId, animeName, animePoster, variant = 'de
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
 
+  // Debug log when component receives IDs
+  console.log('[WatchlistButton] Mounted/Updated:', { 
+    animeId, 
+    animeName: animeName?.substring(0, 30), 
+    malId, 
+    anilistId,
+    hasIds: !!(malId || anilistId)
+  });
+
   const { data: watchlistItem, isLoading } = useWatchlistItem(animeId);
   const addToWatchlist = useAddToWatchlist();
   const removeFromWatchlist = useRemoveFromWatchlist();
 
   const handleAddToWatchlist = async (status: WatchlistStatus) => {
+    console.log('[WatchlistButton] Adding to watchlist:', { 
+      animeId, 
+      status, 
+      malId, 
+      anilistId 
+    });
     await addToWatchlist.mutateAsync({
       animeId,
       animeName,

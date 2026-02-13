@@ -7,6 +7,11 @@ declare global {
     }
 }
 
+// Check if we're online
+function isOnline(): boolean {
+    return typeof navigator !== 'undefined' ? navigator.onLine : true;
+}
+
 // Configuration Constants
 const GA_MEASUREMENT_ID = import.meta.env.VITE_GA_MEASUREMENT_ID;
 const DD_CLIENT_TOKEN = import.meta.env.VITE_DD_CLIENT_TOKEN;
@@ -93,6 +98,9 @@ class AnalyticsService {
     // --- Tracking Methods ---
 
     public trackPageView(path: string, title?: string) {
+        // Skip tracking when offline
+        if (!isOnline()) return;
+        
         if (typeof window.gtag === 'function') {
             window.gtag('event', 'page_view', {
                 page_title: title || document.title,
@@ -112,6 +120,9 @@ class AnalyticsService {
     }
 
     public trackEvent(eventName: string, params?: Record<string, any>) {
+        // Skip tracking when offline
+        if (!isOnline()) return;
+        
         if (typeof window.gtag === 'function') {
             window.gtag('event', eventName, params);
         }
@@ -126,6 +137,9 @@ class AnalyticsService {
     }
 
     public trackError(error: Error, context?: Record<string, any>) {
+        // Skip tracking when offline
+        if (!isOnline()) return;
+        
         if (!this.datadogDisabled) {
             try {
                 datadogLogs.logger.error(error.message, { error, ...context });

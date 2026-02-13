@@ -29,6 +29,7 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Menu, X } from 'lucide-react';
 import { Leaderboard } from '@/components/community/Leaderboard';
+import { useIsNativeApp } from '@/hooks/useIsNativeApp';
 
 // Hook to fetch public playlists from all users
 function usePublicPlaylists() {
@@ -324,13 +325,17 @@ export default function CommunityPage() {
   );
 
   const isLoading = loadingTierLists || loadingPlaylists;
+  const isNative = useIsNativeApp();
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* <StatusVideoBackground /> */}
       <Sidebar />
 
-      <main className="relative z-10 pl-0 md:pl-20 lg:pl-24 w-full">
+      <main className={cn(
+        "relative z-10 w-full",
+        isNative ? "pl-0" : "pl-0 md:pl-20 lg:pl-24"
+      )}>
         <div className="max-w-7xl mx-auto px-4 md:px-8 py-8">
           {/* Header */}
           <div className="mb-8">

@@ -16,57 +16,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
 
-// Define DownloadLocationStep component
-function DownloadLocationStep() {
-  const [downloadPath, setDownloadPath] = useState<string>('Downloads/Tatakai');
-  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    // Set default download path for web
-    const saved = localStorage.getItem('tatakai_download_path');
-    if (saved) {
-      setDownloadPath(saved);
-    }
-  }, []);
-
-  const handleChangeLocation = async () => {
-    try {
-      setLoading(true);
-      // For web, just set a default path
-      const defaultPath = 'Downloads/Tatakai';
-      setDownloadPath(defaultPath);
-      localStorage.setItem('tatakai_download_path', defaultPath);
-      toast.success("Download location updated");
-    } catch (e) {
-      toast.error("Failed to change location");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="p-6 rounded-2xl bg-white/5 border border-white/10 flex flex-col items-center text-center space-y-4">
-        <div className="w-16 h-16 rounded-full bg-cyan-500/10 flex items-center justify-center">
-          <FolderOpen className="w-8 h-8 text-cyan-400" />
-        </div>
-        <div>
-          <p className="text-sm text-muted-foreground mb-1">Download Location</p>
-          <code className="px-3 py-1 rounded-lg bg-black/30 border border-white/10 text-xs font-mono break-all">
-            {downloadPath}
-          </code>
-        </div>
-        <Button onClick={handleChangeLocation} disabled={loading} variant="outline" className="border-cyan-500/20 text-cyan-400 hover:bg-cyan-500/10 hover:text-cyan-300">
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-          Reset to Default
-        </Button>
-        <p className="text-xs text-muted-foreground/60 max-w-xs">
-          Downloads are handled by your browser. Location shown is for reference only.
-        </p>
-      </div>
-    </div>
-  );
-}
 
 interface OnboardingStep {
   id: string;
@@ -283,8 +233,24 @@ function ProfileSetupStep() {
 
 function ThemeSelectionStep() {
   const { theme, setTheme } = useTheme();
-  const [reduceMotion, setReduceMotion] = useState(localStorage.getItem('tatakai_reduce_motion') === 'true');
+  const [reduceMotion, setReduceMotion] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('tatakai_reduce_motion') === 'true';
+  });
   const [ultraLite, setUltraLite] = useState(localStorage.getItem('tatakai_ultra_lite') === 'true');
+
+  // Auto-select dark theme for mobile low performance
+  useEffect(() => {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const cpuCores = navigator.hardwareConcurrency || 4;
+    const deviceMemory = (navigator as any).deviceMemory || 4;
+    const hasLowPerformance = cpuCores <= 4 || deviceMemory <= 4;
+
+    if (isMobile && hasLowPerformance && !theme) {
+      // Select midnight dark theme for low performance mobile (NOT ultra-lite)
+      setTheme('midnight');
+    }
+  }, [theme, setTheme]);
 
   const toggleMotion = () => {
     const newVal = !reduceMotion;
@@ -334,6 +300,9 @@ function ThemeSelectionStep() {
           <Zap className="w-4 h-4 text-amber-500" />
           Accessibility & Performance
         </h5>
+        <p className="text-[11px] text-muted-foreground">
+          Do you want to reduce motion effects? You can change this later.
+        </p>
 
         <button
           onClick={toggleMotion}
@@ -347,8 +316,8 @@ function ThemeSelectionStep() {
               <Activity className="w-4 h-4" />
             </div>
             <div className="text-left">
-              <p className="font-bold text-sm">Reduce Motion</p>
-              <p className="text-[10px] text-muted-foreground">Minimize animations for better accessibility</p>
+              <p className="font-bold text-sm">Reduce Motion?</p>
+              <p className="text-[10px] text-muted-foreground">Minimize animations for accessibility</p>
             </div>
           </div>
           <div className={cn("w-10 h-6 rounded-full p-1 transition-colors", reduceMotion ? "bg-primary" : "bg-white/10")}>
@@ -521,13 +490,6 @@ const onboardingSteps: OnboardingStep[] = [
     condition: (user: any) => !!user,
   },
   {
-    id: 'download-location',
-    title: 'Download Location',
-    description: 'Where should we store your offline anime?',
-    icon: <FolderOpen className="w-10 h-10 text-cyan-400" />,
-    content: <DownloadLocationStep />,
-  },
-  {
     id: 'theme',
     title: 'Choose Your Experience',
     description: 'Customize how Tatakai looks and performs',
@@ -540,6 +502,7 @@ export default function OnboardingPage() {
   const { user } = useAuth();
   const filteredSteps = onboardingSteps.filter(step => !step.condition || step.condition(user));
 
+  // Always start from step 0 (step 1 for users) for new users
   const [currentStep, setCurrentStep] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
   const navigate = useNavigate();
@@ -551,15 +514,9 @@ export default function OnboardingPage() {
       return;
     }
 
-    const themeSelected = localStorage.getItem('tatakai_theme_selected_v2') === 'true';
-    if (!themeSelected) {
-      const themeStepIdx = filteredSteps.findIndex(s => s.id === 'theme');
-      if (themeStepIdx !== -1) {
-        // If they already did onboarding before our 'forced' update, take them to theme step
-        setCurrentStep(themeStepIdx);
-      }
-    }
-  }, [filteredSteps, user, navigate]);
+    // Force step to 0 on mount to always start from beginning
+    setCurrentStep(0);
+  }, [user, navigate]);
 
   const handleNext = () => {
     if (currentStep < filteredSteps.length - 1) {
@@ -685,25 +642,26 @@ export default function OnboardingPage() {
           </AnimatePresence>
         </div>
 
-        {/* Navigation */}
-        <div className="fixed bottom-0 left-0 right-0 p-6 bg-background/80 backdrop-blur-md border-t border-white/10">
-          <div className="max-w-2xl mx-auto flex items-center justify-between">
-            <Button
-              variant="ghost"
-              onClick={handlePrevious}
-              disabled={currentStep === 0}
-              className="px-8 rounded-full text-muted-foreground hover:text-white transition-all"
-            >
-              Back
-            </Button>
 
-            <Button
-              onClick={handleNext}
-              className="px-10 py-6 rounded-full bg-white text-black font-black text-lg hover:bg-white/90 hover:scale-105 active:scale-95 transition-all shadow-xl shadow-white/10 gap-3"
-            >
-              {currentStep === filteredSteps.length - 1 ? 'START TATAKAI' : 'CONTINUE'}
-              <ArrowRight className="w-5 h-5" />
-            </Button>
+          {/* Navigation - Hidden footer for clean onboarding */}
+        <div className="fixed bottom-0 left-0 right-0 p-6 bg-background/95 backdrop-blur-xl border-t border-white/5 z-50">
+          <div className="max-w-2xl mx-auto flex items-center justify-between">
+          <Button
+            variant="ghost"
+            onClick={handlePrevious}
+            disabled={currentStep === 0}
+            className="px-8 rounded-full text-muted-foreground hover:text-white transition-all"
+          >
+            Back
+          </Button>
+
+          <Button
+            onClick={handleNext}
+            className="px-10 py-6 rounded-full bg-white text-black font-black text-lg hover:bg-white/90 hover:scale-105 active:scale-95 transition-all shadow-xl shadow-white/10 gap-3"
+          >
+            {currentStep === filteredSteps.length - 1 ? 'START TATAKAI' : 'CONTINUE'}
+            <ArrowRight className="w-5 h-5" />
+          </Button>
           </div>
         </div>
       </div>

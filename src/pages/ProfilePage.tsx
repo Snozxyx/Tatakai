@@ -3,7 +3,8 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
-import { useIsNativeApp } from '@/hooks/useIsNativeApp';
+import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from '@/hooks/useIsNativeApp';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,6 +47,10 @@ export default function ProfilePage() {
   const { username: usernameParam, atUsername, slug } = useParams<{ username?: string; atUsername?: string; slug?: string }>();
   const { user, profile: ownProfile, signOut, refreshProfile, isAdmin } = useAuth();
   const isNative = useIsNativeApp();
+  const isDesktopApp = useIsDesktopApp();
+  const isMobileApp = useIsMobileApp();
+  const isMobile = useIsMobile();
+  const showSidebar = !isMobile && !isMobileApp;
   const { data: notifications = [], unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
 
   // Determine if viewing someone else's profile
@@ -119,8 +124,11 @@ export default function ProfilePage() {
     return (
       <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
         {/* <StatusVideoBackground overlayColor="from-background/95 via-background/90 to-background/80" /> */}
-        <Sidebar />
-        <main className="relative z-10 pl-0 md:pl-20 lg:pl-24 w-full">
+        {showSidebar && <Sidebar />}
+        <main className={cn(
+          "relative z-10 w-full",
+          !isDesktopApp && "md:pl-24" // Left padding for floating sidebar on web
+        )}>
           <div className="max-w-7xl mx-auto px-4 md:px-8 py-20">
             <button
               onClick={() => navigate(-1)}
@@ -222,11 +230,11 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       {/* <StatusVideoBackground overlayColor="from-background/95 via-background/90 to-background/80" /> */}
-      {!isNative && <Sidebar />}
+      {showSidebar && <Sidebar />}
 
       <main className={cn(
         "relative z-10 w-full",
-        !isNative && "pl-0 md:pl-20 lg:pl-24"
+        !isDesktopApp && "md:pl-24" // Left padding for floating sidebar on web
       )}>
         {/* Hero Banner */}
         <div className="h-[300px] md:h-[400px] relative w-full overflow-hidden group">
@@ -871,7 +879,7 @@ export default function ProfilePage() {
         </div>
       </main>
 
-      {!isNative && <MobileNav />}
+      <MobileNav />
     </div>
   );
 }

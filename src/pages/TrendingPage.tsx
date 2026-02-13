@@ -11,6 +11,8 @@ import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
+import { useIsNativeApp } from "@/hooks/useIsNativeApp";
+import { cn } from "@/lib/utils";
 
 type TimeFrame = 'today' | 'week' | 'month' | 'all';
 
@@ -124,6 +126,7 @@ export default function TrendingPage() {
     { id: 'all', label: 'All Time', icon: <Sparkles className="w-4 h-4" /> },
   ];
 
+  const isNative = useIsNativeApp();
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
@@ -135,7 +138,10 @@ export default function TrendingPage() {
         <div className="absolute inset-0 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:40px_40px] [mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,#000_70%,transparent_100%)] animate-float-slow"></div>
       </div>
 
-      <main className="relative z-10 pl-4 md:pl-32 pr-4 md:pr-6 py-4 md:py-6 max-w-[1800px] mx-auto pb-24 md:pb-6">
+      <main className={cn(
+        "relative z-10 pr-4 md:pr-6 py-4 md:py-6 max-w-[1800px] mx-auto pb-24 md:pb-6",
+        isNative ? "pl-4" : "pl-4 md:pl-32"
+      )}>
         {/* Header */}
         <div className="mb-6 md:mb-8">
           <div className="flex items-center gap-3 mb-4">

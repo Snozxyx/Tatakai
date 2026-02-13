@@ -34,7 +34,7 @@ export default function OfflineLibraryPage() {
     const [downloadPath, setDownloadPath] = useState<string | null>(null);
     const isNative = useIsNativeApp();
     const navigate = useNavigate();
-    const { downloadStates, cancelDownload } = useDownload();
+    const { downloadStates = {}, cancelDownload } = useDownload();
 
     // Get active downloads
     const activeDownloads = Object.entries(downloadStates).filter(
@@ -221,7 +221,7 @@ export default function OfflineLibraryPage() {
         <div className="min-h-screen bg-background text-foreground">
             <Sidebar />
 
-            <main className="pl-6 md:pl-32 pr-6 py-12 max-w-[1600px] mx-auto space-y-8">
+            <main className={isNative ? "pl-6 pr-6 py-12 max-w-[1600px] mx-auto space-y-8" : "pl-6 md:pl-32 pr-6 py-12 max-w-[1600px] mx-auto space-y-8"}>
                 {/* Header */}
                 <div className="flex flex-col gap-6">
                     <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">

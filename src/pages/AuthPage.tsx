@@ -7,6 +7,8 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Eye, EyeOff, Mail, Lock, User, Play, ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
+import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from '@/hooks/useIsNativeApp';
+import { cn } from '@/lib/utils';
 
 const emailSchema = z.string().email('Please enter a valid email');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
@@ -16,6 +18,8 @@ const VIDEO_SOURCES = [
   'https://xkbzamfyupjafugqeaby.supabase.co/storage/v1/object/public/Public/bg/3.mp4',
   'https://xkbzamfyupjafugqeaby.supabase.co/storage/v1/object/public/Public/bg/2.webm',
   'https://xkbzamfyupjafugqeaby.supabase.co/storage/v1/object/public/Public/bg/1.mp4',
+  '/videos/5.mp4',
+  '/videos/6.mp4',
 ];
 
 // Random text variations
@@ -125,14 +129,25 @@ export default function AuthPage() {
     }
   };
 
+  const isNative = useIsNativeApp();
+  const isDesktopApp = useIsDesktopApp();
+  const isMobileApp = useIsMobileApp();
+
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
       {/* Left Side - Form with opaque background */}
-      <div className="w-full lg:w-1/2 min-h-screen bg-background flex flex-col justify-center items-center p-6 lg:p-12 relative">
+      <div className={cn(
+        "w-full lg:w-1/2 min-h-screen bg-background flex flex-col justify-center items-center p-6 lg:p-12 relative",
+        // Only hide right panel on mobile apps, keep 50/50 on desktop apps
+        isMobileApp && "lg:w-full"
+      )}>
         {/* Back button */}
         <button 
           onClick={() => navigate('/')} 
-          className="absolute top-6 left-6 flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors group"
+          className={cn(
+            "absolute top-6 flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors group",
+            isNative ? "left-4" : "left-6"
+          )}
         >
           <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
           <span className="text-sm font-medium">Back to Home</span>
@@ -301,8 +316,11 @@ export default function AuthPage() {
         </div>
       </div>
 
-      {/* Right Side - Video with overlay */}
-      <div className="hidden lg:block w-1/2 h-screen relative overflow-hidden">
+      {/* Right Side - Video with overlay - show on web and desktop apps, hide only on mobile apps */}
+      <div className={cn(
+        "hidden lg:block w-1/2 h-screen relative overflow-hidden",
+        isMobileApp && "lg:hidden"
+      )}>
         {/* Video Background */}
         <video
           autoPlay

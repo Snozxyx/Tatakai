@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useAnimeInfo, useEpisodes, useNextEpisodeSchedule } from "@/hooks/useAnimeData";
-import { useAnimeSeasons } from "@/hooks/useAnimeSeasons";
-import { useAnimelokSeasons } from "@/hooks/useAnimelokSeasons";
+import { useHiAnimeSeasons } from "@/hooks/useHiAnimeSeasons";
+import { useExternalIds } from "@/hooks/useExternalIds";
 import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
@@ -29,19 +29,42 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { fetchCombinedSources } from "@/lib/api";
-import { useIsNativeApp } from '@/hooks/useIsNativeApp';
+import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from '@/hooks/useIsNativeApp';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Capacitor } from '@capacitor/core';
 
 export default function AnimePage() {
   const { animeId } = useParams<{ animeId: string }>();
   const navigate = useNavigate();
   const { data: animeData, isLoading: loadingInfo, error: infoError } = useAnimeInfo(animeId);
   const { data: episodesData, isLoading: loadingEpisodes } = useEpisodes(animeId);
-  const { data: seasons = [], isLoading: loadingSeasons } = useAnimeSeasons(animeId);
-  const { data: animelokSeasonsData } = useAnimelokSeasons(animeId);
+  const { data: hiAnimeSeasons = [], isLoading: loadingSeasons } = useHiAnimeSeasons(animeId);
+  const { data: externalIds, isLoading: loadingExternalIds } = useExternalIds(animeId); // Robust multi-source ID resolution
   const { data: nextEpisodeSchedule } = useNextEpisodeSchedule(animeId);
 
+  // Get MAL/AniList IDs from the robust multi-source hook
+  const malId = externalIds?.malId || null;
+  const anilistId = externalIds?.anilistId || null;
+  
+  // Debug log for tracking ID extraction
+  console.log('[AnimePage] External IDs Debug:', {
+    animeId,
+    loadingExternalIds,
+    source: externalIds?.source,
+    malId,
+    anilistId,
+    seasonsCount: hiAnimeSeasons?.length || 0
+  });
+
   const [isResolving, setIsResolving] = useState(false);
-  const isNative = useIsNativeApp();
+  const isNative = useIsNativeApp(); // Any native app (desktop or mobile)
+  const isDesktopApp = useIsDesktopApp(); // Only Electron/Tauri
+  const isMobileNative = useIsMobileApp(); // Only Capacitor (Android/iOS)
+  const isMobile = useIsMobile(); // Screen width based check
+  
+  // Show sidebar on desktop (web or app), but not on mobile (web or app)
+  const showSidebar = !isMobile && !isMobileNative;
+  
   const [resolutionStatus, setResolutionStatus] = useState<string>("");
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
@@ -90,27 +113,8 @@ export default function AnimePage() {
     }
   }, [animeId, navigate]);
 
-  // Merge Animelok seasons if available
-  const allSeasons = useMemo(() => {
-    const baseSeasons = [...seasons];
-
-    if (animelokSeasonsData?.seasons && animelokSeasonsData.seasons.length > 0) {
-      // Add Animelok seasons that aren't already in the list
-      animelokSeasonsData.seasons.forEach((animelokSeason) => {
-        if (!baseSeasons.find(s => s.id === animelokSeason.id)) {
-          baseSeasons.push({
-            id: animelokSeason.id,
-            name: animelokSeason.title,
-            title: animelokSeason.title,
-            poster: animelokSeason.poster || "",
-            isCurrent: animelokSeason.id === animeId,
-          });
-        }
-      });
-    }
-
-    return baseSeasons;
-  }, [seasons, animelokSeasonsData, animeId]);
+  // Use HiAnime seasons directly - they have proper season titles like "Season 1", "Season 2", etc.
+  const allSeasons = hiAnimeSeasons;
 
   // Auto-select episode 1 when clicking watch
   const handleWatchNow = () => {
@@ -127,7 +131,7 @@ export default function AnimePage() {
     return (
       <div className="min-h-screen bg-background text-foreground">
         <Background />
-        <Sidebar />
+        {showSidebar && <Sidebar />}
         <main className="relative z-10 flex flex-col items-center justify-center min-h-[80vh] p-6 text-center">
           <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
           <h1 className="text-2xl font-bold mb-2">Resolving Anime Link</h1>
@@ -142,7 +146,7 @@ export default function AnimePage() {
     return (
       <div className="min-h-screen bg-background text-foreground">
         <Background />
-        <Sidebar />
+        {showSidebar && <Sidebar />}
         <main className="relative z-10 pl-6 md:pl-32 pr-6 py-6 max-w-[1800px] mx-auto">
           <div className="space-y-8">
             <Skeleton className="h-8 w-32" />
@@ -208,13 +212,13 @@ export default function AnimePage() {
       </Helmet>
 
       <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-        {!isNative && <Sidebar />}
+        {showSidebar && <Sidebar />}
 
         {/* Video Background Hero */}
         <VideoBackground animeId={animeId!} poster={info.poster}>
           <main className={cn(
             "relative z-10 pr-6 py-6 max-w-[1800px] mx-auto pb-24 md:pb-6",
-            isNative ? "p-6" : "pl-6 md:pl-32"
+            isDesktopApp ? "pl-6" : "pl-6 md:pl-32" // Original web padding
           )}>
             {/* Back Button */}
             <button
@@ -316,13 +320,13 @@ export default function AnimePage() {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-4 pt-4">
+                <div className="flex flex-wrap items-center gap-3 pt-4">
                   <button
                     onClick={handleWatchNow}
                     disabled={loadingEpisodes || !episodesData?.episodes[0]}
-                    className="h-14 px-8 rounded-full bg-foreground text-background font-bold text-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-2 glow-primary disabled:opacity-50"
+                    className="h-12 sm:h-14 px-6 sm:px-8 rounded-full bg-foreground text-background font-bold text-base sm:text-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-2 glow-primary disabled:opacity-50"
                   >
-                    <Play className="w-5 h-5 fill-background" />
+                    <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-background" />
                     Watch Now
                   </button>
                   <WatchlistButton
@@ -330,8 +334,8 @@ export default function AnimePage() {
                     animeName={info.name}
                     animePoster={info.poster}
                     variant="icon"
-                    malId={moreInfo.malId}
-                    anilistId={moreInfo.anilistId}
+                    malId={malId || moreInfo.malId || null}
+                    anilistId={anilistId || moreInfo.anilistId || null}
                   />
                   <AddToPlaylistButton
                     animeId={animeId!}
@@ -353,7 +357,7 @@ export default function AnimePage() {
                     <Users className="w-5 h-5 text-white" />
                   </button>
 
-                  {isNative && (
+                  {(isMobileNative || isDesktopApp) && (
                     <button
                       onClick={() => setIsDownloadModalOpen(true)}
                       className="h-14 w-14 rounded-full bg-primary/20 hover:bg-primary/30 text-primary flex items-center justify-center transition-all hover:scale-105"
@@ -433,7 +437,7 @@ export default function AnimePage() {
                     key={season.id}
                     to={`/anime/${season.id}`}
                     className={cn(
-                      "group",
+                      "group flex-shrink-0",
                       season.isCurrent && "pointer-events-none"
                     )}
                   >
@@ -453,10 +457,16 @@ export default function AnimePage() {
                           Current
                         </div>
                       )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                      {/* Show season title at bottom */}
+                      <div className="absolute bottom-0 left-0 right-0 p-2 text-center">
+                        <span className="text-white text-xs font-bold drop-shadow-lg">
+                          {season.title}
+                        </span>
+                      </div>
                     </div>
                     <p className={cn(
-                      "mt-2 text-sm font-medium line-clamp-2 text-center",
+                      "mt-2 text-xs md:text-sm font-medium line-clamp-2 text-center w-32 md:w-40 break-words",
                       season.isCurrent ? "text-primary" : "text-foreground group-hover:text-primary transition-colors"
                     )}>
                       {season.name}
@@ -488,9 +498,9 @@ export default function AnimePage() {
           )}
         </main>
 
-        {!isNative && <MobileNav />}
+        {!showSidebar && <MobileNav />}
 
-        {isNative && episodesData && (
+        {(isMobileNative || isDesktopApp) && episodesData && (
           <SeasonDownloadModal
             isOpen={isDownloadModalOpen}
             onClose={() => setIsDownloadModalOpen(false)}

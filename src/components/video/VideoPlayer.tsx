@@ -2382,28 +2382,28 @@ export function VideoPlayer({
 
 
             {/* Download Button (Native only, not in offline mode) */}
-            {isNative && !isOffline && serverName?.includes('Luffy') && (
+            {isNative && !isOffline && serverName?.includes('Luffy') && episodeId && (
               <div className="relative group/download">
                 <button
                   onClick={async () => {
                     await startDownload({
-                      episodeId: animeId + '?ep=' + episodeNumber, // Simplified, verify ID format
-                      animeName: animeName,
+                      episodeId: episodeId,
+                      animeName: animeName || '',
                       episodeNumber: episodeNumber || 1,
-                      posterUrl: poster || '',
+                      posterUrl: animePoster || poster || '',
                     });
                   }}
-                  disabled={downloadStates[animeId + '?ep=' + episodeNumber]?.status === 'downloading'}
+                  disabled={downloadStates[episodeId]?.status === 'downloading'}
                   className="p-2 rounded-lg hover:bg-white/10 transition-colors relative"
                   title="Download Episode"
                 >
-                  {downloadStates[animeId + '?ep=' + episodeNumber]?.status === 'completed' ? (
+                  {downloadStates[episodeId]?.status === 'completed' ? (
                     <CheckCircle2 className="w-4 h-4 md:w-5 md:h-5 text-green-500" />
-                  ) : downloadStates[animeId + '?ep=' + episodeNumber]?.status === 'downloading' ? (
+                  ) : downloadStates[episodeId]?.status === 'downloading' ? (
                     <div className="relative flex items-center justify-center">
                       <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin text-primary" />
                       <span className="absolute text-[6px] font-bold">
-                        {Math.round(downloadStates[animeId + '?ep=' + episodeNumber]?.progress || 0)}
+                        {Math.round(downloadStates[episodeId]?.progress || 0)}
                       </span>
                     </div>
                   ) : (

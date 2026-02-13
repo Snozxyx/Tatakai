@@ -84,11 +84,14 @@ const FALLBACK_CHANGELOG = [
 ];
 
 import { DesktopSettings } from '@/components/settings/DesktopSettings';
+import { MobileSettings } from '@/components/settings/MobileSettings';
 import { useIsNativeApp } from '@/hooks/useIsNativeApp';
+import { Capacitor } from '@capacitor/core';
 
 export default function SettingsPage() {
   const [searchParams] = useSearchParams();
   const isNative = useIsNativeApp();
+  const isMobile = Capacitor.isNativePlatform();
   const requestedTab = searchParams.get('tab');
 
   const { user, profile, refreshProfile } = useAuth();
@@ -627,7 +630,10 @@ export default function SettingsPage() {
       <Background />
       <Sidebar />
 
-      <main className="relative z-10 pl-6 md:pl-32 pr-6 py-6 max-w-[1400px] mx-auto pb-24 md:pb-6">
+      <main className={cn(
+        "relative z-10 pr-6 py-6 max-w-[1400px] mx-auto pb-24 md:pb-6",
+        isNative ? "pl-6" : "pl-6 md:pl-32"
+      )}>
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <button
@@ -654,7 +660,7 @@ export default function SettingsPage() {
             {isNative && (
               <TabsTrigger value="desktop" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Laptop className="w-4 h-4" />
-                Desktop App
+                 App
               </TabsTrigger>
             )}
             <TabsTrigger value="player" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
@@ -689,9 +695,18 @@ export default function SettingsPage() {
           </TabsContent>
 
           {/* Desktop Tab */}
-          <TabsContent value="desktop">
-            <DesktopSettings />
-          </TabsContent>
+          {!isMobile && (
+            <TabsContent value="desktop">
+              <DesktopSettings />
+            </TabsContent>
+          )}
+
+          {/* Mobile Tab */}
+          {isMobile && (
+            <TabsContent value="desktop">
+              <MobileSettings />
+            </TabsContent>
+          )}
 
           {/* Video Player Tab */}
           <TabsContent value="player">

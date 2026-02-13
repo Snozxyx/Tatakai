@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { AnimeGrid } from "@/components/anime/AnimeGrid";
 import { CardSkeleton } from "@/components/ui/skeleton-custom";
 import { Input } from "@/components/ui/input";
-import { Search, X, Loader2, Film, Play } from "lucide-react";
+import { Search, X, Loader2, Film, Play, Camera } from "lucide-react";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import { useState, useEffect } from "react";
 
@@ -122,17 +122,34 @@ export default function SearchPage() {
               placeholder="Search anime..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="pl-10 pr-10 h-12 bg-muted/50 border-border/50 rounded-xl text-base"
+              className="pl-10 pr-20 h-12 bg-muted/50 border-border/50 rounded-xl text-base"
             />
-            {searchInput && (
-              <button
-                type="button"
-                onClick={() => setSearchInput('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted"
-              >
-                <X className="w-4 h-4 text-muted-foreground" />
-              </button>
-            )}
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+              {searchInput && (
+                <button
+                  type="button"
+                  onClick={() => setSearchInput('')}
+                  className="p-1 rounded-full hover:bg-muted"
+                >
+                  <X className="w-4 h-4 text-muted-foreground" />
+                </button>
+              )}
+              <label className="p-1 rounded-full hover:bg-muted cursor-pointer text-muted-foreground hover:text-primary transition-colors">
+                <Camera className="w-5 h-5" />
+                <input
+                  type="file"
+                  className="hidden"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setSelectedFile(file);
+                      // Optional: auto-scroll to image search section or trigger search
+                    }
+                  }}
+                />
+              </label>
+            </div>
           </div>
         </form>
 
@@ -312,7 +329,7 @@ export default function SearchPage() {
         )}
       </main>
 
-      {!isNative && <MobileNav />}
+      <MobileNav />
     </div>
   );
 }

@@ -126,6 +126,20 @@ export default function AdminPage() {
     enabled: isStaff,
   });
 
+  // Total user count (not limited)
+  const { data: totalUsersCount } = useQuery({
+    queryKey: ['admin_users_count'],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true });
+
+      if (error) throw error;
+      return count || 0;
+    },
+    enabled: isStaff,
+  });
+
   // Fetch all comments
   const { data: comments, isLoading: loadingComments } = useQuery({
     queryKey: ['admin_comments'],
@@ -218,17 +232,12 @@ export default function AdminPage() {
   // Ban user mutation
   const banUser = useMutation({
     mutationFn: async ({ userId, reason }: { userId: string; reason: string }) => {
-      const { data: currentUser } = await supabase.auth.getUser();
-      // Using type assertion since the columns may not be in generated types yet
-      const { error } = await (supabase
-        .from('profiles')
-        .update({
-          is_banned: true,
-          banned_at: new Date().toISOString(),
-          banned_by: currentUser.user?.id,
-          ban_reason: reason,
-        } as any)
-        .eq('user_id', userId) as any);
+      // Use the SQL RPC function for banning
+      const { error } = await supabase.rpc('ban_user', {
+        target_user_id: userId,
+        reason: reason,
+        duration_hours: null // null = permanent ban
+      });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -238,32 +247,28 @@ export default function AdminPage() {
       setBanReason('');
       setUserToBan(null);
     },
-    onError: () => {
-      toast.error('Failed to ban user');
+    onError: (error: any) => {
+      console.error('Ban error:', error);
+      toast.error(error.message || 'Failed to ban user');
     },
   });
 
   // Unban user mutation
   const unbanUser = useMutation({
     mutationFn: async (userId: string) => {
-      // Using type assertion since the columns may not be in generated types yet
-      const { error } = await (supabase
-        .from('profiles')
-        .update({
-          is_banned: false,
-          banned_at: null,
-          banned_by: null,
-          ban_reason: null,
-        } as any)
-        .eq('user_id', userId) as any);
+      // Use the SQL RPC function for unbanning
+      const { error } = await supabase.rpc('unban_user', {
+        target_user_id: userId
+      });
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin_users'] });
       toast.success('User unbanned successfully');
     },
-    onError: () => {
-      toast.error('Failed to unban user');
+    onError: (error: any) => {
+      console.error('Unban error:', error);
+      toast.error(error.message || 'Failed to unban user');
     },
   });
 
@@ -420,7 +425,7 @@ export default function AdminPage() {
                 <Users className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{users?.length || 0}</p>
+                <p className="text-2xl font-bold">{totalUsersCount ?? (users?.length || 0)}</p>
                 <p className="text-xs text-muted-foreground">Total Users</p>
               </div>
             </div>

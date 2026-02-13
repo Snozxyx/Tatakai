@@ -1,13 +1,15 @@
-import { useDownload } from "@/contexts/DownloadContext";
-import { useIsNativeApp } from "@/hooks/useIsNativeApp";
+import { useDownload } from "@/hooks/useDownload";
+import { useIsNativeApp, useIsMobileApp, useIsDesktopApp } from "@/hooks/useIsNativeApp";
 import { Download, X, CheckCircle2, AlertCircle, RotateCcw, Pause, Play, FolderOpen, ChevronDown, ChevronUp } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 
 export function DownloadIndicator() {
   const isNative = useIsNativeApp();
-  const { downloadStates, cancelDownload, startDownload, retryDownload } = useDownload();
+  const isMobile = useIsMobileApp();
+  const isDesktop = useIsDesktopApp();
+  const { downloadStates = {}, cancelDownload, startDownload, retryDownload } = useDownload();
   const [isExpanded, setIsExpanded] = useState(true);
   const [isMinimized, setIsMinimized] = useState(false);
   
@@ -33,7 +35,7 @@ export function DownloadIndicator() {
       <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="fixed bottom-4 right-4 z-[50]"
+        className={isMobile ? "fixed top-4 right-4 z-[50]" : "fixed bottom-4 right-4 z-[50]"}
       >
         <button 
           onClick={() => setIsMinimized(false)}
@@ -55,9 +57,9 @@ export function DownloadIndicator() {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: isMobile ? -20 : 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="fixed bottom-4 right-4 z-[50] w-80"
+      className={isMobile ? "fixed top-4 right-4 z-[50] w-80" : "fixed bottom-4 right-4 z-[50] w-80"}
     >
       <div className="bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
         {/* Header */}
@@ -72,13 +74,15 @@ export function DownloadIndicator() {
             )}
           </div>
           <div className="flex items-center gap-1">
-            <button 
-              onClick={openDownloadFolder}
-              className="p-1 hover:bg-white/5 rounded text-white/40 hover:text-white/70 transition-colors"
-              title="Open folder"
-            >
-              <FolderOpen size={12} />
-            </button>
+            {isDesktop && (
+              <button 
+                onClick={openDownloadFolder}
+                className="p-1 hover:bg-white/5 rounded text-white/40 hover:text-white/70 transition-colors"
+                title="Open folder"
+              >
+                <FolderOpen size={12} />
+              </button>
+            )}
             <button 
               onClick={() => setIsExpanded(!isExpanded)}
               className="p-1 hover:bg-white/5 rounded text-white/40 hover:text-white/70 transition-colors"

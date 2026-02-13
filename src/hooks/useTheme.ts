@@ -728,30 +728,33 @@ export const THEME_INFO: Record<Theme, { name: string; gradient: string; descrip
     category: 'light',
   },
 };
-
 const THEME_KEY = 'anime-theme';
-
 export function useTheme() {
+  const isLowEndDevice = useCallback(() => {
+    if (typeof window === 'undefined') return false;
+
+    return (
+      ((navigator as any).deviceMemory !== undefined &&
+        (navigator as any).deviceMemory < 4) ||
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        navigator.userAgent
+      )
+    );
+  }, []);
+
   const [theme, setThemeState] = useState<Theme>(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem(THEME_KEY) as Theme | null;
       if (stored && THEME_COLORS[stored]) return stored;
-
-      // Auto-detect low-end device/mobile for lite theme default
-      const isLowEnd = (
-        (navigator as any).deviceMemory !== undefined && (navigator as any).deviceMemory < 4
-      ) || (
-          /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-        );
-
-      return isLowEnd ? 'lite' : 'cherry-blossom';
     }
     return 'cherry-blossom';
   });
 
   const [reduceMotion, setReduceMotionState] = useState(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('tatakai_reduce_motion') === 'true';
+      const stored = localStorage.getItem('tatakai_reduce_motion');
+      if (stored !== null) return stored === 'true';
+      return false;
     }
     return false;
   });
@@ -763,91 +766,29 @@ export function useTheme() {
     return false;
   });
 
-  const applyTheme = useCallback((themeName: Theme) => {
-    const colors = THEME_COLORS[themeName];
-    if (!colors) return;
+  const applyTheme = useCallback(
+    (themeName: Theme) => {
+      const colors = THEME_COLORS[themeName];
+      if (!colors) return;
 
-    const root = document.documentElement;
+      const root = document.documentElement;
 
-    root.style.setProperty('--primary', colors.primary);
-    root.style.setProperty('--secondary', colors.secondary);
-    root.style.setProperty('--accent', colors.accent);
-    root.style.setProperty('--background', colors.background);
-    root.style.setProperty('--foreground', colors.foreground);
-    root.style.setProperty('--card', colors.card);
-    root.style.setProperty('--card-foreground', colors.cardForeground);
-    root.style.setProperty('--muted', colors.muted);
-    root.style.setProperty('--muted-foreground', colors.mutedForeground);
-    root.style.setProperty('--border', colors.border);
-    root.style.setProperty('--input', colors.border);
-    root.style.setProperty('--ring', colors.primary);
-    root.style.setProperty('--glass', colors.glass);
-    root.style.setProperty('--glow-primary', colors.glowPrimary);
-    root.style.setProperty('--glow-secondary', colors.glowSecondary);
-    root.style.setProperty('--surface', colors.surface);
-    root.style.setProperty('--surface-hover', colors.surfaceHover);
-    root.style.setProperty('--sidebar-background', colors.sidebarBackground);
-    root.style.setProperty('--sidebar-foreground', colors.foreground);
-    root.style.setProperty('--sidebar-primary', colors.primary);
-    root.style.setProperty('--sidebar-primary-foreground', colors.foreground);
-    root.style.setProperty('--sidebar-accent', colors.muted);
-    root.style.setProperty('--sidebar-accent-foreground', colors.foreground);
-    root.style.setProperty('--sidebar-border', colors.sidebarBorder);
-    root.style.setProperty('--sidebar-ring', colors.primary);
-    root.style.setProperty('--popover', colors.card);
-    root.style.setProperty('--popover-foreground', colors.cardForeground);
+      Object.entries(colors).forEach(([key, value]) => {
+        if (typeof value === 'string') {
+          root.style.setProperty(`--${key}`, value);
+        }
+      });
 
-    if (colors.primaryForeground) {
-      root.style.setProperty('--primary-foreground', colors.primaryForeground);
-    } else {
-      root.style.setProperty('--primary-foreground', colors.isLight ? '220 15% 10%' : '0 0% 100%');
-    }
+      document.body.classList.toggle('light-theme', colors.isLight);
+      document.body.classList.toggle('dark-theme', !colors.isLight);
+      document.body.classList.toggle('ultra-lite-theme', !!colors.isUltraLite);
+      document.body.classList.toggle('reduce-motion', reduceMotion);
+      document.body.classList.toggle('high-contrast', highContrast);
 
-    if (colors.secondaryForeground) {
-      root.style.setProperty('--secondary-foreground', colors.secondaryForeground);
-    } else {
-      root.style.setProperty('--secondary-foreground', colors.isLight ? '220 15% 10%' : '0 0% 100%');
-    }
-
-    // Add light theme class for special styling
-    if (colors.isLight) {
-      document.body.classList.add('light-theme');
-      document.body.classList.remove('dark-theme');
-    } else {
-      document.body.classList.add('dark-theme');
-      document.body.classList.remove('light-theme');
-    }
-
-    // Add brutalism class for special styling
-    if ((colors as any).isBrutalism) {
-      document.body.classList.add('brutalism-theme');
-    } else {
-      document.body.classList.remove('brutalism-theme');
-    }
-
-    // Add ultra-lite class for special styling
-    if (colors.isUltraLite) {
-      document.body.classList.add('ultra-lite-theme');
-    } else {
-      document.body.classList.remove('ultra-lite-theme');
-    }
-
-    // Add display settings classes
-    if (reduceMotion) {
-      document.body.classList.add('reduce-motion');
-    } else {
-      document.body.classList.remove('reduce-motion');
-    }
-
-    if (highContrast) {
-      document.body.classList.add('high-contrast');
-    } else {
-      document.body.classList.remove('high-contrast');
-    }
-
-    // Set data-theme attribute for theme-specific CSS
-    document.body.setAttribute('data-theme', themeName);
-  }, [reduceMotion, highContrast]);
+      document.body.setAttribute('data-theme', themeName);
+    },
+    [reduceMotion, highContrast]
+  );
 
   useEffect(() => {
     applyTheme(theme);
@@ -860,12 +801,12 @@ export function useTheme() {
 
   const setReduceMotion = useCallback((value: boolean) => {
     setReduceMotionState(value);
-    localStorage.setItem('tatakai_reduce_motion', value.toString());
+    localStorage.setItem('tatakai_reduce_motion', String(value));
   }, []);
 
   const setHighContrast = useCallback((value: boolean) => {
     setHighContrastState(value);
-    localStorage.setItem('tatakai_high_contrast', value.toString());
+    localStorage.setItem('tatakai_high_contrast', String(value));
   }, []);
 
   const isLightTheme = THEME_COLORS[theme]?.isLight ?? false;

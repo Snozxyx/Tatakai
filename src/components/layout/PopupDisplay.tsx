@@ -7,6 +7,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
+import { useIsDesktopApp } from '@/hooks/useIsNativeApp';
+import { cn } from '@/lib/utils';
 
 interface Popup {
   id: string;
@@ -32,11 +34,10 @@ interface Popup {
   use_theme_colors?: boolean;
 }
 
-import { cn } from '@/lib/utils';
-
 export function PopupDisplay() {
   const { user, profile } = useAuth();
   const location = useLocation();
+  const isDesktop = useIsDesktopApp();
   const [dismissedPopups, setDismissedPopups] = useState<Record<string, number>>({});
 
   // Load dismissed popups from localStorage
@@ -161,7 +162,8 @@ export function PopupDisplay() {
             color: banner.text_color,
           }}
           className={cn(
-            "fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-3 shadow-lg transition-colors duration-500",
+            "fixed left-0 right-0 z-[10000] flex items-center justify-between px-4 py-3 shadow-lg transition-colors duration-500",
+            isDesktop ? "top-[32px]" : "top-0",
             banner.use_theme_colors && "bg-card/95 backdrop-blur-xl border-b border-white/10 text-foreground"
           )}
         >

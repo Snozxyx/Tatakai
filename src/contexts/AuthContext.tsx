@@ -46,6 +46,11 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Check if we're online
+function isOnline(): boolean {
+  return typeof navigator !== 'undefined' ? navigator.onLine : true;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -58,6 +63,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
 
   const fetchProfile = async (userId: string) => {
+    // Skip fetching profile when offline
+    if (!isOnline()) {
+      setIsLoading(false);
+      return;
+    }
+    
     // Use maybeSingle() to avoid 406 when a profile doesn't exist yet
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
@@ -101,6 +112,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    // Skip auth setup when offline - just set loading to false
+    if (!isOnline()) {
+      setIsLoading(false);
+      return;
+    }
+    
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
@@ -109,7 +126,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session?.user) {
           setTimeout(() => {
             fetchProfile(session.user.id);
-            // Migrate local continue-watching entries to the database
+            // Migrate local continue-watching entries to the database (only when online)
+            if (!isOnline()) return;
+            
             (async () => {
               try {
                 const local = getLocalContinueWatching();

@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { LocalNotifications } from '@capacitor/local-notifications';
 
 export interface Notification {
     id: string;
@@ -13,6 +15,47 @@ export interface Notification {
     read: boolean;
     created_at: string;
 }
+
+// Helper to show native notification on mobile
+async function showNativeNotification(notification: Notification) {
+    if (!Capacitor.isNativePlatform()) return;
+    
+    try {
+        const { display } = await LocalNotifications.checkPermissions();
+        if (display !== 'granted') {
+            await LocalNotifications.requestPermissions();
+        }
+        
+        await LocalNotifications.schedule({
+            notifications: [{
+                title: notification.title,
+                body: notification.body,
+                id: Math.abs(notification.id.hashCode?.() || Date.now()) % 2147483647,
+                smallIcon: 'ic_stat_notification',
+                largeIcon: 'ic_launcher',
+                sound: 'default',
+            }]
+        });
+    } catch (error) {
+        console.warn('Failed to show native notification:', error);
+    }
+}
+
+// Simple hash function for string IDs
+declare global {
+    interface String {
+        hashCode(): number;
+    }
+}
+String.prototype.hashCode = function() {
+    let hash = 0;
+    for (let i = 0; i < this.length; i++) {
+        const char = this.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+    }
+    return hash;
+};
 
 export function useNotifications() {
     const { user } = useAuth();
@@ -29,8 +72,13 @@ export function useNotifications() {
                 schema: 'public',
                 table: 'notifications',
                 filter: `user_id=eq.${user.id}`
-            }, () => {
+            }, (payload) => {
                 queryClient.invalidateQueries({ queryKey: ['notifications', user.id] });
+                
+                // Show native notification on mobile
+                if (payload.new) {
+                    showNativeNotification(payload.new as Notification);
+                }
             })
             .on('postgres_changes', {
                 event: 'UPDATE',

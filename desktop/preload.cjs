@@ -34,5 +34,6 @@ contextBridge.exposeInMainWorld('electron', {
     setAutoLaunch: (enabled) => ipcRenderer.invoke('set-auto-launch', enabled),
     getAutoLaunch: () => ipcRenderer.invoke('get-auto-launch'),
     getSystemInfo: () => ipcRenderer.invoke('get-system-info'),
+    getClientId: () => ipcRenderer.invoke('get-client-id'),
     openDevTools: () => ipcRenderer.send('open-devtools'),
 });

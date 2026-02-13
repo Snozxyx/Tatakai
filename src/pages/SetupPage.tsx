@@ -1,14 +1,36 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Folder, Shield, ChevronRight, Check, Disc, Sparkles } from 'lucide-react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { Folder, Shield, ChevronRight, Check, Disc, Sparkles, ArrowLeft, Smartphone } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
 
-// --- Utility for Tailwind ---
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
+// Video sources - local videos bundled with the app (in public/videos)
+const VIDEO_SOURCES = [
+  '/videos/1.mp4',
+  '/videos/2.webm',
+  '/videos/3.mp4',
+  '/videos/5.mp4',
+  '/videos/6.mp4',
+];
+
+// Text variations for the right side
+const TEXT_VARIATIONS = [
+  {
+    title: "Your Anime Hub",
+    desc: "Download, organize, and watch your favorite anime series - all in one beautiful app."
+  },
+  {
+    title: "Watch Anywhere",
+    desc: "Download episodes for offline viewing and never miss a moment of your favorite shows."
+  },
+  {
+    title: "Your Collection",
+    desc: "Build your personal anime library with easy downloads and seamless organization."
+  },
+];
 
 // --- Micro Components ---
 
@@ -18,7 +40,7 @@ const Toggle = ({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
     onClick={() => onChange(!value)}
     className={cn(
       "w-12 h-7 rounded-full p-1 transition-colors duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary/20",
-      value ? "bg-primary" : "bg-zinc-700/50"
+      value ? "bg-primary" : "bg-muted"
     )}
   >
     <motion.div
@@ -30,18 +52,6 @@ const Toggle = ({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
   </button>
 );
 
-// Glass Card Container
-const GlassCard = ({ children, className }: { children: React.ReactNode; className?: string }) => (
-  <div className={cn(
-    "relative overflow-hidden rounded-3xl border border-white/10 bg-zinc-900/60 backdrop-blur-2xl shadow-2xl",
-    className
-  )}>
-    {/* Subtle gradient noise/sheen overlay */}
-    <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
-    <div className="relative z-10">{children}</div>
-  </div>
-);
-
 // --- Main Page ---
 
 export default function SetupPage() {
@@ -49,35 +59,54 @@ export default function SetupPage() {
   const [downloadPath, setDownloadPath] = useState('');
   const [discordEnabled, setDiscordEnabled] = useState(true);
   const navigate = useNavigate();
+  
+  // Check if we're on mobile (Capacitor)
+  const isMobile = Capacitor.isNativePlatform() && !!(window as any).Capacitor;
+  const isDesktop = !!(window as any).electron;
+
+  // Pick random video and text on mount
+  const randomVideoSrc = useMemo(() => {
+    return VIDEO_SOURCES[Math.floor(Math.random() * VIDEO_SOURCES.length)];
+  }, []);
+
+  const randomText = useMemo(() => {
+    return TEXT_VARIATIONS[Math.floor(Math.random() * TEXT_VARIATIONS.length)];
+  }, []);
 
   useEffect(() => {
     const initPath = async () => {
-      if ((window as any).electron) {
+      if (isDesktop && (window as any).electron) {
         const path = await (window as any).electron.getDownloadsDir();
         setDownloadPath(path);
+      } else if (isMobile) {
+        // On Android, use the app's data directory
+        setDownloadPath('App Data Directory (Internal)');
       }
     };
     initPath();
-  }, []);
+  }, [isDesktop, isMobile]);
 
   const handleSelectDir = async () => {
-    if ((window as any).electron) {
+    if (isDesktop && (window as any).electron) {
       const selected = await (window as any).electron.selectDirectory();
       if (selected) setDownloadPath(selected);
     }
+    // On mobile, we don't allow directory selection - files go to app directory
   };
 
   const handleComplete = () => {
     localStorage.setItem('tatakai_setup_complete', 'true');
-    localStorage.setItem('tatakai_download_path', downloadPath);
-    localStorage.setItem('tatakai_discord_rpc', String(discordEnabled));
+    if (isDesktop) {
+      localStorage.setItem('tatakai_download_path', downloadPath);
+      localStorage.setItem('tatakai_discord_rpc', String(discordEnabled));
+    }
     navigate('/');
   };
 
   // Animation variants for smooth sliding
   const slideVariants = {
     enter: (direction: number) => ({
-      x: direction > 0 ? 50 : -50,
+      x: direction > 0 ? 30 : -30,
       opacity: 0,
     }),
     center: {
@@ -85,50 +114,68 @@ export default function SetupPage() {
       opacity: 1,
     },
     exit: (direction: number) => ({
-      x: direction < 0 ? 50 : -50,
+      x: direction < 0 ? 30 : -30,
       opacity: 0,
     }),
   };
 
   return (
-    <div className="min-h-screen bg-black text-white flex items-center justify-center p-6 overflow-hidden relative selection:bg-primary/30">
-      
-      {/* 1. Ambient Background Effects */}
-      <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] bg-primary/20 rounded-full blur-[120px] mix-blend-screen" />
-      <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-[120px] mix-blend-screen" />
-      
-      {/* Subtle Grain Texture (Optional for high-end feel) */}
-      <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none brightness-100 contrast-150"></div>
-
-      <div className="w-full max-w-lg z-20 space-y-8">
+    <div className="min-h-screen flex flex-col lg:flex-row bg-background">
+      {/* Left Side - Setup Form with opaque background */}
+      <div className="w-full lg:w-1/2 min-h-screen bg-background flex flex-col justify-center items-center p-6 lg:p-12 relative">
         
-        {/* Header */}
-        <div className="text-center space-y-3">
-          <motion.div 
-            initial={{ scale: 0.8, opacity: 0 }} 
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: "spring", duration: 0.8 }}
-            className="w-16 h-16 mx-auto bg-gradient-to-br from-zinc-800 to-black border border-white/10 rounded-2xl flex items-center justify-center shadow-lg"
-          >
-             {/* Replace with your actual logo source */}
-             <img src="/tatakai-logo-square.png" alt="Logo" className="w-10 h-10 object-contain drop-shadow-md" />
-          </motion.div>
-          
-          <motion.div
-             initial={{ y: 10, opacity: 0 }}
-             animate={{ y: 0, opacity: 1 }}
-             transition={{ delay: 0.1 }}
-          >
-            <h1 className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-white to-white/50">
-              Welcome to Tatakai
-            </h1>
-            <p className="text-zinc-400 mt-2 text-base font-medium">Let's fine-tune your experience.</p>
-          </motion.div>
-        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="w-full max-w-md"
+        >
+          {/* Logo/Brand */}
+          <div className="mb-10">
+            <div className="flex items-center gap-3 mb-8">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg overflow-hidden">
+                <img src="/tatakai-logo-square.png" alt="Tatakai logo" className="w-full h-full object-cover" />
+              </div>
+              <h1 className="font-display text-3xl font-bold gradient-text">Tatakai</h1>
+            </div>
 
-        {/* Main Interface */}
-        <GlassCard className="p-1">
-          <div className="bg-black/20 p-8 rounded-[22px]">
+            <h2 className="text-2xl lg:text-3xl font-bold text-foreground mb-2">
+              Welcome to Tatakai
+            </h2>
+            <p className="text-muted-foreground">
+              Let's set up your anime experience in just a few steps.
+            </p>
+          </div>
+
+          {/* Step Indicator */}
+          <div className="flex items-center gap-3 mb-8">
+            {[1, 2].map((i) => (
+              <div key={i} className="flex items-center gap-2">
+                <motion.div 
+                  initial={false}
+                  animate={{ 
+                    scale: step === i ? 1 : 0.9,
+                    backgroundColor: step >= i ? 'hsl(var(--primary))' : 'hsl(var(--muted))'
+                  }}
+                  className={cn(
+                    "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors",
+                    step >= i ? "text-primary-foreground" : "text-muted-foreground"
+                  )}
+                >
+                  {step > i ? <Check className="w-4 h-4" /> : i}
+                </motion.div>
+                {i < 2 && (
+                  <div className={cn(
+                    "w-12 h-0.5 rounded-full transition-colors",
+                    step > i ? "bg-primary" : "bg-muted"
+                  )} />
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Setup Steps */}
+          <div className="min-h-[300px]">
             <AnimatePresence mode="wait" custom={step}>
               {step === 1 && (
                 <motion.div
@@ -139,40 +186,65 @@ export default function SetupPage() {
                   animate="center"
                   exit="exit"
                   transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  className="space-y-8"
+                  className="space-y-6"
                 >
-                  <div className="flex items-center gap-5">
-                    <div className="w-14 h-14 rounded-full bg-blue-500/10 flex items-center justify-center border border-blue-500/20 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
-                      <Folder className="w-6 h-6" />
+                  <div className="flex items-center gap-4">
+                    <div className={cn(
+                      "w-12 h-12 rounded-xl flex items-center justify-center border",
+                      isMobile ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-blue-500/10 border-blue-500/20 text-blue-400"
+                    )}>
+                      {isMobile ? <Smartphone className="w-5 h-5" /> : <Folder className="w-5 h-5" />}
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold text-zinc-100">Storage Location</h3>
-                      <p className="text-sm text-zinc-500">Where should your anime live?</p>
+                      <h3 className="text-lg font-semibold text-foreground">Storage Location</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {isMobile ? "Your downloads will be saved securely" : "Where should your anime be saved?"}
+                      </p>
                     </div>
                   </div>
 
-                  <div className="space-y-3">
-                    <label className="text-xs uppercase tracking-wider text-zinc-500 font-semibold pl-1">Directory Path</label>
-                    <div className="group relative flex items-center gap-2 p-1.5 rounded-xl bg-zinc-900/80 border border-white/5 focus-within:border-primary/50 transition-colors shadow-inner">
-                      <div className="flex-1 px-3 py-2 text-sm font-mono text-zinc-300 truncate opacity-80 group-hover:opacity-100 transition-opacity">
-                        {downloadPath || '/Users/Guest/Downloads'}
+                  {isMobile ? (
+                    // Mobile: Show info about app storage
+                    <div className="space-y-3">
+                      <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                        <div className="flex items-center gap-3 mb-2">
+                          <Check className="w-5 h-5 text-emerald-400" />
+                          <span className="font-medium text-foreground">App Storage</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Downloads will be saved in the app's private storage. This keeps your files organized and secure.
+                        </p>
                       </div>
-                      <button 
-                        onClick={handleSelectDir}
-                        className="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-white transition-all hover:scale-[1.02] active:scale-95 border border-white/5"
-                      >
-                        Browse
-                      </button>
+                      <p className="text-xs text-muted-foreground">
+                        Tip: Files are accessible only through this app for security.
+                      </p>
                     </div>
-                    <p className="text-xs text-zinc-600 pl-1">Usually roughly ~2GB per series.</p>
-                  </div>
+                  ) : (
+                    // Desktop: Show directory picker
+                    <div className="space-y-3">
+                      <label className="text-sm font-medium text-foreground">Download Directory</label>
+                      <div className="flex items-center gap-2 p-2 rounded-xl bg-muted/30 border border-border">
+                        <div className="flex-1 px-3 py-2 text-sm font-mono text-muted-foreground truncate">
+                          {downloadPath || 'Select a folder...'}
+                        </div>
+                        <Button 
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleSelectDir}
+                        >
+                          Browse
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Usually ~2GB per anime series.</p>
+                    </div>
+                  )}
 
-                  <button 
-                    onClick={() => setStep(2)} 
-                    className="w-full h-12 mt-4 rounded-xl bg-white text-black font-semibold hover:bg-zinc-200 transition-all active:scale-[0.98] flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,255,255,0.1)]"
+                  <Button 
+                    onClick={() => isMobile ? handleComplete() : setStep(2)} 
+                    className="w-full h-12 bg-gradient-to-r from-primary to-secondary hover:opacity-90 font-semibold shadow-lg shadow-primary/25"
                   >
-                    Continue <ChevronRight className="w-4 h-4" />
-                  </button>
+                    {isMobile ? 'Get Started' : 'Continue'} <ChevronRight className="w-4 h-4 ml-2" />
+                  </Button>
                 </motion.div>
               )}
 
@@ -185,70 +257,102 @@ export default function SetupPage() {
                   animate="center"
                   exit="exit"
                   transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  className="space-y-8"
+                  className="space-y-6"
                 >
-                  <div className="flex items-center gap-5">
-                    <div className="w-14 h-14 rounded-full bg-purple-500/10 flex items-center justify-center border border-purple-500/20 text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.2)]">
-                      <Shield className="w-6 h-6" />
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center border border-purple-500/20 text-purple-400">
+                      <Shield className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold text-zinc-100">Privacy & Integration</h3>
-                      <p className="text-sm text-zinc-500">Manage how you appear to others.</p>
+                      <h3 className="text-lg font-semibold text-foreground">Privacy & Integration</h3>
+                      <p className="text-sm text-muted-foreground">Customize your experience</p>
                     </div>
                   </div>
 
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 rounded-xl bg-zinc-900/50 border border-white/5 hover:border-white/10 transition-colors">
+                    <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border hover:border-primary/30 transition-colors">
                       <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-zinc-800 text-zinc-400">
+                        <div className="p-2 rounded-lg bg-muted text-muted-foreground">
                            <Disc className="w-4 h-4" />
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-sm font-medium text-zinc-200">Discord Rich Presence</span>
-                          <span className="text-xs text-zinc-500">Show what you're watching</span>
+                          <span className="text-sm font-medium text-foreground">Discord Rich Presence</span>
+                          <span className="text-xs text-muted-foreground">Show what you're watching</span>
                         </div>
                       </div>
                       <Toggle value={discordEnabled} onChange={setDiscordEnabled} />
                     </div>
                   </div>
 
-                  <div className="flex gap-3 mt-4">
-                    <button 
+                  <div className="flex gap-3">
+                    <Button 
+                      variant="outline"
                       onClick={() => setStep(1)}
-                      className="flex-1 h-12 rounded-xl bg-zinc-800/50 hover:bg-zinc-800 text-zinc-300 font-medium transition-all active:scale-[0.98] border border-white/5"
+                      className="flex-1 h-12"
                     >
+                      <ArrowLeft className="w-4 h-4 mr-2" />
                       Back
-                    </button>
-                    <button 
+                    </Button>
+                    <Button 
                       onClick={handleComplete} 
-                      className="flex-[2] h-12 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-all active:scale-[0.98] flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+                      className="flex-[2] h-12 bg-gradient-to-r from-primary to-secondary hover:opacity-90 font-semibold shadow-lg shadow-primary/25"
                     >
-                      <Sparkles className="w-4 h-4" />
+                      <Sparkles className="w-4 h-4 mr-2" />
                       Start Watching
-                    </button>
+                    </Button>
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
-        </GlassCard>
 
-        {/* Step Indicator */}
-        <div className="flex justify-center gap-3">
-          {[1, 2].map((i) => (
-            <motion.div 
-              key={i}
-              initial={false}
-              animate={{ 
-                width: step === i ? 24 : 8,
-                backgroundColor: step === i ? '#ffffff' : '#3f3f46' // zinc-700
-              }}
-              className="h-2 rounded-full cursor-pointer"
-              onClick={() => setStep(i)}
-            />
-          ))}
+          {/* Footer info */}
+          <div className="mt-8 pt-6 border-t border-border/50">
+            <p className="text-xs text-muted-foreground text-center">
+              You can change these settings anytime in the app preferences.
+            </p>
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Right Side - Video with overlay */}
+      <div className="hidden lg:block w-1/2 h-screen relative overflow-hidden">
+        {/* Video Background */}
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover"
+        >
+          <source src={randomVideoSrc} type={randomVideoSrc.endsWith('.webm') ? 'video/webm' : 'video/mp4'} />
+        </video>
+        
+        {/* Dark Overlay (20%) */}
+        <div className="absolute inset-0 bg-black/20" />
+        
+        {/* Content over video */}
+        <div className="absolute inset-0 flex flex-col justify-end p-12">
+          <motion.div 
+            className="max-w-md"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4, duration: 0.6 }}
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <Sparkles className="w-6 h-6 text-white/80" />
+            </div>
+            <h3 className="text-3xl font-bold text-white mb-4 drop-shadow-lg">
+              {randomText.title}
+            </h3>
+            <p className="text-white/80 text-lg drop-shadow-md leading-relaxed">
+              {randomText.desc}
+            </p>
+          </motion.div>
         </div>
 
+        {/* Gradient fade at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-black/50 to-transparent" />
       </div>
     </div>
   );
