@@ -15,31 +15,29 @@
 
 ## 📸 Preview
 
-<div align="center">
-  <p style="max-width:1200px; width:100%; margin:0 auto">
-    <figure style="margin:24px 0">
-      <img src="preview/Home.png" alt="Tatakai Home Page" style="width:100%; height:auto; display:block; border-radius:8px" />
-      <figcaption style="font-size:0.95rem; color:#6b7280; margin-top:8px">Home — browse featured/spotlight anime, trending sections and personalized feed.</figcaption>
-    </figure>
+> Screenshots below are high-resolution captures from the running app (web/Desktop/PWA). Click any image to view full size.
 
-    <figure style="margin:24px 0">
-      <img src="preview/machinelearn.png" alt="Machine Learning Recommendations" style="width:100%; height:auto; display:block; border-radius:8px" />
-      <figcaption style="font-size:0.95rem; color:#6b7280; margin-top:8px">AI Recommendations — ML-powered suggestions based on your watching history.</figcaption>
-    </figure>
+![Home — Tatakai home page preview](preview/Home.png)
+*Home — featured/spotlight anime, trending sections and personalized feed.*
 
-    <figure style="margin:24px 0">
-      <img src="preview/Communtiy.png" alt="Community Page" style="width:100%; height:auto; display:block; border-radius:8px" />
-      <figcaption style="font-size:0.95rem; color:#6b7280; margin-top:8px">Community — forums, discussions and social features.</figcaption>
-    </figure>
+---
 
-    <figure style="margin:24px 0">
-      <img src="preview/Profile.png" alt="User Profile Page" style="width:100%; height:auto; display:block; border-radius:8px" />
-      <figcaption style="font-size:0.95rem; color:#6b7280; margin-top:8px">Profile — user settings, playlists and watch history.</figcaption>
-    </figure>
-  </p>
-</div>
+![AI Recommendations — personalized suggestions](preview/machinelearn.png)
+*AI Recommendations — ML-powered suggestions based on your watching history.*
+
+---
+
+![Community — forums and discussions](preview/Communtiy.png)
+*Community — forum threads, comments and social interactions.*
+
+---
+
+![Profile — user settings & playlists](preview/Profile.png)
+*Profile — user settings, playlists and watch history.*
+
 
 ## Table of contents
+- Features
 - Quick start
 - Platforms (Web / Desktop / Android)
 - Configuration & secrets
@@ -49,6 +47,45 @@
 - Contributing & governance
 
 ---
+
+## Features
+
+This project contains a large feature set focused on discovery, community and cross-platform playback. Key highlights are listed below.
+
+### Community Tab
+- Community Server: users can add fan-made video servers (dubs/subtitle sources) which become available to others after moderator verification.
+- Tierlist: create and share ranked lists (example: assemble the correct Fate series order).
+- Watch2Together: synchronous viewing / watch parties with friends.
+- Forum (Reddit-style): threaded discussions and replies.
+- Leaderboard: activity / contribution rankings for community engagement.
+- Playlists: create public or private playlists (custom ordering supported).
+- Follow/Profile System: follow users, inspect profiles and watchlists.
+
+### Integration
+- Auto-sync with MyAnimeList and AniList — import/export watchlists and keep progress in sync.
+
+### Dubs (expanded)
+- Coverage expanded from ~8 to 13 languages.
+- Scraping: ~30 servers and 14 websites are scraped, including major sources (animekai, animelok, animepahe, etc.).
+- Newly added dubs: German, French, Polish, Hindi, Telugu, Malayalam, English — and more coming.
+
+### Video Player
+- Use your own subtitles (upload/load local subtitle files).
+- Default servers serve 1080p (HD) streams where available.
+- Core features: adaptive quality, subtitle selection, custom action buttons and background playback support.
+
+### Appearance
+- Lite Mode: disable animations and gradients to boost performance on low-end devices.
+- Theme options: 25+ selectable themes (light/dark + accent variants).
+
+### Custom Recommendation
+- Personalized recommendations powered by an ML algorithm using watch history and engagement signals.
+
+### Search
+- Visual search via Trace.moe integration — search by screenshot/image to find corresponding anime.
+
+---
+
 
 ## Quick start (local)
 1. Clone and install
@@ -94,7 +131,7 @@ npm run preview
 - Build: `npm run electron:build`
 - Auto-update is configured using GitHub Releases and `electron-updater`.
 
-### Android (Capacitor)
+### Android (Capacitor) [Under Development]
 - Capacitor is used to create Android project under `android/`.
 - Local dev flow:
   1. `npm run build` (produces web assets)

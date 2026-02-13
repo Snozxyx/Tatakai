@@ -67,7 +67,7 @@ export const AppDownloadPopup = () => {
                                                 <Smartphone className="w-6 h-6" />
                                             </div>
                                             <div className="flex-1">
-                                                <h4 className="font-bold text-sm">Mobile App</h4>
+                                                <h4 className="font-bold text-sm">Mobile App [Under Development]</h4>
                                                 <p className="text-xs text-muted-foreground">Watch offline on Android & iOS</p>
                                             </div>
                                             <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:translate-x-1 transition-transform" />

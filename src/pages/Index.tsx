@@ -134,7 +134,7 @@ const Index = () => {
               title="Most Popular"
               icon={<Heart className="w-5 h-5 text-destructive fill-destructive" />}
             />
-   {!showSidebar && (
+   {!isNative && (
               <div className="mt-24">
                 <AppDownloadSection />
               </div>
