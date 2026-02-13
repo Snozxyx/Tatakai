@@ -71,7 +71,7 @@ const defaultConfig: MobileConfig = {
   cacheSize: 500,
   // Accessibility defaults
   hapticFeedback: true,
-  reduceMotion: true,
+  reduceMotion: false,
   largeText: false,
   highContrast: false,
   // Performance defaults
@@ -218,6 +218,13 @@ export function MobileSettings() {
     }
     if ('reduceMotion' in newConfig) {
       applyReduceMotion(newConfig.reduceMotion!);
+      // keep global/theme key in sync so the ReduceMotionPrompt and web UI
+      // respect the user's mobile preference
+      try {
+        localStorage.setItem('tatakai_reduce_motion', String(newConfig.reduceMotion));
+      } catch (e) {
+        /* ignore */
+      }
     }
     if ('largeText' in newConfig) {
       applyLargeText(newConfig.largeText!);

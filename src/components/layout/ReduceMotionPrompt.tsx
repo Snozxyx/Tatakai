@@ -22,7 +22,22 @@ export function ReduceMotionPrompt() {
   }, [isMobile]);
 
   const applyReduceMotion = (enabled: boolean) => {
+    // store global preference (used by web + onboarding)
     localStorage.setItem(REDUCE_MOTION_KEY, String(enabled));
+
+    // also sync mobile config object (if present) so MobileSettings shows the
+    // same preference consistently across the app
+    try {
+      const saved = localStorage.getItem('tatakai_mobile_config');
+      if (saved) {
+        const cfg = JSON.parse(saved);
+        cfg.reduceMotion = enabled;
+        localStorage.setItem('tatakai_mobile_config', JSON.stringify(cfg));
+      }
+    } catch (e) {
+      /* ignore JSON errors */
+    }
+
     document.documentElement.classList.toggle('reduce-motion', enabled);
     document.body.classList.toggle('reduce-motion', enabled);
   };
