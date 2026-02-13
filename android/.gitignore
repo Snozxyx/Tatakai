@@ -53,6 +53,11 @@ captures/
 .idea/navEditor.xml
 
 # Keystore files
+# Keep keystores out of source control
+*.jks
+*.keystore
+release.keystore
+*.keystore.b64
 # Uncomment the following lines if you do not want to check your keystore files in.
 #*.jks
 #*.keystore
