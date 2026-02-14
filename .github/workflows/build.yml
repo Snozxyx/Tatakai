@@ -136,9 +136,15 @@ jobs:
 
       - name: Sync Capacitor
         run: npx cap sync android
+        env:
+          JAVA_HOME: ${{ env.JAVA_HOME }}
+          PATH: ${{ env.JAVA_HOME }}/bin:$PATH
 
       - name: Build unsigned APK
-        run: cd android && chmod +x gradlew && ./gradlew assembleRelease -Dorg.gradle.java.home=$JAVA_HOME
+        run: cd android && chmod +x gradlew && ./gradlew assembleRelease
+        env:
+          JAVA_HOME: ${{ env.JAVA_HOME }}
+          PATH: ${{ env.JAVA_HOME }}/bin:$PATH
 
       - name: Rename APK with version
         run: |
@@ -175,11 +181,14 @@ jobs:
       - name: Build signed APK
         if: ${{ env.ANDROID_KEYSTORE != '' }}
         run: |
-          cd android && ./gradlew assembleRelease -Dorg.gradle.java.home=$JAVA_HOME \
+          cd android && ./gradlew assembleRelease \
             -Pandroid.injected.signing.store.file=${{ github.workspace }}/android/app/release.keystore \
             -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
             -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
             -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}"
+        env:
+          JAVA_HOME: ${{ env.JAVA_HOME }}
+          PATH: ${{ env.JAVA_HOME }}/bin:$PATH
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
