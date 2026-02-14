@@ -34,7 +34,7 @@ export function useAnimeSeasons(animeId: string | undefined) {
 
         // Try the local proxy endpoint first (avoids CORS issues in browser)
         const proxyUrl = `/api/proxy/aniwatch/anime/${animeId}`;
-        const directUrl = `https://aniwatch-api-taupe-eight.vercel.app/api/v2/hianime/anime/${animeId}`;
+        const directUrl = `http://de-fsn01.na1.host:4270/api/v2/hianime/anime/${animeId}`;
 
         let res: Response | null = null;
         let attemptedUrl = proxyUrl;

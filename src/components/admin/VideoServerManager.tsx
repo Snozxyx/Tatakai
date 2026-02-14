@@ -156,7 +156,7 @@ export function VideoServerManager() {
 
     try {
       // Try internal HiAnime API first (for correct Tatakai IDs)
-      const internalRes = await fetch(`https://aniwatch-api-taupe-eight.vercel.app/api/v2/hianime/search?q=${encodeURIComponent(query)}&page=1`);
+      const internalRes = await fetch(`http://de-fsn01.na1.host:4270/api/v2/hianime/search?q=${encodeURIComponent(query)}&page=1`);
       if (internalRes.ok) {
         const internalData = await internalRes.json();
         const animes = internalData.data?.animes || internalData.animes || [];

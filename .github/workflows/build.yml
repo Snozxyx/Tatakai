@@ -243,11 +243,9 @@ jobs:
             desktop-artifacts/windows/*
             desktop-artifacts/macos/*
             desktop-artifacts/linux/*
-            dist_electron/*.yml
           draft: false
           prerelease: false
           append_body: true
-          replace: true
           body: |
             ## Downloads
 

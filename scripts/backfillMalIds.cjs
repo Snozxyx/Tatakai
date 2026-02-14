@@ -4,7 +4,7 @@ const fetch = require('node-fetch');
 // Configuration
 const supabaseUrl = process.env.SUPABASE_URL 
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY 
-const hianimeApiUrl = 'https://aniwatch-api-taupe-eight.vercel.app/api/v2/hianime';
+const hianimeApiUrl = 'http://de-fsn01.na1.host:4270/api/v2/hianime';
 const tatakaiApiUrl = process.env.TATAKAI_API_URL || 'https://tatakaiapi.vercel.app/api/v1';
 
 const supabase = createClient(supabaseUrl, supabaseKey);
