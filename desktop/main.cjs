@@ -396,7 +396,7 @@ async function setActivity(details, state, extra = {}) {
         largeImageText: 'Tatakai - Watch Anime Online',
         instance: false,
         buttons: [
-            { label: 'Watch with me!', url: 'https://ggmp.me' }
+            { label: 'Watch with me!', url: 'https://tatakai.me' }
         ]
     };
 

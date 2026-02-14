@@ -8,10 +8,17 @@
   <img src="https://img.shields.io/badge/Supabase-2.x-green" alt="Supabase" />
 </div>
 
+
 <div align="center">
   <h3>The Next Generation Anime Streaming Platform</h3>
-  <p>Cross-platform (web, desktop & Android) — fast, accessible and community-driven.</p>
+  <p>Cross-platform (web, desktop & Android (Soon)) — fast, accessible and community-driven.</p>
 </div>
+
+## Social
+> Discord : https://dsc.gg/tatakai
+
+Disclaimer 
+- No other Social Media Handle is availaible right now, If you see then please report us as we only have **discord server** .
 
 ## 📸 Preview
 
@@ -85,7 +92,17 @@ This project contains a large feature set focused on discovery, community and cr
 - Visual search via Trace.moe integration — search by screenshot/image to find corresponding anime.
 
 ---
+## Upcoming Features
+- Mobile Development including IOS and Android **[More Important]**
+- More Scrappers of different dubs including arabic,chinese (Mandarin),Thai and other server
+- Adding Official Indian Server [No Ads]
+- Community Upgrade
+- Web ( Ads Removal from the embed server) + Android ( Ads Removal from the embed server)
+- Abyss Server Reverse Engineering to remove ads
+- Manga Support
+- Adding Torrent Support [P2P] [Directly from torrent for more customization]
 
+---
 
 ## Quick start (local)
 1. Clone and install
@@ -219,9 +236,9 @@ Code of conduct: Be respectful. Report violations to repo maintainers.
 
 ## Maintainers
 - Primary: Snozxyx (GitHub)
-
+- Secondary : GabhastiGiri (Github)
 ## License
-- MIT (see top-level LICENSE file if present)
+- MIT
 
 ---
 
@@ -230,5 +247,7 @@ Code of conduct: Be respectful. Report violations to repo maintainers.
 - For security-sensitive issues (exposed keys), email the maintainer directly or open a private security issue
 
 ---
-
-<p align="center">Made with ❤️ for anime fans — contributions welcome</p>
+  I used the **AI** in this project for more detail <a href="/docs/disclaimerai.md" > Click  Here </a>
+  ---
+<p align="center">Made with 
+❤️ for anime fans — contributions welcome</p>

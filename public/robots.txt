@@ -35,4 +35,4 @@ Allow: /
 Crawl-delay: 1
 
 # Sitemap location
-Sitemap: https://ggmp.me/sitemap.xml
+Sitemap: https://tatakai.me/sitemap.xml

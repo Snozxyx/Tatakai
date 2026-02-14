@@ -255,7 +255,7 @@ export class MobileUpdateService {
    */
   private static async redirectToWebVersion(): Promise<void> {
     await Browser.open({
-      url: 'https://ggmp.me',
+      url: 'https://tatakai.me',
       presentationStyle: 'fullscreen',
       toolbarColor: '#09090b'
     });

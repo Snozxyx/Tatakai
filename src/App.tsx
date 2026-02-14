@@ -43,7 +43,7 @@ const getDevModeEnabled = (): boolean => {
     return false;
   }
 };
-import { AppDownloadPopup } from '@/components/layout/AppDownloadPopup';
+// import { AppDownloadPopup } from '@/components/layout/AppDownloadPopup';
 import Index from "./pages/Index";
 import AnimePage from "./pages/AnimePage";
 import WatchPage from "./pages/WatchPage";
@@ -354,7 +354,7 @@ function AppContent() {
             <GlobalListeners />
             <PopupDisplay />
             <ReduceMotionPrompt />
-            <AppDownloadPopup />
+            {/* <AppDownloadPopup /> */}
             <DownloadIndicator />
             <LogViewer />
             <DeepLinkHandler />

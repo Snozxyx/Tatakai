@@ -1,14 +1,14 @@
 {
   "name": "tatakai",
   "private": true,
-  "version": "4.1.4",
+  "version": "4.1.6",
   "description": "Tatakai - Watch anime online",
   "author": {
     "name": "Tatakai",
     "email": "noreply@github.com"
   },
   "license": "MIT",
-  "homepage": "https://ggmp.me",
+  "homepage": "https://tatakai.me",
   "main": "desktop/main.cjs",
   "type": "module",
   "scripts": {
