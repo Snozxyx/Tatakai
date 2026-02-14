@@ -1,11 +1,15 @@
 {
   "name": "tatakai",
   "private": true,
-  "version": "2.1.0",
+  "version": "4.1.6",
   "description": "Tatakai - Watch anime online",
-  "author": "Tatakai",
+  "author": {
+    "name": "Tatakai",
+    "email": "noreply@github.com"
+  },
   "license": "MIT",
-  "homepage": "https://tatakai.gabhasti.tech",
+  "homepage": "https://tatakai.me",
+  "main": "desktop/main.cjs",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,13 +17,37 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "npm run build && cross-env NODE_ENV=production vite preview --port 3000"
+    "start": "npm run build && cross-env NODE_ENV=production vite preview --port 3000",
+    "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:8088 && electron desktop/main.cjs\"",
+    "electron:build": "vite build && electron-builder",
+    "assets:generate": "node scripts/generate-assets.cjs",
+    "mobile:dev": "npm run build && npx cap open android",
+    "mobile:sync": "npm run build && npx cap sync",
+    "mobile:build": "npx cap sync android && cd android && gradlew assembleRelease"
   },
   "dependencies": {
+    "@capacitor-community/keep-awake": "^8.0.0",
+    "@capacitor/android": "^8.0.2",
+    "@capacitor/app": "^8.0.0",
+    "@capacitor/browser": "^8.0.0",
+    "@capacitor/cli": "^8.0.2",
+    "@capacitor/core": "^8.0.2",
+    "@capacitor/device": "^8.0.0",
+    "@capacitor/file-transfer": "^2.0.3",
+    "@capacitor/filesystem": "^8.1.0",
+    "@capacitor/haptics": "^8.0.0",
+    "@capacitor/ios": "^8.0.2",
+    "@capacitor/keyboard": "^8.0.0",
+    "@capacitor/local-notifications": "^8.0.0",
+    "@capacitor/screen-orientation": "^8.0.0",
+    "@capacitor/splash-screen": "^8.0.0",
+    "@capacitor/status-bar": "^8.0.0",
+    "@capawesome-team/capacitor-android-foreground-service": "^8.0.0",
     "@datadog/browser-logs": "^6.25.4",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
@@ -58,10 +86,14 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^3.6.0",
+    "discord-rpc": "^4.0.1",
     "dompurify": "^3.3.1",
+    "electron-updater": "^6.7.3",
     "embla-carousel-react": "^8.6.0",
-    "framer-motion": "^12.23.26",
+    "fluent-ffmpeg": "^2.1.3",
+    "framer-motion": "^12.29.2",
     "hls.js": "^1.6.15",
+    "icon-gen": "^5.0.0",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",
@@ -73,9 +105,10 @@
     "react-resizable-panels": "^2.1.9",
     "react-router-dom": "^6.30.1",
     "recharts": "^2.15.4",
+    "sharp": "^0.34.5",
     "sonner": "^1.7.4",
     "supabase": "^2.72.3",
-    "tailwind-merge": "^2.6.0",
+    "tailwind-merge": "^2.6.1",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.9",
     "workbox-precaching": "^7.4.0",
@@ -85,6 +118,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@eslint/js": "^9.32.0",
     "@tailwindcss/typography": "^0.5.16",
     "@types/node": "^22.16.5",
@@ -92,7 +126,10 @@
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react-swc": "^3.11.0",
     "autoprefixer": "^10.4.21",
+    "concurrently": "^9.2.1",
     "cross-env": "^7.0.3",
+    "electron": "^40.1.0",
+    "electron-builder": "^26.4.0",
     "eslint": "^9.32.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
@@ -103,9 +140,69 @@
     "terser": "^5.36.0",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.38.0",
-    "vite": "^5.4.19"
+    "vite": "^5.4.19",
+    "wait-on": "^9.0.3"
   },
   "overrides": {
     "esbuild": "^0.25.0"
+  },
+  "build": {
+    "appId": "app.tatakai.me",
+    "productName": "Tatakai",
+    "directories": {
+      "output": "dist_electron",
+      "buildResources": "resources"
+    },
+    "files": [
+      "dist/**/*",
+      "desktop/**/*",
+      "package.json"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "snozxyx",
+        "repo": "Tatakai"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "resources/icon.ico",
+      "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Tatakai"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "resources/icon.icns",
+      "category": "public.app-category.entertainment",
+      "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
+    },
+    "dmg": {
+      "title": "Tatakai ${version}",
+      "icon": "resources/icon.icns"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "maintainer": "Tatakai <noreply@github.com>",
+      "icon": "resources/icon.png",
+      "category": "AudioVideo",
+      "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
+    }
   }
 }

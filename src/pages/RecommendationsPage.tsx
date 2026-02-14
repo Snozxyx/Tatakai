@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Background } from '@/components/layout/Background';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
@@ -26,7 +26,7 @@ function RecommendationCard({ recommendation }: { recommendation: MLRecommendati
             loading="lazy"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
-          
+
           {/* Score Badge */}
           <div className="absolute top-3 right-3 px-3 py-1.5 rounded-full bg-primary/90 backdrop-blur text-primary-foreground text-xs font-bold flex items-center gap-1">
             <Star className="w-3 h-3 fill-current" />
@@ -35,11 +35,10 @@ function RecommendationCard({ recommendation }: { recommendation: MLRecommendati
 
           {/* Confidence Indicator */}
           <div className="absolute top-3 left-3">
-            <div className={`px-2 py-1 rounded-md text-xs font-bold ${
-              confidence > 0.7 ? 'bg-green-500/80 text-white' :
+            <div className={`px-2 py-1 rounded-md text-xs font-bold ${confidence > 0.7 ? 'bg-green-500/80 text-white' :
               confidence > 0.4 ? 'bg-yellow-500/80 text-white' :
-              'bg-gray-500/80 text-white'
-            }`}>
+                'bg-gray-500/80 text-white'
+              }`}>
               {confidence > 0.7 ? 'High' : confidence > 0.4 ? 'Medium' : 'Low'} Match
             </div>
           </div>
@@ -48,7 +47,7 @@ function RecommendationCard({ recommendation }: { recommendation: MLRecommendati
             <h3 className="font-bold text-sm line-clamp-2 group-hover:text-primary transition-colors mb-2">
               {anime.name}
             </h3>
-            
+
             {/* Reasons */}
             {reasons.length > 0 && (
               <div className="space-y-1">
@@ -141,8 +140,8 @@ function TasteProfileDisplay({ profile }: { profile: TasteProfile }) {
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               {profile.diversityScore > 0.7 ? 'Very diverse taste' :
-               profile.diversityScore > 0.4 ? 'Moderate diversity' :
-               'Focused preferences'}
+                profile.diversityScore > 0.4 ? 'Moderate diversity' :
+                  'Focused preferences'}
             </p>
           </div>
         </div>
@@ -157,6 +156,21 @@ export default function RecommendationsPage() {
   const { data: recommendations, isLoading: loadingRecs } = useMLRecommendations(30);
   const { data: personalizedRecs, isLoading: loadingPersonalized } = usePersonalizedRecommendations(12);
   const [filter, setFilter] = useState<'all' | 'high' | 'medium'>('all');
+  const [loadingProgress, setLoadingProgress] = useState(0);
+
+  useEffect(() => {
+    if (loadingRecs || loadingProfile || loadingPersonalized) {
+      const interval = setInterval(() => {
+        setLoadingProgress((prev) => {
+          if (prev >= 95) return prev;
+          return prev + Math.floor(Math.random() * 15);
+        });
+      }, 500);
+      return () => clearInterval(interval);
+    } else {
+      setLoadingProgress(100);
+    }
+  }, [loadingRecs, loadingProfile, loadingPersonalized]);
 
   if (!user) {
     return (
@@ -245,7 +259,7 @@ export default function RecommendationsPage() {
                         loading="lazy"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
-                      
+
                       {/* Score Badge */}
                       <div className="absolute top-3 right-3 px-3 py-1.5 rounded-full bg-green-500/90 backdrop-blur text-white text-xs font-bold flex items-center gap-1">
                         <Star className="w-3 h-3 fill-current" />
@@ -256,7 +270,7 @@ export default function RecommendationsPage() {
                         <h3 className="font-bold text-sm line-clamp-2 group-hover:text-primary transition-colors mb-2">
                           {item.anime.name}
                         </h3>
-                        
+
                         {/* Reason */}
                         {item.reason && (
                           <p className="text-xs text-muted-foreground line-clamp-1">
@@ -312,10 +326,24 @@ export default function RecommendationsPage() {
           </div>
 
           {loadingRecs ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {Array.from({ length: 12 }).map((_, i) => (
-                <div key={i} className="aspect-[3/4] bg-muted/50 rounded-xl animate-pulse" />
-              ))}
+            <div className="space-y-8">
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="text-6xl font-bold text-primary mb-4 animate-pulse">
+                  {loadingProgress}%
+                </div>
+                <div className="w-64 h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all duration-500"
+                    style={{ width: `${loadingProgress}%` }}
+                  />
+                </div>
+                <p className="text-muted-foreground mt-4">Analyzing your taste profile...</p>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <div key={i} className="aspect-[3/4] bg-muted/50 rounded-xl animate-pulse" />
+                ))}
+              </div>
             </div>
           ) : filteredRecommendations.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">

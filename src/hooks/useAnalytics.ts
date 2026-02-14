@@ -3,6 +3,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { analytics } from '@/services/AnalyticsService';
 
+// Check if we're online
+function isOnline(): boolean {
+  return typeof navigator !== 'undefined' ? navigator.onLine : true;
+}
+
 // Generate or get session ID from localStorage
 function getSessionId(): string {
   let sessionId = localStorage.getItem('tatakai_session_id');
@@ -15,6 +20,9 @@ function getSessionId(): string {
 
 // Fetch visitor info (country, IP via external API)
 async function fetchVisitorInfo(): Promise<{ ip?: string; country?: string; city?: string }> {
+  // Skip if offline
+  if (!isOnline()) return {};
+  
   try {
     const res = await fetch('https://ipapi.co/json/', { cache: 'force-cache' });
     if (!res.ok) return {};
@@ -31,6 +39,9 @@ async function fetchVisitorInfo(): Promise<{ ip?: string; country?: string; city
 
 // Track page visit
 export async function trackPageVisit(pagePath: string, userId?: string): Promise<void> {
+  // Skip tracking when offline
+  if (!isOnline()) return;
+  
   try {
     const sessionId = getSessionId();
     const visitorInfo = await fetchVisitorInfo();
@@ -57,6 +68,9 @@ export async function startWatchSession(
   userId?: string,
   metadata?: { animeName?: string; animePoster?: string; genres?: string[] }
 ): Promise<string | null> {
+  // Skip when offline
+  if (!isOnline()) return null;
+  
   try {
     const sessionId = getSessionId();
 
@@ -87,6 +101,9 @@ export async function updateWatchSession(
   watchSessionId: string,
   durationSeconds: number
 ): Promise<void> {
+  // Skip when offline
+  if (!isOnline()) return;
+  
   try {
     await supabase
       .from('watch_sessions')

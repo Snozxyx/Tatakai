@@ -179,6 +179,7 @@ export interface Popup {
   frequency: 'once' | 'always' | 'daily' | 'weekly';
   priority: number;
   is_active: boolean;
+  use_theme_colors: boolean;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -191,7 +192,7 @@ export function useActivePopups() {
     queryKey: ['active_popups', user?.id],
     queryFn: async () => {
       const now = new Date().toISOString();
-      
+
       const query = supabase
         .from('popups')
         .select('*')
@@ -205,11 +206,11 @@ export function useActivePopups() {
       const filtered = (data || []).filter(popup => {
         if (popup.start_date && new Date(popup.start_date) > new Date(now)) return false;
         if (popup.end_date && new Date(popup.end_date) < new Date(now)) return false;
-        
+
         // Check user type
         if (popup.target_user_type === 'guests' && user) return false;
         if (popup.target_user_type === 'logged_in' && !user) return false;
-        
+
         return true;
       });
 
@@ -276,6 +277,7 @@ export function useCreatePopup() {
         .from('popups')
         .insert({
           ...popup,
+          use_theme_colors: popup.use_theme_colors || false,
           created_by: user.id,
         })
         .select()

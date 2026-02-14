@@ -6,7 +6,7 @@ import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { StatusVideoBackground } from '@/components/layout/StatusVideoBackground';
+// import { StatusVideoBackground } from '@/components/layout/StatusVideoBackground';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   useForumPost,
@@ -262,7 +262,7 @@ export default function ForumPostPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <StatusVideoBackground />
+      {/* <StatusVideoBackground /> */}
       <Sidebar />
 
       <main className="relative z-10 pl-0 md:pl-20 lg:pl-24 w-full">

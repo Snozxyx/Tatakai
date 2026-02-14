@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAllSuggestions, useReviewSuggestion, useDeleteSuggestion } from '@/hooks/useSuggestions';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +9,7 @@ import { Loader2, CheckCircle, XCircle, Trash2, Image as ImageIcon } from 'lucid
 import { formatDistanceToNow } from 'date-fns';
 
 export function PendingSuggestions() {
+  const { isAdmin } = useAuth();
   const { data: suggestions, isLoading } = useAllSuggestions();
   const reviewSuggestion = useReviewSuggestion();
   const deleteSuggestion = useDeleteSuggestion();
@@ -60,8 +62,8 @@ export function PendingSuggestions() {
                 <h3 className="font-semibold text-lg mb-2">{suggestion.title}</h3>
                 <div className="flex flex-wrap items-center gap-2 mb-3">
                   <Badge variant="outline">{suggestion.category}</Badge>
-                  <Badge 
-                    variant={suggestion.priority === 'high' ? 'destructive' : suggestion.priority === 'medium' ? 'default' : 'secondary'}
+                  <Badge
+                    variant={suggestion.priority === 'urgent' ? 'destructive' : suggestion.priority === 'normal' ? 'default' : 'secondary'}
                   >
                     {suggestion.priority} priority
                   </Badge>
@@ -70,13 +72,15 @@ export function PendingSuggestions() {
                   </span>
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleDelete(suggestion.id)}
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
+              {isAdmin && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDelete(suggestion.id)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              )}
             </div>
 
             {/* Description */}
@@ -87,9 +91,9 @@ export function PendingSuggestions() {
             {/* Image if available */}
             {suggestion.image_url && (
               <div className="relative rounded-lg overflow-hidden border border-muted">
-                <img 
-                  src={suggestion.image_url} 
-                  alt="Suggestion attachment" 
+                <img
+                  src={suggestion.image_url}
+                  alt="Suggestion attachment"
                   className="w-full max-h-64 object-contain bg-muted/20"
                 />
               </div>
@@ -99,6 +103,24 @@ export function PendingSuggestions() {
             {selectedSuggestion === suggestion.id ? (
               <div className="space-y-3 p-4 rounded-lg bg-primary/5 border border-primary/20">
                 <label className="text-sm font-medium">Admin Response</label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {[
+                    "Thanks for the suggestion! We'll look into it.",
+                    "Great idea! We've added this to our roadmap.",
+                    "This is already being worked on. Stay tuned!",
+                    "Unfortunately, we can't implement this right now.",
+                    "We need more details to evaluate this suggestion."
+                  ].map((text) => (
+                    <button
+                      key={text}
+                      type="button"
+                      onClick={() => setAdminNotes(prev => ({ ...prev, [suggestion.id]: text }))}
+                      className="text-[10px] px-2 py-1 rounded bg-muted hover:bg-muted-foreground/20 transition-colors border border-muted-foreground/10"
+                    >
+                      {text}
+                    </button>
+                  ))}
+                </div>
                 <Textarea
                   value={adminNotes[suggestion.id] || ''}
                   onChange={(e) => setAdminNotes(prev => ({ ...prev, [suggestion.id]: e.target.value }))}

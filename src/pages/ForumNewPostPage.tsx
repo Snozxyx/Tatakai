@@ -6,7 +6,6 @@ import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { StatusVideoBackground } from '@/components/layout/StatusVideoBackground';
 import { useCreateForumPost } from '@/hooks/useForum';
 import { useAuth } from '@/contexts/AuthContext';
 import { ArrowLeft, Send, AlertTriangle, MessageCircle, HelpCircle, Star, FileText, Newspaper, Laugh, Palette, Lightbulb, Tv, Image as ImageIcon, X, Upload } from 'lucide-react';
@@ -60,7 +59,7 @@ export default function ForumNewPostPage() {
     }
 
     setImageFile(file);
-    
+
     // Create preview
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -121,9 +120,9 @@ export default function ForumNewPostPage() {
       });
 
       if (imageUrl) {
-        toast({ 
-          title: 'Post submitted for approval', 
-          description: 'Posts with images require admin approval before they appear publicly.' 
+        toast({
+          title: 'Post submitted for approval',
+          description: 'Posts with images require admin approval before they appear publicly.'
         });
         navigate('/community');
       } else {
@@ -132,10 +131,10 @@ export default function ForumNewPostPage() {
       }
     } catch (error) {
       console.error('Failed to create post:', error);
-      toast({ 
-        title: 'Failed to create post', 
+      toast({
+        title: 'Failed to create post',
         description: error instanceof Error ? error.message : 'Unknown error',
-        variant: 'destructive' 
+        variant: 'destructive'
       });
     } finally {
       setIsSubmitting(false);
@@ -157,7 +156,6 @@ export default function ForumNewPostPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <StatusVideoBackground />
       <Sidebar />
 
       <main className="relative z-10 pl-0 md:pl-20 lg:pl-24 w-full">
@@ -292,9 +290,9 @@ export default function ForumNewPostPage() {
 
               {/* Actions */}
               <div className="flex gap-4 pt-4">
-                <Button 
-                  type="submit" 
-                  disabled={isSubmitting || uploadingImage || !title.trim() || !content.trim()} 
+                <Button
+                  type="submit"
+                  disabled={isSubmitting || uploadingImage || !title.trim() || !content.trim()}
                   className="gap-2"
                 >
                   <Send className="w-4 h-4" />

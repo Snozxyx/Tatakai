@@ -33,7 +33,7 @@ export function useAdminMessages() {
     queryKey: ['admin_messages', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      
+
       try {
         // Using type assertion since the table may not be in generated types yet
         const { data, error } = await (supabase
@@ -41,7 +41,7 @@ export function useAdminMessages() {
           .select('*')
           .or(`message_type.eq.broadcast,recipient_id.eq.${user.id}`)
           .order('created_at', { ascending: false }) as any);
-        
+
         // Handle case where table doesn't exist or access is denied
         if (error) {
           // 42P01 = table doesn't exist, PGRST = PostgREST errors
@@ -70,12 +70,12 @@ export function useAdminMessages() {
     mutationFn: async (messageId: string) => {
       const { error } = await (supabase
         .from('admin_messages' as any)
-        .update({ 
-          is_read: true, 
-          read_at: new Date().toISOString() 
+        .update({
+          is_read: true,
+          read_at: new Date().toISOString()
         })
         .eq('id', messageId) as any);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -87,23 +87,39 @@ export function useAdminMessages() {
   const markAllAsRead = useMutation({
     mutationFn: async () => {
       if (!user) return;
-      
+
       const unreadIds = messages?.filter(m => !m.is_read).map(m => m.id) || [];
-      
+
       if (unreadIds.length === 0) return;
-      
+
       const { error } = await (supabase
         .from('admin_messages' as any)
-        .update({ 
-          is_read: true, 
-          read_at: new Date().toISOString() 
+        .update({
+          is_read: true,
+          read_at: new Date().toISOString()
         })
         .in('id', unreadIds) as any);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin_messages', user?.id] });
+    },
+  });
+
+  // Delete message
+  const deleteMessage = useMutation({
+    mutationFn: async (messageId: string) => {
+      const { error } = await (supabase
+        .from('admin_messages' as any)
+        .delete()
+        .eq('id', messageId) as any);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin_messages', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['admin_sent_messages'] }); // Also invalidate admin view
     },
   });
 
@@ -113,6 +129,7 @@ export function useAdminMessages() {
     isLoading,
     markAsRead,
     markAllAsRead,
+    deleteMessage,
   };
 }
 
@@ -126,7 +143,7 @@ export function useMaintenanceMode() {
           .from('maintenance_mode' as any)
           .select('*')
           .single() as any);
-        
+
         // Handle case where table doesn't exist
         if (error) {
           if (error.code === '42P01' || error.code === 'PGRST116' || error.message?.includes('permission denied')) {

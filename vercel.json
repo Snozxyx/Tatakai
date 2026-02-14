@@ -25,6 +25,10 @@
         {
           "key": "Permissions-Policy",
           "value": "geolocation=(), microphone=(), camera=()"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
         }
       ]
     },

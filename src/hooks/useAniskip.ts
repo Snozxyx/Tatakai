@@ -17,8 +17,9 @@ interface AniskipResponse {
   statusCode: number;
 }
 
-export function useAniskip() {
-  const [skipTimes, setSkipTimes] = useState<SkipTime[]>([]);
+export function useAniskip(initialSkipTimes: SkipTime[] = []) {
+  const [skipTimes, setSkipTimes] = useState<SkipTime[]>(initialSkipTimes);
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,31 +38,42 @@ export function useAniskip() {
 
     try {
       // Use v2 API endpoint with proper array params
-      const params = new URLSearchParams();
-      params.append('types[]', 'op');
-      params.append('types[]', 'ed');
-      params.append('types[]', 'recap');
-      // AniSkip API requires episodeLength - use provided value or default to 1440 (24 min)
-      const length = (typeof episodeLength === 'number' && !isNaN(episodeLength) && episodeLength > 0) 
-        ? Math.floor(episodeLength) 
+      const v2Params = new URLSearchParams();
+      v2Params.append('types[]', 'op');
+      v2Params.append('types[]', 'ed');
+      v2Params.append('types[]', 'recap');
+
+      const length = (typeof episodeLength === 'number' && !isNaN(episodeLength) && episodeLength > 0)
+        ? Math.floor(episodeLength)
         : 1440;
-      params.set('episodeLength', String(length));
+      v2Params.set('episodeLength', String(length));
 
-      const url = `https://api.aniskip.com/v2/skip-times/${malId}/${episodeNumber}?${params.toString()}`;
+      const v2Url = `https://api.aniskip.com/v2/skip-times/${malId}/${episodeNumber}?${v2Params.toString()}`;
+      console.log('Fetching skip times from v2:', v2Url);
 
-      console.log('Fetching skip times from:', url);
-
-      const response = await fetch(url, {
-        headers: {
-          'Accept': 'application/json',
-        },
+      let response = await fetch(v2Url, {
+        headers: { 'Accept': 'application/json' },
       });
 
-      // 404 means no skip times found - this is normal, not an error
-      if (response.status === 404) {
-        console.log('No skip times found for this episode (404)');
-        setSkipTimes([]);
-        return [];
+      // Fallback to v1 if v2 fails or returns 404
+      if (response.status === 404 || !response.ok) {
+        console.log(`v2 failed with ${response.status}, trying v1 fallback...`);
+
+        // Attempt v1 with op and ed types
+        // v1 uses types parameter (often not an array, or comma separated)
+        // We'll try common formats or just multiple requests if needed
+        const v1Url = `https://api.aniskip.com/v1/skip-times/${malId}/${episodeNumber}?types=op&types=ed&types=recap`;
+        console.log('Fetching skip times from v1:', v1Url);
+
+        response = await fetch(v1Url, {
+          headers: { 'Accept': 'application/json' },
+        });
+
+        if (response.status === 404) {
+          console.log('No skip times found in v1 either (404)');
+          setSkipTimes([]);
+          return [];
+        }
       }
 
       if (!response.ok) {
@@ -69,7 +81,7 @@ export function useAniskip() {
       }
 
       const data: AniskipResponse = await response.json();
-      
+
       if (data.found && data.results) {
         console.log('Found skip times:', data.results);
         setSkipTimes(data.results);

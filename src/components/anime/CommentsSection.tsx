@@ -4,7 +4,7 @@ import { useComments, useReplies, useAddComment, useDeleteComment, useLikeCommen
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, Heart, Reply, Trash2, ChevronDown, ChevronUp, AlertTriangle, Loader2, Ban, MoreVertical, Pin } from 'lucide-react';
+import { MessageSquare, Heart, Reply, Trash2, ChevronDown, ChevronUp, AlertTriangle, Loader2, Ban, MoreVertical, Pin, ShieldCheck, Shield } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useNavigate } from 'react-router-dom';
@@ -31,6 +31,8 @@ interface CommentItemProps {
       display_name: string | null;
       avatar_url: string | null;
       username: string | null;
+      is_admin?: boolean | null;
+      role?: string | null;
     };
     user_has_liked?: boolean;
   };
@@ -47,7 +49,7 @@ function CommentItem({ comment, animeId, episodeId, isReply = false }: CommentIt
   const [replyContent, setReplyContent] = useState('');
   const [revealSpoiler, setRevealSpoiler] = useState(false);
   const [isBanning, setIsBanning] = useState(false);
-  
+
   const { data: replies, isLoading: loadingReplies } = useReplies(showReplies ? comment.id : undefined);
   const addComment = useAddComment();
   const deleteComment = useDeleteComment();
@@ -80,7 +82,7 @@ function CommentItem({ comment, animeId, episodeId, isReply = false }: CommentIt
         .from('profiles')
         .update({ is_banned: true, ban_reason: 'Banned from comment section by admin' })
         .eq('user_id', comment.user_id);
-      
+
       if (error) throw error;
       toast.success('User has been banned');
       // Also delete the comment
@@ -104,16 +106,31 @@ function CommentItem({ comment, animeId, episodeId, isReply = false }: CommentIt
             {comment.profile?.display_name?.[0]?.toUpperCase() || 'U'}
           </AvatarFallback>
         </Avatar>
-        
+
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <button 
+            <button
               onClick={() => comment.profile?.username && navigate(`/@${comment.profile.username}`)}
               disabled={!comment.profile?.username}
               className={`font-medium text-sm ${comment.profile?.username ? 'hover:text-primary hover:underline cursor-pointer' : ''}`}
             >
               {comment.profile?.display_name || 'Anonymous'}
             </button>
+
+            {/* Staff Badges */}
+            {comment.profile?.role === 'admin' && (
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-500/20 text-violet-400 border border-violet-500/30">
+                <ShieldCheck className="w-3 h-3" />
+                ADMIN
+              </span>
+            )}
+            {comment.profile?.role === 'moderator' && (
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                <Shield className="w-3 h-3" />
+                MOD
+              </span>
+            )}
+
             <span className="text-xs text-muted-foreground">
               {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
             </span>
@@ -130,7 +147,7 @@ function CommentItem({ comment, animeId, episodeId, isReply = false }: CommentIt
               </span>
             )}
           </div>
-          
+
           {comment.is_spoiler && !revealSpoiler ? (
             <button
               onClick={() => setRevealSpoiler(true)}
@@ -141,19 +158,18 @@ function CommentItem({ comment, animeId, episodeId, isReply = false }: CommentIt
           ) : (
             <p className="text-sm text-foreground/90 break-words">{comment.content}</p>
           )}
-          
+
           <div className="flex items-center gap-4 mt-3">
             <button
               onClick={handleLike}
               disabled={!user}
-              className={`flex items-center gap-1 text-xs transition-colors ${
-                comment.user_has_liked ? 'text-destructive' : 'text-muted-foreground hover:text-destructive'
-              }`}
+              className={`flex items-center gap-1 text-xs transition-colors ${comment.user_has_liked ? 'text-destructive' : 'text-muted-foreground hover:text-destructive'
+                }`}
             >
               <Heart className={`w-4 h-4 ${comment.user_has_liked ? 'fill-current' : ''}`} />
               {comment.likes_count || 0}
             </button>
-            
+
             {!isReply && user && (
               <button
                 onClick={() => setShowReplyInput(!showReplyInput)}
@@ -163,7 +179,7 @@ function CommentItem({ comment, animeId, episodeId, isReply = false }: CommentIt
                 Reply
               </button>
             )}
-            
+
             {canDelete && (
               <button
                 onClick={() => deleteComment.mutate(comment.id)}
@@ -177,11 +193,10 @@ function CommentItem({ comment, animeId, episodeId, isReply = false }: CommentIt
             {/* Direct Pin Button for moderators */}
             {canModerate && (
               <button
-                onClick={() => pinComment.mutate({ commentId: comment.id, pinned: !comment.is_pinned })}
+                onClick={() => pinComment.mutate({ commentId: comment.id, isPinned: !comment.is_pinned, isAdmin: !!isAdmin })}
                 disabled={pinComment.isPending}
-                className={`flex items-center gap-1 text-xs transition-colors ${
-                  comment.is_pinned ? 'text-primary' : 'text-muted-foreground hover:text-primary'
-                }`}
+                className={`flex items-center gap-1 text-xs transition-colors ${comment.is_pinned ? 'text-primary' : 'text-muted-foreground hover:text-primary'
+                  }`}
                 title={comment.is_pinned ? "Unpin" : "Pin"}
               >
                 <Pin className={`w-4 h-4 ${comment.is_pinned ? 'fill-current' : ''}`} />
@@ -198,7 +213,7 @@ function CommentItem({ comment, animeId, episodeId, isReply = false }: CommentIt
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem
-                    onClick={() => pinComment.mutate({ commentId: comment.id, pinned: !comment.is_pinned })}
+                    onClick={() => pinComment.mutate({ commentId: comment.id, isPinned: !comment.is_pinned, isAdmin: !!isAdmin })}
                     disabled={pinComment.isPending}
                   >
                     <Pin className="w-4 h-4 mr-2" />
@@ -226,7 +241,7 @@ function CommentItem({ comment, animeId, episodeId, isReply = false }: CommentIt
               </DropdownMenu>
             )}
           </div>
-          
+
           {showReplyInput && (
             <div className="mt-3 space-y-2">
               <Textarea
@@ -251,7 +266,7 @@ function CommentItem({ comment, animeId, episodeId, isReply = false }: CommentIt
           )}
         </div>
       </div>
-      
+
       {!isReply && (
         <>
           {replies && replies.length > 0 && (
@@ -263,13 +278,13 @@ function CommentItem({ comment, animeId, episodeId, isReply = false }: CommentIt
               {showReplies ? 'Hide' : 'Show'} {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
             </button>
           )}
-          
+
           {showReplies && loadingReplies && (
             <div className="ml-8 mt-2">
               <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
             </div>
           )}
-          
+
           {showReplies && replies && (
             <div className="mt-2 space-y-2">
               {replies.map((reply) => (
@@ -294,7 +309,7 @@ export function CommentsSection({ animeId, episodeId }: CommentsSectionProps) {
   const navigate = useNavigate();
   const [newComment, setNewComment] = useState('');
   const [isSpoiler, setIsSpoiler] = useState(false);
-  
+
   const { data: comments, isLoading } = useComments(animeId, episodeId);
   const addComment = useAddComment();
 
@@ -319,7 +334,7 @@ export function CommentsSection({ animeId, episodeId }: CommentsSectionProps) {
           <span className="text-sm text-muted-foreground">({comments.length})</span>
         )}
       </div>
-      
+
       {user ? (
         <div className="space-y-3 p-4 rounded-xl bg-card/50 border border-border/30">
           <Textarea
@@ -351,7 +366,7 @@ export function CommentsSection({ animeId, episodeId }: CommentsSectionProps) {
           <Button onClick={() => navigate('/auth')}>Sign In</Button>
         </div>
       )}
-      
+
       {isLoading ? (
         <div className="flex justify-center py-8">
           <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />

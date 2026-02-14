@@ -4,7 +4,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { getLocalContinueWatching, clearLocalContinueWatching } from '@/lib/localStorage';
 
-interface Profile {
+export interface Profile {
   id: string;
   user_id: string;
   username: string | null;
@@ -18,10 +18,15 @@ interface Profile {
   is_public?: boolean;
   mal_access_token?: string | null;
   mal_refresh_token?: string | null;
-  mal_username?: string | null;
+  mal_user_id?: string | null;
+  mal_token_expires_at?: string | null;
+  mal_auto_delete?: boolean;
   anilist_access_token?: string | null;
+  anilist_user_id?: string | null;
   anilist_username?: string | null;
   showcase_anime?: any | null;
+  is_premium?: boolean;
+  role?: string;
 }
 
 interface AuthContextType {
@@ -41,6 +46,11 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Check if we're online
+function isOnline(): boolean {
+  return typeof navigator !== 'undefined' ? navigator.onLine : true;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -53,22 +63,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
 
   const fetchProfile = async (userId: string) => {
+    // Skip fetching profile when offline
+    if (!isOnline()) {
+      setIsLoading(false);
+      return;
+    }
+    
     // Use maybeSingle() to avoid 406 when a profile doesn't exist yet
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
       .select('*')
       .eq('user_id', userId)
       .maybeSingle();
-    
+
     if (profileError && profileError.code !== 'PGRST116') {
       console.warn('Error fetching profile:', profileError.message || profileError);
     }
 
     if (profileData) {
       setProfile(profileData);
-      // Set admin status from profile
-      const adminStatus = profileData.is_admin || false;
-      setIsAdmin(adminStatus);
+
+      // Role detection
+      const role = profileData.role || 'user';
+      setIsAdmin(role === 'admin');
+      setIsModerator(role === 'moderator' || role === 'admin');
+
       // Check if user is banned
       if (profileData.is_banned) {
         setIsBanned(true);
@@ -80,18 +99,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else {
       setProfile(null);
       setIsAdmin(false);
+      setIsModerator(false);
       setIsBanned(false);
       setBanReason(null);
-    }
-
-    const { data: rolesData } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId);
-    
-    if (rolesData) {
-      const hasModRole = rolesData.some(r => r.role === 'moderator');
-      setIsModerator(prev => prev || hasModRole);
     }
   };
 
@@ -102,15 +112,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    // Skip auth setup when offline - just set loading to false
+    if (!isOnline()) {
+      setIsLoading(false);
+      return;
+    }
+    
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
-        
+
         if (session?.user) {
           setTimeout(() => {
             fetchProfile(session.user.id);
-            // Migrate local continue-watching entries to the database
+            // Migrate local continue-watching entries to the database (only when online)
+            if (!isOnline()) return;
+            
             (async () => {
               try {
                 const local = getLocalContinueWatching();
@@ -147,7 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setIsAdmin(false);
           setIsModerator(false);
         }
-        
+
         setIsLoading(false);
       }
     );
@@ -155,11 +173,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      
+
       if (session?.user) {
         fetchProfile(session.user.id);
       }
-      
+
       setIsLoading(false);
     });
 
@@ -173,7 +191,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string, displayName?: string) => {
     const redirectUrl = `${window.location.origin}/`;
-    
+
     const { error } = await supabase.auth.signUp({
       email,
       password,

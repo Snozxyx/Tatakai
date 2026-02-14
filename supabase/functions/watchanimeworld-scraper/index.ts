@@ -46,33 +46,33 @@ interface StreamingData {
 // Retry fetch with exponential backoff
 async function fetchWithRetry(url: string, options: RequestInit, retries = 3): Promise<Response> {
   let lastError: Error | null = null;
-  
+
   for (let i = 0; i < retries; i++) {
     try {
       const response = await fetch(url, {
         ...options,
         signal: AbortSignal.timeout(30000),
       });
-      
+
       if (response.ok || response.status === 206 || response.status === 302) {
         return response;
       }
-      
+
       if (response.status >= 400 && response.status < 500 && response.status !== 429) {
         return response;
       }
-      
+
       lastError = new Error(`HTTP ${response.status}: ${response.statusText}`);
     } catch (error) {
       lastError = error as Error;
       console.warn(`Fetch attempt ${i + 1} failed:`, error);
     }
-    
+
     if (i < retries - 1) {
       await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 500));
     }
   }
-  
+
   throw lastError || new Error('Failed to fetch after retries');
 }
 
@@ -80,16 +80,16 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3): P
 function checkRateLimit(clientIp: string): boolean {
   const now = Date.now();
   let limit = rateLimits.get(clientIp);
-  
+
   if (!limit || now > limit.resetTime) {
     limit = { count: 0, resetTime: now + RATE_LIMIT_WINDOW };
     rateLimits.set(clientIp, limit);
   }
-  
+
   if (limit.count >= RATE_LIMIT_MAX) {
     return false;
   }
-  
+
   limit.count++;
   return true;
 }
@@ -107,7 +107,7 @@ function parseEpisodeUrl(urlOrSlug: string): { slug: string; animeSlug: string; 
       slug = pathMatch[1];
       fullUrl = urlOrSlug;
     } else {
-      fullUrl = `https://watchanimeworld.in/episode/${slug}/`;
+      fullUrl = `https://watchanimeworld.net/episode/${slug}/`;
     }
 
     const seasonEpisodeMatch = slug.match(/^(.+?)-(\d+)x(\d+)$/);
@@ -160,7 +160,7 @@ function extractM3U8Links(content: string): string[] {
 // Resolve short link by following multiple redirects
 async function resolveShortLink(shortUrl: string, maxHops = 5): Promise<string> {
   let currentUrl = shortUrl;
-  
+
   for (let hop = 0; hop < maxHops; hop++) {
     try {
       const response = await fetchWithRetry(currentUrl, {
@@ -170,30 +170,30 @@ async function resolveShortLink(shortUrl: string, maxHops = 5): Promise<string> 
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         },
       }, 2);
-      
+
       const location = response.headers.get('location');
       if (!location) {
         // No more redirects
         return currentUrl;
       }
-      
+
       // Resolve relative URLs
       const nextUrl = location.startsWith('http') ? location : new URL(location, currentUrl).href;
-      
+
       console.log(`Redirect hop ${hop + 1}: ${currentUrl} -> ${nextUrl}`);
-      
+
       // Avoid redirect loops
       if (nextUrl === currentUrl) {
         return currentUrl;
       }
-      
+
       currentUrl = nextUrl;
     } catch (error) {
       console.warn(`Failed to resolve redirect at hop ${hop + 1}:`, currentUrl, error);
       return currentUrl;
     }
   }
-  
+
   console.warn('Max redirect hops reached:', currentUrl);
   return currentUrl;
 }
@@ -255,16 +255,16 @@ serve(async (req) => {
     });
 
     const html = await pageResponse.text();
-    
+
     // Extract iframe sources
     const player1Match = html.match(/iframe[^>]+data-src="([^"]*\/api\/player1\.php\?data=([^"]+))"/i);
-    
+
     const sources: StreamingSource[] = [];
     const subtitles: Subtitle[] = [];
 
     if (player1Match) {
       const player1Data = player1Match[2];
-      
+
       try {
         // Decode base64 data
         const decoded = atob(player1Data);
@@ -273,17 +273,34 @@ serve(async (req) => {
         console.log('Found servers:', servers.length);
 
         // Process each server
+        const langCounts: Record<string, number> = {};
         for (const server of servers) {
           const language = server.language || 'Unknown';
           const link = server.link || '';
-          
+
           if (!link) continue;
 
           const langInfo = normalizeLanguage(language);
-          
+          const langKey = langInfo.name.toUpperCase();
+          langCounts[langKey] = (langCounts[langKey] || 0) + 1;
+          const variant = langCounts[langKey] === 1 ? 'I' : 'II';
+
+          // Assign familiar character names
+          let charName = 'Z-Fighter';
+          if (langKey === 'HINDI') charName = 'Goku';
+          else if (langKey === 'TAMIL') charName = 'Vegeta';
+          else if (langKey === 'TELUGU') charName = 'Gohan';
+          else if (langKey === 'MALAYALAM') charName = 'Piccolo';
+          else if (langKey === 'BENGALI') charName = 'Trunks';
+          else if (langKey === 'ENGLISH') charName = 'Luffy';
+          else if (langKey === 'JAPANESE') charName = 'Zoro';
+          else charName = 'Kira';
+
+          const providerName = `${charName} ${variant} (${langInfo.code.toUpperCase()})`;
+
           // Resolve short link
           const resolvedLink = await resolveShortLink(link);
-          
+
           // Try to fetch provider page
           try {
             const providerResponse = await fetchWithRetry(resolvedLink, {
@@ -305,14 +322,14 @@ serve(async (req) => {
                 langCode: langInfo.code,
                 isDub: langInfo.isDub,
                 needsHeadless: true,
-                providerName: new URL(resolvedLink).hostname.split('.').slice(-2, -1)[0],
+                providerName: providerName,
               });
               continue;
             }
 
             // Extract m3u8 links
             const m3u8Links = extractM3U8Links(providerHtml);
-            
+
             if (m3u8Links.length > 0) {
               for (const m3u8Url of m3u8Links.slice(0, 2)) {
                 sources.push({
@@ -322,7 +339,7 @@ serve(async (req) => {
                   langCode: langInfo.code,
                   isDub: langInfo.isDub,
                   quality: 'HD',
-                  providerName: new URL(resolvedLink).hostname.split('.').slice(-2, -1)[0],
+                  providerName: providerName,
                 });
               }
             } else {
@@ -334,7 +351,7 @@ serve(async (req) => {
                 langCode: langInfo.code,
                 isDub: langInfo.isDub,
                 needsHeadless: true,
-                providerName: new URL(resolvedLink).hostname.split('.').slice(-2, -1)[0],
+                providerName: providerName,
               });
             }
           } catch (error) {
@@ -347,6 +364,7 @@ serve(async (req) => {
               langCode: langInfo.code,
               isDub: langInfo.isDub,
               needsHeadless: true,
+              providerName: providerName,
             });
           }
         }
@@ -390,7 +408,7 @@ serve(async (req) => {
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Scraper error';
     console.error('Scraper error:', errorMessage);
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       error: errorMessage,
       timestamp: new Date().toISOString(),
     }), {

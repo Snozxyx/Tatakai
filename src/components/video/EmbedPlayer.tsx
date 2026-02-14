@@ -68,10 +68,11 @@ export function EmbedPlayer({ url, poster, language, onError }: EmbedPlayerProps
         src={url}
         className="w-full h-full border-0"
         allowFullScreen
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture *; display-capture; microphone; camera; midi; payment; usb; xr-spatial-tracking; geolocation"
         onLoad={handleLoad}
         onError={handleError}
         title={`Video player - ${language || "Embed"}`}
+        referrerPolicy="no-referrer-when-downgrade"
       />
     </div>
   );

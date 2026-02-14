@@ -11,7 +11,7 @@ node_modules
 dist
 dist-ssr
 *.local
-
+dist_desktop
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -23,3 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 .env
+
+src-tauri/target
+
+# Temporary HTML samples for scraper development
+temp/

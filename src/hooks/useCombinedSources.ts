@@ -12,18 +12,58 @@ export function useCombinedSources(
   animeName: string | undefined,
   episodeNumber: number | undefined,
   server: string = "hd-2",
-  category: string = "sub"
+  category: string = "sub",
+  currentUserId?: string
 ) {
-  return useQuery<StreamingData & { hasWatchAnimeWorld: boolean; hasAnimeHindiDubbed: boolean; hasTatakaiAPI: boolean; hasAnimelok: boolean; hasAnimeya: boolean; malID?: number }, Error>({
-    queryKey: ["combined-sources", episodeId, animeName, episodeNumber, server, category],
+  return useQuery<StreamingData & {
+    hasWatchAnimeWorld: boolean;
+    hasAnimeHindiDubbed: boolean;
+    hasTatakaiAPI: boolean;
+    hasAnimelok: boolean;
+    hasAnimeya: boolean;
+    hasDesidubanime: boolean;
+    hasAniworld: boolean;
+    hasToonStream: boolean;
+    hasHindiApi: boolean;
+    malID?: number | null;
+    anilistID?: number | null;
+    nextEpisodeEstimates?: Array<{ lang?: string, server?: string, label: string }>;
+  }, Error>({
+    queryKey: ["combined-sources", episodeId, animeName, episodeNumber, server, category, currentUserId],
     queryFn: async () => {
-      const data = await fetchCombinedSources(episodeId, animeName, episodeNumber, server, category);
+      const data = await fetchCombinedSources(episodeId, animeName, episodeNumber, server, category, currentUserId);
+
+      // Debug log sources breakdown
+      const hindiApiSources = data.sources.filter(s => s.langCode?.startsWith('hindiapi'));
+      const toonStreamSources = data.sources.filter(s => s.langCode?.startsWith('toonstream'));
+      const hindiDubbedSources = data.sources.filter(s => s.langCode?.startsWith('animehindidubbed'));
+      console.debug('[useCombinedSources] Sources breakdown:', {
+        total: data.sources?.length,
+        malID: data.malID,
+        anilistID: data.anilistID,
+        hindiApi: hindiApiSources.length,
+        toonStream: toonStreamSources.length,
+        hindiDubbed: hindiDubbedSources.length,
+        hindiApiProviders: hindiApiSources.map(s => s.providerName),
+      });
+
       return {
         ...data,
-        hasWatchAnimeWorld: data.sources.some(s => s.providerName?.includes('WatchAnimeWorld')),
-        hasAnimeHindiDubbed: data.sources.some(s => s.providerName === 'Berlin' || s.providerName === 'Madrid'),
-        hasAnimelok: data.sources.some(s => s.providerName === 'Animelok'),
-        hasAnimeya: data.sources.some(s => s.providerName?.includes('Animeya')),
+        hasWatchAnimeWorld: data.sources.some(s => s.langCode?.startsWith('watchanimeworld') || s.providerName?.includes('Goku') || s.providerName?.includes('Luffy') || s.providerName?.includes('Z-Fighter')),
+        hasAnimeHindiDubbed: data.sources.some(s => s.providerName === 'Berlin' || s.providerName === 'Madrid' || s.langCode?.startsWith('animehindidubbed')),
+        hasAnimelok: data.sources.some(s =>
+          s.langCode?.startsWith('animelok') ||
+          s.providerName?.includes('Pain') ||
+          s.providerName?.includes('Sukuna') ||
+          s.providerName?.toLowerCase().includes('abyess') ||
+          s.providerName?.includes('Broly') ||
+          s.providerName?.includes('Kaido')
+        ),
+        hasAnimeya: data.sources.some(s => s.providerName?.includes('Animeya') || s.providerName?.includes('Bebop') || s.langCode?.startsWith('animeya')),
+        hasDesidubanime: data.sources.some(s => s.langCode?.startsWith('desidubanime')),
+        hasAniworld: data.sources.some(s => s.langCode?.startsWith('aniworld')),
+        hasToonStream: data.sources.some(s => s.langCode?.startsWith('toonstream') || s.providerName?.includes('ToonStream')),
+        hasHindiApi: data.sources.some(s => s.langCode?.startsWith('hindiapi')),
       };
     },
     enabled: !!episodeId,

@@ -1,6 +1,8 @@
+import { useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useAnimeInfo, useEpisodes, useNextEpisodeSchedule } from "@/hooks/useAnimeData";
-import { useAnimeSeasons } from "@/hooks/useAnimeSeasons";
+import { useHiAnimeSeasons } from "@/hooks/useHiAnimeSeasons";
+import { useExternalIds } from "@/hooks/useExternalIds";
 import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
@@ -14,18 +16,105 @@ import { WatchlistButton } from "@/components/anime/WatchlistButton";
 import { ShareButton } from "@/components/anime/ShareButton";
 import { AddToPlaylistButton } from "@/components/playlist/AddToPlaylistButton";
 import { NextEpisodeSchedule } from "@/components/anime/NextEpisodeSchedule";
-import { ArrowLeft, Play, Star, Calendar, Clock, Film, Tv, Layers, Users } from "lucide-react";
-import { Helmet } from "react-helmet-async";
-import { getProxiedImageUrl } from "@/lib/api";
+import { getProxiedImageUrl, searchAnime } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useEffect, useState } from "react";
+import { Loader2, Search, ArrowLeft, Play, Star, Calendar, Clock, Film, Tv, Layers, Users, Download, CloudDownload } from "lucide-react";
+import { SeasonDownloadModal } from "@/components/anime/SeasonDownloadModal";
+import { Helmet } from "react-helmet-async";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import { fetchCombinedSources } from "@/lib/api";
+import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from '@/hooks/useIsNativeApp';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Capacitor } from '@capacitor/core';
 
 export default function AnimePage() {
   const { animeId } = useParams<{ animeId: string }>();
   const navigate = useNavigate();
-  const { data: animeData, isLoading: loadingInfo } = useAnimeInfo(animeId);
+  const { data: animeData, isLoading: loadingInfo, error: infoError } = useAnimeInfo(animeId);
   const { data: episodesData, isLoading: loadingEpisodes } = useEpisodes(animeId);
-  const { data: seasons = [], isLoading: loadingSeasons } = useAnimeSeasons(animeId);
+  const { data: hiAnimeSeasons = [], isLoading: loadingSeasons } = useHiAnimeSeasons(animeId);
+  const { data: externalIds, isLoading: loadingExternalIds } = useExternalIds(animeId); // Robust multi-source ID resolution
   const { data: nextEpisodeSchedule } = useNextEpisodeSchedule(animeId);
+
+  // Get MAL/AniList IDs from the robust multi-source hook
+  const malId = externalIds?.malId || null;
+  const anilistId = externalIds?.anilistId || null;
+  
+  // Debug log for tracking ID extraction
+  console.log('[AnimePage] External IDs Debug:', {
+    animeId,
+    loadingExternalIds,
+    source: externalIds?.source,
+    malId,
+    anilistId,
+    seasonsCount: hiAnimeSeasons?.length || 0
+  });
+
+  const [isResolving, setIsResolving] = useState(false);
+  const isNative = useIsNativeApp(); // Any native app (desktop or mobile)
+  const isDesktopApp = useIsDesktopApp(); // Only Electron/Tauri
+  const isMobileNative = useIsMobileApp(); // Only Capacitor (Android/iOS)
+  const isMobile = useIsMobile(); // Screen width based check
+  
+  // Show sidebar on desktop (web or app), but not on mobile (web or app)
+  const showSidebar = !isMobile && !isMobileNative;
+  
+  const [resolutionStatus, setResolutionStatus] = useState<string>("");
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+
+  // handleDownloadEpisode removed as per user request to only keep season download here
+
+  // Handle MAL-prefixed IDs by searching and redirecting
+  useEffect(() => {
+    if (animeId?.startsWith('mal-') && !isResolving) {
+      const resolveMalId = async () => {
+        setIsResolving(true);
+        setResolutionStatus("Looking for this anime on Tatakai...");
+
+        try {
+          // If we have an error or it's clearly a MAL ID, we need to find it on HiAnime
+          // Note: useAnimeInfo will likely fail for 'mal-xxxx'
+          const malNumericId = animeId.split('-')[1];
+          console.log(`[AnimePage] Resolving MAL ID: ${malNumericId}`);
+
+          // Look in our own database first for a mapping
+          const { supabase } = await import('@/integrations/supabase/client');
+          const { data: mapping } = await supabase
+            .from('watchlist')
+            .select('anime_id, anime_name')
+            .eq('mal_id', parseInt(malNumericId))
+            .neq('anime_id', animeId)
+            .limit(1)
+            .maybeSingle();
+
+          if (mapping?.anime_id && !mapping.anime_id.startsWith('mal-')) {
+            console.log(`[AnimePage] Found mapping in DB: ${mapping.anime_id}`);
+            navigate(`/anime/${mapping.anime_id}`, { replace: true });
+            return;
+          }
+
+          // Fallback: Search HiAnime by title if we have it, or just use general search
+          // This is a bit tricky without the title, but we can try to get it from MAL if needed
+          // For now, let's assume if it fails, the user can search manually OR we try metadata lookup
+        } catch (err) {
+          console.error('[AnimePage] Resolution failed:', err);
+        } finally {
+          setIsResolving(false);
+        }
+      };
+
+      resolveMalId();
+    }
+  }, [animeId, navigate]);
+
+  // Use HiAnime seasons directly - they have proper season titles like "Season 1", "Season 2", etc.
+  const allSeasons = hiAnimeSeasons;
 
   // Auto-select episode 1 when clicking watch
   const handleWatchNow = () => {
@@ -38,11 +127,26 @@ export default function AnimePage() {
     navigate(`/watch/${encodeURIComponent(episodeId)}`);
   };
 
+  if (isResolving || (animeId?.startsWith('mal-') && !animeData)) {
+    return (
+      <div className="min-h-screen bg-background text-foreground">
+        <Background />
+        {showSidebar && <Sidebar />}
+        <main className="relative z-10 flex flex-col items-center justify-center min-h-[80vh] p-6 text-center">
+          <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
+          <h1 className="text-2xl font-bold mb-2">Resolving Anime Link</h1>
+          <p className="text-muted-foreground">{resolutionStatus || "Please wait while we find the best source for this anime..."}</p>
+        </main>
+        <MobileNav />
+      </div>
+    );
+  }
+
   if (loadingInfo) {
     return (
       <div className="min-h-screen bg-background text-foreground">
         <Background />
-        <Sidebar />
+        {showSidebar && <Sidebar />}
         <main className="relative z-10 pl-6 md:pl-32 pr-6 py-6 max-w-[1800px] mx-auto">
           <div className="space-y-8">
             <Skeleton className="h-8 w-32" />
@@ -64,12 +168,13 @@ export default function AnimePage() {
     );
   }
 
-  if (!animeData) {
+  if (!animeData || !animeData.anime) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-2">Anime not found</h1>
-          <button onClick={() => navigate("/")} className="text-primary hover:underline">
+          <h1 className="text-2xl font-bold mb-2">Anime details not available</h1>
+          <p className="text-muted-foreground mb-4">We couldn't retrieve the information for this anime ID.</p>
+          <button onClick={() => navigate("/")} className="px-6 py-2 bg-primary text-primary-foreground rounded-full hover:brightness-110">
             Go back home
           </button>
         </div>
@@ -77,8 +182,16 @@ export default function AnimePage() {
     );
   }
 
-  const { anime, recommendedAnimes, relatedAnimes } = animeData;
+  const { anime, recommendedAnimes: rawRecommended = [], relatedAnimes: rawRelated = [] } = animeData;
   const { info, moreInfo } = anime;
+
+  // Filter out duplicates between related and recommended to avoid key collisions
+  const relatedAnimes = rawRelated.slice(0, 6);
+  const recommendedAnimes = rawRecommended
+    .filter(rec => !relatedAnimes.some(rel => rel.id === rec.id))
+    .slice(0, 6);
+
+  if (!info || !moreInfo) return null;
 
   return (
     <>
@@ -99,11 +212,14 @@ export default function AnimePage() {
       </Helmet>
 
       <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-        <Sidebar />
+        {showSidebar && <Sidebar />}
 
         {/* Video Background Hero */}
         <VideoBackground animeId={animeId!} poster={info.poster}>
-          <main className="relative z-10 pl-6 md:pl-32 pr-6 py-6 max-w-[1800px] mx-auto pb-24 md:pb-6">
+          <main className={cn(
+            "relative z-10 pr-6 py-6 max-w-[1800px] mx-auto pb-24 md:pb-6",
+            isDesktopApp ? "pl-6" : "pl-6 md:pl-32" // Original web padding
+          )}>
             {/* Back Button */}
             <button
               onClick={() => navigate(-1)}
@@ -204,13 +320,13 @@ export default function AnimePage() {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-4 pt-4">
+                <div className="flex flex-wrap items-center gap-3 pt-4">
                   <button
                     onClick={handleWatchNow}
                     disabled={loadingEpisodes || !episodesData?.episodes[0]}
-                    className="h-14 px-8 rounded-full bg-foreground text-background font-bold text-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-2 glow-primary disabled:opacity-50"
+                    className="h-12 sm:h-14 px-6 sm:px-8 rounded-full bg-foreground text-background font-bold text-base sm:text-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-2 glow-primary disabled:opacity-50"
                   >
-                    <Play className="w-5 h-5 fill-background" />
+                    <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-background" />
                     Watch Now
                   </button>
                   <WatchlistButton
@@ -218,6 +334,8 @@ export default function AnimePage() {
                     animeName={info.name}
                     animePoster={info.poster}
                     variant="icon"
+                    malId={malId || moreInfo.malId || null}
+                    anilistId={anilistId || moreInfo.anilistId || null}
                   />
                   <AddToPlaylistButton
                     animeId={animeId!}
@@ -238,6 +356,16 @@ export default function AnimePage() {
                   >
                     <Users className="w-5 h-5 text-white" />
                   </button>
+
+                  {(isMobileNative || isDesktopApp) && (
+                    <button
+                      onClick={() => setIsDownloadModalOpen(true)}
+                      className="h-14 w-14 rounded-full bg-primary/20 hover:bg-primary/30 text-primary flex items-center justify-center transition-all hover:scale-105"
+                      title="Download Season"
+                    >
+                      <Download className="w-6 h-6" />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -267,36 +395,49 @@ export default function AnimePage() {
             ) : episodesData ? (
               <div className="grid grid-cols-4 md:grid-cols-8 lg:grid-cols-12 gap-2">
                 {episodesData.episodes.map((ep) => (
-                  <button
-                    key={ep.episodeId}
-                    onClick={() => handleEpisodeClick(ep.episodeId)}
-                    className={`h-12 rounded-lg font-medium transition-all hover:scale-105 ${ep.isFiller
-                      ? "bg-orange/20 text-orange hover:bg-orange/30"
-                      : "bg-muted hover:bg-primary hover:text-primary-foreground"
-                      }`}
-                    title={ep.title}
-                  >
-                    {ep.number}
-                  </button>
+                  <ContextMenu key={ep.episodeId}>
+                    <ContextMenuTrigger>
+                      <button
+                        onClick={() => handleEpisodeClick(ep.episodeId)}
+                        className={`h-12 w-full rounded-lg font-medium transition-all hover:scale-105 relative ${ep.isFiller
+                          ? "bg-orange/20 text-orange hover:bg-orange/30"
+                          : "bg-muted hover:bg-primary hover:text-primary-foreground"
+                          }`}
+                        title={ep.title}
+                      >
+                        {ep.number}
+                      </button>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent>
+                      {/* Download Episode removed from context menu */}
+                      <ContextMenuItem
+                        onClick={() => handleEpisodeClick(ep.episodeId)}
+                        className="gap-2 cursor-pointer"
+                      >
+                        <Play className="w-4 h-4" />
+                        Play Episode
+                      </ContextMenuItem>
+                    </ContextMenuContent>
+                  </ContextMenu>
                 ))}
               </div>
             ) : null}
           </section>
 
           {/* Seasons Section */}
-          {seasons.length > 1 && (
+          {allSeasons.length > 1 && (
             <section className="mb-16">
               <h2 className="font-display text-2xl font-semibold mb-6 flex items-center gap-2">
                 <Layers className="w-5 h-5 text-primary" />
                 Seasons
               </h2>
               <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
-                {seasons.map((season) => (
+                {allSeasons.map((season) => (
                   <Link
                     key={season.id}
                     to={`/anime/${season.id}`}
                     className={cn(
-                      "group",
+                      "group flex-shrink-0",
                       season.isCurrent && "pointer-events-none"
                     )}
                   >
@@ -316,10 +457,16 @@ export default function AnimePage() {
                           Current
                         </div>
                       )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                      {/* Show season title at bottom */}
+                      <div className="absolute bottom-0 left-0 right-0 p-2 text-center">
+                        <span className="text-white text-xs font-bold drop-shadow-lg">
+                          {season.title}
+                        </span>
+                      </div>
                     </div>
                     <p className={cn(
-                      "mt-2 text-sm font-medium line-clamp-2 text-center",
+                      "mt-2 text-xs md:text-sm font-medium line-clamp-2 text-center w-32 md:w-40 break-words",
                       season.isCurrent ? "text-primary" : "text-foreground group-hover:text-primary transition-colors"
                     )}>
                       {season.name}
@@ -351,7 +498,17 @@ export default function AnimePage() {
           )}
         </main>
 
-        <MobileNav />
+        {!showSidebar && <MobileNav />}
+
+        {(isMobileNative || isDesktopApp) && episodesData && (
+          <SeasonDownloadModal
+            isOpen={isDownloadModalOpen}
+            onClose={() => setIsDownloadModalOpen(false)}
+            episodes={episodesData.episodes}
+            animeName={info.name}
+            posterUrl={info.poster}
+          />
+        )}
       </div>
     </>
   );

@@ -8,13 +8,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
   DialogTrigger,
-  DialogFooter 
+  DialogFooter
 } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -26,11 +26,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { StatusVideoBackground } from '@/components/layout/StatusVideoBackground';
 import { PlaylistCard } from '@/components/playlist/PlaylistCard';
-import { 
-  usePlaylists, 
-  usePlaylist, 
+import {
+  usePlaylists,
+  usePlaylist,
   usePlaylistItems,
   useCreatePlaylist,
   useUpdatePlaylist,
@@ -40,8 +39,8 @@ import {
 } from '@/hooks/usePlaylist';
 import { useAuth } from '@/contexts/AuthContext';
 import { getProxiedImageUrl } from '@/lib/api';
-import { 
-  ArrowLeft, Plus, Music2, Globe, Lock, Play, 
+import {
+  ArrowLeft, Plus, Music2, Globe, Lock, Play,
   Trash2, Edit2, Share2, MoreVertical, GripVertical,
   Loader2, Calendar
 } from 'lucide-react';
@@ -56,7 +55,7 @@ export default function PlaylistsPage() {
   const { data: playlists = [], isLoading } = usePlaylists();
   const createPlaylist = useCreatePlaylist();
   const deletePlaylist = useDeletePlaylist();
-  
+
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
@@ -65,13 +64,13 @@ export default function PlaylistsPage() {
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
-    
+
     await createPlaylist.mutateAsync({
       name: newName.trim(),
       description: newDesc.trim() || undefined,
       isPublic: newPublic,
     });
-    
+
     setNewName('');
     setNewDesc('');
     setNewPublic(false);
@@ -87,7 +86,6 @@ export default function PlaylistsPage() {
   if (!user) {
     return (
       <div className="min-h-screen bg-background text-foreground">
-        <StatusVideoBackground />
         <Sidebar />
         <main className="relative z-10 pl-0 md:pl-20 lg:pl-24 w-full">
           <div className="max-w-7xl mx-auto px-4 md:px-8 py-20 text-center">
@@ -104,9 +102,8 @@ export default function PlaylistsPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <StatusVideoBackground />
       <Sidebar />
-      
+
       <main className="relative z-10 pl-0 md:pl-20 lg:pl-24 w-full">
         <div className="max-w-7xl mx-auto px-4 md:px-8 py-8">
           {/* Header */}
@@ -128,7 +125,7 @@ export default function PlaylistsPage() {
                 </p>
               </div>
             </div>
-            
+
             <Dialog open={showCreate} onOpenChange={setShowCreate}>
               <DialogTrigger asChild>
                 <Button className="gap-2">
@@ -177,7 +174,7 @@ export default function PlaylistsPage() {
                   <Button variant="outline" onClick={() => setShowCreate(false)}>
                     Cancel
                   </Button>
-                  <Button 
+                  <Button
                     onClick={handleCreate}
                     disabled={!newName.trim() || createPlaylist.isPending}
                   >
@@ -263,7 +260,7 @@ export function PlaylistViewPage() {
   const { playlistId } = useParams<{ playlistId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  
+
   const { data: playlist, isLoading: loadingPlaylist } = usePlaylist(playlistId);
   const { data: items = [], isLoading: loadingItems } = usePlaylistItems(playlistId);
   const updatePlaylist = useUpdatePlaylist();
@@ -319,7 +316,7 @@ export function PlaylistViewPage() {
 
   const handleUpdate = async () => {
     if (!playlist || !editName.trim()) return;
-    
+
     await updatePlaylist.mutateAsync({
       id: playlist.id,
       name: editName.trim(),
@@ -329,7 +326,7 @@ export function PlaylistViewPage() {
       shareDescription: editShareDesc ?? undefined,
       embedAllowed: editEmbedAllowed,
     });
-    
+
     setShowEdit(false);
   };
 
@@ -364,7 +361,6 @@ export function PlaylistViewPage() {
   if (!playlist) {
     return (
       <div className="min-h-screen bg-background text-foreground">
-        <StatusVideoBackground />
         <Sidebar />
         <main className="relative z-10 pl-0 md:pl-20 lg:pl-24 w-full">
           <div className="max-w-7xl mx-auto px-4 md:px-8 py-20 text-center">
@@ -386,9 +382,8 @@ export function PlaylistViewPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <StatusVideoBackground />
       <Sidebar />
-      
+
       <main className="relative z-10 pl-0 md:pl-20 lg:pl-24 w-full">
         <div className="max-w-7xl mx-auto px-4 md:px-8 py-8">
           {/* Header */}
@@ -445,11 +440,11 @@ export function PlaylistViewPage() {
               </div>
 
               <h1 className="text-4xl font-black mb-2">{playlist.name}</h1>
-              
+
               {playlist.description && (
                 <p className="text-muted-foreground mb-4">{playlist.description}</p>
               )}
-              
+
               <p className="text-sm text-muted-foreground flex items-center gap-2 mb-6">
                 <Calendar className="w-4 h-4" />
                 Created {new Date(playlist.created_at).toLocaleDateString()}
@@ -459,7 +454,7 @@ export function PlaylistViewPage() {
 
               <div className="flex flex-wrap gap-3">
                 {items.length > 0 && (
-                  <Button 
+                  <Button
                     className="gap-2"
                     onClick={() => navigate(`/anime/${items[0].anime_id}`)}
                   >
@@ -467,22 +462,22 @@ export function PlaylistViewPage() {
                     Start Watching
                   </Button>
                 )}
-                
+
                 {playlist.is_public && (
                   <Button variant="outline" onClick={handleShare} className="gap-2">
                     <Share2 className="w-4 h-4" />
                     Share
                   </Button>
                 )}
-                
+
                 {isOwner && (
                   <>
                     <Button variant="outline" onClick={openEdit} className="gap-2">
                       <Edit2 className="w-4 h-4" />
                       Edit
                     </Button>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       onClick={() => setShowDelete(true)}
                       className="gap-2 text-destructive hover:text-destructive"
                     >
@@ -520,7 +515,7 @@ export function PlaylistViewPage() {
                     <span className="text-muted-foreground w-8 text-center font-mono">
                       {index + 1}
                     </span>
-                    
+
                     <Link to={`/anime/${item.anime_id}`} className="flex items-center gap-4 flex-1 min-w-0">
                       <div className="relative w-16 h-20 rounded-lg overflow-hidden flex-shrink-0">
                         <img
@@ -532,7 +527,7 @@ export function PlaylistViewPage() {
                           <Play className="w-6 h-6 text-white" />
                         </div>
                       </div>
-                      
+
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold line-clamp-1 group-hover:text-primary transition-colors">
                           {item.anime_name}
@@ -650,7 +645,7 @@ export function PlaylistViewPage() {
             <Button variant="outline" onClick={() => setShowEdit(false)}>
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={handleUpdate}
               disabled={!editName.trim() || updatePlaylist.isPending}
             >

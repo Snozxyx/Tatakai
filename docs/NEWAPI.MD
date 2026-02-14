@@ -347,7 +347,7 @@ Regional Scrapers (Hindi, Tamil, Telugu)
 Specialized scrapers for Indian regional languages and dubbed content.
 
 1. Animelok
-Next-gen scraper for animelok.to using HiAnime-style IDs.
+Next-gen scraper for animelok.site using HiAnime-style IDs.
 
 Homepage
 URL: /animelok/home

@@ -14,6 +14,8 @@ import { useState, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { getProxiedImageUrl, AnimeCard } from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
+import { useIsNativeApp } from "@/hooks/useIsNativeApp";
+import { cn } from "@/lib/utils";
 
 type TabType = 'for-you' | 'ai-recs' | 'all' | 'watching' | 'completed' | 'plan' | 'on-hold' | 'dropped';
 
@@ -141,13 +143,17 @@ export default function FavoritesPage() {
   const showRecommendations = activeTab === 'for-you';
   const showMLRecs = activeTab === 'ai-recs';
   const isLoading = showRecommendations ? loadingRecs : (showMLRecs ? loadingML || loadingProfile : loadingWatchlist);
+  const isNative = useIsNativeApp();
 
   if (!user) {
     return (
       <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
         <Background />
         <Sidebar />
-        <main className="relative z-10 pl-4 md:pl-32 pr-4 md:pr-6 py-4 md:py-6 max-w-[1800px] mx-auto pb-24 md:pb-6">
+        <main className={cn(
+          "relative z-10 pr-4 md:pr-6 py-4 md:py-6 max-w-[1800px] mx-auto pb-24 md:pb-6",
+          isNative ? "pl-4" : "pl-4 md:pl-32"
+        )}>
           <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
@@ -178,7 +184,10 @@ export default function FavoritesPage() {
       <Background />
       <Sidebar />
 
-      <main className="relative z-10 pl-4 md:pl-32 pr-4 md:pr-6 py-4 md:py-6 max-w-[1800px] mx-auto pb-24 md:pb-6">
+      <main className={cn(
+        "relative z-10 pr-4 md:pr-6 py-4 md:py-6 max-w-[1800px] mx-auto pb-24 md:pb-6",
+        isNative ? "pl-4" : "pl-4 md:pl-32"
+      )}>
         {/* Header */}
         <div className="mb-8 md:mb-12">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8">
@@ -560,8 +569,4 @@ export default function FavoritesPage() {
       <MobileNav />
     </div>
   );
-}
-
-function cn(...args: any[]) {
-  return args.filter(Boolean).join(' ');
 }

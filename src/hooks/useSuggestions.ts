@@ -47,9 +47,9 @@ export function useUserSuggestions() {
   });
 }
 
-// Fetch all suggestions (admin only)
+// Fetch all suggestions (admin and moderator)
 export function useAllSuggestions() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isModerator } = useAuth();
 
   return useQuery<Suggestion[]>({
     queryKey: ['all_suggestions'],
@@ -77,7 +77,7 @@ export function useAllSuggestions() {
         profiles: profileMap.get(suggestion.user_id) || null,
       })) as Suggestion[];
     },
-    enabled: isAdmin,
+    enabled: isAdmin || isModerator,
   });
 }
 
@@ -100,6 +100,8 @@ export function useCreateSuggestion() {
         .insert({
           user_id: user.id,
           ...suggestion,
+          status: 'pending',
+          priority: 'normal',
         })
         .select()
         .single();
@@ -166,24 +168,24 @@ export function useDeleteSuggestion() {
   });
 }
 
-// Admin: Update suggestion status
+// Admin/Moderator: Update suggestion status
 export function useReviewSuggestion() {
   const queryClient = useQueryClient();
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isModerator } = useAuth();
 
   return useMutation({
-    mutationFn: async ({ 
-      id, 
-      status, 
-      priority, 
-      adminNotes 
-    }: { 
-      id: string; 
-      status: Suggestion['status']; 
+    mutationFn: async ({
+      id,
+      status,
+      priority,
+      adminNotes
+    }: {
+      id: string;
+      status: Suggestion['status'];
       priority?: Suggestion['priority'];
       adminNotes?: string;
     }) => {
-      if (!isAdmin) throw new Error('Admin access required');
+      if (!user || (!isAdmin && !isModerator)) throw new Error('Admin or moderator access required');
 
       const { error } = await supabase
         .from('user_suggestions')
@@ -191,16 +193,16 @@ export function useReviewSuggestion() {
           status,
           priority: priority || undefined,
           admin_notes: adminNotes || undefined,
-          reviewed_by: user!.id,
+          reviewed_by: user.id,
           reviewed_at: new Date().toISOString(),
         })
         .eq('id', id);
 
       if (error) throw error;
 
-      // Log admin action
+      // Log staff action
       await supabase.from('admin_logs').insert({
-        user_id: user!.id,
+        user_id: user.id,
         action: `review_suggestion_${status}`,
         entity_type: 'user_suggestion',
         entity_id: id,

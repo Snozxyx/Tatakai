@@ -1,5 +1,17 @@
+import { getClientIdSync } from '@/hooks/useClientId';
+
 const API_URL = "https://aniwatch-api-taupe-eight.vercel.app/api/v2/hianime";
 const CHAR_API_URL = "https://anime-api.canelacho.com/api/v1";
+
+// TatakaiAPI URL - configurable for development
+const TATAKAI_API_URL = import.meta.env.VITE_TATAKAI_API_URL || "https://tatakaiapi.vercel.app/api/v1";
+
+// Detect mobile for performance optimizations
+const isMobileNative = typeof window !== 'undefined' && 
+  (window as any).Capacitor?.isNativePlatform?.() || false;
+
+// Shorter timeout for mobile for faster feedback
+const API_TIMEOUT = isMobileNative ? 15000 : 30000;
 
 // Use Supabase edge function as proxy for CORS
 function getProxyUrl(): string {
@@ -58,19 +70,31 @@ function unwrapApiData<T>(payload: AnyEnvelope<T> | T): T {
   return payload as T;
 }
 
-export async function apiGet<T>(path: string, retries = 3): Promise<T> {
+export async function apiGet<T>(path: string, retries?: number): Promise<T> {
+  // Fewer retries on mobile for faster feedback
+  const maxRetries = retries ?? (isMobileNative ? 2 : 3);
   const url = `${API_URL}${path}`;
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const fallbackProxy = "https://api.allorigins.win/raw?url=";
 
   let lastError: Error | null = null;
 
-  // Try Supabase proxy first, then fallback
+  // On mobile, try direct API first (faster), then proxy as fallback
+  // On web, use proxy to handle CORS
   const proxies = supabaseUrl
     ? (() => {
       const apiOrigin = new URL(API_URL).origin;
       const apikey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       const rapidUrl = `${supabaseUrl}/functions/v1/rapid-service?url=${encodeURIComponent(url)}&type=api&referer=${encodeURIComponent(apiOrigin)}` + (apikey ? `&apikey=${encodeURIComponent(apikey)}` : '');
+      
+      // Mobile can try direct API first (no CORS in native webview)
+      if (isMobileNative) {
+        return [
+          { url, type: 'direct' },
+          { url: rapidUrl, type: 'supabase' },
+        ];
+      }
+      
       return [
         { url: rapidUrl, type: 'supabase' },
         { url: `${fallbackProxy}${encodeURIComponent(url)}`, type: 'fallback' }
@@ -81,7 +105,7 @@ export async function apiGet<T>(path: string, retries = 3): Promise<T> {
     ];
 
   for (const proxy of proxies) {
-    for (let attempt = 0; attempt < retries; attempt++) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         const headers: Record<string, string> = {
           'Accept': 'application/json',
@@ -94,7 +118,7 @@ export async function apiGet<T>(path: string, retries = 3): Promise<T> {
         }
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
 
         const response = await fetch(proxy.url, {
           headers,
@@ -113,15 +137,26 @@ export async function apiGet<T>(path: string, retries = 3): Promise<T> {
         lastError = error as Error;
         console.warn(`API request via ${proxy.type} attempt ${attempt + 1} failed:`, error);
 
-        // Wait before retry with exponential backoff
-        if (attempt < retries - 1) {
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 500));
+        // Wait before retry with exponential backoff (shorter on mobile)
+        if (attempt < maxRetries - 1) {
+          const baseDelay = isMobileNative ? 300 : 500;
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * baseDelay));
         }
       }
     }
   }
 
   throw lastError || new ApiError('Failed to fetch data after all attempts');
+}
+
+/**
+ * Build headers with optional CID for rate-limiting
+ */
+function withClientHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  const headers: Record<string, string> = { ...extra };
+  const cid = getClientIdSync();
+  if (cid) headers['X-Client-Id'] = cid;
+  return headers;
 }
 
 /**
@@ -136,7 +171,10 @@ export async function externalApiGet<T>(baseUrl: string, path: string, retries =
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-      const response = await fetch(url, { signal: controller.signal });
+      const response = await fetch(url, {
+        headers: withClientHeaders(),
+        signal: controller.signal,
+      });
       clearTimeout(timeoutId);
 
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -168,8 +206,9 @@ export function trackEvent(category: string, action: string, label?: string, val
 
 // Proxy helper for video streaming with referer header
 export function getProxiedVideoUrl(videoUrl: string, referer?: string, userAgent?: string): string {
-  // Avoid double-proxying if the URL is already pointing at our edge function
+  // Avoid double-proxying if the URL is already pointing at our edge function or TatakaiAPI proxy
   if (videoUrl.includes('/functions/v1/rapid-service')) return videoUrl;
+  if (videoUrl.includes('/hindiapi/proxy')) return videoUrl;
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   if (!supabaseUrl) {
@@ -261,6 +300,8 @@ export interface AnimeCard {
   duration?: string;
   rating?: string;
   episodes: Episode;
+  malId?: number;
+  anilistId?: number;
 }
 
 export interface HomeData {
@@ -319,7 +360,9 @@ export interface AnimeInfo {
     status: string;
     studios: string;
     duration: string;
-    [key: string]: unknown;
+    malId?: number | null;
+    anilistId?: number | null;
+    [key: string]: any;
   };
 }
 
@@ -345,12 +388,24 @@ export interface StreamingSource {
   providerName?: string;
   needsHeadless?: boolean;
   isEmbed?: boolean;
+  server?: string;
+  contributorDisplay?: string;
+  contributorUsername?: string;
 }
 
 export interface Subtitle {
   lang: string;
   url: string;
   label?: string;
+  kind?: string;
+  file?: string;
+}
+
+export interface NextEpisodeEstimate {
+  lang?: string;
+  server?: string;
+  label: string;
+  iso?: string;
 }
 
 export interface StreamingData {
@@ -365,6 +420,7 @@ export interface StreamingData {
   malID: number | null;
   intro?: { start: number; end: number };
   outro?: { start: number; end: number };
+  nextEpisodeEstimates?: NextEpisodeEstimate[];
 }
 export interface SearchResult {
   animes: AnimeCard[];
@@ -421,13 +477,92 @@ export async function fetchHome(): Promise<HomeData> {
 export async function fetchAnimeInfo(
   animeId: string
 ): Promise<{ anime: AnimeInfo; recommendedAnimes: AnimeCard[]; relatedAnimes: AnimeCard[] }> {
+  // Routing numeric IDs to Animelok via TatakaiAPI
+  if (/^\d+$/.test(animeId)) {
+    const res = await externalApiGet<any>(TATAKAI_API_URL, `/animelok/anime/${animeId}`);
+    if (res.status === 200 && res.data) {
+      return mapAnimelokToAnimePage(res.data);
+    }
+  }
   return apiGet(`/anime/${animeId}`);
 }
 
 export async function fetchEpisodes(
   animeId: string
 ): Promise<{ totalEpisodes: number; episodes: EpisodeData[] }> {
+  if (/^\d+$/.test(animeId)) {
+    // For numeric anime IDs, fetch all episodes by making multiple requests
+    let allEpisodes: any[] = [];
+    let page = 1;
+    let hasMore = true;
+
+    while (hasMore) {
+      try {
+        const res = await externalApiGet<any>(TATAKAI_API_URL, `/animelok/watch/${animeId}?ep=${page}`);
+        if (res.status === 200 && res.data && res.data.episodes) {
+          const pageEpisodes = res.data.episodes;
+          allEpisodes = [...allEpisodes, ...pageEpisodes];
+
+          // If we got fewer episodes than expected, we're done
+          if (pageEpisodes.length === 0) {
+            hasMore = false;
+          } else {
+            page++;
+          }
+        } else {
+          hasMore = false;
+        }
+      } catch (error) {
+        console.error(`Failed to fetch episodes page ${page}:`, error);
+        hasMore = false;
+      }
+    }
+
+    return {
+      totalEpisodes: allEpisodes.length,
+      episodes: allEpisodes.map((ep: any) => ({
+        number: parseInt(ep.number),
+        title: ep.title || `Episode ${ep.number}`,
+        episodeId: `${animeId}?ep=${ep.number}`,
+        isFiller: false
+      }))
+    };
+  }
   return apiGet(`/anime/${animeId}/episodes`);
+}
+
+// Helper to map Animelok data to the format expected by AnimePage (HiAnime compatible)
+function mapAnimelokToAnimePage(data: any) {
+  return {
+    anime: {
+      info: {
+        id: data.id,
+        name: data.title,
+        poster: data.poster,
+        description: data.description || "No description available.",
+        stats: {
+          rating: data.rating?.toString() || "?",
+          quality: "HD",
+          episodes: data.stats?.episodes || { sub: 0, dub: 0 },
+          type: data.stats?.type || "TV",
+          duration: data.stats?.duration || "?"
+        },
+        promotionalVideos: [],
+        characterVoiceActor: []
+      },
+      moreInfo: {
+        aired: data.stats?.aired || "?",
+        genres: data.genres || [],
+        status: data.stats?.status || "?",
+        studios: data.stats?.studios || "?",
+        duration: data.stats?.duration || "?",
+        malId: data.malID || data.mal_id,
+        anilistId: data.anilistID || data.anilist_id
+      }
+    },
+    recommendedAnimes: [],
+    relatedAnimes: []
+  };
 }
 
 export async function fetchEpisodeServers(
@@ -444,9 +579,10 @@ export async function fetchEpisodeServers(
 
 export async function fetchStreamingSources(
   episodeId: string,
-  server: string = "hd-2",
+  server: string = "hd-1",
   category: string = "sub"
 ): Promise<StreamingData> {
+  // Use the refined query parameter structure from docs
   return apiGet(
     `/episode/sources?animeEpisodeId=${episodeId}&server=${server}&category=${category}`
   );
@@ -485,53 +621,75 @@ export async function fetchNextEpisodeSchedule(
   return apiGet(`/anime/${animeId}/next-episode-schedule`);
 }
 
-// Fetch sources from WatchAnimeWorld
+// Fetch sources from WatchAnimeWorld via local TatakaiAPI
 export async function fetchWatchanimeworldSources(
   episodeUrl: string
 ): Promise<StreamingData> {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  if (!supabaseUrl) {
-    throw new Error('Supabase URL not configured');
+  try {
+    const json = await externalApiGet<any>(TATAKAI_API_URL, `/watchaw/episode?id=${encodeURIComponent(episodeUrl)}`);
+
+    if (json.status === 200 && json.data) {
+      return json.data;
+    }
+
+    return {
+      headers: { Referer: "", "User-Agent": "" },
+      sources: [],
+      subtitles: [],
+      anilistID: null,
+      malID: null
+    };
+  } catch (error) {
+    console.warn(`Failed to fetch WatchAnimeWorld sources: ${error}`);
+    return {
+      headers: { Referer: "", "User-Agent": "" },
+      sources: [],
+      subtitles: [],
+      anilistID: null,
+      malID: null
+    };
   }
-
-  const apikey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  const params = new URLSearchParams({ episodeUrl });
-  if (apikey) params.set('apikey', apikey);
-
-  const url = `${supabaseUrl}/functions/v1/watchanimeworld-scraper?${params.toString()}`;
-
-  const headers: Record<string, string> = {
-    'Accept': 'application/json',
-  };
-  if (apikey) {
-    headers['apikey'] = apikey;
-    headers['Authorization'] = `Bearer ${apikey}`;
-  }
-
-  const response = await fetch(url, { headers });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch WatchAnimeWorld sources: ${response.status}`);
-  }
-
-  return response.json();
 }
 
 // Fetch anime data from AnimeHindiDubbed
+// Tries TatakaiAPI first (has S5E episode parsing fix), falls back to Supabase edge function
 export async function fetchAnimeHindiDubbedData(
-  slug: string
+  slug: string,
+  episode?: number
 ): Promise<{
   title: string;
   slug: string;
   thumbnail?: string;
   description?: string;
   rating?: string;
-  servers: {
-    filemoon: Array<{ name: string; url: string }>;
-    servabyss: Array<{ name: string; url: string }>;
-    vidgroud: Array<{ name: string; url: string }>;
-  };
+  episodes: Array<{
+    number: number;
+    title: string;
+    servers: Array<{
+      name: string;
+      url: string;
+      language: string;
+    }>;
+  }>;
 }> {
+  // --- Strategy 1: TatakaiAPI (has correct S5E parsing) ---
+  try {
+    const tatakaiUrl = `${TATAKAI_API_URL}/hindidubbed/anime/${encodeURIComponent(slug)}`;
+    const tRes = await fetch(tatakaiUrl, {
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (tRes.ok) {
+      const json = await tRes.json();
+      if (json.status === 200 && json.data) {
+        return json.data; // Already episode-centric with correct parsing
+      }
+    }
+  } catch (e) {
+    console.warn('[AnimeHindiDubbed] TatakaiAPI failed, trying Supabase edge function:', e);
+  }
+
+  // --- Strategy 2: Supabase edge function fallback ---
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   if (!supabaseUrl) {
     throw new Error('Supabase URL not configured');
@@ -539,6 +697,11 @@ export async function fetchAnimeHindiDubbedData(
 
   const apikey = import.meta.env.VITE_SUPABASE_ANON_KEY;
   const params = new URLSearchParams({ action: 'anime', slug });
+  // Send BOTH param names so edge function works with either
+  if (episode !== undefined) {
+    params.set('episode', episode.toString());
+    params.set('ep', episode.toString()); // Edge function reads 'ep'
+  }
   if (apikey) params.set('apikey', apikey);
 
   const url = `${supabaseUrl}/functions/v1/animehindidubbed-scraper?${params.toString()}`;
@@ -566,48 +729,67 @@ export async function fetchTatakaiEpisodeSources(
   server: string = "hd-2",
   category: string = "sub"
 ): Promise<StreamingData & { malID?: number; anilistID?: number }> {
-  const apiUrl = 'https://tatakaiapi.vercel.app/api/v1/hianime/episode/sources';
+  const apiUrl = `${TATAKAI_API_URL}/hianime/episode/sources`;
+  // Map frontend server names to backend-compatible scraper names
+  const serverMap: Record<string, string> = {
+    'hd-1': 'vidstreaming',
+    'hd-2': 'megacloud',
+    'stream-sb': 'streamsb',
+    'vidcloud': 'vidcloud'
+  };
+
   const params = new URLSearchParams({
     animeEpisodeId: episodeId,
-    server,
+    server: serverMap[server] || server,
     category
   });
 
   const targetUrl = `${apiUrl}?${params}`;
 
-  // Use Supabase proxy to avoid CORS issues
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const apikey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl) {
-    throw new Error('Supabase URL not configured');
-  }
-
-  const proxyParams = new URLSearchParams({
-    url: targetUrl,
-    type: 'api',
-    referer: 'https://tatakaiapi.vercel.app'
-  });
-  if (apikey) proxyParams.set('apikey', apikey);
-
-  const proxyUrl = `${supabaseUrl}/functions/v1/rapid-service?${proxyParams}`;
+  // Determine if we should use proxy
+  const isLocal = targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1');
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // Increased timeout
 
-    const headers: Record<string, string> = {
-      'Accept': 'application/json',
-    };
-    if (apikey) {
-      headers['apikey'] = apikey;
-      headers['Authorization'] = `Bearer ${apikey}`;
+    let response: Response;
+
+    if (isLocal) {
+      // Direct fetch for localhost
+      response = await fetch(targetUrl, {
+        signal: controller.signal,
+        headers: { 'Accept': 'application/json' }
+      });
+    } else {
+      // Use Supabase proxy to avoid CORS issues
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const apikey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl) {
+        throw new Error('Supabase URL not configured');
+      }
+
+      const proxyParams = new URLSearchParams({
+        url: targetUrl,
+        type: 'api',
+        referer: TATAKAI_API_URL.replace('/api/v1', '')
+      });
+      if (apikey) proxyParams.set('apikey', apikey);
+
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+      };
+      if (apikey) {
+        headers['apikey'] = apikey;
+        headers['Authorization'] = `Bearer ${apikey}`;
+      }
+
+      response = await fetch(`${supabaseUrl}/functions/v1/rapid-service?${proxyParams}`, {
+        signal: controller.signal,
+        headers
+      });
     }
-
-    const response = await fetch(proxyUrl, {
-      signal: controller.signal,
-      headers
-    });
 
     clearTimeout(timeoutId);
 
@@ -651,63 +833,59 @@ export async function fetchTatakaiEpisodeSources(
   }
 }
 
+// Helper for Animelok fetch with proxy/local support
+async function animelokApiFetch(targetUrl: string): Promise<any> {
+  const isLocal = targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1');
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    let response: Response;
+    if (isLocal) {
+      response = await fetch(targetUrl, {
+        signal: controller.signal,
+        headers: { 'Accept': 'application/json' }
+      });
+    } else {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const apikey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      if (!supabaseUrl) throw new Error('Supabase URL not configured');
+
+      const proxyParams = new URLSearchParams({
+        url: targetUrl,
+        type: 'api',
+        referer: TATAKAI_API_URL.replace('/api/v1', '')
+      });
+      if (apikey) proxyParams.set('apikey', apikey);
+
+      const headers: Record<string, string> = { 'Accept': 'application/json' };
+      if (apikey) {
+        headers['apikey'] = apikey;
+        headers['Authorization'] = `Bearer ${apikey}`;
+      }
+
+      response = await fetch(`${supabaseUrl}/functions/v1/rapid-service?${proxyParams}`, {
+        signal: controller.signal,
+        headers
+      });
+    }
+    clearTimeout(timeoutId);
+    if (!response.ok) return null;
+    return await response.json();
+  } catch (e) {
+    clearTimeout(timeoutId);
+    return null;
+  }
+}
+
 // Fetch from Animelok (TatakaiAPI) with anime slug using Supabase proxy
 export async function fetchAnimelokSources(
   animeSlug: string,
   episodeNumber: number
-): Promise<StreamingSource[]> {
-  const apiUrl = `https://tatakaiapi.vercel.app/api/v1/animelok/watch/${animeSlug}`;
-  const params = new URLSearchParams({
-    ep: episodeNumber.toString()
-  });
-
-  const targetUrl = `${apiUrl}?${params}`;
-
-  // Use Supabase proxy to avoid CORS issues
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const apikey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl) {
-    throw new Error('Supabase URL not configured');
-  }
-
-  const proxyParams = new URLSearchParams({
-    url: targetUrl,
-    type: 'api',
-    referer: 'https://tatakaiapi.vercel.app'
-  });
-  if (apikey) proxyParams.set('apikey', apikey);
-
-  const proxyUrl = `${supabaseUrl}/functions/v1/rapid-service?${proxyParams}`;
-
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-    const headers: Record<string, string> = {
-      'Accept': 'application/json',
-    };
-    if (apikey) {
-      headers['apikey'] = apikey;
-      headers['Authorization'] = `Bearer ${apikey}`;
-    }
-
-    const response = await fetch(proxyUrl, {
-      signal: controller.signal,
-      headers
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      throw new Error(`Animelok API returned status ${response.status}`);
-    }
-
-    const json = await response.json();
-
-    if (json.status === 200 && json.data && json.data.servers) {
-      // Map Animelok servers to StreamingSource format with proper M3U8 detection
-      return json.data.servers.map((server: any, index: number) => {
+): Promise<{ sources: StreamingSource[]; malID?: number; anilistID?: number }> {
+  const getSourcesFromData = (json: any) => {
+    if (json?.status === 200 && json.data?.servers) {
+      const sources = json.data.servers.map((server: any, index: number) => {
         let isM3U8 = server.url?.includes('.m3u8') || server.url?.includes('m3u8');
         const serverNameLower = server.name?.toLowerCase() || '';
         const tipLower = server.tip?.toLowerCase() || '';
@@ -719,73 +897,448 @@ export async function fetchAnimelokSources(
           try {
             const parsed = JSON.parse(server.url);
             if (Array.isArray(parsed) && parsed.length > 0) {
-              isM3U8 = true; // Assume JSON array implies M3U8/Source list
+              isM3U8 = true;
             }
-          } catch (e) {
-            console.warn('Failed to parse JSON url:', e);
-          }
+          } catch (e) { }
         }
 
         // Detect language code
         let displayLang = 'Unknown';
-        if (language.includes('JAPAN') || language.includes('JAP')) displayLang = 'JAP';
-        else if (language.includes('ENG')) displayLang = 'ENG';
-        else if (language.includes('HINDI') || language.includes('HIN')) displayLang = 'HIN';
-        else if (language.includes('TAMIL')) displayLang = 'TAM';
-        else if (language.includes('MALAYALAM')) displayLang = 'MAL';
-        else if (language.includes('TELUGU')) displayLang = 'TEL';
-        else if (language.includes('SPANISH') || language.includes('ESP')) displayLang = 'ESP';
+        const isCloudServer = serverNameLower.includes('cloud') || tipLower.includes('cloud');
+        if (isCloudServer || language.toUpperCase().includes('HINDI') || language.toUpperCase().includes('HIN')) displayLang = 'HIN';
+        else if (language.toUpperCase().includes('JAPAN') || language.toUpperCase().includes('JAP')) displayLang = 'JAP';
+        else if (language.toUpperCase().includes('ENGLISH') || language.toUpperCase().includes('ENG') || language.toUpperCase() === 'EN') displayLang = 'ENG';
+        else if (language.toUpperCase().includes('TAMIL') || language.toUpperCase().includes('TAM')) displayLang = 'TAM';
+        else if (language.toUpperCase().includes('MALAYALAM') || language.toUpperCase().includes('MAL')) displayLang = 'MAL';
+        else if (language.toUpperCase().includes('TELUGU') || language.toUpperCase().includes('TEL')) displayLang = 'TEL';
+        else if (language.toUpperCase().includes('SPANISH') || language.toUpperCase().includes('ESP')) displayLang = 'ESP';
         else displayLang = language.substring(0, 3).toUpperCase();
 
         let providerName = `${displayLang}`;
-
-        // Robust naming logic to avoid "abysscdn" appearing
-        if (tipLower.includes('multi') || serverNameLower.includes('multi')) {
-          providerName = `Multi (${displayLang}) `;
-        } else if (serverNameLower.includes('bato')) {
-          providerName = `Totoro (${displayLang}) `;
-        } else if (serverNameLower.includes('kuro')) {
-          providerName = `Kuro (${displayLang}) `;
-        } else if (serverNameLower.includes('pahe')) {
-          providerName = `Pahe (${displayLang}) `;
-        } else if (serverNameLower.includes('abyss') || serverNameLower.includes('abysscdn') || tipLower.includes('abyess') || tipLower.includes('abyss')) {
-          // Assign different characters based on language for Abyss sources
-          // Use index to distinguish multiple servers of same language (Pain I, Pain II)
-          const variant = (index % 2 === 0) ? 'I' : 'II';
-
-          if (displayLang === 'HIN') providerName = `Pain ${variant} (${displayLang})`;
-          else if (displayLang === 'TAM') providerName = `Kaido ${variant} (${displayLang})`;
-          else if (displayLang === 'TEL') providerName = `Broly ${variant} (${displayLang})`;
-          else if (displayLang === 'MAL') providerName = `Yami ${variant} (${displayLang})`;
-          else if (displayLang === 'ENG') providerName = `AllMight ${variant} (${displayLang})`;
-          else if (displayLang === 'JAP') providerName = `Sukuna ${variant} (${displayLang})`;
-          else providerName = `Akatsuki ${variant} (${displayLang})`;
-        } else {
-          // Fallback but NEVER use "abysscdn"
-          if (server.name && !server.name.toLowerCase().includes('abyss')) {
-            providerName = `${server.name} (${displayLang})`;
-          } else {
-            providerName = `Server ${index + 1} (${displayLang})`;
-          }
-        }
+        if (tipLower.includes('multi') || serverNameLower.includes('multi')) providerName = `Multi (${displayLang}) `;
+        else if (serverNameLower.includes('bato')) providerName = `Totoro (${displayLang}) `;
+        else if (serverNameLower.includes('kuro')) providerName = `Kuro (${displayLang}) `;
+        else if (serverNameLower.includes('pahe')) providerName = `Pahe (${displayLang}) `;
+        else if (serverNameLower.includes('gogo')) providerName = `Gogo (${displayLang}) `;
+        else if (serverNameLower.includes('stream')) providerName = `Stream (${displayLang}) `;
+        else if (serverNameLower.includes('all')) providerName = `AllMight (${displayLang}) `;
+        else if (serverNameLower.includes('pain')) providerName = `Pain (${displayLang}) `;
+        else if (serverNameLower.includes('kaido')) providerName = `Kaido (${displayLang}) `;
+        else if (serverNameLower.includes('gara')) providerName = `Gaara (${displayLang}) `;
+        else if (serverNameLower.includes('itachi')) providerName = `Itachi (${displayLang}) `;
+        else if (serverNameLower.includes('madara')) providerName = `Madara (${displayLang}) `;
+        else if (serverNameLower.includes('cloud')) providerName = `Hindi (Cloud) `;
 
         return {
-          url: finalUrl,
-          isM3U8: isM3U8,
-          quality: isM3U8 ? 'Auto' : '720p',
-          language: language,
-          langCode: `animelok-${index}-${displayLang.toLowerCase()}`, // Use index to ensure uniqueness
-          isDub: language !== 'JAPANESE' && !language.includes('JAP'),
-          providerName: providerName,
+          url: server.url,
+          isM3U8,
+          quality: server.quality || 'HD',
+          language: displayLang === 'HIN' ? 'Hindi' : (displayLang === 'JAP' ? 'Japanese' : (displayLang === 'TAM' ? 'Tamil' : (displayLang === 'MAL' ? 'Malayalam' : 'English'))),
+          langCode: `animelok-${index}-${displayLang}`,
+          isDub: displayLang !== 'JAP' && !language.toLowerCase().includes('sub'),
+          providerName: providerName.trim(),
           isEmbed: !isM3U8,
-          needsHeadless: !isM3U8,
+          needsHeadless: !isM3U8
         };
       });
+
+      return {
+        sources,
+        malID: json.data.malId || json.data.malID,
+        anilistID: json.data.anilistId || json.data.anilistID
+      };
+    }
+    return { sources: [] };
+  };
+
+  const constructUrl = (slug: string) => `${TATAKAI_API_URL}/animelok/watch/${slug}?ep=${episodeNumber}`;
+
+  try {
+    // 1. Direct fetch
+    let json = await animelokApiFetch(constructUrl(animeSlug));
+    let result = getSourcesFromData(json);
+    if (result.sources.length > 0) return result;
+
+    // 2. Search fallback
+    const searchUrl = `${TATAKAI_API_URL}/animelok/search?q=${encodeURIComponent(animeSlug.replace(/-/g, ' '))}`;
+    const searchJson = await animelokApiFetch(searchUrl);
+
+    if (searchJson?.status === 200 && searchJson.data?.animes?.length > 0) {
+      const results = searchJson.data.animes;
+      // Search for best match or just use the first one if it seems related
+      const bestMatch = results.find((a: any) =>
+        a.id?.includes(animeSlug) || animeSlug.includes(a.id)
+      ) || results[0];
+
+      if (bestMatch?.id && bestMatch.id !== animeSlug) {
+        json = await animelokApiFetch(constructUrl(bestMatch.id));
+        return getSourcesFromData(json);
+      }
+    }
+
+    return { sources: [] };
+  } catch (error) {
+    console.error('Animelok fetch failed:', error);
+    return { sources: [] };
+  }
+}
+
+
+// Fetch from Desidubanime (TatakaiAPI)
+export async function fetchDesidubanimeSources(
+  watchSlug: string
+): Promise<StreamingSource[] | { sources: StreamingSource[]; nextEpisodeEstimates?: Array<{ lang?: string; server?: string; label: string; iso?: string }> }> {
+  const apiUrl = `${TATAKAI_API_URL}/desidubanime/watch/${watchSlug}`;
+
+  // Determine if we should use proxy
+  const isLocal = apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1');
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    let response: Response;
+
+    if (isLocal) {
+      // Direct fetch for localhost
+      response = await fetch(apiUrl, {
+        signal: controller.signal,
+        headers: { 'Accept': 'application/json' }
+      });
+    } else {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const apikey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl) {
+        throw new Error('Supabase URL not configured');
+      }
+
+      const proxyParams = new URLSearchParams({
+        url: apiUrl,
+        type: 'api',
+        referer: TATAKAI_API_URL.replace('/api/v1', '')
+      });
+      if (apikey) proxyParams.set('apikey', apikey);
+
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+      };
+      if (apikey) {
+        headers['apikey'] = apikey;
+        headers['Authorization'] = `Bearer ${apikey}`;
+      }
+
+      const proxyUrl = `${supabaseUrl}/functions/v1/rapid-service?${proxyParams}`;
+
+      response = await fetch(proxyUrl, {
+        signal: controller.signal,
+        headers
+      });
+    }
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`Desidubanime API returned status ${response.status}`);
+    }
+
+    const json = await response.json();
+
+    if (json.status === 200 && json.data && json.data.sources) {
+      const sources: StreamingSource[] = json.data.sources.map((source: any, index: number) => ({
+        url: source.url,
+        isM3U8: source.isM3U8 || false,
+        quality: source.quality || 'default',
+        language: source.language || 'Unknown',
+        langCode: `desidubanime-${index}-${(source.language || 'unknown').toLowerCase()}`,
+        isDub: source.category === 'dub' || source.language?.toLowerCase().includes('hindi'),
+        providerName: source.name || `DesiDub ${index + 1}`,
+        isEmbed: source.isEmbed || !source.isM3U8,
+        needsHeadless: source.needsHeadless || false
+      }));
+
+      // Return object with sources and nextEpisodeEstimates if available
+      if (json.data.nextEpisodeEstimates && json.data.nextEpisodeEstimates.length > 0) {
+        return {
+          sources,
+          nextEpisodeEstimates: json.data.nextEpisodeEstimates
+        };
+      }
+
+      return sources;
     }
 
     return [];
   } catch (error) {
-    console.error('Failed to fetch from Animelok:', error);
+    console.error('Failed to fetch from Desidubanime:', error);
+    return [];
+  }
+}
+
+// Fetch from Aniworld (TatakaiAPI)
+export async function fetchAniworldSources(
+  slug: string, // e.g., "fire-force/staffel-1"
+  episodeNumber: number
+): Promise<StreamingSource[]> {
+  const apiUrl = `${TATAKAI_API_URL}/aniworld/watch/${slug}/episode/${episodeNumber}`;
+
+  // Determine if we should use proxy
+  const isLocal = apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1');
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    let response: Response;
+
+    if (isLocal) {
+      response = await fetch(apiUrl, {
+        signal: controller.signal,
+        headers: { 'Accept': 'application/json' }
+      });
+    } else {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const apikey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl) {
+        throw new Error('Supabase URL not configured');
+      }
+
+      const proxyParams = new URLSearchParams({
+        url: apiUrl,
+        type: 'api',
+        referer: TATAKAI_API_URL.replace('/api/v1', '')
+      });
+      if (apikey) proxyParams.set('apikey', apikey);
+
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+      };
+      if (apikey) {
+        headers['apikey'] = apikey;
+        headers['Authorization'] = `Bearer ${apikey}`;
+      }
+
+      const proxyUrl = `${supabaseUrl}/functions/v1/rapid-service?${proxyParams}`;
+
+      response = await fetch(proxyUrl, {
+        signal: controller.signal,
+        headers
+      });
+    }
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`Aniworld API returned status ${response.status}`);
+    }
+
+    const json = await response.json();
+
+    if (json.status === 200 && json.data && json.data.sources) {
+      return json.data.sources.map((source: any, index: number) => ({
+        url: source.url,
+        isM3U8: source.isM3U8 || false,
+        quality: 'HD',
+        language: source.language || 'German',
+        langCode: `aniworld-${index}-${(source.langCode || 'de').toLowerCase()}`,
+        isDub: source.isDub !== false, // German is typically dub
+        providerName: source.name || `Aniworld ${index + 1}`,
+        isEmbed: source.isEmbed || true,
+        needsHeadless: source.needsHeadless || false
+      }));
+    }
+
+    return [];
+  } catch (error) {
+    console.error('Failed to fetch from Aniworld:', error);
+    return [];
+  }
+}
+
+// Fetch from ToonStream API (Hindi/Multi-language embed servers)
+// Tries TatakaiAPI proxy first, then calls external ToonStream API directly via Supabase proxy
+export async function fetchToonStreamSources(
+  animeName: string,
+  season: number,
+  episodeNumber: number
+): Promise<StreamingSource[]> {
+  const slug = animeName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const episodeSlug = `${slug}-${season}x${episodeNumber}`;
+
+  const parseToonStreamResponse = (json: any): StreamingSource[] => {
+    // Handle both TatakaiAPI wrapper format and raw ToonStream format
+    const data = json.data || json;
+    const sources = data.sources;
+    if (!sources || !Array.isArray(sources)) return [];
+
+    const languages = data.languages || ['Hindi'];
+    const primaryLang = languages[0] || 'Hindi';
+    const langAbbr = primaryLang.toLowerCase().startsWith('hin') ? 'HIN'
+      : primaryLang.toLowerCase().startsWith('tam') ? 'TAM'
+      : primaryLang.toLowerCase().startsWith('tel') ? 'TEL'
+      : primaryLang.toLowerCase().startsWith('eng') ? 'ENG'
+      : primaryLang.toLowerCase().startsWith('jap') ? 'JAP'
+      : primaryLang.toUpperCase().slice(0, 3);
+
+    // For raw ToonStream API, pair sources with servers array
+    const servers = data.servers || [];
+
+    return sources.map((source: any, index: number) => {
+      // Determine server name from servers array or source itself
+      const serverInfo = servers[index] || {};
+      const serverName = source.serverName // TatakaiAPI format
+        || serverInfo.name               // Raw ToonStream format
+        || `Server ${index + 1}`;
+      const serverId = source.serverId || serverInfo.id || `server-${index}`;
+
+      return {
+        url: source.url,
+        isM3U8: false,
+        quality: source.quality || 'HD',
+        language: primaryLang,
+        langCode: `toonstream-${index}-${serverId}`,
+        isDub: true,
+        providerName: `${serverName} (${langAbbr})`,
+        isEmbed: source.type === 'iframe',
+        needsHeadless: false
+      };
+    });
+  };
+
+  // --- Strategy 1: TatakaiAPI proxy ---
+  try {
+    const apiUrl = `${TATAKAI_API_URL}/toonstream/episode/${episodeSlug}`;
+    const res = await fetch(apiUrl, {
+      headers: withClientHeaders({ 'Accept': 'application/json' }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      const parsed = parseToonStreamResponse(json);
+      if (parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    console.warn('[ToonStream] TatakaiAPI proxy failed, trying direct:', e);
+  }
+
+  // --- Strategy 2: Call ToonStream external API directly via Supabase proxy ---
+  try {
+    const externalUrl = `https://toonstream-api.ry4n.qzz.io/api/episode/${episodeSlug}`;
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const apikey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    let response: Response;
+    if (supabaseUrl) {
+      // Use Supabase rapid-service proxy to avoid CORS
+      const proxyParams = new URLSearchParams({
+        url: externalUrl,
+        type: 'api',
+      });
+      if (apikey) proxyParams.set('apikey', apikey);
+
+      const headers: Record<string, string> = { 'Accept': 'application/json' };
+      if (apikey) {
+        headers['apikey'] = apikey;
+        headers['Authorization'] = `Bearer ${apikey}`;
+      }
+
+      response = await fetch(
+        `${supabaseUrl}/functions/v1/rapid-service?${proxyParams}`,
+        { headers, signal: AbortSignal.timeout(12000) }
+      );
+    } else {
+      // Direct call (works in non-browser environments or if CORS allows)
+      response = await fetch(externalUrl, {
+        headers: { 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(12000),
+      });
+    }
+
+    if (response.ok) {
+      const json = await response.json();
+      return parseToonStreamResponse(json);
+    }
+  } catch (e) {
+    console.warn('[ToonStream] Direct/proxy fetch also failed:', e);
+  }
+
+  return [];
+}
+
+// Fetch HindiAPI sources (TechInMind) using TMDB-based lookup
+// Accepts MAL or AniList IDs, which the TatakaiAPI route auto-converts to TMDB
+export async function fetchHindiApiSources(
+  episodeNumber: number,
+  malId?: number | string,
+  anilistId?: number | string,
+  season: number = 1
+): Promise<StreamingSource[]> {
+  const params = new URLSearchParams({
+    season: String(season),
+    episode: String(episodeNumber),
+    type: 'series',
+  });
+
+  if (malId) params.set('malId', String(malId));
+  else if (anilistId) params.set('anilistId', String(anilistId));
+  else return []; // Need at least one ID
+
+  console.debug(`[HindiAPI] Fetching: malId=${malId}, anilistId=${anilistId}, ep=${episodeNumber}, season=${season}`);
+
+  try {
+    const apiUrl = `${TATAKAI_API_URL}/hindiapi/episode?${params.toString()}`;
+    const res = await fetch(apiUrl, {
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(15000), // Longer timeout: upstream TMDB resolve + embed extraction
+    });
+
+    if (!res.ok) {
+      if (res.status !== 404) console.warn(`[HindiAPI] API returned ${res.status}`);
+      return [];
+    }
+
+    const json: any = await res.json();
+    const data = json.data;
+    if (!data?.streams || !Array.isArray(data.streams)) {
+      console.warn('[HindiAPI] No streams in response:', json);
+      return [];
+    }
+
+    const mapped = data.streams
+      .filter((s: any) => s.url || s.dhls)
+      .map((stream: any, index: number) => {
+        const hasDirect = Boolean(stream.dhls);
+        const providerKey = stream.provider?.toLowerCase().replace(/\s+/g, '') || `server${index}`;
+
+        // Route direct HLS through proxy to handle CORS + required headers
+        let streamUrl: string;
+        let isM3U8 = false;
+        if (hasDirect) {
+          const referer = stream.headers?.Referer || stream.headers?.referer || '';
+          streamUrl = `${TATAKAI_API_URL}/hindiapi/proxy?url=${encodeURIComponent(stream.dhls)}${referer ? `&referer=${encodeURIComponent(referer)}` : ''}`;
+          isM3U8 = true;
+        } else {
+          streamUrl = stream.url;
+        }
+
+        return {
+          url: streamUrl,
+          isM3U8,
+          quality: 'HD',
+          language: 'Hindi',
+          langCode: `hindiapi-${index}-${providerKey}`,
+          isDub: true,
+          providerName: `${stream.provider || `Server ${index + 1}`} (HIN)`,
+          isEmbed: !hasDirect,
+          needsHeadless: !hasDirect,
+        } satisfies StreamingSource;
+      });
+
+    console.debug(`[HindiAPI] Got ${mapped.length} sources:`, mapped.map(s => `${s.providerName} [${s.isM3U8 ? 'HLS' : s.isEmbed ? 'embed' : 'direct'}]`));
+    return mapped;
+  } catch (e) {
+    console.warn('[HindiAPI] Fetch failed:', e);
     return [];
   }
 }
@@ -809,10 +1362,17 @@ export async function fetchAnimeyaSources(
 
   // Helper to fetch via proxy
   const fetchProxy = async (targetUrl: string) => {
+    // If localhost, bypass proxy
+    if (targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1')) {
+      const res = await fetch(targetUrl, { headers: { 'Accept': 'application/json' } });
+      if (!res.ok) throw new Error(`Status ${res.status}`);
+      return res.json();
+    }
+
     const proxyParams = new URLSearchParams({
       url: targetUrl,
       type: 'api',
-      referer: 'https://tatakaiapi.vercel.app'
+      referer: TATAKAI_API_URL.replace('/api/v1', '')
     });
     if (apikey) proxyParams.set('apikey', apikey);
 
@@ -829,7 +1389,7 @@ export async function fetchAnimeyaSources(
       console.log(`[Animeya] Resolving episode ID for ${animeName} (MAL: ${id}) Ep ${episodeNumber}`);
 
       // 1. Search for the anime
-      const searchRes = await fetchProxy(`https://tatakaiapi.vercel.app/api/v1/animeya/search?q=${encodeURIComponent(animeName)}`);
+      const searchRes = await fetchProxy(`${TATAKAI_API_URL}/animeya/search?q=${encodeURIComponent(animeName)}`);
 
       if (searchRes.status === 200 && Array.isArray(searchRes.data)) {
         // Find best match - look for slug ending with MAL ID
@@ -840,7 +1400,7 @@ export async function fetchAnimeyaSources(
           console.log(`[Animeya] Found anime slug: ${match.slug}`);
 
           // 2. Get Info (Episodes)
-          const infoRes = await fetchProxy(`https://tatakaiapi.vercel.app/api/v1/animeya/info/${match.slug}`);
+          const infoRes = await fetchProxy(`${TATAKAI_API_URL}/animeya/info/${match.slug}`);
 
           if (infoRes.status === 200 && infoRes.data && Array.isArray(infoRes.data.episodes) && infoRes.data.episodes.length > 0) {
             const episodes = infoRes.data.episodes;
@@ -870,7 +1430,7 @@ export async function fetchAnimeyaSources(
   }
 
   // 3. Watch (Get Sources)
-  let apiUrl = `https://tatakaiapi.vercel.app/api/v1/animeya/watch/${episodeId}`;
+  let apiUrl = `${TATAKAI_API_URL}/animeya/watch/${episodeId}`;
 
   // Keep legacy ?ep support just in case, though using resolved ID is safer
   if (episodeNumber !== undefined && episodeId === id) {
@@ -880,7 +1440,7 @@ export async function fetchAnimeyaSources(
   const proxyParams = new URLSearchParams({
     url: apiUrl,
     type: 'api',
-    referer: 'https://tatakaiapi.vercel.app'
+    referer: TATAKAI_API_URL.replace('/api/v1', '')
   });
   if (apikey) proxyParams.set('apikey', apikey);
 
@@ -890,10 +1450,29 @@ export async function fetchAnimeyaSources(
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-    const response = await fetch(proxyUrl, {
-      signal: controller.signal,
-      headers
-    });
+    let response: Response;
+    const isLocal = apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1');
+
+    if (isLocal) {
+      response = await fetch(apiUrl, {
+        signal: controller.signal,
+        headers: { 'Accept': 'application/json' }
+      });
+    } else {
+      const proxyParams = new URLSearchParams({
+        url: apiUrl,
+        type: 'api',
+        referer: TATAKAI_API_URL.replace('/api/v1', '')
+      });
+      if (apikey) proxyParams.set('apikey', apikey);
+
+      const proxyUrl = `${supabaseUrl}/functions/v1/rapid-service?${proxyParams}`;
+
+      response = await fetch(proxyUrl, {
+        signal: controller.signal,
+        headers
+      });
+    }
 
     clearTimeout(timeoutId);
 
@@ -953,43 +1532,116 @@ export async function fetchAnimeyaSources(
 // Fetch custom sources from Supabase targeting this anime/episode
 export async function fetchCustomSupabaseSources(
   animeId?: string,
-  episodeId?: string
+  episodeId?: string,
+  episodeNumber?: number,
+  currentUserId?: string // Support visibility of pending items for the uploader
 ): Promise<StreamingSource[]> {
   try {
     const { supabase } = await import('@/integrations/supabase/client');
 
-    let query = supabase
-      .from('custom_sources')
-      .select('*')
-      .eq('is_active', true);
-
-    // Build filter: either global (no anime/episode ID) or targeting specific anime/episode
-    const filters = ['anime_id.is.null', 'episode_id.is.null'];
-    if (animeId) filters.push(`anime_id.eq.${animeId}`);
-    if (episodeId) filters.push(`episode_id.eq.${episodeId}`);
-
-    // Using or filter to get both global and specific ones
-    const orFilter = `or(anime_id.is.null,anime_id.eq.${animeId || ''}${episodeId ? `,episode_id.eq.${episodeId}` : ''})`;
-
-    const { data, error } = await supabase
+    // 1. Fetch staff-added custom sources
+    const { data: customData } = await supabase
       .from('custom_sources')
       .select('*')
       .eq('is_active', true)
       .or(animeId ? `anime_id.is.null,anime_id.eq.${animeId}` : 'anime_id.is.null')
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    // 2. Fetch approved user marketplace items OR the user's own pending items
+    // Using profiles!user_id to resolve ambiguity between multiple FKs to profiles table
+    let marketplaceQuery = supabase
+      .from('marketplace_items')
+      .select('*, profiles!user_id(display_name, username)');
 
-    return (data || []).map(source => ({
-      url: source.url,
-      isM3U8: source.type === 'direct' && source.url.includes('.m3u8'),
-      quality: 'HD',
-      language: 'Custom',
-      langCode: `custom-${source.id}`,
-      providerName: source.name,
-      isEmbed: source.type === 'embed',
-      needsHeadless: source.type === 'embed'
-    }));
+    // Status filter: approved for everyone, OR pending if it's the current user's item
+    if (currentUserId) {
+      marketplaceQuery = marketplaceQuery.or(`status.eq.approved,and(status.eq.pending,user_id.eq.${currentUserId})`);
+    } else {
+      marketplaceQuery = marketplaceQuery.eq('status', 'approved');
+    }
+
+    if (animeId) {
+      marketplaceQuery = marketplaceQuery.eq('anime_id', animeId);
+    }
+    if (episodeNumber !== undefined) {
+      marketplaceQuery = marketplaceQuery.eq('episode_number', episodeNumber);
+    }
+
+    let { data: marketplaceData, error: marketplaceError } = await marketplaceQuery;
+
+    // Fallback if join fails (e.g. schema cache lag or PostgREST ambiguity)
+    if (marketplaceError || !marketplaceData) {
+      console.warn('Marketplace join query failed, falling back to simple query:', marketplaceError);
+
+      let simpleQuery = supabase
+        .from('marketplace_items')
+        .select('*');
+
+      if (currentUserId) {
+        simpleQuery = simpleQuery.or(`status.eq.approved,and(status.eq.pending,user_id.eq.${currentUserId})`);
+      } else {
+        simpleQuery = simpleQuery.eq('status', 'approved');
+      }
+
+      if (animeId) {
+        simpleQuery = simpleQuery.eq('anime_id', animeId);
+      }
+      if (episodeNumber !== undefined) {
+        simpleQuery = simpleQuery.eq('episode_number', episodeNumber);
+      }
+
+      const { data: simpleData } = await simpleQuery;
+      marketplaceData = simpleData;
+    }
+
+    const sources: StreamingSource[] = [];
+
+    // Map staff sources
+    if (customData) {
+      customData.forEach(source => {
+        sources.push({
+          url: source.url,
+          isM3U8: source.type === 'direct' && source.url.includes('.m3u8'),
+          quality: 'HD',
+          language: 'Custom',
+          langCode: `custom-${source.id}`,
+          providerName: source.name,
+          isEmbed: source.type === 'embed',
+          needsHeadless: source.type === 'embed'
+        });
+      });
+    }
+
+    // Map approved user sources
+    if (marketplaceData) {
+      marketplaceData.forEach((item: any) => {
+        if (item.type === 'server') {
+          const isEmbed = item.data?.isEmbed ?? !item.data?.url?.includes('.m3u8');
+          // If profiles join worked, use those fields. 
+          // If not, and it's our own item, use 'You' or fallback to user_id
+          const isOwn = currentUserId && item.user_id === currentUserId;
+          const display = item.profiles?.display_name || item.profiles?.username || (isOwn ? 'You' : 'Community');
+          const username = item.profiles?.username || (isOwn ? 'me' : 'user');
+          const isPending = item.status === 'pending';
+
+          sources.push({
+            url: item.data?.url,
+            isM3U8: item.data?.url?.includes('.m3u8'),
+            quality: 'HD',
+            language: item.data?.lang || 'Custom',
+            langCode: `marketplace-${item.id}`,
+            providerName: isPending ? `${item.data?.label || 'User Source'} (Pending)` : (item.data?.label || 'User Source'),
+            isEmbed: isEmbed,
+            needsHeadless: isEmbed,
+            server: `Shared by ${display}`,
+            contributorDisplay: display,
+            contributorUsername: username
+          });
+        }
+      });
+    }
+
+    return sources;
   } catch (error) {
     console.warn('Failed to fetch custom supabase sources:', error);
     return [];
@@ -1002,75 +1654,346 @@ export async function fetchCombinedSources(
   animeName: string | undefined,
   episodeNumber: number | undefined,
   server: string = "hd-2",
-  category: string = "sub"
-) {
+  category: string = "sub",
+  currentUserId?: string // New parameter for pending item visibility
+): Promise<StreamingData & { hasTatakaiAPI: boolean }> {
   if (!episodeId) throw new Error("Episode ID required");
 
-  // Try TatakaiAPI first
-  let primaryData: StreamingData & { malID?: number; anilistID?: number };
-  let hasTatakaiAPI = false;
-  let malID: number | undefined;
+  // Step 1: Fetch Primary HiAnime sources (Priority 1: Direct Vercel API)
+  let primaryData: StreamingData = {
+    headers: { Referer: "", "User-Agent": "" },
+    sources: [],
+    subtitles: [],
+    anilistID: null,
+    malID: null
+  };
+  let directHiAnimeSuccess = false;
 
   try {
-    primaryData = await fetchTatakaiEpisodeSources(episodeId, server, category);
-    hasTatakaiAPI = true;
-    malID = primaryData.malID;
-  } catch (error: any) {
-    // Silently fall back - 403 errors are expected if API is not configured
-    if (error?.message?.includes('403')) {
-      // Suppress 403 errors as they're handled by fallback
-    } else {
-      console.warn('TatakaiAPI failed, falling back to HiAnime:', error);
-    }
     primaryData = await fetchStreamingSources(episodeId, server, category);
+    directHiAnimeSuccess = true;
+  } catch (error) {
+    console.warn('Direct HiAnime API failed, trying TatakaiAPI fallback');
+    try {
+      const fallback = await fetchTatakaiEpisodeSources(episodeId, server, category);
+      primaryData = fallback;
+    } catch (f) {
+      console.warn('All HiAnime source attempts failed');
+    }
   }
 
-  // Parallel fetches for extra sources
-  const [watchAwData, animeyaSources, animelokSources, customSources] = await Promise.all([
-    // WatchAnimeWorld
+  // Step 2: Use resolved IDs from primary data for other scrapers
+  let malID = primaryData.malID || undefined;
+  let anilistID = primaryData.anilistID || undefined;
+  const hasTatakaiAPI = directHiAnimeSuccess;
+
+  // Fetch all other sources in parallel with the best available metadata
+  const otherResults = await Promise.allSettled([
+    // [0] WatchAnimeWorld Sources
     (async () => {
       try {
-        const baseSlug = episodeId.split('?')[0];
-        const animeSlug = baseSlug.replace(/-\d+$/, '');
-        if (episodeNumber !== undefined) {
-          return await fetchWatchanimeworldSources(`${animeSlug}-1x${episodeNumber}`);
+        if (episodeNumber !== undefined && animeName) {
+          const waSimpleName = animeName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+          const directSlug = `${waSimpleName}-1x${episodeNumber}`;
+          let data = await fetchWatchanimeworldSources(directSlug);
+          if (data.sources && data.sources.length > 0) return data;
+
+          const cleanSearchName = animeName.replace(/:/g, '');
+          const searchRes = await externalApiGet<any>(TATAKAI_API_URL, `/watchaw/search?q=${encodeURIComponent(cleanSearchName)}`);
+          if (searchRes.status === 200 && (searchRes.data as any)?.results?.length > 0) {
+            const match = (searchRes.data as any).results[0];
+            if (match && match.slug) {
+              const resolvedSlug = match.slug.includes('x') ? match.slug : `${match.slug}-1x${episodeNumber}`;
+              return await fetchWatchanimeworldSources(resolvedSlug);
+            }
+          }
         }
-      } catch (e) { return { sources: [] }; }
+      } catch (e) {
+        console.warn('WatchAnimeWorld fetch failed:', e);
+      }
+      return { sources: [] };
     })(),
-    // Animeya
+
+    // [1] Animeya Sources (Use MAL ID if available)
     (async () => {
-      if (malID && episodeNumber !== undefined && animeName) {
-        return await fetchAnimeyaSources(malID, episodeNumber, animeName);
+      try {
+        if (episodeNumber !== undefined) {
+          return await fetchAnimeyaSources(malID || animeName || "", episodeNumber, animeName);
+        }
+      } catch (e) {
+        console.warn('Animeya fetch failed:', e);
       }
       return [];
     })(),
-    // Animelok
+
+    // [2] Animelok Sources
     (async () => {
-      if (episodeNumber !== undefined && malID) {
-        const baseSlug = episodeId.split('?')[0];
-        const animeSlug = baseSlug.replace(/-\d+$/, '');
-        return await fetchAnimelokSources(`${animeSlug}-${malID}`, episodeNumber);
+      try {
+        if (episodeNumber !== undefined) {
+          const simpleName = animeName?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || "";
+          const animelokId = malID ? `${simpleName}-${malID}` : (animeName || "");
+          if (animelokId) {
+            const result = await fetchAnimelokSources(animelokId, episodeNumber);
+            return result;
+          }
+        }
+      } catch (e) {
+        console.warn('[CombinedSources] Animelok fetch failed:', e);
+      }
+      return { sources: [] };
+    })(),
+
+    // [3] Desidubanime Sources
+    (async () => {
+      try {
+        if (episodeNumber !== undefined && animeName) {
+          const ddSimpleName = animeName.toLowerCase()
+            .replace(/'s/g, 's')
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-|-$/g, '');
+
+          const watchSlug = `${ddSimpleName}-episode-${episodeNumber}`;
+          let sources = await fetchDesidubanimeSources(watchSlug);
+          if (Array.isArray(sources) && sources.length > 0) return sources;
+          if (!Array.isArray(sources) && (sources as any).sources?.length > 0) return sources;
+
+          const cleanSearchName = animeName.replace(/:/g, '');
+          const searchRes = await externalApiGet<any>(TATAKAI_API_URL, `/desidubanime/search?q=${encodeURIComponent(cleanSearchName)}`);
+          if (searchRes.status === 200 && (searchRes.data as any)?.results?.length > 0) {
+            const results = (searchRes.data as any).results;
+            const match = results.find((r: any) =>
+              r.slug && (r.slug.includes(ddSimpleName) || ddSimpleName.includes(r.slug))
+            ) || results[0];
+
+            if (match && match.slug) {
+              const resolvedSlug = `${match.slug}-episode-${episodeNumber}`;
+              return await fetchDesidubanimeSources(resolvedSlug);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Desidubanime fetch failed:', e);
       }
       return [];
     })(),
-    // Custom Supabase Sources
-    fetchCustomSupabaseSources(episodeId.split('?')[0], episodeId)
+
+    // [4] Aniworld Sources
+    (async () => {
+      try {
+        if (episodeNumber !== undefined && animeName) {
+          const awSimpleName = animeName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+          const cleanSearchName = animeName.replace(/:/g, '');
+          let sources = await fetchAniworldSources(awSimpleName, episodeNumber);
+          if (sources.length > 0) return sources;
+
+          const searchRes = await externalApiGet<any>(TATAKAI_API_URL, `/aniworld/search?q=${encodeURIComponent(cleanSearchName)}`);
+          if (searchRes.status === 200 && (searchRes.data as any)?.results?.length > 0) {
+            const results = (searchRes.data as any).results;
+            const match = results.find((r: any) =>
+              r.slug && (r.slug.includes(awSimpleName) || awSimpleName.includes(r.slug))
+            ) || results[0];
+
+            if (match && match.slug) {
+              return await fetchAniworldSources(match.slug, episodeNumber);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Aniworld fetch failed:', e);
+      }
+      return [];
+    })(),
+
+    // [5] AnimeHindiDubbed
+    (async () => {
+      try {
+        if (episodeNumber !== undefined && animeName) {
+          const ahdSimpleName = animeName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+          const data = await fetchAnimeHindiDubbedData(ahdSimpleName, episodeNumber);
+
+          if (data && data.episodes) {
+            const targetEp = data.episodes.find(e => e.number === episodeNumber);
+
+            if (targetEp && targetEp.servers) {
+              // Deduplicate: keep only ONE source per server name (Filemoon, Servabyss, Vidgroud)
+              // This prevents flooding if the backend returns broken episode data
+              const seenServers = new Set<string>();
+              const dedupedServers = targetEp.servers.filter(s => {
+                const key = s.name.toLowerCase();
+                if (seenServers.has(key)) return false;
+                seenServers.add(key);
+                return true;
+              });
+
+              return dedupedServers.map((s, i) => {
+                const lang = (s.language || 'Hindi').trim();
+                const langCode = lang.toLowerCase().startsWith('hin') ? 'HIN'
+                  : lang.toLowerCase().startsWith('tam') ? 'TAM'
+                  : lang.toLowerCase().startsWith('tel') ? 'TEL'
+                  : lang.toLowerCase().startsWith('eng') ? 'ENG'
+                  : lang.toLowerCase().startsWith('jap') ? 'JAP'
+                  : lang.toUpperCase().slice(0, 3);
+                return {
+                  url: s.url,
+                  isM3U8: s.url.includes('.m3u8'),
+                  quality: 'HD',
+                  language: lang,
+                  langCode: `animehindidubbed-${i}-${langCode.toLowerCase()}`,
+                  isDub: true,
+                  providerName: `${s.name} (${langCode})`,
+                  isEmbed: !s.url.includes('.m3u8'),
+                  needsHeadless: false
+                };
+              });
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('AnimeHindiDubbed fetch failed:', e);
+      }
+      return [];
+    })(),
+
+    // [6] Custom Supabase Sources
+    (async () => {
+      try {
+        const idBase = episodeId.split('?')[0];
+        return await fetchCustomSupabaseSources(idBase, episodeId, episodeNumber, currentUserId);
+      } catch (error) {
+        console.warn('Supabase sources fetch failed:', error);
+        return [];
+      }
+    })(),
+
+    // [7] ToonStream Sources (Hindi/Multi-language embeds)
+    (async () => {
+      try {
+        if (episodeNumber !== undefined && animeName) {
+          return await fetchToonStreamSources(animeName, 1, episodeNumber);
+        }
+      } catch (e) {
+        console.warn('ToonStream fetch failed:', e);
+      }
+      return [];
+    })(),
+
+    // [8] HindiAPI Sources (TechInMind - TMDB-based Hindi embeds + direct HLS)
+    (async () => {
+      try {
+        if (episodeNumber !== undefined && (malID || anilistID)) {
+          console.debug(`[CombinedSources] HindiAPI slot starting: malID=${malID}, anilistID=${anilistID}, ep=${episodeNumber}`);
+          const result = await fetchHindiApiSources(episodeNumber, malID, anilistID);
+          console.debug(`[CombinedSources] HindiAPI slot returned ${result.length} sources`);
+          return result;
+        } else {
+          console.debug(`[CombinedSources] HindiAPI slot skipped: ep=${episodeNumber}, malID=${malID}, anilistID=${anilistID}`);
+        }
+      } catch (e) {
+        console.warn('HindiAPI fetch failed:', e);
+      }
+      return [];
+    })()
   ]);
 
-  // Merge everything
+  // Extract results
+  const watchAwVal = otherResults[0].status === 'fulfilled' ? otherResults[0].value : { sources: [] };
+  const animeyaVal = otherResults[1].status === 'fulfilled' ? otherResults[1].value : [];
+  const animelokResult = otherResults[2].status === 'fulfilled' ? otherResults[2].value : { sources: [] };
+  const desidubVal = otherResults[3].status === 'fulfilled' ? otherResults[3].value : [];
+  const aniworldVal = otherResults[4].status === 'fulfilled' ? otherResults[4].value : [];
+  const hindiVal = otherResults[5].status === 'fulfilled' ? otherResults[5].value : [];
+  const customVal = otherResults[6].status === 'fulfilled' ? otherResults[6].value : [];
+  const toonStreamVal = otherResults[7].status === 'fulfilled' ? otherResults[7].value : [];
+  const hindiApiVal = otherResults[8].status === 'fulfilled' ? otherResults[8].value : [];
+
+  const animelokVal = 'sources' in animelokResult ? animelokResult.sources : animelokResult;
+
+  // ID Harvesting: Update malID and anilistID if missing from main source
+  if (!malID) {
+    malID = (animelokResult as any).malID || (animelokResult as any).malId ||
+      (watchAwVal as any).malID || (watchAwVal as any).malId;
+    if (typeof malID === 'string') malID = parseInt(malID);
+  }
+  if (!anilistID) {
+    anilistID = (animelokResult as any).anilistID || (animelokResult as any).anilistId ||
+      (watchAwVal as any).anilistID || (watchAwVal as any).anilistId;
+    if (typeof anilistID === 'string') anilistID = parseInt(anilistID);
+  }
+
+  // Handle marketplace subtitles separately
+  try {
+    const { supabase } = await import('@/integrations/supabase/client');
+    let { data: marketplaceSubtitles, error: subError } = await supabase
+      .from('marketplace_items')
+      .select('*, profiles!user_id(display_name, username)')
+      .eq('status', 'approved')
+      .eq('type', 'subtitle')
+      .eq('anime_id', episodeId.split('?')[0])
+      .eq('episode_number', episodeNumber || 1);
+
+    if (subError || !marketplaceSubtitles) {
+      const { data: simpleSubData } = await supabase
+        .from('marketplace_items')
+        .select('*')
+        .eq('status', 'approved')
+        .eq('type', 'subtitle')
+        .eq('anime_id', episodeId.split('?')[0])
+        .eq('episode_number', episodeNumber || 1);
+      marketplaceSubtitles = simpleSubData;
+    }
+
+    if (marketplaceSubtitles) {
+      const extraSubs = marketplaceSubtitles.map((item: any) => {
+        const display = item.profiles?.display_name || item.profiles?.username || 'Community';
+        const username = item.profiles?.username || 'user';
+        return {
+          lang: item.data.lang || 'Custom',
+          url: item.data.url,
+          label: `${item.data.label || 'Sub'} (by ${display})`,
+          contributorDisplay: display,
+          contributorUsername: username
+        };
+      });
+      primaryData.subtitles = [...(primaryData.subtitles || []), ...extraSubs];
+    }
+  } catch (e) {
+    console.warn('Marketplace subtitles fetch failed:', e);
+  }
+
+  // Next episode estimates
+  let nextEpisodeEstimates: any[] = [];
+  if (desidubVal && !Array.isArray(desidubVal) && 'nextEpisodeEstimates' in desidubVal) {
+    nextEpisodeEstimates = (desidubVal as any).nextEpisodeEstimates || [];
+  }
+
+  const desidubArray = Array.isArray(desidubVal)
+    ? desidubVal
+    : (desidubVal && 'sources' in desidubVal ? (desidubVal as any).sources : []);
+
   const allSources = [
-    ...primaryData.sources,
-    ...(watchAwData?.sources || []).map(s => ({ ...s, isEmbed: !s.isM3U8 && s.needsHeadless })),
-    ...animeyaSources,
-    ...animelokSources,
-    ...customSources
+    ...(primaryData.sources || []),
+    ...(watchAwVal?.sources || []).map((s: any) => ({ ...s, isEmbed: !s.isM3U8 && s.needsHeadless })),
+    ...(Array.isArray(animeyaVal) ? animeyaVal : []),
+    ...(Array.isArray(animelokVal) ? animelokVal : []),
+    ...(Array.isArray(desidubArray) ? desidubArray : []),
+    ...(Array.isArray(aniworldVal) ? aniworldVal : []),
+    ...(Array.isArray(hindiVal) ? hindiVal : []),
+    ...(Array.isArray(toonStreamVal) ? toonStreamVal : []),
+    ...(Array.isArray(hindiApiVal) ? hindiApiVal : []),
+    ...(Array.isArray(customVal) ? customVal : [])
   ];
 
   return {
-    ...primaryData,
     sources: allSources,
-    hasTatakaiAPI,
-    malID
+    subtitles: primaryData.subtitles || [],
+    tracks: primaryData.tracks || [],
+    anilistID: anilistID || null,
+    malID: malID || null,
+    intro: primaryData.intro,
+    outro: primaryData.outro,
+    nextEpisodeEstimates: nextEpisodeEstimates.length > 0 ? nextEpisodeEstimates : undefined,
+    headers: primaryData.headers,
+    hasTatakaiAPI
   };
 }
 

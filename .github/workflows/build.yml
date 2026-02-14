@@ -1,0 +1,264 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - 'main'
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish to GitHub Release'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  # ──────────────────────────────────────────────────────
+  #  Desktop — electron-builder with auto-update manifests
+  #  Publishes latest.yml / latest-mac.yml / latest-linux.yml
+  #  which electron-updater reads to detect new versions
+  # ──────────────────────────────────────────────────────
+  build-desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+          - os: macos-latest
+            platform: mac
+          - os: ubuntu-latest
+            platform: linux
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Vite app
+        run: npx cross-env NODE_ENV=production vite build
+
+      # Tag push → publish to GitHub Release (creates latest.yml for electron-updater)
+      # workflow_dispatch with publish → also publish
+      # Otherwise → local build only
+      - name: Build Electron
+        run: npx electron-builder --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Debug — list `dist_electron` contents
+        shell: bash
+        run: |
+          echo "=== dist_electron contents ==="
+          ls -la dist_electron || echo "dist_electron directory not found"
+
+      - name: Validate desktop artifacts exist
+        shell: bash
+        run: |
+          set -e
+          matches=$(ls dist_electron/*.{exe,dmg,zip,AppImage,deb,yml,blockmap} 2>/dev/null || true)
+          if [ -z "$matches" ]; then
+            echo "No desktop artifacts were produced. Failing to surface the problem."
+            ls -la dist_electron || true
+            exit 1
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tatakai-${{ matrix.platform }}
+          path: |
+            dist_electron/*.exe
+            dist_electron/*.dmg
+            dist_electron/*.zip
+            dist_electron/*.AppImage
+            dist_electron/*.deb
+            dist_electron/*.yml
+            dist_electron/*.blockmap
+          if-no-files-found: warn
+          retention-days: 30
+
+  # ──────────────────────────────────────────────────────
+  #  Android — Capacitor APK
+  # ──────────────────────────────────────────────────────
+  build-android:
+    runs-on: ubuntu-latest
+    env:
+      ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Java debug
+        run: |
+          echo "JAVA_HOME=$JAVA_HOME"
+          java -version || true
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web app
+        run: npx cross-env NODE_ENV=production vite build
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Build unsigned APK
+        run: cd android && chmod +x gradlew && ./gradlew assembleRelease -Dorg.gradle.java.home=$JAVA_HOME
+
+      - name: Rename APK with version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          APK_DIR="android/app/build/outputs/apk/release"
+          for f in "$APK_DIR"/*.apk; do
+            mv "$f" "$APK_DIR/Tatakai-${VERSION}-android.apk"
+          done
+
+      - name: Debug — list APK output folder
+        shell: bash
+        run: |
+          echo "=== android APK output ==="
+          ls -la android/app/build/outputs/apk/release || echo "APK output folder not present"
+
+      - name: Validate APK artifact exists
+        shell: bash
+        run: |
+          set -e
+          shopt -s nullglob || true
+          apks=(android/app/build/outputs/apk/release/*.apk)
+          if [ "${#apks[@]}" -eq 0 ]; then
+            echo "No APKs found in android/app/build/outputs/apk/release — failing to surface issue"
+            ls -la android/app/build/outputs/apk/release || true
+            exit 1
+          fi
+
+      - name: Decode keystore
+        if: ${{ env.ANDROID_KEYSTORE != '' }}
+        run: echo "$ANDROID_KEYSTORE" | base64 -d > android/app/release.keystore
+        env:
+          ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
+
+      - name: Build signed APK
+        if: ${{ env.ANDROID_KEYSTORE != '' }}
+        run: |
+          cd android && ./gradlew assembleRelease -Dorg.gradle.java.home=$JAVA_HOME \
+            -Pandroid.injected.signing.store.file=${{ github.workspace }}/android/app/release.keystore \
+            -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
+            -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
+            -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: tatakai-android
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: warn
+          retention-days: 30
+
+  # ──────────────────────────────────────────────────────
+  #  Finalize Release — upload Android APK & mark non-draft
+  #  electron-builder already created the draft release and
+  #  uploaded desktop installers + latest*.yml manifests
+  # ──────────────────────────────────────────────────────
+  release:
+    needs: [build-desktop, build-android]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Download Android artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tatakai-android
+          path: android-artifacts
+
+      - name: Download desktop artifacts — Windows
+        uses: actions/download-artifact@v4
+        with:
+          name: tatakai-win
+          path: desktop-artifacts/windows
+          if-no-files-found: warn
+
+      - name: Download desktop artifacts — macOS
+        uses: actions/download-artifact@v4
+        with:
+          name: tatakai-mac
+          path: desktop-artifacts/macos
+          if-no-files-found: warn
+
+      - name: Download desktop artifacts — Linux
+        uses: actions/download-artifact@v4
+        with:
+          name: tatakai-linux
+          path: desktop-artifacts/linux
+          if-no-files-found: warn
+
+      - name: Upload all artifacts to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            desktop-artifacts/windows/*
+            desktop-artifacts/macos/*
+            desktop-artifacts/linux/*
+            android-artifacts/*.apk
+            dist_electron/*.yml
+          draft: false
+          prerelease: false
+          append_body: true
+          replace: true
+          body: |
+            ## Downloads
+
+            ### Desktop (auto-updates enabled)
+            | Platform | Installer | Portable |
+            |----------|-----------|----------|
+            | Windows  | `.exe`    | `.zip`   |
+            | macOS    | `.dmg`    | `.zip`   |
+            | Linux    | `.AppImage` | `.deb` |
+
+            > Desktop apps update automatically via electron-updater.
+            > Each device is identified by a unique Client ID (CID) sent with update checks.
+
+            ### Android
+            - Download the `.apk` file
+            - Enable *Install from Unknown Sources* in settings
+            - Install the APK
+
+            ### Web
+            - Visit [tatakai.me](https://tatakai.me)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

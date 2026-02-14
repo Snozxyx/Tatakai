@@ -163,7 +163,7 @@ export default function PrivacyPage() {
               </p>
               <div className="bg-muted/30 rounded-lg p-4 mt-3 space-y-2">
                 <p className="text-sm text-muted-foreground">
-                  <strong>Email:</strong> privacy@tatakai.gabhasti.tech
+                  <strong>Email:</strong> privacy@tatakai.me
                 </p>
                 <p className="text-sm text-muted-foreground">
                   <strong>Discord:</strong> Join our community server

@@ -1,20 +1,20 @@
 import { Background } from '@/components/layout/Background';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
-import { Download, Smartphone, Monitor, CheckCircle, ArrowRight, Apple, ChevronDown } from 'lucide-react';
+import { Download, Smartphone, Monitor, CheckCircle, ArrowRight, Apple, ChevronDown, RefreshCw, Loader2, ArrowUpCircle, User as UserIcon } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { User as UserIcon } from 'lucide-react';
+import { useAppUpdate } from '@/hooks/useAppUpdate';
+import { toast } from 'sonner';
 
 export default function DownloadPage() {
   const { user } = useAuth();
   const [selectedOS, setSelectedOS] = useState<'mac' | 'win' | 'android'>('android');
-  const [downloadProgress, setDownloadProgress] = useState(0);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [downloadInterval, setDownloadInterval] = useState<NodeJS.Timeout | null>(null);
+
+  const update = useAppUpdate();
 
   // Platform detection
   useEffect(() => {
@@ -27,38 +27,48 @@ export default function DownloadPage() {
   // Noise texture SVG constant for reusability
   const NOISE_TEXTURE_SVG = "data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E";
 
-  const handleDownload = () => {
-    setIsDownloading(true);
-    setDownloadProgress(0);
-
-    // Simulate download progress - 100ms intervals for smooth performance
-    const interval = setInterval(() => {
-      setDownloadProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setTimeout(() => {
-            setIsDownloading(false);
-            setDownloadProgress(0);
-          }, 1000);
-          return 100;
-        }
-        return prev + 1; // Increment by 1 every 100ms
-      });
-    }, 100);
-
-    setDownloadInterval(interval);
+  // Get the download URL for the selected platform from the release
+  const getPlatformDownloadUrl = (): string | null => {
+    if (!update.release) return null;
+    const assets = update.release.assets;
+    switch (selectedOS) {
+      case 'android':
+        return assets.find(a => a.name.endsWith('.apk'))?.browser_download_url ?? null;
+      case 'win':
+        return assets.find(a => a.name.endsWith('.exe') && !a.name.includes('blockmap'))?.browser_download_url ?? null;
+      case 'mac':
+        return assets.find(a => a.name.endsWith('.dmg'))?.browser_download_url ?? null;
+      default:
+        return null;
+    }
   };
 
-  // Cleanup interval on component unmount
-  useEffect(() => {
-    return () => {
-      if (downloadInterval) {
-        clearInterval(downloadInterval);
-      }
-      setIsDownloading(false);
-      setDownloadProgress(0);
-    };
-  }, []); // Empty dependency array - only run on mount/unmount
+  const handleDownload = () => {
+    // If running inside the app and an update is available, use the update system
+    if (update.platform !== 'web' && update.updateAvailable) {
+      update.downloadUpdate();
+      return;
+    }
+
+    // Otherwise, open direct download link
+    const url = getPlatformDownloadUrl();
+    if (url) {
+      window.open(url, '_blank');
+    } else if (update.releaseUrl) {
+      window.open(update.releaseUrl, '_blank');
+    } else {
+      window.open('https://github.com/snozxyx/Tatakai/releases/latest', '_blank');
+    }
+  };
+
+  const handleInstall = () => {
+    update.installUpdate();
+    toast.success('Installing update... The app will restart.');
+  };
+
+  const displayVersion = update.latestVersion ?? update.currentVersion;
+  const isInApp = update.platform !== 'web';
+  const showUpdateBadge = isInApp && update.updateAvailable;
 
   return (
     <div className="min-h-screen bg-black text-white overflow-x-hidden">
@@ -152,7 +162,12 @@ export default function DownloadPage() {
               <div className="space-y-6">
                 <div className="inline-flex items-center gap-3 px-4 py-1.5 rounded-full border border-white/20 bg-white/5 text-gray-300 text-[10px] font-bold uppercase tracking-widest">
                   <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
-                  Version 2.0.0 Live
+                  {update.isChecking ? 'Checking...' : `Version ${displayVersion} Live`}
+                  {showUpdateBadge && (
+                    <span className="ml-1 px-2 py-0.5 bg-white/10 rounded-full text-[8px] text-green-400 font-bold">
+                      UPDATE
+                    </span>
+                  )}
                 </div>
                 <h1 className="text-6xl md:text-8xl font-medium leading-[0.9] tracking-tight">
                   Pure <br />
@@ -259,30 +274,81 @@ export default function DownloadPage() {
                       </button>
                     </div>
                     <div className="flex justify-between items-center text-[10px] uppercase tracking-wider text-gray-600 px-1 font-mono">
-                      <span>v2.0.0 (x64)</span>
-                      <span className="text-gray-700 cursor-not-allowed">
+                      <span>v{displayVersion} ({selectedOS === 'android' ? 'arm64' : 'x64'})</span>
+                      <button
+                        onClick={() => update.releaseUrl ? window.open(update.releaseUrl, '_blank') : null}
+                        className="text-gray-500 hover:text-white transition-colors cursor-pointer"
+                      >
                         Changelog
-                      </span>
+                      </button>
                     </div>
                   </div>
 
-                  <button
-                    onClick={handleDownload}
-                    disabled={isDownloading}
-                    className="relative w-full h-14 rounded-lg overflow-hidden group/btn cursor-pointer focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-black disabled:cursor-not-allowed active:scale-95 transition-transform"
-                  >
-                    <div
-                      className="absolute inset-0 bg-white group-hover/btn:bg-gray-100 transition-colors"
-                    />
-                    <div
-                      className="absolute bottom-0 left-0 h-full bg-black/10 transition-all duration-100"
-                      style={{ width: `${downloadProgress}%` }}
-                    />
-                    <div className="relative z-10 flex items-center justify-center gap-3 w-full h-full font-bold text-black uppercase tracking-widest text-xs">
-                      <span>{isDownloading ? `Downloading ${downloadProgress}%` : 'Initialize Download'}</span>
-                      {!isDownloading && <ArrowRight className="w-4 h-4" />}
-                    </div>
-                  </button>
+                  {/* Update ready — install button (Electron only) */}
+                  {update.updateReady ? (
+                    <button
+                      onClick={handleInstall}
+                      className="relative w-full h-14 rounded-lg overflow-hidden group/btn cursor-pointer focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-offset-2 focus:ring-offset-black active:scale-95 transition-transform"
+                    >
+                      <div className="absolute inset-0 bg-green-500 group-hover/btn:bg-green-400 transition-colors" />
+                      <div className="relative z-10 flex items-center justify-center gap-3 w-full h-full font-bold text-black uppercase tracking-widest text-xs">
+                        <ArrowUpCircle className="w-4 h-4" />
+                        <span>Install & Restart</span>
+                      </div>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleDownload}
+                      disabled={update.isDownloading || update.isChecking}
+                      className="relative w-full h-14 rounded-lg overflow-hidden group/btn cursor-pointer focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-black disabled:cursor-not-allowed active:scale-95 transition-transform"
+                    >
+                      <div className="absolute inset-0 bg-white group-hover/btn:bg-gray-100 transition-colors" />
+                      {update.isDownloading && (
+                        <div
+                          className="absolute bottom-0 left-0 h-full bg-black/10 transition-all duration-100"
+                          style={{ width: `${update.downloadProgress}%` }}
+                        />
+                      )}
+                      <div className="relative z-10 flex items-center justify-center gap-3 w-full h-full font-bold text-black uppercase tracking-widest text-xs">
+                        {update.isChecking ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Checking...</span>
+                          </>
+                        ) : update.isDownloading ? (
+                          <span>Downloading {update.downloadProgress}%</span>
+                        ) : isInApp && update.updateAvailable ? (
+                          <>
+                            <span>Update to v{update.latestVersion}</span>
+                            <ArrowUpCircle className="w-4 h-4" />
+                          </>
+                        ) : (
+                          <>
+                            <span>Download</span>
+                            <ArrowRight className="w-4 h-4" />
+                          </>
+                        )}
+                      </div>
+                    </button>
+                  )}
+
+                  {/* Check for updates button (in-app only) */}
+                  {isInApp && !update.isChecking && !update.isDownloading && !update.updateReady && (
+                    <button
+                      onClick={() => update.checkForUpdates()}
+                      className="w-full flex items-center justify-center gap-2 py-2 text-[10px] text-gray-500 hover:text-white uppercase tracking-widest font-mono transition-colors"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      {update.updateAvailable ? 'Re-check' : 'Check for updates'}
+                    </button>
+                  )}
+
+                  {/* Current version info (in-app) */}
+                  {isInApp && (
+                    <p className="text-center text-[9px] text-gray-600 font-mono">
+                      Current: v{update.currentVersion} · {update.platform === 'electron' ? 'Desktop' : 'Mobile'}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

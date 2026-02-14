@@ -39,7 +39,7 @@ import { toast } from 'sonner';
 export default function WatchRoomPage() {
     const { roomId } = useParams<{ roomId: string }>();
     const navigate = useNavigate();
-    const { user } = useAuth();
+    const { user, isModerator, isAdmin } = useAuth();
     const queryClient = useQueryClient();
 
     // UI State
@@ -511,7 +511,22 @@ export default function WatchRoomPage() {
                     </div>
                 )}
 
-                {/* Content Grid */}
+                {/* Content Grid: moderators (non-host) see restricted view */}
+                {isModerator && !isHost && !isAdmin ? (
+                    <div className="flex-1 flex flex-col items-center justify-center gap-6 py-16">
+                        <GlassPanel className="max-w-md p-8 text-center">
+                            <Lock className="w-14 h-14 mx-auto mb-4 text-muted-foreground opacity-50" />
+                            <h2 className="text-xl font-bold mb-2">Restricted Access</h2>
+                            <p className="text-sm text-muted-foreground mb-6">
+                                Moderators have restricted access to watch rooms. You cannot view the broadcast, participants, or chat.
+                            </p>
+                            <Button onClick={() => navigate('/isshoni')} variant="outline" className="gap-2">
+                                <ArrowLeft className="w-4 h-4" />
+                                Back to Watch Rooms
+                            </Button>
+                        </GlassPanel>
+                    </div>
+                ) : (
                 <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-4 min-h-0">
                     {/* Video / Countdown */}
                     <div className="lg:col-span-3 flex flex-col gap-4">
@@ -669,6 +684,7 @@ export default function WatchRoomPage() {
                         </GlassPanel>
                     </div>
                 </div>
+                )}
             </main>
 
             <AnimatePresence>

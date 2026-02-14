@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline - Tatakai</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #09090b;
+            --card: #111113;
+            --border: rgba(255, 255, 255, 0.08);
+            --text: #ffffff;
+            --text-muted: rgba(255, 255, 255, 0.5);
+            --purple: #a855f7;
+            --pink: #ec4899;
+            --orange: #f97316;
+        }
+
+        body {
+            background: var(--bg);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            color: var(--text);
+            overflow: hidden;
+        }
+
+        /* Titlebar drag region */
+        .titlebar {
+            height: 28px;
+            background: rgba(0, 0, 0, 0.5);
+            -webkit-app-region: drag;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .titlebar-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .titlebar-logo {
+            width: 14px;
+            height: 14px;
+            background: linear-gradient(135deg, var(--purple), #3b82f6);
+            border-radius: 4px;
+        }
+
+        .titlebar-controls {
+            display: flex;
+            -webkit-app-region: no-drag;
+        }
+
+        .titlebar-btn {
+            width: 46px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.4);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .titlebar-btn:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .titlebar-btn.close:hover {
+            background: #ef4444;
+            color: white;
+        }
+
+        /* Main content */
+        .main {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            position: relative;
+        }
+
+        /* Animated background */
+        .bg-gradient {
+            position: fixed;
+            inset: 0;
+            background: 
+                radial-gradient(ellipse at 20% 20%, rgba(139, 92, 246, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(236, 72, 153, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(59, 130, 246, 0.05) 0%, transparent 70%);
+            z-index: -1;
+            animation: pulse-bg 8s ease-in-out infinite;
+        }
+
+        @keyframes pulse-bg {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .grid-pattern {
+            position: fixed;
+            inset: 0;
+            background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 60px 60px;
+            z-index: -1;
+        }
+
+        /* Card */
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 48px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Icon */
+        .icon-container {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 28px;
+            position: relative;
+        }
+
+        .icon-ring {
+            position: absolute;
+            inset: 0;
+            border: 2px solid;
+            border-color: var(--orange) transparent transparent transparent;
+            border-radius: 50%;
+            animation: spin 3s linear infinite;
+        }
+
+        .icon-ring:nth-child(2) {
+            inset: 10px;
+            animation-duration: 2s;
+            animation-direction: reverse;
+            border-color: transparent var(--pink) transparent transparent;
+        }
+
+        .icon-ring:nth-child(3) {
+            inset: 20px;
+            animation-duration: 4s;
+            border-color: transparent transparent var(--purple) transparent;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .icon-inner {
+            position: absolute;
+            inset: 30px;
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.2), rgba(168, 85, 247, 0.2));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(249, 115, 22, 0.3);
+        }
+
+        .icon-inner svg {
+            width: 24px;
+            height: 24px;
+            color: var(--orange);
+        }
+
+        /* Text */
+        .title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, #fff, rgba(255, 255, 255, 0.7));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 32px;
+        }
+
+        /* Buttons */
+        .buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--pink), var(--purple));
+            color: white;
+            box-shadow: 0 4px 15px rgba(168, 85, 247, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(168, 85, 247, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            color: white;
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Status info */
+        .status-bar {
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #ef4444;
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+
+        .status-dot.checking {
+            background: #f59e0b;
+        }
+
+        .status-dot.online {
+            background: #22c55e;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Feature cards */
+        .features {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 16px;
+        }
+
+        .feature-card {
+            padding: 16px 20px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 12px;
+            color: var(--text-muted);
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .feature-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.15);
+            color: white;
+        }
+
+        .feature-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .feature-icon.purple { background: rgba(168, 85, 247, 0.15); color: var(--purple); }
+        .feature-icon.pink { background: rgba(236, 72, 153, 0.15); color: var(--pink); }
+        .feature-icon.orange { background: rgba(249, 115, 22, 0.15); color: var(--orange); }
+
+        @media (max-width: 600px) {
+            .card {
+                padding: 32px 24px;
+            }
+            .features {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="titlebar">
+        <div class="titlebar-title">
+            <div class="titlebar-logo"></div>
+            <span>Tatakai</span>
+        </div>
+        <div class="titlebar-controls">
+            <button class="titlebar-btn" onclick="window.electron?.minimize()">
+                <svg width="10" height="1" viewBox="0 0 10 1" fill="currentColor"><rect width="10" height="1"/></svg>
+            </button>
+            <button class="titlebar-btn" onclick="window.electron?.maximize()">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1"><rect x="0.5" y="0.5" width="9" height="9"/></svg>
+            </button>
+            <button class="titlebar-btn close" onclick="window.electron?.close()">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 1l8 8M9 1l-8 8"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <div class="bg-gradient"></div>
+    <div class="grid-pattern"></div>
+
+    <main class="main">
+        <div class="card">
+            <div class="icon-container">
+                <div class="icon-ring"></div>
+                <div class="icon-ring"></div>
+                <div class="icon-ring"></div>
+                <div class="icon-inner">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="1" y1="1" x2="23" y2="23"/>
+                        <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
+                        <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
+                        <path d="M10.71 5.05A16 16 0 0 1 22.58 9"/>
+                        <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
+                        <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+                        <line x1="12" y1="20" x2="12.01" y2="20"/>
+                    </svg>
+                </div>
+            </div>
+
+            <h1 class="title">No Internet Connection</h1>
+            <p class="subtitle">
+                We couldn't connect to the server. Check your internet connection 
+                and try again, or browse your offline downloads.
+            </p>
+
+            <div class="buttons">
+                <button class="btn btn-primary" onclick="location.reload()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                        <path d="M3 3v5h5"/>
+                        <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+                        <path d="M16 16h5v5"/>
+                    </svg>
+                    Retry Connection
+                </button>
+                <button class="btn btn-secondary" onclick="openDownloads()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    View Downloads
+                </button>
+            </div>
+
+            <div class="status-bar">
+                <div class="status-item">
+                    <div class="status-dot" id="statusDot"></div>
+                    <span id="statusText">Checking connection...</span>
+                </div>
+                <div class="status-item">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" opacity="0.5">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    <span id="lastChecked">Just now</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="features">
+            <div class="feature-card" onclick="openDownloads()">
+                <div class="feature-icon purple">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                </div>
+                <span>Offline Library</span>
+            </div>
+            <div class="feature-card" onclick="openSettings()">
+                <div class="feature-icon pink">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
+                </div>
+                <span>Settings</span>
+            </div>
+            <div class="feature-card" onclick="openDevTools()">
+                <div class="feature-icon orange">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="16 18 22 12 16 6"/>
+                        <polyline points="8 6 2 12 8 18"/>
+                    </svg>
+                </div>
+                <span>Developer Tools</span>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let checkCount = 0;
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const lastChecked = document.getElementById('lastChecked');
+
+        async function checkConnection() {
+            checkCount++;
+            statusDot.className = 'status-dot checking';
+            statusText.textContent = 'Checking connection...';
+
+            try {
+                const response = await fetch('https://www.google.com/favicon.ico', { 
+                    mode: 'no-cors',
+                    cache: 'no-store'
+                });
+                statusDot.className = 'status-dot online';
+                statusText.textContent = 'Connection restored!';
+                setTimeout(() => location.reload(), 1000);
+            } catch (e) {
+                statusDot.className = 'status-dot';
+                statusText.textContent = 'No connection';
+                lastChecked.textContent = 'Checked ' + checkCount + ' time' + (checkCount > 1 ? 's' : '');
+            }
+        }
+
+        function openDownloads() {
+            if (window.electron && window.electron.getDownloadsDir) {
+                window.electron.getDownloadsDir().then(function(path) {
+                    if (window.electron.openPath) {
+                        window.electron.openPath(path);
+                    }
+                });
+            }
+        }
+
+        function openSettings() {
+            window.location.href = '#/settings';
+        }
+
+        function openDevTools() {
+            // F12 key event
+            const event = new KeyboardEvent('keydown', {
+                key: 'F12',
+                code: 'F12',
+                keyCode: 123,
+                bubbles: true
+            });
+            document.dispatchEvent(event);
+        }
+
+        // Check connection every 10 seconds
+        setInterval(checkConnection, 10000);
+        
+        // Initial check after 1 second
+        setTimeout(checkConnection, 1000);
+    </script>
+</body>
+</html>

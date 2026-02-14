@@ -3,218 +3,251 @@
 <div align="center">
   <img src="https://img.shields.io/badge/React-18.2.0-blue" alt="React" />
   <img src="https://img.shields.io/badge/TypeScript-5.0.0-blue" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/Vite-4.0.0-yellow" alt="Vite" />
-  <img src="https://img.shields.io/badge/Tailwind-3.0.0-blue" alt="Tailwind" />
-  <img src="https://img.shields.io/badge/Supabase-2.0.0-green" alt="Supabase" />
+  <img src="https://img.shields.io/badge/Vite-5.x-yellow" alt="Vite" />
+  <img src="https://img.shields.io/badge/Tailwind-3.x-blue" alt="Tailwind" />
+  <img src="https://img.shields.io/badge/Supabase-2.x-green" alt="Supabase" />
 </div>
+
 
 <div align="center">
   <h3>The Next Generation Anime Streaming Platform</h3>
-  <p>Built with modern web technologies for an immersive anime experience</p>
+  <p>Cross-platform (web, desktop & Android (Soon)) — fast, accessible and community-driven.</p>
 </div>
+
+## Social
+> Discord : https://dsc.gg/tatakai
+
+Disclaimer 
+- No other Social Media Handle is availaible right now, If you see then please report us as we only have **discord server** .
 
 ## 📸 Preview
 
-<div align="center">
-  <h3>Home Page</h3>
-  <img src="preview/Home.png" alt="Tatakai Home Page" width="800" />
-  
-  <h3>ML Recommendations</h3>
-  <img src="preview/machinelearn.png" alt="Machine Learning Recommendations" width="800" />
-  
-  <h3>Community Features</h3>
-  <img src="preview/Communtiy.png" alt="Community Page" width="800" />
-  
-  <h3>User Profile</h3>
-  <img src="preview/Profile.png" alt="User Profile Page" width="800" />
-</div>
+> Screenshots below are high-resolution captures from the running app (web/Desktop/PWA). Click any image to view full size.
 
-## ✨ Features
-
-- 🎬 **Streaming**: High-quality anime streaming with multiple sources
-- 🤖 **AI Recommendations**: Personalized anime suggestions powered by machine learning
-- 👥 **Social Features**: Follow users, create playlists, and engage with the community
-- 📱 **Cross-Platform**: Responsive design that works on all devices
-- 🎨 **Modern UI**: Beautiful, animated interface with dark theme
-- 🔍 **Advanced Search**: Find anime by genre, status, rating, and more
-- 📊 **Analytics**: Track your watching habits and get insights
-- 🌐 **Multi-Source**: Aggregates content from multiple anime providers
-
-## 🚀 Tech Stack
-
-### Frontend
-- **React 18** - Modern React with hooks and concurrent features
-- **TypeScript** - Type-safe development
-- **Vite** - Fast build tool and dev server
-- **Tailwind CSS** - Utility-first CSS framework
-- **Framer Motion** - Smooth animations and transitions
-- **React Query** - Powerful data fetching and caching
-
-### Backend & Database
-- **Supabase** - Backend-as-a-Service with PostgreSQL
-- **Row Level Security** - Database-level access control
-- **Real-time subscriptions** - Live updates for social features
-
-### Integrations
-- **DataDog** - Application monitoring and logging
-- **Google Analytics** - User analytics and tracking
-- **Multiple Anime APIs** - Content aggregation from various sources
-
-## 📋 Prerequisites
-
-- Node.js 18+ and npm
-- Git
-- Supabase account (for backend)
-
-## 🛠️ Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/tatakai.git
-   cd tatakai
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   # or
-   bun install
-   ```
-
-3. **Environment Setup**
-   ```bash
-   cp .env.example .env
-   ```
-
-   Fill in your environment variables:
-   ```env
-   VITE_SUPABASE_URL=your_supabase_url
-   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-   VITE_GA_MEASUREMENT_ID=your_google_analytics_id
-   VITE_DD_CLIENT_TOKEN=your_datadog_client_token
-   ```
-
-4. **Database Setup**
-   ```sql
-   -- Run the migrations in your Supabase SQL Editor
-   -- See supabase/migrations/ for the migration files
-   ```
-
-5. **Start development server**
-   ```bash
-   npm run dev
-   # or
-   bun run dev
-   ```
-
-## 📁 Project Structure
-
-```
-tatakai/
-├── src/
-│   ├── components/          # Reusable UI components
-│   │   ├── ui/             # Base UI components
-│   │   ├── layout/         # Layout components
-│   │   ├── anime/          # Anime-specific components
-│   │   └── ...
-│   ├── pages/              # Page components
-│   ├── hooks/              # Custom React hooks
-│   ├── contexts/           # React contexts
-│   ├── lib/                # Utility functions
-│   └── services/           # API services
-├── supabase/
-│   ├── migrations/         # Database migrations
-│   └── functions/          # Edge functions
-├── public/                 # Static assets
-└── docs/                   # Documentation
-```
-
-## 🎯 Key Components
-
-### Core Features
-- **Anime Streaming**: Watch anime with multiple quality options
-- **Personal Recommendations**: ML-powered suggestions based on viewing history
-- **Social Interaction**: Follow users, comment on anime, create tier lists
-- **Playlist Management**: Create and share anime playlists
-- **Community Forums**: Discuss anime with other fans
-
-### Technical Highlights
-- **Real-time Updates**: Live notifications and chat features
-- **Offline Support**: Download anime for offline viewing
-- **PWA Ready**: Installable as a progressive web app
-- **Accessibility**: WCAG compliant with keyboard navigation
-
-## 🔧 Development
-
-### Available Scripts
-
-```bash
-npm run dev          # Start development server
-npm run build        # Build for production
-npm run preview      # Preview production build
-npm run lint         # Run ESLint
-npm run type-check   # TypeScript type checking
-```
-
-### Code Quality
-
-- **ESLint**: Code linting and formatting
-- **Prettier**: Code formatting
-- **TypeScript**: Strict type checking
-- **Husky**: Git hooks for quality checks
-
-## 🚀 Deployment
-
-### Vercel (Recommended)
-1. Connect your GitHub repository to Vercel
-2. Add environment variables in Vercel dashboard
-3. Deploy automatically on push
-
-### Manual Deployment
-```bash
-npm run build
-# Deploy the dist/ folder to your hosting provider
-```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Development Guidelines
-- Follow the existing code style
-- Write meaningful commit messages
-- Add tests for new features
-- Update documentation as needed
-
-## 📄 License
-
-This project is for educational purposes only. See individual components for their respective licenses.
-
-## ⚠️ Disclaimer
-
-This project is built for educational and portfolio purposes. It aggregates publicly available content from third-party sources. We do not host or distribute copyrighted material.
-
-## 🙏 Acknowledgments
-
-- Anime data provided by various public APIs
-- UI inspiration from modern streaming platforms
-- Community contributions and feedback
-
-## 📞 Support
-
-For questions or support, please open an issue on GitHub.
+![Home — Tatakai home page preview](preview/Home.png)
+*Home — featured/spotlight anime, trending sections and personalized feed.*
 
 ---
 
-<div align="center">
-  <p>Made with ❤️ for anime fans</p>
-  <p>
-    <a href="#features">Features</a> •
-    <a href="#installation">Installation</a> •
-    <a href="#contributing">Contributing</a>
-  </p>
-</div>
+![AI Recommendations — personalized suggestions](preview/machinelearn.png)
+*AI Recommendations — ML-powered suggestions based on your watching history.*
+
+---
+
+![Community — forums and discussions](preview/Communtiy.png)
+*Community — forum threads, comments and social interactions.*
+
+---
+
+![Profile — user settings & playlists](preview/Profile.png)
+*Profile — user settings, playlists and watch history.*
+
+
+## Table of contents
+- Features
+- Quick start
+- Platforms (Web / Desktop / Android)
+- Configuration & secrets
+- Development & testing
+- CI / Release process
+- Troubleshooting
+- Contributing & governance
+
+---
+
+## Features
+
+This project contains a large feature set focused on discovery, community and cross-platform playback. Key highlights are listed below.
+
+### Community Tab
+- Community Server: users can add fan-made video servers (dubs/subtitle sources) which become available to others after moderator verification.
+- Tierlist: create and share ranked lists (example: assemble the correct Fate series order).
+- Watch2Together: synchronous viewing / watch parties with friends.
+- Forum (Reddit-style): threaded discussions and replies.
+- Leaderboard: activity / contribution rankings for community engagement.
+- Playlists: create public or private playlists (custom ordering supported).
+- Follow/Profile System: follow users, inspect profiles and watchlists.
+
+### Integration
+- Auto-sync with MyAnimeList and AniList — import/export watchlists and keep progress in sync.
+
+### Dubs (expanded)
+- Coverage expanded from ~8 to 13 languages.
+- Scraping: ~30 servers and 14 websites are scraped, including major sources (animekai, animelok, animepahe, etc.).
+- Newly added dubs: German, French, Polish, Hindi, Telugu, Malayalam, English — and more coming.
+
+### Video Player
+- Use your own subtitles (upload/load local subtitle files).
+- Default servers serve 1080p (HD) streams where available.
+- Core features: adaptive quality, subtitle selection, custom action buttons and background playback support.
+
+### Appearance
+- Lite Mode: disable animations and gradients to boost performance on low-end devices.
+- Theme options: 25+ selectable themes (light/dark + accent variants).
+
+### Custom Recommendation
+- Personalized recommendations powered by an ML algorithm using watch history and engagement signals.
+
+### Search
+- Visual search via Trace.moe integration — search by screenshot/image to find corresponding anime.
+
+---
+## Upcoming Features
+- Mobile Development including IOS and Android **[More Important]**
+- More Scrappers of different dubs including arabic,chinese (Mandarin),Thai and other server
+- Adding Official Indian Server [No Ads]
+- Community Upgrade
+- Web ( Ads Removal from the embed server) + Android ( Ads Removal from the embed server)
+- Abyss Server Reverse Engineering to remove ads
+- Manga Support
+- Adding Torrent Support [P2P] [Directly from torrent for more customization]
+
+---
+
+## Quick start (local)
+1. Clone and install
+```bash
+git clone https://github.com/Snozxyx/Tatakai.git
+cd Tatakai
+npm ci
+```
+
+2. Copy env and add keys
+```bash
+cp .env.example .env
+# edit .env with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY etc.
+```
+
+3. Run development server
+```bash
+npm run dev
+# open http://localhost:8088
+```
+
+4. Run unit/type checks
+```bash
+npm run lint
+# add type-check script if needed: npm run type-check
+```
+
+---
+
+## Platforms
+### Web (PWA)
+- Built with Vite + React + Tailwind.
+- To build production web assets:
+```bash
+npm run build
+npm run preview
+```
+- PWA support is included; manifest and service worker are in `public/`.
+
+### Desktop (Electron)
+- Electron app packaged with `electron-builder`.
+- Development: `npm run electron:dev` (runs Vite + Electron)
+- Build: `npm run electron:build`
+- Auto-update is configured using GitHub Releases and `electron-updater`.
+
+### Android (Capacitor) [Under Development]
+- Capacitor is used to create Android project under `android/`.
+- Local dev flow:
+  1. `npm run build` (produces web assets)
+  2. `npm run mobile:sync` or `npm run mobile:dev`
+  3. Open/Run in Android Studio or `cd android && ./gradlew assembleRelease`
+- CI signing: workflow reads `ANDROID_KEYSTORE`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` secrets.
+
+---
+
+## Configuration & required secrets
+- Environment variables (.env / Vercel):
+  - VITE_SUPABASE_URL
+  - VITE_SUPABASE_ANON_KEY
+  - VITE_GA_MEASUREMENT_ID (optional)
+  - VITE_DD_CLIENT_TOKEN (optional)
+- GitHub Actions secrets (for release CI):
+  - GH_PAT (personal access token for publishing desktop installers)
+  - ANDROID_KEYSTORE (base64-encoded keystore file)
+  - KEYSTORE_PASSWORD
+  - KEY_ALIAS
+  - KEY_PASSWORD
+
+How to add Android keystore to GitHub Actions (recommended):
+1. Base64-encode your `release.keystore`:
+```bash
+base64 release.keystore | pbcopy  # or redirect to file
+```
+2. In repo Settings → Secrets → Actions, add `ANDROID_KEYSTORE` and the other key variables.
+
+Security note: Do NOT commit keystore files or secrets to the repository. Use GitHub Secrets or CI artifacts.
+
+---
+
+## CI / Release process (GitHub Actions)
+- Workflow: `.github/workflows/build.yml`
+- Jobs:
+  - build-desktop → builds Electron packages and optionally publishes on tag
+  - build-android → builds unsigned/signed APKs (signing runs only when `ANDROID_KEYSTORE` secret exists)
+  - release → collects artifacts and attaches APK to GitHub Release when tagging
+
+Tag-release flow:
+1. Create a tag (e.g. `v4.1.0`) and push
+2. Actions build desktop installers and Android APK (if secrets present)
+3. Release job uploads artifacts and updates the GitHub Release
+
+---
+
+## Development & testing
+- Primary scripts (see `package.json`):
+  - `npm run dev` — start Vite dev server
+  - `npm run build` — production build
+  - `npm run preview` — serve production build locally
+  - `npm run mobile:dev` / `mobile:sync` — Capacitor workflows
+  - `npm run electron:dev` / `electron:build` — Electron workflows
+
+- Tests: Add unit/integration tests under `src/` and wire any test runner (Jest/Playwright) as needed.
+
+---
+
+## Troubleshooting (common issues)
+- Android Lint failures during `gradlew assembleRelease` — often caused by incorrect manifest entries or missing service classes. Example fix committed: register `AndroidForegroundService` in `android/app/src/main/AndroidManifest.xml`.
+- CI secret expression errors — ensure `secrets.*` are referenced directly in workflow `if:` conditions.
+- Large binary files (APK, keystore) accidentally committed — remove with `git rm` and add to `.gitignore`; rotate keys if a keystore was exposed.
+
+If you hit a problem not covered here, open an issue with logs and steps-to-reproduce.
+
+---
+
+## Release checklist
+1. Bump `package.json` version
+2. Create a Git tag `vX.Y.Z`
+3. Push tag to origin → GitHub Actions runs release pipeline
+4. Verify artifacts in Release and CI logs
+
+---
+
+## Contributing & governance
+- Please follow the commit message guidelines and use feature branches.
+- Open PRs against `main` or the appropriate release branch.
+- Add tests for new features and update documentation.
+
+Code of conduct: Be respectful. Report violations to repo maintainers.
+
+---
+
+## Maintainers
+- Primary: Snozxyx (GitHub)
+- Secondary : GabhastiGiri (Github)
+## License
+- MIT
+
+---
+
+## Where to get help
+- Open an issue on GitHub
+- For security-sensitive issues (exposed keys), email the maintainer directly or open a private security issue
+
+---
+  I used the **AI** in this project for more detail <a href="/docs/disclaimerai.md" > Click  Here </a>
+  ---
+<p align="center">Made with 
+❤️ for anime fans — contributions welcome</p>

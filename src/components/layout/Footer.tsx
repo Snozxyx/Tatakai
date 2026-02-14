@@ -28,10 +28,10 @@ const FOOTER_LINKS = {
 
 export function Footer() {
   return (
-    <footer className="relative z-10 pt-20 pb-10 overflow-hidden border-t border-white/5 bg-black/40 backdrop-blur-xl mt-24">
+    <footer className="relative  pt-20 pb-10 overflow-hidden border-t border-white/5 bg-black/40 backdrop-blur-xl">
       {/* Background Gradients */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] transform translate-y-1/2 -translate-x-1/2 mix-blend-screen" />
+        <div className=" absolute bottom-0 left-0 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] transform translate-y-1/2 -translate-x-1/2 mix-blend-screen" />
         <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-[120px] transform translate-y-1/2 translate-x-1/2 mix-blend-screen" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
       </div>
