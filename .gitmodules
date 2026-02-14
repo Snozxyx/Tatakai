@@ -1,0 +1,3 @@
+[submodule "TatakaiAPI"]
+	path = TatakaiAPI
+	url = https://github.com/Snozxyx/TatakaiAPI
