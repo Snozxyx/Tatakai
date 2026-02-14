@@ -57,15 +57,10 @@ jobs:
       # Tag push → publish to GitHub Release (creates latest.yml for electron-updater)
       # workflow_dispatch with publish → also publish
       # Otherwise → local build only
-      - name: Build Electron (publish)
-        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.publish)
-        run: npx electron-builder --publish always
+      - name: Build Electron
+        run: npx electron-builder --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build Electron (no publish)
-        if: ${{ !startsWith(github.ref, 'refs/tags/') && !(github.event_name == 'workflow_dispatch' && inputs.publish) }}
-        run: npx electron-builder --publish never
 
       - name: Debug — list `dist_electron` contents
         shell: bash
@@ -123,6 +118,11 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Java debug
+        run: |
+          echo "JAVA_HOME=$JAVA_HOME"
+          java -version || true
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
@@ -136,7 +136,7 @@ jobs:
         run: npx cap sync android
 
       - name: Build unsigned APK
-        run: cd android && chmod +x gradlew && ./gradlew assembleRelease
+        run: cd android && chmod +x gradlew && ./gradlew assembleRelease -Dorg.gradle.java.home=$JAVA_HOME
 
       - name: Rename APK with version
         run: |
@@ -173,7 +173,7 @@ jobs:
       - name: Build signed APK
         if: ${{ env.ANDROID_KEYSTORE != '' }}
         run: |
-          cd android && ./gradlew assembleRelease \
+          cd android && ./gradlew assembleRelease -Dorg.gradle.java.home=$JAVA_HOME \
             -Pandroid.injected.signing.store.file=${{ github.workspace }}/android/app/release.keystore \
             -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
             -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
@@ -204,13 +204,40 @@ jobs:
           name: tatakai-android
           path: android-artifacts
 
-      - name: Upload Android APK to Release
+      - name: Download desktop artifacts — Windows
+        uses: actions/download-artifact@v4
+        with:
+          name: tatakai-win
+          path: desktop-artifacts/windows
+          if-no-files-found: warn
+
+      - name: Download desktop artifacts — macOS
+        uses: actions/download-artifact@v4
+        with:
+          name: tatakai-mac
+          path: desktop-artifacts/macos
+          if-no-files-found: warn
+
+      - name: Download desktop artifacts — Linux
+        uses: actions/download-artifact@v4
+        with:
+          name: tatakai-linux
+          path: desktop-artifacts/linux
+          if-no-files-found: warn
+
+      - name: Upload all artifacts to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: android-artifacts/*.apk
+          files: |
+            desktop-artifacts/windows/*
+            desktop-artifacts/macos/*
+            desktop-artifacts/linux/*
+            android-artifacts/*.apk
+            dist_electron/*.yml
           draft: false
           prerelease: false
           append_body: true
+          replace: true
           body: |
             ## Downloads
 
@@ -230,6 +257,6 @@ jobs:
             - Install the APK
 
             ### Web
-            - Visit [ggmp.me](https://ggmp.me)
+            - Visit [tatakai.me](https://tatakai.me)
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,47 @@
+name: Cleanup tags & releases
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type DELETE to confirm removal of ALL tags and releases'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "DELETE" ]; then
+            echo "Confirmation string incorrect — aborting"
+            exit 1
+          fi
+
+      - name: Remove GitHub Releases and tags (uses GH_PAT)
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GH_PAT }}
+          script: |
+            const owner = context.repo.owner
+            const repo = context.repo.repo
+
+            // Delete all releases
+            const releases = await github.rest.repos.listReleases({ owner, repo })
+            for (const r of releases.data) {
+              core.info(`Deleting release id=${r.id} tag=${r.tag_name}`)
+              await github.rest.repos.deleteRelease({ owner, repo, release_id: r.id })
+            }
+
+            // Delete all tags (git refs)
+            const tags = await github.rest.git.listRefs({ owner, repo, ref: 'tags' }).catch(() => ({ data: [] }))
+            for (const t of (tags.data || [])) {
+              const ref = t.ref
+              core.info(`Deleting ref ${ref}`)
+              await github.rest.git.deleteRef({ owner, repo, ref: ref.replace('refs/', '') })
+            }
+
+            return `Deleted ${releases.data.length} releases and ${tags.data.length} tags.`
