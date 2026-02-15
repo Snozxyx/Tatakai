@@ -70,6 +70,18 @@ export default function DownloadPage() {
   const isInApp = update.platform !== 'web';
   const showUpdateBadge = isInApp && update.updateAvailable;
 
+  // Direct release assets (used for explicit download buttons)
+  const windowsAsset = update.release?.assets.find(a => a.name.endsWith('.exe') && !a.name.includes('blockmap')) ?? null;
+  const macAsset = update.release?.assets.find(a => a.name.endsWith('.dmg')) ?? null;
+  const linuxAsset = update.release?.assets.find(a => a.name.endsWith('.AppImage')) ?? update.release?.assets.find(a => a.name.endsWith('.deb')) ?? null;
+
+  const formatBytes = (bytes?: number | null) => {
+    if (!bytes || bytes <= 0) return '';
+    const sizes = ['B','KB','MB','GB','TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${sizes[i]}`;
+  };
+
   return (
     <div className="min-h-screen bg-black text-white overflow-x-hidden">
       {/* Subtle Noise Texture */}
@@ -331,6 +343,50 @@ export default function DownloadPage() {
                       </div>
                     </button>
                   )}
+
+                  {/* Direct platform downloads */}
+                  <div className="mt-4 grid grid-cols-3 gap-3">
+                    <a
+                      href={windowsAsset?.browser_download_url ?? update.releaseUrl ?? 'https://github.com/snozxyx/Tatakai/releases/latest'}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-2 bg-white/5 hover:bg-white/10 rounded-md text-xs text-center font-semibold uppercase tracking-wide"
+                    >
+                      Windows
+                      {windowsAsset && <div className="text-[10px] text-gray-500 mt-1">{formatBytes(windowsAsset.size)}</div>}
+                    </a>
+
+                    <a
+                      href={macAsset?.browser_download_url ?? update.releaseUrl ?? 'https://github.com/snozxyx/Tatakai/releases/latest'}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-2 bg-white/5 hover:bg-white/10 rounded-md text-xs text-center font-semibold uppercase tracking-wide"
+                    >
+                      macOS
+                      {macAsset && <div className="text-[10px] text-gray-500 mt-1">{formatBytes(macAsset.size)}</div>}
+                    </a>
+
+                    <a
+                      href={linuxAsset?.browser_download_url ?? update.releaseUrl ?? 'https://github.com/snozxyx/Tatakai/releases/latest'}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-2 bg-white/5 hover:bg-white/10 rounded-md text-xs text-center font-semibold uppercase tracking-wide"
+                    >
+                      Linux
+                      {linuxAsset && <div className="text-[10px] text-gray-500 mt-1">{formatBytes(linuxAsset.size)}</div>}
+                    </a>
+                  </div>
+
+                  {/* Discord banner */}
+                  <a
+                    href="https://dsc.gg/tatakai"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 w-full inline-flex items-center justify-center gap-3 py-3 rounded-lg bg-[#5865F2] text-white font-bold text-xs uppercase tracking-widest"
+                  >
+                    Join our Discord
+                    <ArrowRight className="w-4 h-4" />
+                  </a>
 
                   {/* Check for updates button (in-app only) */}
                   {isInApp && !update.isChecking && !update.isDownloading && !update.updateReady && (
