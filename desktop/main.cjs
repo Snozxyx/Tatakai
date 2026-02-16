@@ -97,9 +97,7 @@ function createWindow() {
             enableBlinkFeatures: 'CSSContainerQueries'
         },
         backgroundColor: '#09090b',
-        icon: isDev
-            ? path.join(__dirname, '../resources/icon.ico')
-            : path.join(process.resourcesPath, 'resources/icon.ico')
+        icon: path.join(__dirname, '..', 'resources', 'icon.ico')
     });
 
     const startUrl = isDev
@@ -129,12 +127,12 @@ function createWindow() {
 
     // Ensure splash screen is closed eventually even if main window hangs
     setTimeout(() => {
-        if (splash) {
+        if (splash && !splash.isDestroyed()) {
             splash.close();
             splash = null;
-            if (!mainWindow.isVisible()) {
-                mainWindow.show();
-            }
+        }
+        if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+            mainWindow.show();
         }
     }, 10000); // 10s safety timeout for splash
 
@@ -203,15 +201,17 @@ function createWindow() {
     Menu.setApplicationMenu(menu);
 
     mainWindow.once('ready-to-show', () => {
-        if (splash) {
+        if (splash && !splash.isDestroyed()) {
             splash.close();
             splash = null;
         }
-        mainWindow.show();
-        mainWindow.focus();
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.show();
+            mainWindow.focus();
 
-        // Register keyboard shortcuts
-        registerShortcuts();
+            // Register keyboard shortcuts
+            registerShortcuts();
+        }
     });
 
     mainWindow.on('closed', () => (mainWindow = null));
@@ -440,9 +440,7 @@ function createSplash() {
         transparent: true,
         frame: false,
         alwaysOnTop: true,
-        icon: isDev
-            ? path.join(__dirname, '../resources/icon-512.png')
-            : path.join(process.resourcesPath, 'resources/icon-512.png'),
+        icon: path.join(__dirname, '..', 'resources', 'icon-512.png'),
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true
@@ -457,22 +455,38 @@ app.on('ready', () => {
 
     // Initialize main window after a short delay
     setTimeout(() => {
+        if (app.isQuitting) return;
+
         createWindow();
         initRPC(); // Initialize Discord RPC
 
         // Create System Tray
-        const trayIconPath = isDev
-            ? path.join(__dirname, '../resources/icon-512.png')
-            : path.join(process.resourcesPath, 'resources/icon-512.png');
-        tray = new Tray(trayIconPath);
-        const contextMenu = Menu.buildFromTemplate([
-            { label: 'Show App', click: () => mainWindow && mainWindow.show() },
-            { type: 'separator' },
-            { label: 'Quit', click: () => app.quit() }
-        ]);
-        tray.setToolTip('Tatakai');
-        tray.setContextMenu(contextMenu);
-        tray.on('click', () => mainWindow && mainWindow.show());
+        const trayIconPath = path.join(__dirname, '..', 'resources', 'icon-512.png');
+        try {
+            if (fs.existsSync(trayIconPath)) {
+                tray = new Tray(trayIconPath);
+                const contextMenu = Menu.buildFromTemplate([
+                    {
+                        label: 'Show App', click: () => {
+                            if (mainWindow && !mainWindow.isDestroyed()) {
+                                mainWindow.show();
+                            }
+                        }
+                    },
+                    { type: 'separator' },
+                    { label: 'Quit', click: () => app.quit() }
+                ]);
+                tray.setToolTip('Tatakai');
+                tray.setContextMenu(contextMenu);
+                tray.on('click', () => {
+                    if (mainWindow && !mainWindow.isDestroyed()) {
+                        mainWindow.show();
+                    }
+                });
+            }
+        } catch (e) {
+            console.error('Failed to create tray:', e);
+        }
     }, 1500);
 });
 
@@ -486,6 +500,7 @@ app.on('activate', () => {
 });
 
 app.on('will-quit', () => {
+    app.isQuitting = true;
     globalShortcut.unregisterAll();
 });
 
