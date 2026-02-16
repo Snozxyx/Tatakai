@@ -10,6 +10,9 @@ const DiscordRPC = require('discord-rpc');
 // Set app name to Tatakai
 app.setName('Tatakai');
 
+// Disable Hardware Acceleration to prevent black screen issues on some GPUs
+app.disableHardwareAcceleration();
+
 let mainWindow;
 let splash;
 let tray;
@@ -72,6 +75,29 @@ function registerShortcuts() {
             mainWindow.webContents.reloadIgnoringCache();
         }
     });
+
+    // Developer Ultra Mode - Special Key Combo Alt + 0 + T
+    // Using a more standard accelerator if needed, but trying literal Alt+0+T first
+    try {
+        globalShortcut.register('Alt+0+T', () => {
+            if (mainWindow && mainWindow.webContents) {
+                console.log('--- DEVELOPER ULTRA MODE ACTIVATED ---');
+                mainWindow.webContents.openDevTools();
+                mainWindow.webContents.send('ultra-mode-enabled');
+
+                // Also bypass some standard restrictions
+                mainWindow.webContents.session.webRequest.onBeforeRequest(null);
+                mainWindow.webContents.setWindowOpenHandler(null);
+
+                new Notification({
+                    title: 'ULTRA MODE',
+                    body: 'Developer Ultra Mode Activated. All restrictions lifted.'
+                }).show();
+            }
+        });
+    } catch (e) {
+        console.error('Failed to register Ultra Mode shortcut:', e);
+    }
 }
 
 function createWindow() {
@@ -130,16 +156,39 @@ function createWindow() {
 
     loadURL(startUrl);
 
+    // Renderer process crash handling
+    mainWindow.webContents.on('render-process-gone', (event, details) => {
+        logger.error('[Renderer] Process gone:', details);
+        if (details.reason !== 'clean-exit') {
+            console.log('[Renderer] Process crashed, reloading...');
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.reload();
+            }
+        }
+    });
+
+    mainWindow.webContents.on('unresponsive', () => {
+        logger.warn('[Renderer] Window unresponsive, attempting reload...');
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.reload();
+        }
+    });
+
     // Ensure splash screen is closed eventually even if main window hangs
     setTimeout(() => {
         if (splash && !splash.isDestroyed()) {
             splash.close();
             splash = null;
         }
-        if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
-            mainWindow.show();
-            // If still black, try reloading
-            if (!isDev) {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            if (!mainWindow.isVisible()) {
+                console.log('[Safety] Forcing window show after timeout');
+                mainWindow.show();
+            }
+
+            // If still black (or failed to load), force a reload in production
+            if (!isDev && mainWindow.webContents.getURL() === '') {
+                console.log('[Safety] Triggering emergency reload');
                 mainWindow.reload();
             }
         }

@@ -3,6 +3,7 @@ import { useIsNativeApp, useIsDesktopApp } from "@/hooks/useIsNativeApp";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ReduceMotionPrompt } from '@/components/layout/ReduceMotionPrompt';
@@ -336,6 +337,29 @@ function AppContent() {
       document.documentElement.classList.remove('capacitor-native');
     };
   }, [isNative, isMobileApp]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Secret combo: Alt + 0 + T
+      if (e.altKey && e.code === 'Digit0' && e.key.toLowerCase() === 't') {
+        console.log('%c DEVELOPER ULTRA MODE ACTIVATED ', 'background: #8b5cf6; color: #fff; font-size: 20px; font-weight: bold; padding: 4px; border-radius: 4px;');
+        toast.info("Developer Ultra Mode Activated", {
+          description: "Native restrictions bypassed. DevTools opening...",
+          duration: 5000,
+        });
+
+        if (window.electron) {
+          // @ts-ignore
+          window.electron.openDevTools?.();
+          // @ts-ignore
+          window.electron.log?.('info', 'Developer Ultra Mode activated via Alt+0+T');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   return (
     <>
