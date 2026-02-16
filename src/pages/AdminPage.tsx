@@ -23,6 +23,7 @@ import { PendingForumPosts } from '@/components/admin/PendingForumPosts';
 import { PendingSuggestions } from '@/components/admin/PendingSuggestions';
 import { WatchRoomManager } from '@/components/admin/WatchRoomsManager';
 import { AppVersionManager } from '@/components/admin/AppVersionManager';
+import { AppReleaseManager } from '@/components/admin/AppReleaseManager';
 import { ModerationLogs } from '@/components/admin/ModerationLogs';
 import { CustomSourceManager } from '@/components/admin/CustomSourceManager';
 import { ReportManager } from '@/components/admin/ReportManager';
@@ -1009,6 +1010,10 @@ export default function AdminPage() {
                 </GlassPanel>
 
                 <GlassPanel className="p-6">
+                  <AppReleaseManager />
+                </GlassPanel>
+
+                <GlassPanel className="p-6">
                   <RedirectManager />
                 </GlassPanel>
               </div>
@@ -1174,12 +1179,12 @@ export default function AdminPage() {
                         .from('profiles')
                         .select('user_id')
                         .neq('is_banned', true);
-                      
+
                       if (!users || users.length === 0) {
                         toast.error('No users found to notify');
                         return;
                       }
-                      
+
                       // Create notifications for all users
                       const notifications = users.map(user => ({
                         user_id: user.user_id,
@@ -1189,16 +1194,16 @@ export default function AdminPage() {
                         read: false,
                         created_at: new Date().toISOString()
                       }));
-                      
+
                       const { error } = await supabase
                         .from('notifications')
                         .insert(notifications);
-                      
+
                       if (error) throw error;
-                      
+
                       // Invalidate all notification queries to refresh for all users
                       queryClient.invalidateQueries({ queryKey: ['notifications'] });
-                      
+
                       toast.success(`Broadcast notification sent to ${users.length} users!`);
                       setShowBroadcastModal(false);
                       setBroadcastTitle('');

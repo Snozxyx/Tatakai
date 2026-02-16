@@ -9,38 +9,52 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAppUpdate } from '@/hooks/useAppUpdate';
 import { toast } from 'sonner';
+import { ReleaseService, type AppRelease } from '@/services/releaseService';
 
 export default function DownloadPage() {
   const { user } = useAuth();
-  const [selectedOS, setSelectedOS] = useState<'mac' | 'win' | 'android'>('android');
+  const [selectedOS, setSelectedOS] = useState<'mac' | 'win' | 'linux'>('win');
+  const [dbReleases, setDbReleases] = useState<Record<string, AppRelease | null>>({
+    win: null,
+    mac: null,
+    linux: null
+  });
 
   const update = useAppUpdate();
 
-  // Platform detection
+  // Platform detection and DB fetch
   useEffect(() => {
     const ua = navigator.userAgent.toLowerCase();
-    if (ua.includes('android')) setSelectedOS('android');
+    if (ua.includes('linux')) setSelectedOS('linux');
     else if (ua.includes('mac')) setSelectedOS('mac');
     else if (ua.includes('win')) setSelectedOS('win');
+
+    // Fetch latest for each platform
+    const fetchReleases = async () => {
+      const [win, mac, linux] = await Promise.all([
+        ReleaseService.getLatestRelease('win'),
+        ReleaseService.getLatestRelease('mac'),
+        ReleaseService.getLatestRelease('linux')
+      ]);
+      setDbReleases({ win, mac, linux });
+    };
+    fetchReleases();
   }, []);
 
   // Noise texture SVG constant for reusability
   const NOISE_TEXTURE_SVG = "data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E";
 
+  // Direct release assets (used for explicit download buttons)
+  const windowsAsset = update.release?.assets.find(a => a.name.endsWith('-win-x64.exe')) ??
+    update.release?.assets.find(a => a.name.endsWith('.exe') && !a.name.includes('blockmap')) ?? null;
+  const macAsset = update.release?.assets.find(a => a.name.endsWith('-mac-arm64.dmg')) ??
+    update.release?.assets.find(a => a.name.endsWith('.dmg')) ?? null;
+  const androidAsset = update.release?.assets.find(a => a.name.includes('android') && a.name.endsWith('.apk')) ??
+    update.release?.assets.find(a => a.name.endsWith('.apk')) ?? null;
+
   // Get the download URL for the selected platform from the release
   const getPlatformDownloadUrl = (): string | null => {
-    if (!update.release) return null;
-    const assets = update.release.assets;
-    switch (selectedOS) {
-      case 'android':
-        return assets.find(a => a.name.endsWith('.apk'))?.browser_download_url ?? null;
-      case 'win':
-        return assets.find(a => a.name.endsWith('.exe') && !a.name.includes('blockmap'))?.browser_download_url ?? null;
-      case 'mac':
-        return assets.find(a => a.name.endsWith('.dmg'))?.browser_download_url ?? null;
-      default:
-        return null;
-    }
+    return dbReleases[selectedOS]?.url ?? null;
   };
 
   const handleDownload = () => {
@@ -53,8 +67,10 @@ export default function DownloadPage() {
     // Otherwise, open direct download link
     const url = getPlatformDownloadUrl();
     if (url) {
-      window.open(url, '_blank');
+      // Use location.href for direct download to avoid many redirect issues or popup blockers
+      window.location.href = url;
     } else if (update.releaseUrl) {
+      // Fallback only if no direct asset found
       window.open(update.releaseUrl, '_blank');
     } else {
       window.open('https://github.com/snozxyx/Tatakai/releases/latest', '_blank');
@@ -69,18 +85,6 @@ export default function DownloadPage() {
   const displayVersion = update.latestVersion ?? update.currentVersion;
   const isInApp = update.platform !== 'web';
   const showUpdateBadge = isInApp && update.updateAvailable;
-
-  // Direct release assets (used for explicit download buttons)
-  const windowsAsset = update.release?.assets.find(a => a.name.endsWith('.exe') && !a.name.includes('blockmap')) ?? null;
-  const macAsset = update.release?.assets.find(a => a.name.endsWith('.dmg')) ?? null;
-  const linuxAsset = update.release?.assets.find(a => a.name.endsWith('.AppImage')) ?? update.release?.assets.find(a => a.name.endsWith('.deb')) ?? null;
-
-  const formatBytes = (bytes?: number | null) => {
-    if (!bytes || bytes <= 0) return '';
-    const sizes = ['B','KB','MB','GB','TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${sizes[i]}`;
-  };
 
   return (
     <div className="min-h-screen bg-black text-white overflow-x-hidden">
@@ -175,6 +179,11 @@ export default function DownloadPage() {
                 <div className="inline-flex items-center gap-3 px-4 py-1.5 rounded-full border border-white/20 bg-white/5 text-gray-300 text-[10px] font-bold uppercase tracking-widest">
                   <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
                   {update.isChecking ? 'Checking...' : `Version ${displayVersion} Live`}
+                  {update.release && (
+                    <span className="ml-2 text-gray-500 lowercase first-letter:uppercase">
+                      • {new Date(update.release.published_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </span>
+                  )}
                   {showUpdateBadge && (
                     <span className="ml-1 px-2 py-0.5 bg-white/10 rounded-full text-[8px] text-green-400 font-bold">
                       UPDATE
@@ -194,10 +203,10 @@ export default function DownloadPage() {
 
               {/* Specs Tags */}
               <div className="flex flex-wrap items-center gap-4 text-[10px] uppercase tracking-widest text-gray-600 font-bold">
-                <span className="px-3 py-1 border border-white/10 rounded">Android</span>
+                <span className="px-3 py-1 border border-white/10 rounded">Linux</span>
                 <span className="px-3 py-1 border border-white/10 rounded">Windows</span>
                 <span className="px-3 py-1 border border-white/10 rounded">macOS</span>
-                <span className="text-gray-400 ml-2">Coming Soon</span>
+                <span className="text-gray-400 ml-2">Web Edition</span>
               </div>
             </div>
 
@@ -264,11 +273,11 @@ export default function DownloadPage() {
                   <div className="space-y-4 mb-8">
                     <div className="grid grid-cols-3 gap-px bg-gray-800 p-px rounded-md overflow-hidden">
                       <button
-                        onClick={() => setSelectedOS('android')}
-                        className={`flex items-center justify-center gap-2 py-3 text-[10px] font-bold uppercase tracking-wide transition-all ${selectedOS === 'android' ? 'bg-white text-black' : 'bg-black text-gray-500 hover:text-white'
+                        onClick={() => setSelectedOS('linux')}
+                        className={`flex items-center justify-center gap-2 py-3 text-[10px] font-bold uppercase tracking-wide transition-all ${selectedOS === 'linux' ? 'bg-white text-black' : 'bg-black text-gray-500 hover:text-white'
                           }`}
                       >
-                        <Smartphone className="w-3 h-3" /> Android
+                        <Monitor className="w-3 h-3" /> Linux
                       </button>
                       <button
                         onClick={() => setSelectedOS('mac')}
@@ -286,7 +295,7 @@ export default function DownloadPage() {
                       </button>
                     </div>
                     <div className="flex justify-between items-center text-[10px] uppercase tracking-wider text-gray-600 px-1 font-mono">
-                      <span>v{displayVersion} ({selectedOS === 'android' ? 'arm64' : 'x64'})</span>
+                      <span>v{displayVersion} ({selectedOS === 'linux' ? 'AppImage/deb' : 'x64'})</span>
                       <button
                         onClick={() => update.releaseUrl ? window.open(update.releaseUrl, '_blank') : null}
                         className="text-gray-500 hover:text-white transition-colors cursor-pointer"
@@ -343,50 +352,6 @@ export default function DownloadPage() {
                       </div>
                     </button>
                   )}
-
-                  {/* Direct platform downloads */}
-                  <div className="mt-4 grid grid-cols-3 gap-3">
-                    <a
-                      href={windowsAsset?.browser_download_url ?? update.releaseUrl ?? 'https://github.com/snozxyx/Tatakai/releases/latest'}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="px-3 py-2 bg-white/5 hover:bg-white/10 rounded-md text-xs text-center font-semibold uppercase tracking-wide"
-                    >
-                      Windows
-                      {windowsAsset && <div className="text-[10px] text-gray-500 mt-1">{formatBytes(windowsAsset.size)}</div>}
-                    </a>
-
-                    <a
-                      href={macAsset?.browser_download_url ?? update.releaseUrl ?? 'https://github.com/snozxyx/Tatakai/releases/latest'}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="px-3 py-2 bg-white/5 hover:bg-white/10 rounded-md text-xs text-center font-semibold uppercase tracking-wide"
-                    >
-                      macOS
-                      {macAsset && <div className="text-[10px] text-gray-500 mt-1">{formatBytes(macAsset.size)}</div>}
-                    </a>
-
-                    <a
-                      href={linuxAsset?.browser_download_url ?? update.releaseUrl ?? 'https://github.com/snozxyx/Tatakai/releases/latest'}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="px-3 py-2 bg-white/5 hover:bg-white/10 rounded-md text-xs text-center font-semibold uppercase tracking-wide"
-                    >
-                      Linux
-                      {linuxAsset && <div className="text-[10px] text-gray-500 mt-1">{formatBytes(linuxAsset.size)}</div>}
-                    </a>
-                  </div>
-
-                  {/* Discord banner */}
-                  <a
-                    href="https://dsc.gg/tatakai"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-3 w-full inline-flex items-center justify-center gap-3 py-3 rounded-lg bg-[#5865F2] text-white font-bold text-xs uppercase tracking-widest"
-                  >
-                    Join our Discord
-                    <ArrowRight className="w-4 h-4" />
-                  </a>
 
                   {/* Check for updates button (in-app only) */}
                   {isInApp && !update.isChecking && !update.isDownloading && !update.updateReady && (

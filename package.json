@@ -157,6 +157,7 @@
     "files": [
       "dist/**/*",
       "desktop/**/*",
+      "resources/**/*",
       "package.json"
     ],
     "publish": [

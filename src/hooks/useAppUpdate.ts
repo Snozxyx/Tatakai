@@ -35,6 +35,11 @@ const GITHUB_RELEASE_URL = 'https://github.com/snozxyx/Tatakai/releases/latest';
 function getDownloadUrl(release: GitHubRelease | null): string | null {
   if (!release) return null;
 
+  // If the release is from our database, the download URL is already provided
+  if (release.from_db && release.assets.length > 0) {
+    return release.assets[0].browser_download_url;
+  }
+
   const ua = navigator.userAgent.toLowerCase();
   const assets = release.assets;
 
@@ -47,14 +52,14 @@ function getDownloadUrl(release: GitHubRelease | null): string | null {
   if ((window as any).electron) {
     // Electron — updater handles this, but provide the link for display
     if (ua.includes('win')) {
-      const win = assets.find(a => a.name.endsWith('.exe') && !a.name.includes('blockmap'));
-      return win?.browser_download_url ?? null;
+      return assets.find(a => a.name.endsWith('-win-x64.exe'))?.browser_download_url ??
+        assets.find(a => a.name.endsWith('.exe') && !a.name.includes('blockmap'))?.browser_download_url ?? null;
     }
     if (ua.includes('mac')) {
-      const mac = assets.find(a => a.name.endsWith('.dmg'));
-      return mac?.browser_download_url ?? null;
+      return assets.find(a => a.name.endsWith('-mac-arm64.dmg'))?.browser_download_url ??
+        assets.find(a => a.name.endsWith('.dmg'))?.browser_download_url ?? null;
     }
-    const linux = assets.find(a => a.name.endsWith('.AppImage'));
+    const linux = assets.find(a => a.name.endsWith('.AppImage')) ?? assets.find(a => a.name.endsWith('.deb'));
     return linux?.browser_download_url ?? null;
   }
 
@@ -63,13 +68,16 @@ function getDownloadUrl(release: GitHubRelease | null): string | null {
     return assets.find(a => a.name.endsWith('.apk'))?.browser_download_url ?? null;
   }
   if (ua.includes('win')) {
-    return assets.find(a => a.name.endsWith('.exe') && !a.name.includes('blockmap'))?.browser_download_url ?? null;
+    return assets.find(a => a.name.endsWith('-win-x64.exe'))?.browser_download_url ??
+      assets.find(a => a.name.endsWith('.exe') && !a.name.includes('blockmap'))?.browser_download_url ?? null;
   }
   if (ua.includes('mac')) {
-    return assets.find(a => a.name.endsWith('.dmg'))?.browser_download_url ?? null;
+    return assets.find(a => a.name.endsWith('-mac-arm64.dmg'))?.browser_download_url ??
+      assets.find(a => a.name.endsWith('.dmg'))?.browser_download_url ?? null;
   }
   // Linux
-  return assets.find(a => a.name.endsWith('.AppImage'))?.browser_download_url ?? null;
+  const linux = assets.find(a => a.name.endsWith('.AppImage')) ?? assets.find(a => a.name.endsWith('.deb'));
+  return linux?.browser_download_url ?? null;
 }
 
 export function useAppUpdate(): AppUpdateState & {
@@ -169,7 +177,7 @@ export function useAppUpdate(): AppUpdateState & {
             ...s,
             isChecking: false,
             release,
-            latestVersion: release?.tag_name.replace('v', '') ?? null,
+            latestVersion: release?.tag_name.replace(/^v/, '') ?? null,
             releaseUrl: release?.html_url ?? GITHUB_RELEASE_URL,
             downloadUrl: getDownloadUrl(release),
           }));

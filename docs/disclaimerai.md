@@ -4,8 +4,14 @@
 - <H1> Is Ai used in this project ? </H1>
  - <p>Yes, AI is used in this project.</p>
 
+ <H1> Is this project Open Source ? </H1>
+ - <p>Yes, This project is Open Source. You can check the code on <a href="https://github.com/snozxyx/Tatakai">GitHub</a> </p>
+
+ <h1> What have i dont use ai ? </h1>
+ - <p>I have used AI in this project but i have not used it for the design , backend , api, scrapper ONLY Frontend is fully AI (so don't judge me ) </p>
+
 - <H1> Why You Used Ai ? You Don't Know How to Code </H1>
- - <p>Just for fun. I Know How to Code. But  I am the student in CS Branch so I am learning it. </p>
+ - <p>Uhm . I wanted to test my figma skill and it is my first time using AI for coding and Just for fun. I Know How to Code. But  I am the student in CS Branch so I am learning it. </p>
 
 - <H1> Everything is AI Generated </H1>
  - <p> The technical Answer is <b>Yes</b>  but Try Yourself to create something like this with one go without know how to code. I am dammed sure that you will get <b>Failed</b> Because Software Development was never about <b>Codding</b> it was about <b>Problem Solving</b> </p>

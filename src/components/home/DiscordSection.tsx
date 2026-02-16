@@ -62,7 +62,7 @@ export function DiscordSection() {
           </div>
 
           <Button
-            onClick={() => window.open('https://discord.gg/Vr5GZFJszp', '_blank')}
+            onClick={() => window.open('https://dsc.gg/tatakai', '_blank')}
             className="w-full md:w-auto bg-[#5865F2] hover:bg-[#4752C4] text-white gap-2"
             size="lg"
           >

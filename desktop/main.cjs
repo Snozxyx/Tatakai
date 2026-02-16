@@ -23,7 +23,7 @@ function getOrCreateCID() {
             const existing = fs.readFileSync(cidPath, 'utf-8').trim();
             if (existing && existing.length >= 32) return existing;
         }
-    } catch {}
+    } catch { }
     const cid = `electron-${crypto.randomUUID()}`;
     try { fs.writeFileSync(cidPath, cid, 'utf-8'); } catch (e) { logger.error('Failed to write CID:', e); }
     return cid;
@@ -97,7 +97,9 @@ function createWindow() {
             enableBlinkFeatures: 'CSSContainerQueries'
         },
         backgroundColor: '#09090b',
-        icon: path.join(__dirname, '../resources/icon.ico')
+        icon: isDev
+            ? path.join(__dirname, '../resources/icon.ico')
+            : path.join(process.resourcesPath, 'resources/icon.ico')
     });
 
     const startUrl = isDev
@@ -107,17 +109,41 @@ function createWindow() {
     console.log('Loading URL:', startUrl);
     console.log('Is development mode:', isDev);
 
-    mainWindow.loadURL(startUrl).catch(err => {
-        console.error('Failed to load app:', err);
-        mainWindow.loadFile(path.join(__dirname, 'offline.html'));
-    });
+    const loadURL = async (url) => {
+        try {
+            await mainWindow.loadURL(url);
+            console.log('Successfully loaded URL:', url);
+        } catch (err) {
+            console.error(`Failed to load URL ${url}:`, err);
+            // If 8088 fails in dev, try 8089
+            if (isDev && url === 'http://localhost:8088') {
+                console.log('Trying fallback port 8089...');
+                await loadURL('http://localhost:8089');
+            } else {
+                mainWindow.loadFile(path.join(__dirname, 'offline.html'));
+            }
+        }
+    };
+
+    loadURL(startUrl);
+
+    // Ensure splash screen is closed eventually even if main window hangs
+    setTimeout(() => {
+        if (splash) {
+            splash.close();
+            splash = null;
+            if (!mainWindow.isVisible()) {
+                mainWindow.show();
+            }
+        }
+    }, 10000); // 10s safety timeout for splash
 
     // Disable any ad-blocking and allow all content
     const session = mainWindow.webContents.session;
-    
+
     // Clear any existing cache that might have blocked content
     session.clearCache();
-    
+
     // Allow all web requests (disable ad-blocking)
     session.webRequest.onBeforeRequest((details, callback) => {
         // Allow all requests without blocking
@@ -183,7 +209,7 @@ function createWindow() {
         }
         mainWindow.show();
         mainWindow.focus();
-        
+
         // Register keyboard shortcuts
         registerShortcuts();
     });
@@ -199,17 +225,17 @@ function createWindow() {
     // Block navigation hijacking from iframes/embeds
     mainWindow.webContents.on('will-navigate', (event, url) => {
         const currentURL = mainWindow.webContents.getURL();
-        
+
         // Allow navigation within the app (localhost or file://)
         if (url.startsWith('http://localhost') || url.startsWith('file://')) {
             return;
         }
-        
+
         // Block any navigation attempts from within the app (click hijacking)
         if (!currentURL.startsWith('http://localhost') && !currentURL.startsWith('file://')) {
             return;
         }
-        
+
         // Block the navigation
         event.preventDefault();
         console.log('Blocked navigation hijacking attempt to:', url);
@@ -234,7 +260,7 @@ function createWindow() {
             if (frameURL === 'about:blank' || frameURL === '' || details.frame.isDestroyed?.()) {
                 return;
             }
-            
+
             // Inject script to prevent click hijacking (with defensive checks)
             details.frame.executeJavaScript(`
                 (function() {
@@ -292,7 +318,7 @@ function createWindow() {
                         // Silent fail if frame is sandboxed
                     }
                 })();
-            `).catch(() => {});
+            `).catch(() => { });
         });
     });
 
@@ -414,7 +440,9 @@ function createSplash() {
         transparent: true,
         frame: false,
         alwaysOnTop: true,
-        icon: path.join(__dirname, '../resources/icon-512.png'),
+        icon: isDev
+            ? path.join(__dirname, '../resources/icon-512.png')
+            : path.join(process.resourcesPath, 'resources/icon-512.png'),
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true
@@ -426,14 +454,17 @@ function createSplash() {
 
 app.on('ready', () => {
     createSplash();
-    
+
     // Initialize main window after a short delay
     setTimeout(() => {
         createWindow();
         initRPC(); // Initialize Discord RPC
-        
+
         // Create System Tray
-        tray = new Tray(path.join(__dirname, '../resources/icon-512.png'));
+        const trayIconPath = isDev
+            ? path.join(__dirname, '../resources/icon-512.png')
+            : path.join(process.resourcesPath, 'resources/icon-512.png');
+        tray = new Tray(trayIconPath);
         const contextMenu = Menu.buildFromTemplate([
             { label: 'Show App', click: () => mainWindow && mainWindow.show() },
             { type: 'separator' },
@@ -490,10 +521,12 @@ ipcMain.on('update-rpc', (event, data) => {
 });
 
 ipcMain.on('notify', (event, { title, body }) => {
-    new Notification({ 
-        title: title || 'Tatakai', 
-        body, 
-        icon: path.join(__dirname, '../resources/icon.png') 
+    new Notification({
+        title: title || 'Tatakai',
+        body,
+        icon: isDev
+            ? path.join(__dirname, '../resources/icon.png')
+            : path.join(process.resourcesPath, 'resources/icon.png')
     }).show();
 });
 
@@ -533,7 +566,7 @@ ipcMain.handle('start-download', async (event, payload) => {
                     const langCode = sub.lang || sub.language || 'en';
                     const label = sub.label || sub.lang || langCode;
                     const subPath = path.join(animeDir, `Episode_${episodeNumber}_${langCode}.vtt`);
-                    
+
                     if (!fs.existsSync(subPath)) {
                         try {
                             console.log(`Downloading subtitle: ${label} (${langCode}) from ${sub.url}`);
@@ -546,7 +579,7 @@ ipcMain.handle('start-download', async (event, payload) => {
                                 },
                                 timeout: 30000
                             });
-                            
+
                             // Verify subtitle was downloaded successfully
                             if (fs.existsSync(subPath)) {
                                 const stats = fs.statSync(subPath);
@@ -555,7 +588,7 @@ ipcMain.handle('start-download', async (event, payload) => {
                                 console.error(`✗ Subtitle file not created: ${label}`);
                                 continue;
                             }
-                            
+
                             subtitleFiles.push({
                                 lang: langCode,
                                 label: label,
@@ -583,10 +616,10 @@ ipcMain.handle('start-download', async (event, payload) => {
         let manifest = { animeName, episodes: [], posterUrl };
         if (fs.existsSync(manifestPath)) {
             const existingManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-            manifest = { 
-                ...existingManifest, 
+            manifest = {
+                ...existingManifest,
                 animeName: existingManifest.animeName || animeName, // Preserve or set animeName
-                posterUrl: existingManifest.posterUrl || posterUrl 
+                posterUrl: existingManifest.posterUrl || posterUrl
             };
         }
 
@@ -609,16 +642,16 @@ ipcMain.handle('start-download', async (event, payload) => {
                 manifest.episodes[epIndex].subtitles = subtitleFiles;
             }
         }
-        
+
         fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 
         // 5. Start M3U8 -> MP4 Conversion
         console.log(`Queuing download for ${episodeId}:`, { url, outputFilePath });
-        
+
         // Define the download task
         const startConversion = () => {
-             console.log(`Starting download execution for ${episodeId}`);
-             const downloadPromise = downloadEpisode({
+            console.log(`Starting download execution for ${episodeId}`);
+            const downloadPromise = downloadEpisode({
                 url,
                 output: outputFilePath,
                 headers: headers || {},
@@ -627,14 +660,14 @@ ipcMain.handle('start-download', async (event, payload) => {
                     // Ensure window is still available
                     if (mainWindow && !mainWindow.isDestroyed()) {
                         // progressData can be number (old) or object (new with speed)
-                        const data = typeof progressData === 'object' 
+                        const data = typeof progressData === 'object'
                             ? { episodeId, ...progressData }
                             : { episodeId, percent: progressData };
                         mainWindow.webContents.send('download-progress', data);
                     }
                 }
             });
-            
+
             activeDownloads.set(episodeId, downloadPromise);
 
             downloadPromise
@@ -646,11 +679,11 @@ ipcMain.handle('start-download', async (event, payload) => {
                         try {
                             const stats = fs.statSync(filePath);
                             fileSize = stats.size;
-                        } catch (e) {}
-                        mainWindow.webContents.send('download-completed', { 
-                            episodeId, 
+                        } catch (e) { }
+                        mainWindow.webContents.send('download-completed', {
+                            episodeId,
                             path: filePath,
-                            size: fileSize 
+                            size: fileSize
                         });
                     }
                     processQueue(); // Trigger next download
@@ -692,24 +725,24 @@ const processQueue = () => {
 
 ipcMain.handle('cancel-download', async (event, { episodeId, animePath }) => {
     console.log('Cancelling download:', episodeId, animePath);
-    
+
     try {
         // Cancel the download process
         if (activeDownloads.has(episodeId)) {
             cancelDownload(episodeId);
             activeDownloads.delete(episodeId);
         }
-        
+
         // Clean up files if animePath provided
         if (animePath && fs.existsSync(animePath)) {
             console.log('Cleaning up files at:', animePath);
-            
+
             // Delete manifest to invalidate the anime entry
             const manifestPath = path.join(animePath, 'manifest.json');
             if (fs.existsSync(manifestPath)) {
                 fs.unlinkSync(manifestPath);
             }
-            
+
             // Delete all .tmp files
             const files = fs.readdirSync(animePath);
             for (const file of files) {
@@ -719,19 +752,19 @@ ipcMain.handle('cancel-download', async (event, { episodeId, animePath }) => {
                     console.log('Deleted temp file:', file);
                 }
             }
-            
+
             // If no valid video files remain, delete the entire folder
-            const remainingVideos = files.filter(f => 
-                (f.endsWith('.mp4') || f.endsWith('.mkv') || f.endsWith('.webm')) && 
+            const remainingVideos = files.filter(f =>
+                (f.endsWith('.mp4') || f.endsWith('.mkv') || f.endsWith('.webm')) &&
                 !f.endsWith('.tmp')
             );
-            
+
             if (remainingVideos.length === 0) {
                 fs.rmSync(animePath, { recursive: true, force: true });
                 console.log('Deleted empty anime folder');
             }
         }
-        
+
         return { success: true };
     } catch (err) {
         console.error('Failed to cancel download:', err);
@@ -757,7 +790,7 @@ ipcMain.handle('get-downloads-dir', async (event, customPath) => {
 ipcMain.handle('get-offline-library', async (event, customPath) => {
     const downloadPath = customPath || path.join(app.getPath('videos'), 'Tatakai');
     console.log('Getting offline library from:', downloadPath);
-    
+
     if (!fs.existsSync(downloadPath)) {
         console.log('Download path does not exist');
         return [];
@@ -774,12 +807,12 @@ ipcMain.handle('get-offline-library', async (event, customPath) => {
     for (const dirName of animeDirs) {
         const animeDir = path.join(downloadPath, dirName);
         const manifestPath = path.join(animeDir, 'manifest.json');
-        
+
         if (fs.existsSync(manifestPath)) {
             try {
                 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
                 const posterPath = path.join(animeDir, 'poster.jpg');
-                
+
                 // Filter episodes to only include ones with actual video files > 1KB
                 const validEpisodes = (manifest.episodes || []).filter(ep => {
                     const videoPath = path.join(animeDir, ep.file);
@@ -794,7 +827,7 @@ ipcMain.handle('get-offline-library', async (event, customPath) => {
                 if (validEpisodes.length > 0 || manifest.episodes?.length > 0) {
                     const posterExists = fs.existsSync(posterPath);
                     console.log(`Anime: ${dirName}, Poster exists: ${posterExists}, Episodes: ${validEpisodes.length}`);
-                    
+
                     library.push({
                         name: manifest.animeName || dirName,
                         path: animeDir,
@@ -811,7 +844,7 @@ ipcMain.handle('get-offline-library', async (event, customPath) => {
             console.log(`No manifest found for ${dirName}`);
         }
     }
-    
+
     console.log('Returning library with', library.length, 'items');
     return library;
 });
@@ -820,7 +853,7 @@ ipcMain.handle('get-offline-library', async (event, customPath) => {
 ipcMain.handle('sync-offline-library', async (event, customPath) => {
     const downloadPath = customPath || path.join(app.getPath('videos'), 'Tatakai');
     console.log('Syncing offline library at:', downloadPath);
-    
+
     if (!fs.existsSync(downloadPath)) {
         fs.mkdirSync(downloadPath, { recursive: true });
         return { synced: 0, total: 0, message: 'Download folder created' };
@@ -838,9 +871,9 @@ ipcMain.handle('sync-offline-library', async (event, customPath) => {
     for (const dirName of animeDirs) {
         const animeDir = path.join(downloadPath, dirName);
         const manifestPath = path.join(animeDir, 'manifest.json');
-        
+
         // Find all video files in the directory
-        const videoFiles = fs.readdirSync(animeDir).filter(f => 
+        const videoFiles = fs.readdirSync(animeDir).filter(f =>
             f.endsWith('.mp4') || f.endsWith('.mkv') || f.endsWith('.webm')
         );
 
@@ -861,7 +894,7 @@ ipcMain.handle('sync-offline-library', async (event, customPath) => {
         for (const videoFile of videoFiles) {
             const videoPath = path.join(animeDir, videoFile);
             const stats = fs.statSync(videoPath);
-            
+
             // Skip files smaller than 1MB (likely incomplete)
             if (stats.size < 1024 * 1024) {
                 console.log(`Skipping small file: ${videoFile} (${stats.size} bytes)`);
@@ -873,7 +906,7 @@ ipcMain.handle('sync-offline-library', async (event, customPath) => {
             const episodeNumber = match ? parseInt(match[1]) : videoFiles.indexOf(videoFile) + 1;
 
             // Check if episode already exists in manifest
-            const existingEp = manifest.episodes.find(e => 
+            const existingEp = manifest.episodes.find(e =>
                 e.file === videoFile || e.number === episodeNumber
             );
 
@@ -897,7 +930,7 @@ ipcMain.handle('sync-offline-library', async (event, customPath) => {
 
         // Save updated manifest
         fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
-        
+
         results.push({
             name: dirName,
             episodes: manifest.episodes.length,
@@ -906,12 +939,12 @@ ipcMain.handle('sync-offline-library', async (event, customPath) => {
     }
 
     console.log(`Sync complete: ${synced} new episodes found out of ${total} video files`);
-    return { 
-        synced, 
-        total, 
+    return {
+        synced,
+        total,
         results,
-        message: synced > 0 
-            ? `Found and added ${synced} episode(s) to your library!` 
+        message: synced > 0
+            ? `Found and added ${synced} episode(s) to your library!`
             : 'Library is already up to date'
     };
 });
@@ -958,7 +991,7 @@ ipcMain.handle('import-video-files', async () => {
     for (const filePath of filePaths) {
         const fileName = path.basename(filePath);
         const destPath = path.join(importedDir, fileName);
-        
+
         try {
             fs.copyFileSync(filePath, destPath);
             imported++;
@@ -974,7 +1007,7 @@ ipcMain.handle('import-video-files', async () => {
         manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     }
 
-    const videoFiles = fs.readdirSync(importedDir).filter(f => 
+    const videoFiles = fs.readdirSync(importedDir).filter(f =>
         f.endsWith('.mp4') || f.endsWith('.mkv') || f.endsWith('.webm')
     );
 
@@ -987,10 +1020,10 @@ ipcMain.handle('import-video-files', async () => {
 
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 
-    return { 
-        success: true, 
-        imported, 
-        message: `Successfully imported ${imported} video(s)` 
+    return {
+        success: true,
+        imported,
+        message: `Successfully imported ${imported} video(s)`
     };
 });
 
@@ -1007,7 +1040,7 @@ ipcMain.handle('open-downloads-folder', async (event, customPath) => {
 // Repair anime - re-download missing posters and subtitles
 ipcMain.handle('repair-anime', async (event, { animePath, posterUrl, subtitles, animeName }) => {
     console.log('Repairing anime:', { animePath, posterUrl, animeName });
-    
+
     if (!fs.existsSync(animePath)) {
         return { success: false, error: 'Anime folder not found' };
     }
@@ -1035,7 +1068,7 @@ ipcMain.handle('repair-anime', async (event, { animePath, posterUrl, subtitles, 
         // 2. Check and download subtitles if missing
         const manifestPath = path.join(animePath, 'manifest.json');
         let manifest = { animeName: animeName || path.basename(animePath), episodes: [] };
-        
+
         if (fs.existsSync(manifestPath)) {
             manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
         }
@@ -1048,14 +1081,14 @@ ipcMain.handle('repair-anime', async (event, { animePath, posterUrl, subtitles, 
                     if (sub.url) {
                         const subFileName = `Episode_${episode.number}_${sub.lang || 'en'}.vtt`;
                         const subPath = path.join(animePath, subFileName);
-                        
+
                         if (!fs.existsSync(subPath)) {
                             results.subtitles.needed++;
                             try {
                                 console.log('[REPAIR] Downloading:', subFileName);
                                 console.log('[REPAIR] URL:', sub.url);
                                 await downloadFile(sub.url, subPath);
-                                
+
                                 // Verify file exists and has content
                                 if (fs.existsSync(subPath)) {
                                     const stats = fs.statSync(subPath);
@@ -1064,7 +1097,7 @@ ipcMain.handle('repair-anime', async (event, { animePath, posterUrl, subtitles, 
                                 } else {
                                     console.error('[REPAIR] ✗ Subtitle file not created:', subFileName);
                                 }
-                                
+
                                 // Update episode manifest with subtitle info
                                 if (!episode.subtitles) episode.subtitles = [];
                                 if (!episode.subtitles.find(s => s.file === subFileName)) {
@@ -1108,13 +1141,13 @@ ipcMain.handle('repair-anime', async (event, { animePath, posterUrl, subtitles, 
         if (results.poster.success) message.push('Poster downloaded');
         if (results.subtitles.downloaded > 0) message.push(`${results.subtitles.downloaded} subtitle(s) downloaded`);
         if (results.manifest.updated) message.push('Manifest updated');
-        
+
         if (message.length === 0) {
             message.push('Everything looks good!');
         }
 
-        return { 
-            success: true, 
+        return {
+            success: true,
             results,
             message: message.join(', ')
         };
@@ -1131,7 +1164,7 @@ ipcMain.handle('open-path', async (event, filePath) => {
 // Delete anime and all its files
 ipcMain.handle('delete-anime', async (event, animePath) => {
     console.log('Deleting anime at:', animePath);
-    
+
     try {
         if (!fs.existsSync(animePath)) {
             return { success: false, error: 'Anime folder not found' };
@@ -1140,7 +1173,7 @@ ipcMain.handle('delete-anime', async (event, animePath) => {
         // Recursively delete the entire anime directory
         fs.rmSync(animePath, { recursive: true, force: true });
         console.log('Successfully deleted:', animePath);
-        
+
         return { success: true, message: 'Anime deleted successfully' };
     } catch (err) {
         console.error('Failed to delete anime:', err);
@@ -1151,25 +1184,25 @@ ipcMain.handle('delete-anime', async (event, animePath) => {
 // Reset app data and redirect to setup
 ipcMain.handle('reset-app-data', async () => {
     console.log('Resetting app data...');
-    
+
     try {
         // Get all potential download paths
         const userDataPath = app.getPath('userData');
         const defaultDownloadPath = path.join(app.getPath('videos'), 'Tatakai');
-        
+
         // Delete downloaded anime from default location
         if (fs.existsSync(defaultDownloadPath)) {
             fs.rmSync(defaultDownloadPath, { recursive: true, force: true });
             console.log('Deleted download folder:', defaultDownloadPath);
         }
-        
+
         // Clear cache and non-locked files
         const itemsToDelete = [
             'Cache',
             'Code Cache',
             'GPUCache'
         ];
-        
+
         for (const item of itemsToDelete) {
             const itemPath = path.join(userDataPath, item);
             if (fs.existsSync(itemPath)) {
@@ -1181,10 +1214,10 @@ ipcMain.handle('reset-app-data', async () => {
                 }
             }
         }
-        
+
         // Schedule deletion of locked files (Local Storage, Session Storage, Preferences) on next startup
         // by using app.relaunch() which will close the app and restart
-        
+
         // Return success and let the frontend handle the restart
         return { success: true, message: 'App data reset successfully', needsRestart: true };
     } catch (err) {
@@ -1275,7 +1308,7 @@ ipcMain.handle('reset-app', async () => {
         const userData = app.getPath('userData');
         const settingsFile = path.join(userData, 'settings.json');
         const logFile = path.join(userData, 'logs');
-        
+
         // Clear localStorage equivalent data if any
         if (fs.existsSync(settingsFile)) {
             fs.unlinkSync(settingsFile);
@@ -1284,7 +1317,7 @@ ipcMain.handle('reset-app', async () => {
         // Clear some specific files but keep logs
         const sessionData = app.getPath('sessionData');
         const cacheDir = path.join(userData, 'Cache');
-        
+
         try {
             if (fs.existsSync(cacheDir)) {
                 const files = fs.readdirSync(cacheDir);

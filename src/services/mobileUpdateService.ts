@@ -4,6 +4,7 @@ import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { getClientIdSync } from '@/hooks/useClientId';
+import { ReleaseService, type AppRelease } from './releaseService';
 
 export interface GitHubRelease {
   tag_name: string;
@@ -16,6 +17,7 @@ export interface GitHubRelease {
     size: number;
   }>;
   html_url: string;
+  from_db?: boolean;
 }
 
 export type UpdateProgress = {
@@ -65,7 +67,7 @@ export class MobileUpdateService {
       }
 
       const latestVersion = latestRelease.tag_name.replace('v', '');
-      
+
       if (this.isNewerVersion(latestVersion, currentVersion)) {
         console.log(`Update available: ${currentVersion} → ${latestVersion}`);
         await this.notifyUpdate(latestRelease);
@@ -91,28 +93,49 @@ export class MobileUpdateService {
   }
 
   /**
-   * Fetch latest release from GitHub
+   * Fetch latest release from Supabase (formerly GitHub)
    */
   static async getLatestRelease(): Promise<GitHubRelease | null> {
     try {
-      const headers: Record<string, string> = { 'Accept': 'application/vnd.github.v3+json' };
-      const cid = getClientIdSync();
-      if (cid) headers['X-Client-Id'] = cid;
+      const platform = Capacitor.getPlatform();
+      const dbPlatform = platform === 'ios' ? 'mac' : platform === 'android' ? 'android' : 'win';
 
-      const response = await fetch(
-        `https://api.github.com/repos/${this.GITHUB_OWNER}/${this.GITHUB_REPO}/releases/latest`,
-        { headers }
-      );
+      const release = await ReleaseService.getLatestRelease(dbPlatform as any);
 
-      if (!response.ok) {
-        throw new Error(`GitHub API error: ${response.status}`);
+      if (!release) {
+        // Fallback to searching win for cross-platform metadata if specific one not found
+        const winRelease = await ReleaseService.getLatestRelease('win');
+        if (!winRelease) return null;
+        return this.mapDbReleaseToGitHub(winRelease);
       }
 
-      return await response.json();
+      return this.mapDbReleaseToGitHub(release);
     } catch (error) {
-      console.error('Failed to fetch latest release:', error);
+      console.error('Failed to fetch latest release from DB:', error);
       return null;
     }
+  }
+
+  /**
+   * Map database release to the internal GitHubRelease interface to maintain compatibility
+   */
+  private static mapDbReleaseToGitHub(release: AppRelease): GitHubRelease {
+    const size = release.metadata?.size || 0;
+    const name = release.url.split('/').pop() || `tatakai-${release.version}`;
+
+    return {
+      tag_name: release.version.startsWith('v') ? release.version : `v${release.version}`,
+      name: release.version,
+      body: release.notes || '',
+      published_at: release.created_at,
+      assets: [{
+        name: name,
+        browser_download_url: release.url,
+        size: size
+      }],
+      html_url: release.url,
+      from_db: true
+    };
   }
 
   /**
@@ -185,7 +208,7 @@ export class MobileUpdateService {
   private static async downloadAndInstallAPK(release: GitHubRelease): Promise<void> {
     try {
       // Find APK asset
-      const apkAsset = release.assets.find(asset => 
+      const apkAsset = release.assets.find(asset =>
         asset.name.endsWith('.apk')
       );
 
@@ -237,7 +260,7 @@ export class MobileUpdateService {
       });
     } catch (error) {
       console.error('Failed to download APK:', error);
-      
+
       await LocalNotifications.schedule({
         notifications: [
           {
@@ -300,7 +323,7 @@ export class MobileUpdateService {
       }
 
       const latestVersion = latestRelease.tag_name.replace('v', '');
-      
+
       if (this.isNewerVersion(latestVersion, currentVersion)) {
         await this.handleUpdate(latestRelease);
         return true;
