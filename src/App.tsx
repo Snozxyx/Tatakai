@@ -43,53 +43,64 @@ const getDevModeEnabled = (): boolean => {
     return false;
   }
 };
-// import { AppDownloadPopup } from '@/components/layout/AppDownloadPopup';
-import Index from "./pages/Index";
-import AnimePage from "./pages/AnimePage";
-import WatchPage from "./pages/WatchPage";
-import OfflineLibraryPage from "./pages/OfflineLibraryPage";
-import MobileOfflinePage from "./pages/MobileOfflinePage";
-import GenrePage from "./pages/GenrePage";
-import TrendingPage from "./pages/TrendingPage";
-import FavoritesPage from "./pages/FavoritesPage";
-import AuthPage from "./pages/AuthPage";
-import ProfilePage from "./pages/ProfilePage";
-import MalRedirectPage from "./pages/MalRedirectPage";
-import AniListRedirectPage from "./pages/AniListRedirectPage";
-import SettingsPage from "./pages/SettingsPage";
-import StatusPage from "./pages/StatusPage";
-import NotFound from "./pages/NotFound";
-import MaintenancePage from "./pages/MaintenancePage";
-import ServiceUnavailablePage from "./pages/ServiceUnavailablePage";
-import BannedPage from "./pages/BannedPage";
-import ErrorPage from "./pages/ErrorPage";
-import TierListPage, { TierListViewPage } from "./pages/TierListPage";
-import TierListEditPage from "./pages/TierListEditPage";
-import PlaylistsPage, { PlaylistViewPage } from "./pages/PlaylistPage";
-import PublicPlaylistPage from "./pages/PublicPlaylistPage";
-import CommunityPage from "./pages/CommunityPage";
-import ForumPostPage from "./pages/ForumPostPage";
-import ForumNewPostPage from "./pages/ForumNewPostPage";
-import CollectionsPage from "./pages/CollectionsPage";
-import SuggestionsPage from "./pages/SuggestionsPage";
-import TermsPage from "./pages/TermsPage";
-import DMCAPage from "./pages/DMCAPage";
-import PrivacyPage from "./pages/PrivacyPage";
-import ResetPasswordPage from "./pages/ResetPasswordPage";
-import UpdatePasswordPage from "./pages/UpdatePasswordPage";
-import CharacterPage from "./pages/CharacterPage";
-import IsshoNiPage from "./pages/IsshoNiPage";
-import WatchRoomPage from "./pages/WatchRoomPage";
-import AdminPage from "./pages/AdminPage";
-import RecommendationsPage from "./pages/RecommendationsPage";
-import OnboardingPage from "./pages/OnboardingPage";
-import LanguagesPage from "./pages/LanguagesPage";
-import LanguageAnimePage from "./pages/LanguageAnimePage";
-import SearchPage from "./pages/SearchPage";
-import SetupPage from "./pages/SetupPage";
-import DownloadPage from "./pages/DownloadPage";
+import { lazy, Suspense } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { mobileCache } from '@/services/mobileCacheService';
+
+// Lazy load components for performance
+const Index = lazy(() => import("./pages/Index"));
+const AnimePage = lazy(() => import("./pages/AnimePage"));
+const WatchPage = lazy(() => import("./pages/WatchPage"));
+const OfflineLibraryPage = lazy(() => import("./pages/OfflineLibraryPage"));
+const MobileOfflinePage = lazy(() => import("./pages/MobileOfflinePage"));
+const GenrePage = lazy(() => import("./pages/GenrePage"));
+const TrendingPage = lazy(() => import("./pages/TrendingPage"));
+const FavoritesPage = lazy(() => import("./pages/FavoritesPage"));
+const AuthPage = lazy(() => import("./pages/AuthPage"));
+const ProfilePage = lazy(() => import("./pages/ProfilePage"));
+const MalRedirectPage = lazy(() => import("./pages/MalRedirectPage"));
+const AniListRedirectPage = lazy(() => import("./pages/AniListRedirectPage"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const StatusPage = lazy(() => import("./pages/StatusPage"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const MaintenancePage = lazy(() => import("./pages/MaintenancePage"));
+const ServiceUnavailablePage = lazy(() => import("./pages/ServiceUnavailablePage"));
+const BannedPage = lazy(() => import("./pages/BannedPage"));
+const ErrorPage = lazy(() => import("./pages/ErrorPage"));
+const TierListPage = lazy(() => import("./pages/TierListPage"));
+const { TierListViewPage } = { TierListViewPage: lazy(() => import("./pages/TierListPage").then(m => ({ default: m.TierListViewPage }))) };
+const TierListEditPage = lazy(() => import("./pages/TierListEditPage"));
+const PlaylistsPage = lazy(() => import("./pages/PlaylistPage"));
+const { PlaylistViewPage } = { PlaylistViewPage: lazy(() => import("./pages/PlaylistPage").then(m => ({ default: m.PlaylistViewPage }))) };
+const PublicPlaylistPage = lazy(() => import("./pages/PublicPlaylistPage"));
+const CommunityPage = lazy(() => import("./pages/CommunityPage"));
+const ForumPostPage = lazy(() => import("./pages/ForumPostPage"));
+const ForumNewPostPage = lazy(() => import("./pages/ForumNewPostPage"));
+const CollectionsPage = lazy(() => import("./pages/CollectionsPage"));
+const SuggestionsPage = lazy(() => import("./pages/SuggestionsPage"));
+const TermsPage = lazy(() => import("./pages/TermsPage"));
+const DMCAPage = lazy(() => import("./pages/DMCAPage"));
+const PrivacyPage = lazy(() => import("./pages/PrivacyPage"));
+const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
+const UpdatePasswordPage = lazy(() => import("./pages/UpdatePasswordPage"));
+const CharacterPage = lazy(() => import("./pages/CharacterPage"));
+const IsshoNiPage = lazy(() => import("./pages/IsshoNiPage"));
+const WatchRoomPage = lazy(() => import("./pages/WatchRoomPage"));
+const AdminPage = lazy(() => import("./pages/AdminPage"));
+const RecommendationsPage = lazy(() => import("./pages/RecommendationsPage"));
+const OnboardingPage = lazy(() => import("./pages/OnboardingPage"));
+const LanguagesPage = lazy(() => import("./pages/LanguagesPage"));
+const LanguageAnimePage = lazy(() => import("./pages/LanguageAnimePage"));
+const SearchPage = lazy(() => import("./pages/SearchPage"));
+const SetupPage = lazy(() => import("./pages/SetupPage"));
+const DownloadPage = lazy(() => import("./pages/DownloadPage"));
+
+// Loading spinner component for Suspense
+const PageLoader = () => (
+  <div className="min-h-screen bg-background flex items-center justify-center">
+    <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+  </div>
+);
 
 // Detect if running on mobile for performance optimizations
 const isMobileApp = Capacitor.isNativePlatform();
@@ -293,11 +304,11 @@ function AppContent() {
   const isDesktopApp = useIsDesktopApp(); // Only Electron/Tauri, not Capacitor mobile
   const isMobile = useIsMobile(); // Screen width based check
   const isMobileApp = Capacitor.isNativePlatform(); // Capacitor mobile apps
-  
+
   // Pages where sidebar should be hidden even on desktop
   const hideSidebarPages = ['/auth', '/onboarding', '/setup', '/maintenance', '/banned', '/error', '/smarttv'];
   const isHiddenPage = hideSidebarPages.some(page => location.pathname.startsWith(page));
-  
+
   // Show sidebar on desktop (web or app), but not on mobile (web or app) or hidden pages
   const showSidebar = !isMobile && !isMobileApp && !isHiddenPage;
 
@@ -314,12 +325,12 @@ function AppContent() {
     } else {
       document.body.classList.remove('native-app');
     }
-    
+
     // Add Capacitor-specific class for mobile optimizations
     if (isMobileApp) {
       document.documentElement.classList.add('capacitor-native');
     }
-    
+
     return () => {
       document.body.classList.remove('native-app');
       document.documentElement.classList.remove('capacitor-native');
@@ -332,14 +343,14 @@ function AppContent() {
       <Sonner />
       <OfflineBanner />
       {/* <AppDownloadBanner /> */}
-        <DesktopDownloadProvider>
+      <DesktopDownloadProvider>
         <OfflineGate>
           {/* Dev Console for mobile apps in dev mode */}
           {getDevModeEnabled() && <DevConsole />}
-          
+
           {/* Downloads Panel for mobile apps */}
           <MobileDownloadsUI />
-          
+
           <div
             className={cn(
               "min-h-screen relative flex flex-col transition-all duration-300",
@@ -360,86 +371,88 @@ function AppContent() {
             <DeepLinkHandler />
 
             <main className="flex-1 w-full relative z-10">
-              <Routes>
-                {/* Status pages - only accessible when in appropriate state */}
-                <Route path="/maintenance" element={
-                  <StatusPageGuard allowedWhen={isMaintenanceMode}>
-                    <MaintenancePage />
-                  </StatusPageGuard>
-                } />
-                <Route path="/banned" element={
-                  <StatusPageGuard allowedWhen={isBanned}>
-                    <BannedPage />
-                  </StatusPageGuard>
-                } />
-                <Route path="/503" element={
-                  <StatusPageGuard allowedWhen={false}>
-                    <ServiceUnavailablePage />
-                  </StatusPageGuard>
-                } />
-                <Route path="/error" element={
-                  <StatusPageGuard allowedWhen={false}>
-                    <ErrorPage />
-                  </StatusPageGuard>
-                } />
-                <Route path="/char/:charname" element={<CharacterPage />} />
-                <Route path="/auth" element={<AuthPage />} />
-                <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
-                <Route path="/setup" element={<SetupPage />} />
+              <Suspense fallback={<PageLoader />}>
+                <Routes>
+                  {/* Status pages - only accessible when in appropriate state */}
+                  <Route path="/maintenance" element={
+                    <StatusPageGuard allowedWhen={isMaintenanceMode}>
+                      <MaintenancePage />
+                    </StatusPageGuard>
+                  } />
+                  <Route path="/banned" element={
+                    <StatusPageGuard allowedWhen={isBanned}>
+                      <BannedPage />
+                    </StatusPageGuard>
+                  } />
+                  <Route path="/503" element={
+                    <StatusPageGuard allowedWhen={false}>
+                      <ServiceUnavailablePage />
+                    </StatusPageGuard>
+                  } />
+                  <Route path="/error" element={
+                    <StatusPageGuard allowedWhen={false}>
+                      <ErrorPage />
+                    </StatusPageGuard>
+                  } />
+                  <Route path="/char/:charname" element={<CharacterPage />} />
+                  <Route path="/auth" element={<AuthPage />} />
+                  <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
+                  <Route path="/setup" element={<SetupPage />} />
 
-                {/* Protected routes */}
-                <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-                <Route path="/anime/:animeId" element={<ProtectedRoute><AnimePage /></ProtectedRoute>} />
-                <Route path="/watch/:episodeId" element={<ProtectedRoute><WatchPage /></ProtectedRoute>} />
-                {/* Downloads page - different component for desktop vs mobile */}
-                <Route path="/downloads" element={<ProtectedRoute>{isMobileApp ? <MobileOfflinePage /> : <OfflineLibraryPage />}</ProtectedRoute>} />
-                {/* Legacy routes for backwards compatibility */}
-                <Route path="/offline-library" element={<ProtectedRoute><OfflineLibraryPage /></ProtectedRoute>} />
-                <Route path="/offline" element={<ProtectedRoute><OfflineLibraryPage /></ProtectedRoute>} />
-                <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
-                <Route path="/download" element={<ProtectedRoute><DownloadPage /></ProtectedRoute>} />
-                <Route path="/image-search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
-                <Route path="/languages" element={<ProtectedRoute><LanguagesPage /></ProtectedRoute>} />
-                <Route path="/languages/:language" element={<ProtectedRoute><LanguageAnimePage /></ProtectedRoute>} />
-                <Route path="/genre/:genre" element={<ProtectedRoute><GenrePage /></ProtectedRoute>} />
-                <Route path="/trending" element={<ProtectedRoute><TrendingPage /></ProtectedRoute>} />
-                <Route path="/collections" element={<ProtectedRoute><CollectionsPage /></ProtectedRoute>} />
-                <Route path="/favorites" element={<ProtectedRoute><FavoritesPage /></ProtectedRoute>} />
-                <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-                <Route path="/integration/mal/redirect" element={<ProtectedRoute><MalRedirectPage /></ProtectedRoute>} />
-                <Route path="/integration/anilist/redirect" element={<ProtectedRoute><AniListRedirectPage /></ProtectedRoute>} />
-                <Route path="/recommendations" element={<ProtectedRoute><RecommendationsPage /></ProtectedRoute>} />
-                {/* Admin Routes */}
-                <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
-                <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-                <Route path="/status" element={<ProtectedRoute><StatusPage /></ProtectedRoute>} />
-                <Route path="/suggestions" element={<ProtectedRoute><SuggestionsPage /></ProtectedRoute>} />
-                <Route path="/terms" element={<ProtectedRoute><TermsPage /></ProtectedRoute>} />
-                <Route path="/dmca" element={<ProtectedRoute><DMCAPage /></ProtectedRoute>} />
-                <Route path="/privacy" element={<ProtectedRoute><PrivacyPage /></ProtectedRoute>} />
-                <Route path="/reset-password" element={<ResetPasswordPage />} />
-                <Route path="/update-password" element={<UpdatePasswordPage />} />
-                <Route path="/community" element={<ProtectedRoute><CommunityPage /></ProtectedRoute>} />
-                <Route path="/community/forum/new" element={<ProtectedRoute><ForumNewPostPage /></ProtectedRoute>} />
-                <Route path="/community/forum/:postId" element={<ProtectedRoute><ForumPostPage /></ProtectedRoute>} />
-                <Route path="/tierlists" element={<ProtectedRoute><TierListPage /></ProtectedRoute>} />
-                <Route path="/tierlist/:shareCode" element={<ProtectedRoute><TierListViewPage /></ProtectedRoute>} />
-                <Route path="/tierlists/edit/:id" element={<ProtectedRoute><TierListEditPage /></ProtectedRoute>} />
-                <Route path="/playlists" element={<ProtectedRoute><PlaylistsPage /></ProtectedRoute>} />
-                <Route path="/p/:shareSlug" element={<PublicPlaylistPage />} />
-                <Route path="/playlist/:playlistId" element={<ProtectedRoute><PlaylistViewPage /></ProtectedRoute>} />
-                <Route path="/isshoni" element={<ProtectedRoute><IsshoNiPage /></ProtectedRoute>} />
-                <Route path="/isshoni/room/:roomId" element={<ProtectedRoute><WatchRoomPage /></ProtectedRoute>} />
-                <Route path="/user/:username" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-                <Route path="/:slug" element={<ProtectedRoute><CatchAllHandler /></ProtectedRoute>} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
+                  {/* Protected routes */}
+                  <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+                  <Route path="/anime/:animeId" element={<ProtectedRoute><AnimePage /></ProtectedRoute>} />
+                  <Route path="/watch/:episodeId" element={<ProtectedRoute><WatchPage /></ProtectedRoute>} />
+                  {/* Downloads page - different component for desktop vs mobile */}
+                  <Route path="/downloads" element={<ProtectedRoute>{isMobileApp ? <MobileOfflinePage /> : <OfflineLibraryPage />}</ProtectedRoute>} />
+                  {/* Legacy routes for backwards compatibility */}
+                  <Route path="/offline-library" element={<ProtectedRoute><OfflineLibraryPage /></ProtectedRoute>} />
+                  <Route path="/offline" element={<ProtectedRoute><OfflineLibraryPage /></ProtectedRoute>} />
+                  <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
+                  <Route path="/download" element={<ProtectedRoute><DownloadPage /></ProtectedRoute>} />
+                  <Route path="/image-search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
+                  <Route path="/languages" element={<ProtectedRoute><LanguagesPage /></ProtectedRoute>} />
+                  <Route path="/languages/:language" element={<ProtectedRoute><LanguageAnimePage /></ProtectedRoute>} />
+                  <Route path="/genre/:genre" element={<ProtectedRoute><GenrePage /></ProtectedRoute>} />
+                  <Route path="/trending" element={<ProtectedRoute><TrendingPage /></ProtectedRoute>} />
+                  <Route path="/collections" element={<ProtectedRoute><CollectionsPage /></ProtectedRoute>} />
+                  <Route path="/favorites" element={<ProtectedRoute><FavoritesPage /></ProtectedRoute>} />
+                  <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+                  <Route path="/integration/mal/redirect" element={<ProtectedRoute><MalRedirectPage /></ProtectedRoute>} />
+                  <Route path="/integration/anilist/redirect" element={<ProtectedRoute><AniListRedirectPage /></ProtectedRoute>} />
+                  <Route path="/recommendations" element={<ProtectedRoute><RecommendationsPage /></ProtectedRoute>} />
+                  {/* Admin Routes */}
+                  <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
+                  <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+                  <Route path="/status" element={<ProtectedRoute><StatusPage /></ProtectedRoute>} />
+                  <Route path="/suggestions" element={<ProtectedRoute><SuggestionsPage /></ProtectedRoute>} />
+                  <Route path="/terms" element={<ProtectedRoute><TermsPage /></ProtectedRoute>} />
+                  <Route path="/dmca" element={<ProtectedRoute><DMCAPage /></ProtectedRoute>} />
+                  <Route path="/privacy" element={<ProtectedRoute><PrivacyPage /></ProtectedRoute>} />
+                  <Route path="/reset-password" element={<ResetPasswordPage />} />
+                  <Route path="/update-password" element={<UpdatePasswordPage />} />
+                  <Route path="/community" element={<ProtectedRoute><CommunityPage /></ProtectedRoute>} />
+                  <Route path="/community/forum/new" element={<ProtectedRoute><ForumNewPostPage /></ProtectedRoute>} />
+                  <Route path="/community/forum/:postId" element={<ProtectedRoute><ForumPostPage /></ProtectedRoute>} />
+                  <Route path="/tierlists" element={<ProtectedRoute><TierListPage /></ProtectedRoute>} />
+                  <Route path="/tierlist/:shareCode" element={<ProtectedRoute><TierListViewPage /></ProtectedRoute>} />
+                  <Route path="/tierlists/edit/:id" element={<ProtectedRoute><TierListEditPage /></ProtectedRoute>} />
+                  <Route path="/playlists" element={<ProtectedRoute><PlaylistsPage /></ProtectedRoute>} />
+                  <Route path="/p/:shareSlug" element={<PublicPlaylistPage />} />
+                  <Route path="/playlist/:playlistId" element={<ProtectedRoute><PlaylistViewPage /></ProtectedRoute>} />
+                  <Route path="/isshoni" element={<ProtectedRoute><IsshoNiPage /></ProtectedRoute>} />
+                  <Route path="/isshoni/room/:roomId" element={<ProtectedRoute><WatchRoomPage /></ProtectedRoute>} />
+                  <Route path="/user/:username" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+                  <Route path="/:slug" element={<ProtectedRoute><CatchAllHandler /></ProtectedRoute>} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Suspense>
             </main>
 
             <ConditionalFooter />
           </div>
         </OfflineGate>
-        </DesktopDownloadProvider>
+      </DesktopDownloadProvider>
     </>
   );
 }

@@ -109,15 +109,20 @@ function createWindow() {
 
     const loadURL = async (url) => {
         try {
+            console.log(`[Loading] Attempting to load: ${url}`);
             await mainWindow.loadURL(url);
-            console.log('Successfully loaded URL:', url);
+            console.log('[Loading] Successfully loaded URL:', url);
         } catch (err) {
-            console.error(`Failed to load URL ${url}:`, err);
-            // If 8088 fails in dev, try 8089
-            if (isDev && url === 'http://localhost:8088') {
-                console.log('Trying fallback port 8089...');
+            console.error(`[Loading] Failed to load URL ${url}:`, err);
+
+            if (isDev && url.includes('localhost:8088')) {
+                console.log('[Loading] dev-server probably not ready, retrying in 2s...');
+                setTimeout(() => loadURL(url), 2000);
+            } else if (isDev && url === 'http://localhost:8088') {
+                console.log('[Loading] Trying fallback port 8089...');
                 await loadURL('http://localhost:8089');
             } else {
+                console.log('[Loading] Falling back to offline page');
                 mainWindow.loadFile(path.join(__dirname, 'offline.html'));
             }
         }
@@ -133,8 +138,12 @@ function createWindow() {
         }
         if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
             mainWindow.show();
+            // If still black, try reloading
+            if (!isDev) {
+                mainWindow.reload();
+            }
         }
-    }, 10000); // 10s safety timeout for splash
+    }, 15000); // 15s absolute safety timeout for splash
 
     // Disable any ad-blocking and allow all content
     const session = mainWindow.webContents.session;

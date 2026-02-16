@@ -1,4 +1,5 @@
 import { useTheme } from "@/hooks/useTheme";
+import { cn } from "@/lib/utils";
 
 export function Background() {
   const { isLightTheme, themes, theme } = useTheme();
@@ -28,9 +29,17 @@ export function Background() {
         }}
       />
 
-      {/* Ambient Glows */}
-      <div className={`absolute top-[-20%] left-[-10%] w-[50vw] h-[50vw] bg-primary/${isLightTheme ? '5' : '10'} rounded-full blur-[150px] animate-pulse-slow`} />
-      <div className={`absolute bottom-[-20%] right-[-10%] w-[50vw] h-[50vw] bg-secondary/${isLightTheme ? '5' : '10'} rounded-full blur-[150px] animate-pulse-slow`} style={{ animationDelay: "2s" }} />
+      {/* Ambient Glows - Simplified on mobile for performance */}
+      <div className={cn(
+        "absolute top-[-20%] left-[-10%] w-[50vw] h-[50vw] rounded-full blur-[150px] animate-pulse-slow",
+        isLightTheme ? "bg-primary/5" : "bg-primary/10",
+        "md:block" // Keep full glow on desktop
+      )} />
+      <div className={cn(
+        "absolute bottom-[-20%] right-[-10%] w-[50vw] h-[50vw] rounded-full blur-[150px] animate-pulse-slow",
+        isLightTheme ? "bg-secondary/5" : "bg-secondary/10",
+        "md:block"
+      )} style={{ animationDelay: "2s" }} />
     </div>
   );
 }

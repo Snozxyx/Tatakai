@@ -180,23 +180,31 @@ html.quality-animations * {
     -webkit-overflow-scrolling: touch;
     transform: translateZ(0);
     backface-visibility: hidden;
+    perspective: 1000px;
+    will-change: scroll-position;
   }
   
+  /* Optimize major containers with content-visibility */
+  main, 
+  .hero-section,
+  .trending-grid,
+  .anime-grid,
+  .episode-list {
+    content-visibility: auto;
+    contain-intrinsic-size: 1px 500px; /* Placeholder size for layout stability */
+  }
+
   /* Optimize images for mobile */
   img {
     content-visibility: auto;
     contain-intrinsic-size: 200px 300px;
+    image-rendering: -webkit-optimize-contrast;
   }
   
   /* Reduce repaints on scroll */
   .glass-panel {
     contain: layout paint;
-  }
-  
-  /* Smoother list rendering */
-  .anime-grid,
-  .episode-list {
-    contain: content;
+    transform: translateZ(0); /* Force GUI layer */
   }
 }
 
