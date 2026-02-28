@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-const TATAKAI_API_URL = import.meta.env.VITE_TATAKAI_API_URL || "https://tatakaiapi.vercel.app/api/v1";
+const TATAKAI_API_URL = import.meta.env.VITE_TATAKAI_API_URL || "https://api.tatakai.me/api/v1";
 
 async function fetchAnimelok<T>(endpoint: string): Promise<T> {
   const response = await fetch(`${TATAKAI_API_URL}/animelok${endpoint}`, {

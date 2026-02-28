@@ -28,8 +28,9 @@ import { TitleBar } from "@/components/layout/TitleBar";
 import { DownloadIndicator } from "@/components/layout/DownloadIndicator";
 import { LogViewer } from "@/components/debug/LogViewer";
 import { DevConsole } from "@/components/debug/DevConsole";
-import { MobileDownloadsUI } from "@/components/mobile/MobileDownloadsUI";
+import { KeyboardShortcutsProvider } from '@/components/ui/KeyboardShortcutsModal';
 import { DesktopDownloadProvider } from "@/contexts/DesktopDownloadContext";
+import { useAntiDevTools } from '@/hooks/useAntiDevTools';
 import { useClientId, setCachedClientId } from "@/hooks/useClientId";
 
 // Safe mobile config getter
@@ -95,6 +96,9 @@ const LanguageAnimePage = lazy(() => import("./pages/LanguageAnimePage"));
 const SearchPage = lazy(() => import("./pages/SearchPage"));
 const SetupPage = lazy(() => import("./pages/SetupPage"));
 const DownloadPage = lazy(() => import("./pages/DownloadPage"));
+const DevtoolsBlockedPage = lazy(() => import("./pages/DevtoolsBlockedPage"));
+const DiscordPage = lazy(() => import("./pages/DiscordPage"));
+const WrappedPage = lazy(() => import('./pages/WrappedPage'));
 
 // Loading spinner component for Suspense
 const PageLoader = () => (
@@ -227,6 +231,12 @@ function DeepLinkHandler() {
     }
   }, [navigate]);
 
+  return null;
+}
+
+// Anti-DevTools guard: detects devtools and redirects to blocked page (web-only)
+function AntiDevToolsGuard() {
+  useAntiDevTools();
   return null;
 }
 
@@ -372,8 +382,8 @@ function AppContent() {
           {/* Dev Console for mobile apps in dev mode */}
           {getDevModeEnabled() && <DevConsole />}
 
-          {/* Downloads Panel for mobile apps */}
-          <MobileDownloadsUI />
+          {/* Keyboard Shortcuts (desktop only) */}
+          <KeyboardShortcutsProvider />
 
           <div
             className={cn(
@@ -393,6 +403,7 @@ function AppContent() {
             <DownloadIndicator />
             <LogViewer />
             <DeepLinkHandler />
+            <AntiDevToolsGuard />
 
             <main className="flex-1 w-full relative z-10">
               <Suspense fallback={<PageLoader />}>
@@ -418,10 +429,13 @@ function AppContent() {
                       <ErrorPage />
                     </StatusPageGuard>
                   } />
+                  {/* Devtools blocked page - publicly accessible */}
+                  <Route path="/devtools-blocked" element={<DevtoolsBlockedPage />} />
                   <Route path="/char/:charname" element={<CharacterPage />} />
                   <Route path="/auth" element={<AuthPage />} />
                   <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
                   <Route path="/setup" element={<SetupPage />} />
+                  <Route path="/discord" element={<DiscordPage />} />
 
                   {/* Protected routes */}
                   <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
@@ -464,10 +478,12 @@ function AppContent() {
                   <Route path="/playlists" element={<ProtectedRoute><PlaylistsPage /></ProtectedRoute>} />
                   <Route path="/p/:shareSlug" element={<PublicPlaylistPage />} />
                   <Route path="/playlist/:playlistId" element={<ProtectedRoute><PlaylistViewPage /></ProtectedRoute>} />
-                  <Route path="/isshoni" element={<ProtectedRoute><IsshoNiPage /></ProtectedRoute>} />
+                  <Route path="/stats" element={<ProtectedRoute><WrappedPage /></ProtectedRoute>} />
+                  <Route path="/wrapped" element={<ProtectedRoute><WrappedPage /></ProtectedRoute>} />
                   <Route path="/isshoni/room/:roomId" element={<ProtectedRoute><WatchRoomPage /></ProtectedRoute>} />
                   <Route path="/user/:username" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
                   <Route path="/:slug" element={<ProtectedRoute><CatchAllHandler /></ProtectedRoute>} />
+                  <Route path="/isshoni" element={<ProtectedRoute><IsshoNiPage /></ProtectedRoute>} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </Suspense>

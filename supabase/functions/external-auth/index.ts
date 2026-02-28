@@ -23,6 +23,14 @@ serve(async (req) => {
             const ANILIST_CLIENT_ID = Deno.env.get('ANILIST_CLIENT_ID') 
             const ANILIST_CLIENT_SECRET = Deno.env.get('ANILIST_CLIENT_SECRET') 
 
+            if (!ANILIST_CLIENT_ID || !ANILIST_CLIENT_SECRET) {
+                console.error('[AniList] Missing ANILIST_CLIENT_ID or ANILIST_CLIENT_SECRET env vars')
+                return new Response(JSON.stringify({ error: 'AniList integration not configured on server' }), {
+                    status: 500,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                })
+            }
+
             const response = await fetch('https://anilist.co/api/v2/oauth/token', {
                 method: 'POST',
                 headers: {

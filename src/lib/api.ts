@@ -4,10 +4,10 @@ const API_URL = "http://de-fsn01.na1.host:4270/api/v2/hianime";
 const CHAR_API_URL = "https://anime-api.canelacho.com/api/v1";
 
 // TatakaiAPI URL - configurable for development
-const TATAKAI_API_URL = import.meta.env.VITE_TATAKAI_API_URL || "https://tatakaiapi.vercel.app/api/v1";
+const TATAKAI_API_URL = import.meta.env.VITE_TATAKAI_API_URL || "https://api.tatakai.me/api/v1";
 
 // Detect mobile for performance optimizations
-const isMobileNative = typeof window !== 'undefined' && 
+const isMobileNative = typeof window !== 'undefined' &&
   (window as any).Capacitor?.isNativePlatform?.() || false;
 
 // Shorter timeout for mobile for faster feedback
@@ -19,16 +19,11 @@ function getProxyUrl(): string {
   if (supabaseUrl) {
     return `${supabaseUrl}/functions/v1/rapid-service`;
   }
-  // Fallback proxy
-  return "https://api.allorigins.win/raw?url=";
+  return '';
 }
 
-// Fallback proxies for production redundancy
-const FALLBACK_PROXIES = [
-  "https://api.allorigins.win/raw?url=",
-  "https://corsproxy.io/?",
-  "https://proxy.cors.sh/",
-];
+// All requests go through rapid-service — no third-party proxies
+const FALLBACK_PROXIES: string[] = [];
 
 /**
  * Enhanced network error class for better production monitoring
@@ -75,18 +70,17 @@ export async function apiGet<T>(path: string, retries?: number): Promise<T> {
   const maxRetries = retries ?? (isMobileNative ? 2 : 3);
   const url = `${API_URL}${path}`;
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const fallbackProxy = "https://api.allorigins.win/raw?url=";
 
   let lastError: Error | null = null;
 
-  // On mobile, try direct API first (faster), then proxy as fallback
-  // On web, use proxy to handle CORS
+  // On mobile, try direct API first (faster), then rapid-service as fallback
+  // On web, always use rapid-service proxy
   const proxies = supabaseUrl
     ? (() => {
       const apiOrigin = new URL(API_URL).origin;
       const apikey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       const rapidUrl = `${supabaseUrl}/functions/v1/rapid-service?url=${encodeURIComponent(url)}&type=api&referer=${encodeURIComponent(apiOrigin)}` + (apikey ? `&apikey=${encodeURIComponent(apikey)}` : '');
-      
+
       // Mobile can try direct API first (no CORS in native webview)
       if (isMobileNative) {
         return [
@@ -94,15 +88,12 @@ export async function apiGet<T>(path: string, retries?: number): Promise<T> {
           { url: rapidUrl, type: 'supabase' },
         ];
       }
-      
+
       return [
         { url: rapidUrl, type: 'supabase' },
-        { url: `${fallbackProxy}${encodeURIComponent(url)}`, type: 'fallback' }
       ];
     })()
-    : [
-      { url: `${fallbackProxy}${encodeURIComponent(url)}`, type: 'fallback' }
-    ];
+    : [];
 
   for (const proxy of proxies) {
     for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -162,14 +153,14 @@ function withClientHeaders(extra: Record<string, string> = {}): Record<string, s
 /**
  * Generic fetcher for external APIs with retry logic
  */
-export async function externalApiGet<T>(baseUrl: string, path: string, retries = 2): Promise<T> {
+export async function externalApiGet<T>(baseUrl: string, path: string, retries = 2, timeoutMs: number = 25000): Promise<T> {
   const url = `${baseUrl}${path}`;
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
       const response = await fetch(url, {
         headers: withClientHeaders(),
@@ -232,9 +223,14 @@ export function getProxiedImageUrl(imageUrl: string): string {
   if (!imageUrl) return imageUrl;
 
   // Avoid proxying local assets or URLs already using our proxy
-  const trimmed = imageUrl.trim();
+  let trimmed = imageUrl.trim();
   if (!trimmed.startsWith('http')) return trimmed;
   if (trimmed.includes('/functions/v1/rapid-service')) return trimmed;
+
+  // Upgrade AniList CDN images from medium → large quality
+  if (trimmed.includes('s4.anilist.co') || trimmed.includes('anilist.co/file/anilistcdn')) {
+    trimmed = trimmed.replace('/cover/medium/', '/cover/large/').replace(/\/banner\/(small|medium)\//, '/banner/large/');
+  }
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   if (!supabaseUrl) {
@@ -246,6 +242,42 @@ export function getProxiedImageUrl(imageUrl: string): string {
   const apikey = import.meta.env.VITE_SUPABASE_ANON_KEY;
   if (apikey) params.set('apikey', apikey);
   return `${supabaseUrl}/functions/v1/rapid-service?${params.toString()}`;
+}
+
+/**
+ * Returns the best available poster URL for an anime synchronously.
+ * Upgrades AniList CDN medium → large via getProxiedImageUrl.
+ * The anilistId parameter is kept for backwards compatibility but is unused here —
+ * use fetchAniListExtraLargeCover() for the full async high-quality fetch.
+ */
+export function getHighQualityPoster(poster: string, _anilistId?: number | null): string {
+  return getProxiedImageUrl(poster);
+}
+
+/**
+ * Fetches the highest quality cover image from the Jikan (MAL) API.
+ * Uses images.jpg.large_image_url which is the full-size MAL cover.
+ * Falls back to proxied source poster if fetch fails or no malId.
+ */
+export async function fetchJikanCover(
+  malId: number | null | undefined,
+  fallbackPoster: string
+): Promise<string> {
+  if (!malId) return getProxiedImageUrl(fallbackPoster);
+  try {
+    const res = await fetch(`https://api.jikan.moe/v4/anime/${malId}`, {
+      headers: { 'Accept': 'application/json' },
+    });
+    if (!res.ok) throw new Error(`Jikan ${res.status}`);
+    const json = await res.json();
+    const url: string | undefined =
+      json?.data?.images?.webp?.large_image_url ||
+      json?.data?.images?.jpg?.large_image_url;
+    if (url) return getProxiedImageUrl(url);
+  } catch {
+    // fall through to fallback
+  }
+  return getProxiedImageUrl(fallbackPoster);
 }
 
 // Proxy helper for subtitle files
@@ -1176,10 +1208,10 @@ export async function fetchToonStreamSources(
     const primaryLang = languages[0] || 'Hindi';
     const langAbbr = primaryLang.toLowerCase().startsWith('hin') ? 'HIN'
       : primaryLang.toLowerCase().startsWith('tam') ? 'TAM'
-      : primaryLang.toLowerCase().startsWith('tel') ? 'TEL'
-      : primaryLang.toLowerCase().startsWith('eng') ? 'ENG'
-      : primaryLang.toLowerCase().startsWith('jap') ? 'JAP'
-      : primaryLang.toUpperCase().slice(0, 3);
+        : primaryLang.toLowerCase().startsWith('tel') ? 'TEL'
+          : primaryLang.toLowerCase().startsWith('eng') ? 'ENG'
+            : primaryLang.toLowerCase().startsWith('jap') ? 'JAP'
+              : primaryLang.toUpperCase().slice(0, 3);
 
     // For raw ToonStream API, pair sources with servers array
     const servers = data.servers || [];
@@ -1194,7 +1226,7 @@ export async function fetchToonStreamSources(
 
       return {
         url: source.url,
-        isM3U8: false,
+        isM3U8: source.url.includes('.m3u8'),
         quality: source.quality || 'HD',
         language: primaryLang,
         langCode: `toonstream-${index}-${serverId}`,
@@ -1339,6 +1371,132 @@ export async function fetchHindiApiSources(
     return mapped;
   } catch (e) {
     console.warn('[HindiAPI] Fetch failed:', e);
+    return [];
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// AnilistHindi Sources (AniList ID → TMDB → TechInMind HLS/Embeds)
+// ──────────────────────────────────────────────────────────────────────────
+export async function fetchAnilistHindiSources(
+  episodeNumber: number,
+  anilistId?: number | string,
+  season: number = 1
+): Promise<StreamingSource[]> {
+  if (!anilistId) return [];
+
+  const params = new URLSearchParams({
+    anilistId: String(anilistId),
+    episode: String(episodeNumber),
+    season: String(season),
+    type: 'series',
+  });
+
+  console.debug(`[AnilistHindi] Fetching: anilistId=${anilistId}, ep=${episodeNumber}, season=${season}`);
+
+  try {
+    const apiUrl = `${TATAKAI_API_URL}/anilisthindi/episode?${params}`;
+    const res = await fetch(apiUrl, {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(20000),
+    });
+
+    if (!res.ok) {
+      if (res.status !== 404) console.warn(`[AnilistHindi] API returned ${res.status}`);
+      return [];
+    }
+
+    const json: any = await res.json();
+    const data = json.data;
+    if (!data?.streams || !Array.isArray(data.streams)) {
+      console.warn('[AnilistHindi] No streams in response');
+      return [];
+    }
+
+    const mapped: StreamingSource[] = data.streams
+      .filter((s: any) => s.url || s.dhls)
+      .map((stream: any, index: number) => {
+        const hasDirect = Boolean(stream.dhls);
+        const providerKey = stream.provider?.toLowerCase().replace(/\s+/g, '') || `server${index}`;
+        let streamUrl: string;
+        let isM3U8 = false;
+
+        if (hasDirect) {
+          const referer = stream.headers?.Referer || stream.headers?.referer || '';
+          streamUrl = `${TATAKAI_API_URL}/anilisthindi/proxy?url=${encodeURIComponent(stream.dhls)}${referer ? `&referer=${encodeURIComponent(referer)}` : ''}`;
+          isM3U8 = true;
+        } else {
+          streamUrl = stream.url;
+        }
+
+        return {
+          url: streamUrl,
+          isM3U8,
+          quality: 'HD',
+          language: 'Hindi',
+          langCode: `anilisthindi-${index}-${providerKey}`,
+          isDub: true,
+          providerName: `${stream.provider || `Server ${index + 1}`} (AH)`,
+          isEmbed: !hasDirect,
+          needsHeadless: !hasDirect,
+        } satisfies StreamingSource;
+      });
+
+    console.debug(`[AnilistHindi] Got ${mapped.length} sources`);
+    return mapped;
+  } catch (e) {
+    console.warn('[AnilistHindi] Fetch failed:', e);
+    return [];
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// ToonWorld4ALL Sources (Madara WordPress scraper)
+// ──────────────────────────────────────────────────────────────────────────
+export async function fetchToonWorldSources(
+  animeName: string,
+  season: number = 1,
+  episodeNumber: number = 1
+): Promise<StreamingSource[]> {
+  const animeSlug = animeName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+  const params = new URLSearchParams({
+    slug: animeSlug,
+    season: String(season),
+    episode: String(episodeNumber),
+  });
+
+  console.debug(`[ToonWorld] Fetching: ${animeSlug} S${season}E${episodeNumber}`);
+
+  try {
+    const apiUrl = `${TATAKAI_API_URL}/toonworld/episode?${params}`;
+    const res = await fetch(apiUrl, {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(25000),
+    });
+
+    if (!res.ok) {
+      if (res.status !== 404) console.warn(`[ToonWorld] API returned ${res.status}`);
+      return [];
+    }
+
+    const json: any = await res.json();
+    const data = json.data;
+    if (!data?.sources || !Array.isArray(data.sources)) return [];
+
+    return data.sources.map((s: any, idx: number): StreamingSource => ({
+      url: s.url,
+      isM3U8: s.isM3U8 || s.type === 'hls',
+      quality: s.quality || 'HD',
+      language: 'English',
+      langCode: s.langCode || `toonworld-${idx}`,
+      isDub: false,
+      providerName: s.provider || 'ToonWorld4ALL',
+      isEmbed: s.type === 'iframe',
+      needsHeadless: false,
+    }));
+  } catch (e) {
+    console.warn('[ToonWorld] Fetch failed:', e);
     return [];
   }
 }
@@ -1829,10 +1987,10 @@ export async function fetchCombinedSources(
                 const lang = (s.language || 'Hindi').trim();
                 const langCode = lang.toLowerCase().startsWith('hin') ? 'HIN'
                   : lang.toLowerCase().startsWith('tam') ? 'TAM'
-                  : lang.toLowerCase().startsWith('tel') ? 'TEL'
-                  : lang.toLowerCase().startsWith('eng') ? 'ENG'
-                  : lang.toLowerCase().startsWith('jap') ? 'JAP'
-                  : lang.toUpperCase().slice(0, 3);
+                    : lang.toLowerCase().startsWith('tel') ? 'TEL'
+                      : lang.toLowerCase().startsWith('eng') ? 'ENG'
+                        : lang.toLowerCase().startsWith('jap') ? 'JAP'
+                          : lang.toUpperCase().slice(0, 3);
                 return {
                   url: s.url,
                   isM3U8: s.url.includes('.m3u8'),
@@ -1892,6 +2050,30 @@ export async function fetchCombinedSources(
         console.warn('HindiAPI fetch failed:', e);
       }
       return [];
+    })(),
+
+    // [9] AnilistHindi Sources (AniList ID → TMDB → TechInMind HLS/Embeds — Hindi dub)
+    (async () => {
+      try {
+        if (episodeNumber !== undefined && anilistID) {
+          return await fetchAnilistHindiSources(episodeNumber, anilistID);
+        }
+      } catch (e) {
+        console.warn('AnilistHindi fetch failed:', e);
+      }
+      return [];
+    })(),
+
+    // [10] ToonWorld4ALL Sources (Madara scraper — English, hard subs)
+    (async () => {
+      try {
+        if (episodeNumber !== undefined && animeName) {
+          return await fetchToonWorldSources(animeName, 1, episodeNumber);
+        }
+      } catch (e) {
+        console.warn('ToonWorld fetch failed:', e);
+      }
+      return [];
     })()
   ]);
 
@@ -1905,6 +2087,8 @@ export async function fetchCombinedSources(
   const customVal = otherResults[6].status === 'fulfilled' ? otherResults[6].value : [];
   const toonStreamVal = otherResults[7].status === 'fulfilled' ? otherResults[7].value : [];
   const hindiApiVal = otherResults[8].status === 'fulfilled' ? otherResults[8].value : [];
+  const anilistHindiVal = otherResults[9].status === 'fulfilled' ? otherResults[9].value : [];
+  const toonWorldVal = otherResults[10].status === 'fulfilled' ? otherResults[10].value : [];
 
   const animelokVal = 'sources' in animelokResult ? animelokResult.sources : animelokResult;
 
@@ -1980,6 +2164,8 @@ export async function fetchCombinedSources(
     ...(Array.isArray(hindiVal) ? hindiVal : []),
     ...(Array.isArray(toonStreamVal) ? toonStreamVal : []),
     ...(Array.isArray(hindiApiVal) ? hindiApiVal : []),
+    ...(Array.isArray(anilistHindiVal) ? anilistHindiVal : []),
+    ...(Array.isArray(toonWorldVal) ? toonWorldVal : []),
     ...(Array.isArray(customVal) ? customVal : [])
   ];
 

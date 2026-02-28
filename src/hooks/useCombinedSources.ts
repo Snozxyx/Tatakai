@@ -25,6 +25,8 @@ export function useCombinedSources(
     hasAniworld: boolean;
     hasToonStream: boolean;
     hasHindiApi: boolean;
+    hasAnilistHindi: boolean;
+    hasToonWorld: boolean;
     malID?: number | null;
     anilistID?: number | null;
     nextEpisodeEstimates?: Array<{ lang?: string, server?: string, label: string }>;
@@ -64,6 +66,8 @@ export function useCombinedSources(
         hasAniworld: data.sources.some(s => s.langCode?.startsWith('aniworld')),
         hasToonStream: data.sources.some(s => s.langCode?.startsWith('toonstream') || s.providerName?.includes('ToonStream')),
         hasHindiApi: data.sources.some(s => s.langCode?.startsWith('hindiapi')),
+        hasAnilistHindi: data.sources.some(s => s.langCode?.startsWith('anilisthindi')),
+        hasToonWorld: data.sources.some(s => s.langCode?.startsWith('toonworld') || s.providerName?.includes('ToonWorld')),
       };
     },
     enabled: !!episodeId,

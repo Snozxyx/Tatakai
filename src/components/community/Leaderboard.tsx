@@ -4,15 +4,17 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useLeaderboard, LeaderboardType, useUserRank } from '@/hooks/useLeaderboard';
 import { useAuth } from '@/contexts/AuthContext';
-import { Trophy, Medal, Award, Users, Star, MessageSquare, TrendingUp, UserPlus } from 'lucide-react';
+import { Trophy, Medal, Award, Users, Star, MessageSquare, TrendingUp, UserPlus, Flame } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { getRankTier, getRankImageUrl } from '@/lib/rankUtils';
 
-const LEADERBOARD_TYPES: Array<{ value: LeaderboardType; label: string; icon: any }> = [
-  { value: 'watched', label: 'Most Watched', icon: Trophy },
-  { value: 'rated', label: 'Most Rated', icon: Star },
-  { value: 'comments', label: 'Most Comments', icon: MessageSquare },
-  { value: 'active', label: 'Most Active', icon: TrendingUp },
-  { value: 'followers', label: 'Most Followers', icon: UserPlus },
+const LEADERBOARD_TYPES: Array<{ value: LeaderboardType; label: string; icon: any; scoreLabel: string }> = [
+  { value: 'watched',   label: 'Most Watched',  icon: Trophy,      scoreLabel: 'episodes' },
+  { value: 'streak',    label: 'Best Streak',   icon: Flame,       scoreLabel: 'days'     },
+  { value: 'rated',     label: 'Most Rated',    icon: Star,        scoreLabel: 'ratings'  },
+  { value: 'comments',  label: 'Most Comments', icon: MessageSquare, scoreLabel: 'comments' },
+  { value: 'active',    label: 'Most Active',   icon: TrendingUp,  scoreLabel: 'points'   },
+  { value: 'followers', label: 'Most Followers',icon: UserPlus,    scoreLabel: 'followers'},
 ];
 
 function RankBadge({ rank }: { rank: number }) {
@@ -47,11 +49,15 @@ function RankBadge({ rank }: { rank: number }) {
 function LeaderboardEntry({
   entry,
   currentUserId,
+  scoreLabel,
 }: {
   entry: any;
   currentUserId?: string;
+  scoreLabel: string;
 }) {
   const isCurrentUser = entry.user_id === currentUserId;
+  const rankTier = getRankTier(entry.score);
+  const rankImg = getRankImageUrl(rankTier.rank);
 
   return (
     <Link to={`/user/${entry.username || entry.user_id}`}>
@@ -61,7 +67,7 @@ function LeaderboardEntry({
           }`}
       >
         <RankBadge rank={entry.rank} />
-        <Avatar className="w-12 h-12">
+        <Avatar className="w-11 h-11">
           <AvatarImage src={entry.avatar_url || ''} />
           <AvatarFallback>
             {entry.display_name?.[0] || entry.username?.[0] || 'U'}
@@ -78,13 +84,14 @@ function LeaderboardEntry({
               </span>
             )}
           </div>
-          <p className="text-sm text-muted-foreground truncate">
-            @{entry.username && entry.username !== 'null' ? entry.username : 'user'}
-          </p>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <img src={rankImg} alt={rankTier.name} className="w-4 h-4 object-contain" />
+            <p className={`text-xs font-semibold ${rankTier.color}`}>{rankTier.name}</p>
+          </div>
         </div>
         <div className="text-right">
           <p className="text-lg font-bold">{entry.score.toLocaleString()}</p>
-          <p className="text-xs text-muted-foreground">points</p>
+          <p className="text-xs text-muted-foreground">{scoreLabel}</p>
         </div>
       </GlassPanel>
     </Link>
@@ -94,10 +101,13 @@ function LeaderboardEntry({
 export function Leaderboard() {
   const { user } = useAuth();
   const [type, setType] = useState<LeaderboardType>('watched');
-  const { data: leaderboard, isLoading } = useLeaderboard(type, 100);
+  const limit = type === 'streak' ? 10 : 100;
+  const { data: leaderboard, isLoading } = useLeaderboard(type, limit);
   const { data: userRank } = useUserRank(type, user?.id);
 
-  const Icon = LEADERBOARD_TYPES.find((t) => t.value === type)?.icon || Trophy;
+  const activeType = LEADERBOARD_TYPES.find((t) => t.value === type)!;
+  const Icon = activeType.icon || Trophy;
+  const scoreLabel = activeType.scoreLabel;
 
   return (
     <div className="space-y-6">
@@ -118,7 +128,7 @@ export function Leaderboard() {
 
       {/* Type Selector */}
       <div className="flex flex-wrap gap-2">
-        {LEADERBOARD_TYPES.map(({ value, label, icon: Icon }) => (
+        {LEADERBOARD_TYPES.map(({ value, label, icon: BtnIcon }) => (
           <Button
             key={value}
             variant={type === value ? 'default' : 'outline'}
@@ -126,7 +136,7 @@ export function Leaderboard() {
             onClick={() => setType(value)}
             className="gap-2"
           >
-            <Icon className="w-4 h-4" />
+            <BtnIcon className="w-4 h-4" />
             {label}
           </Button>
         ))}
@@ -144,7 +154,7 @@ export function Leaderboard() {
             </div>
             <div className="text-right">
               <p className="text-sm text-muted-foreground">Your Score</p>
-              <p className="text-2xl font-bold">{userRank.score.toLocaleString()}</p>
+              <p className="text-2xl font-bold">{userRank.score.toLocaleString()} <span className="text-sm font-normal text-muted-foreground">{scoreLabel}</span></p>
             </div>
           </div>
         </GlassPanel>
@@ -174,6 +184,7 @@ export function Leaderboard() {
               key={entry.user_id}
               entry={entry}
               currentUserId={user?.id}
+              scoreLabel={scoreLabel}
             />
           ))}
         </div>

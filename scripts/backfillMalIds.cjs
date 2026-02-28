@@ -5,7 +5,7 @@ const fetch = require('node-fetch');
 const supabaseUrl = process.env.SUPABASE_URL 
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY 
 const hianimeApiUrl = 'http://de-fsn01.na1.host:4270/api/v2/hianime';
-const tatakaiApiUrl = process.env.TATAKAI_API_URL || 'https://tatakaiapi.vercel.app/api/v1';
+const tatakaiApiUrl = process.env.TATAKAI_API_URL || 'https://api.tatakai.me/api/v1';
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 

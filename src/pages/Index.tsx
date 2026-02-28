@@ -29,6 +29,7 @@ import { AppDownloadSection } from "@/components/layout/AppDownloadSection";
 import { Heart, Sparkles } from "lucide-react";
 import { DiscordSection } from "@/components/home/DiscordSection";
 import { useEffect } from "react";
+import { BecauseYouWatched } from "@/components/anime/BecauseYouWatched";
 
 const Index = () => {
   const { data, isLoading, error } = useHomeData();
@@ -71,6 +72,11 @@ const Index = () => {
       )}>
         <Header />
 
+        {/* Quick-action buttons: mood picker + random anime */}
+        {/* <div className="flex items-center gap-3 mb-4 flex-wrap mt-4">
+          <AnimeRoulette trendingAnimes={data?.trendingAnimes} />
+        </div> */}
+
         {isLoading ? (
           <>
             <HeroSkeleton />
@@ -97,6 +103,9 @@ const Index = () => {
 
             {/* Continue Watching - LocalStorage for guests */}
             <LocalContinueWatching />
+
+            {/* Because You Watched — Personalised recommendations */}
+            <BecauseYouWatched className="mb-12" />
 
             {/* My Playlists */}
             <PlaylistSection />

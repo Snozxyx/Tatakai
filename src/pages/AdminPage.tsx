@@ -32,6 +32,7 @@ import { AnalyticsActiveUsers } from '@/components/admin/AnalyticsActiveUsers';
 import { MarketplaceManager } from '@/components/admin/MarketplaceManager';
 import { RedirectManager } from '@/components/admin/RedirectManager';
 import { UserActivityLogs } from '@/components/admin/UserActivityLogs';
+import { AchievementManager } from '@/components/admin/AchievementManager';
 import { useAdminMessages } from '@/hooks/useAdminMessages';
 import { formatDistanceToNow } from 'date-fns';
 import { Link } from 'react-router-dom';
@@ -60,6 +61,7 @@ const navItems = [
   { value: 'changelog', label: 'Changelog', icon: History, roles: ['admin'] },
   { value: 'servers', label: 'Video Servers', icon: Server, roles: ['admin'] },
   { value: 'settings', label: 'System', icon: Settings, roles: ['admin'] },
+  { value: 'achievements', label: 'Achievements', icon: Star, roles: ['admin', 'moderator'] },
 ];
 
 export default function AdminPage() {
@@ -560,6 +562,11 @@ export default function AdminPage() {
             {/* Languages Tab */}
             <TabsContent value="languages">
               <LanguageManager />
+            </TabsContent>
+
+            {/* Achievements Tab */}
+            <TabsContent value="achievements">
+              <AchievementManager />
             </TabsContent>
 
             {/* Users Tab */}

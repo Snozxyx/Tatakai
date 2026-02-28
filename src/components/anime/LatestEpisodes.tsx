@@ -1,6 +1,6 @@
 import { Clock, ChevronLeft, ChevronRight, Play } from "lucide-react";
 import { GlassPanel } from "@/components/ui/GlassPanel";
-import { AnimeCard, getProxiedImageUrl } from "@/lib/api";
+import { AnimeCard, getProxiedImageUrl, getProxiedVideoUrl, getHighQualityPoster } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 import { useRef, useState, useEffect } from "react";
 import { fetchEpisodes, fetchStreamingSources } from "@/lib/api";
@@ -63,8 +63,9 @@ function LatestEpisodeCard({ anime }: { anime: AnimeCard }) {
       <div className="flex items-center gap-4">
         <div className="relative w-20 h-28 flex-shrink-0 rounded-xl overflow-hidden">
               <img
-                src={getProxiedImageUrl(anime.poster)} 
+                src={getHighQualityPoster(anime.poster, anime.anilistId)} 
                 alt={anime.name}
+                loading="lazy"
                 className="w-full h-full object-cover transition-all duration-500 group-hover:scale-110"
               />
           
@@ -72,7 +73,7 @@ function LatestEpisodeCard({ anime }: { anime: AnimeCard }) {
           {previewUrl && (
             <video
               ref={videoRef}
-              src={`https://corsproxy.io/?${encodeURIComponent(previewUrl)}`}
+              src={getProxiedVideoUrl(previewUrl)}
               className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
                 isHovering ? 'opacity-100' : 'opacity-0'
               }`}

@@ -1,6 +1,6 @@
 import { Trophy } from "lucide-react";
 import { GlassPanel } from "@/components/ui/GlassPanel";
-import { TopAnime, getProxiedImageUrl } from "@/lib/api";
+import { TopAnime, getProxiedImageUrl, getHighQualityPoster } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 
@@ -64,7 +64,7 @@ export function TopAnimeSection({ today, week, month }: TopAnimeSectionProps) {
           >
             <div className="relative aspect-[3/4]">
               <img
-                src={getProxiedImageUrl(anime.poster)}
+                src={getHighQualityPoster(anime.poster, anime.anilistId)}
                 alt={anime.name}
                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
               />

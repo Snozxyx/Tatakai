@@ -6,6 +6,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { WebappWrapper } from '@/components/WebappWrapper';
 import { initConsoleProtection, logger } from '@/lib/logger';
 import { initSentryClient } from '@/lib/sentry';
+import { initDiscordActivity } from '@/lib/discordActivity';
 import '@/lib/production'; // Suppress console in production
 
 // Initialize Sentry (client) if configured

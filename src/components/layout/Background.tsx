@@ -9,9 +9,9 @@ export function Background() {
       {/* Deep textured base */}
       <div className="absolute inset-0 bg-background" />
 
-      {/* Subtle noise grain */}
+      {/* Subtle noise grain - desktop only to avoid remote fetch on mobile */}
       <div
-        className="absolute inset-0 opacity-[0.02] mix-blend-overlay"
+        className="absolute inset-0 opacity-[0.02] mix-blend-overlay hidden md:block"
         style={{
           backgroundImage: "url('https://grainy-gradients.vercel.app/noise.svg')",
           backgroundRepeat: "repeat"
@@ -29,16 +29,14 @@ export function Background() {
         }}
       />
 
-      {/* Ambient Glows - Simplified on mobile for performance */}
+      {/* Ambient Glows - desktop only, too expensive on mobile */}
       <div className={cn(
-        "absolute top-[-20%] left-[-10%] w-[50vw] h-[50vw] rounded-full blur-[150px] animate-pulse-slow",
-        isLightTheme ? "bg-primary/5" : "bg-primary/10",
-        "md:block" // Keep full glow on desktop
+        "absolute top-[-20%] left-[-10%] w-[50vw] h-[50vw] rounded-full blur-[150px] animate-pulse-slow hidden md:block",
+        isLightTheme ? "bg-primary/5" : "bg-primary/10"
       )} />
       <div className={cn(
-        "absolute bottom-[-20%] right-[-10%] w-[50vw] h-[50vw] rounded-full blur-[150px] animate-pulse-slow",
-        isLightTheme ? "bg-secondary/5" : "bg-secondary/10",
-        "md:block"
+        "absolute bottom-[-20%] right-[-10%] w-[50vw] h-[50vw] rounded-full blur-[150px] animate-pulse-slow hidden md:block",
+        isLightTheme ? "bg-secondary/5" : "bg-secondary/10"
       )} style={{ animationDelay: "2s" }} />
     </div>
   );

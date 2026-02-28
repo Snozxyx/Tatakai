@@ -1,6 +1,6 @@
 import { Play, Star } from "lucide-react";
 import { GlassPanel } from "@/components/ui/GlassPanel";
-import { AnimeCard, getProxiedImageUrl } from "@/lib/api";
+import { AnimeCard, getProxiedImageUrl, getHighQualityPoster } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 import { AnimeCardWithPreview } from "./AnimeCardWithPreview";
 import { useTheme } from "@/hooks/useTheme";
@@ -40,7 +40,7 @@ export function AnimeGrid({ animes, title, icon, enablePreview = false }: AnimeG
             >
               <div className="relative aspect-[3/4]">
                 <img
-                  src={getProxiedImageUrl(anime.poster)}
+                  src={getHighQualityPoster(anime.poster, anime.anilistId)}
                   alt={anime.name}
                   loading="lazy"
                   decoding="async"

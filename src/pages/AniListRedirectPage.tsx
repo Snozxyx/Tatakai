@@ -10,13 +10,16 @@ import { GlassPanel } from '@/components/ui/GlassPanel';
 export default function AniListRedirectPage() {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
-    const { user, refreshProfile } = useAuth();
+    const { user, isLoading: authLoading, refreshProfile } = useAuth();
     const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
     const [error, setError] = useState<string | null>(null);
 
     const hasRun = useRef(false);
 
     useEffect(() => {
+        // Wait until auth context has finished resolving before doing anything
+        if (authLoading) return;
+
         if (hasRun.current) return;
 
         const code = searchParams.get('code');
@@ -61,7 +64,7 @@ export default function AniListRedirectPage() {
         };
 
         completeAuth();
-    }, [searchParams, navigate, user, refreshProfile]);
+    }, [searchParams, navigate, user, authLoading, refreshProfile]);
 
     return (
         <div className="min-h-screen bg-background flex items-center justify-center p-4">

@@ -5,7 +5,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-export type LeaderboardType = 'watched' | 'rated' | 'comments' | 'active' | 'followers';
+export type LeaderboardType = 'watched' | 'rated' | 'comments' | 'active' | 'followers' | 'streak';
 
 export interface LeaderboardEntry {
   user_id: string;
@@ -14,6 +14,7 @@ export interface LeaderboardEntry {
   avatar_url: string | null;
   score: number;
   rank: number;
+  total_episodes?: number;
   metadata?: Record<string, any>;
 }
 
@@ -67,6 +68,10 @@ export function useLeaderboard(
             .select('following_id')
             .limit(10000);
           break;
+
+        case 'streak':
+          // Longest watch streak – fetch all watch_history dates per user
+          return await getStreakLeaderboard(limit);
 
         default:
           throw new Error(`Unknown leaderboard type: ${type}`);
@@ -131,6 +136,72 @@ export function useLeaderboard(
       });
     },
     staleTime: 300000, // 5 minutes cache
+  });
+}
+
+/**
+ * Compute streak leaderboard from watch_history
+ */
+async function getStreakLeaderboard(limit: number): Promise<LeaderboardEntry[]> {
+  // Fetch distinct (user_id, date) pairs
+  const { data, error } = await supabase
+    .from('watch_history')
+    .select('user_id, watched_at')
+    .order('watched_at', { ascending: true })
+    .limit(100000);
+
+  if (error) throw error;
+
+  // Group by user
+  const byUser = new Map<string, Set<string>>();
+  (data || []).forEach((item: any) => {
+    const uid = item.user_id;
+    if (!uid) return;
+    if (!byUser.has(uid)) byUser.set(uid, new Set());
+    const day = new Date(item.watched_at).toISOString().slice(0, 10);
+    byUser.get(uid)!.add(day);
+  });
+
+  // Compute longest streak per user
+  const userStreaks: { userId: string; streak: number }[] = [];
+  byUser.forEach((days, userId) => {
+    const sorted = [...days].sort();
+    let longest = 1, temp = 1;
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = new Date(sorted[i - 1]);
+      prev.setDate(prev.getDate() + 1);
+      if (prev.toISOString().slice(0, 10) === sorted[i]) {
+        temp++;
+        if (temp > longest) longest = temp;
+      } else {
+        temp = 1;
+      }
+    }
+    userStreaks.push({ userId, streak: sorted.length === 1 ? 1 : longest });
+  });
+
+  const top = userStreaks.sort((a, b) => b.streak - a.streak).slice(0, limit);
+  const topIds = top.map(u => u.userId);
+  if (topIds.length === 0) return [];
+
+  const { data: profiles, error: pErr } = await supabase
+    .from('profiles')
+    .select('user_id, display_name, username, avatar_url')
+    .in('user_id', topIds);
+  if (pErr) throw pErr;
+
+  const profileMap = new Map((profiles || []).map((p: any) => [p.user_id, p]));
+
+  return top.map(({ userId, streak }, idx) => {
+    const profile = profileMap.get(userId) as any;
+    return {
+      user_id: userId,
+      display_name: profile?.display_name ?? null,
+      username: profile?.username ?? null,
+      avatar_url: profile?.avatar_url ?? null,
+      score: streak,
+      rank: idx + 1,
+    };
   });
 }
 

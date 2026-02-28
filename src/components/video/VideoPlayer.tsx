@@ -32,6 +32,7 @@ import {
   CheckCircle2,
   Download,
   DownloadCloud,
+  PictureInPicture2,
 } from "lucide-react";
 
 import Hls from "hls.js";
@@ -249,6 +250,7 @@ export function VideoPlayer({
   const [isMuted, setIsMuted] = useState(false);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isPiP, setIsPiP] = useState(false);
 
   const [showControls, setShowControls] = useState(true);
 
@@ -1668,6 +1670,32 @@ export function VideoPlayer({
 
 
 
+  const togglePiP = async () => {
+    if (!videoRef.current) return;
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else if ((document as any).pictureInPictureEnabled !== false) {
+        await videoRef.current.requestPictureInPicture();
+      }
+    } catch (e) {
+      console.warn('PiP not supported', e);
+    }
+  };
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const onEnter = () => setIsPiP(true);
+    const onLeave = () => setIsPiP(false);
+    video.addEventListener('enterpictureinpicture', onEnter);
+    video.addEventListener('leavepictureinpicture', onLeave);
+    return () => {
+      video.removeEventListener('enterpictureinpicture', onEnter);
+      video.removeEventListener('leavepictureinpicture', onLeave);
+    };
+  }, []);
+
   const toggleFullscreen = () => {
 
     if (!containerRef.current) return;
@@ -2414,6 +2442,17 @@ export function VideoPlayer({
             )}
 
 
+
+            {/* Picture in Picture */}
+            {!isMobile && typeof document !== 'undefined' && 'pictureInPictureEnabled' in document && (document as any).pictureInPictureEnabled && (
+              <button
+                onClick={togglePiP}
+                className={`p-2 rounded-lg hover:bg-white/10 transition-colors ${isPiP ? 'text-primary' : ''}`}
+                title="Picture in Picture (I)"
+              >
+                <PictureInPicture2 className="w-4 h-4 md:w-5 md:h-5" />
+              </button>
+            )}
 
             {/* Fullscreen */}
 

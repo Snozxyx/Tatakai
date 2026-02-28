@@ -3,7 +3,7 @@ import { Heart, Github, Twitter, MessageCircle, ExternalLink } from 'lucide-reac
 import { cn } from '@/lib/utils';
 
 const SOCIAL_LINKS = [
-  { icon: MessageCircle, label: 'Discord', url: 'https://discord.gg/Vr5GZFJszp', color: 'hover:text-[#5865F2]' },
+  { icon: MessageCircle, label: 'Discord', url: 'https://discord.gg/Mt2jG5QuGP', color: 'hover:text-[#5865F2]' },
   { icon: Github, label: 'GitHub', url: 'https://github.com/snozxyx/tatakai', color: 'hover:text-[#fff]' },
 ];
 
@@ -21,7 +21,7 @@ const FOOTER_LINKS = {
     { label: 'DMCA', path: '/dmca' },
   ],
   Socials: [
-    { label: 'Discord', path: 'https://discord.gg/Vr5GZFJszp', isExternal: true },
+    { label: 'Discord', path: 'https://discord.gg/Mt2jG5QuGP', isExternal: true },
     { label: 'Github', path: 'https://github.com/snozxyx/tatakai', isExternal: true },
   ]
 };

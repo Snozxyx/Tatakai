@@ -1,6 +1,6 @@
 import { useAnimelokSchedule } from "@/hooks/useAnimelok";
 import { GlassPanel } from "@/components/ui/GlassPanel";
-import { AnimeCard, getProxiedImageUrl } from "@/lib/api";
+import { AnimeCard, getProxiedImageUrl, getHighQualityPoster } from "@/lib/api";
 import { Calendar, Clock, Play } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -90,7 +90,7 @@ export function ScheduleSection() {
                     <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-white/5 border border-white/10 group">
                       {anime.poster && (
                         <img
-                          src={getProxiedImageUrl(anime.poster)}
+                          src={getHighQualityPoster(anime.poster, anime.anilistId)}
                           alt={anime.title}
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                         />

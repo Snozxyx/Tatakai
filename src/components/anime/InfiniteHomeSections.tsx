@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
-import { AnimeCard, getProxiedImageUrl } from '@/lib/api';
+import { AnimeCard, getProxiedImageUrl, getHighQualityPoster } from '@/lib/api';
 import { useInfiniteHomeSections, type HomeSection, type SectionLayout } from '@/hooks/useInfiniteHomeSections';
 import { Play, Star, Loader2, ChevronRight, Sparkles, LayoutGrid, Heart, Flame, Zap, ArrowRight, ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -57,8 +57,8 @@ function GridLayout({ animes, isMobile }: { animes: AnimeCard[]; isMobile: boole
       {items.map((anime, i) => (
         <motion.div
           key={anime.id}
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
+          initial={isMobile ? false : { opacity: 0, scale: 0.9 }}
+          animate={isMobile ? {} : { opacity: 1, scale: 1 }}
           transition={{ delay: i * delayStep, duration }}
         >
           <AnimeCardWithPreview anime={anime} />
@@ -78,8 +78,8 @@ function CarouselLayout({ animes, isMobile }: { animes: AnimeCard[]; isMobile: b
       {items.map((anime, i) => (
         <motion.div
           key={anime.id}
-          initial={{ opacity: 0, x: isMobile ? 18 : 30 }}
-          animate={{ opacity: 1, x: 0 }}
+          initial={isMobile ? false : { opacity: 0, x: 30 }}
+          animate={isMobile ? {} : { opacity: 1, x: 0 }}
           transition={{ delay: i * delayStep, duration }}
           className="flex-shrink-0 w-40 md:w-56 snap-start"
         >
@@ -103,8 +103,8 @@ function FeaturedLayout({ animes, isMobile }: { animes: AnimeCard[]; isMobile: b
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {/* Featured card */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
+        initial={isMobile ? false : { opacity: 0, scale: 0.95 }}
+        animate={isMobile ? {} : { opacity: 1, scale: 1 }}
         transition={{ duration }}
         className="md:col-span-1 lg:row-span-2 h-full"
       >
@@ -113,7 +113,7 @@ function FeaturedLayout({ animes, isMobile }: { animes: AnimeCard[]; isMobile: b
           className="relative h-full min-h-[450px] rounded-[2rem] overflow-hidden cursor-pointer group border border-white/5"
         >
           <img
-            src={getProxiedImageUrl(featured.poster)}
+            src={getHighQualityPoster(featured.poster, featured.anilistId)}
             alt={featured.name}
             className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110 filter brightness-90 saturate-[1.1]"
           />
@@ -150,8 +150,8 @@ function FeaturedLayout({ animes, isMobile }: { animes: AnimeCard[]; isMobile: b
         {rest.map((anime, i) => (
           <motion.div
             key={anime.id}
-            initial={{ opacity: 0, y: isMobile ? 12 : 20 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={isMobile ? false : { opacity: 0, y: 20 }}
+            animate={isMobile ? {} : { opacity: 1, y: 0 }}
             transition={{ delay: 0.1 + i * (isMobile ? 0.03 : 0.05), duration }}
           >
             <AnimeCardWithPreview anime={anime} />
@@ -172,8 +172,8 @@ function CompactLayout({ animes, isMobile }: { animes: AnimeCard[]; isMobile: bo
       {items.map((anime, i) => (
         <motion.div
           key={anime.id}
-          initial={{ opacity: 0, y: isMobile ? 8 : 10 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={isMobile ? false : { opacity: 0, y: 10 }}
+          animate={isMobile ? {} : { opacity: 1, y: 0 }}
           transition={{ delay: i * delayStep, duration }}
         >
           <AnimeCardWithPreview anime={anime} />
@@ -197,8 +197,8 @@ function MasonryLayout({ animes, isMobile }: { animes: AnimeCard[]; isMobile: bo
         return (
           <motion.div
             key={anime.id}
-            initial={{ opacity: 0, y: isMobile ? 12 : 20 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={isMobile ? false : { opacity: 0, y: 20 }}
+            animate={isMobile ? {} : { opacity: 1, y: 0 }}
             transition={{ delay: i * delayStep, duration }}
             className={cn(
               isLarge && 'row-span-2 col-span-1 md:col-span-2'
@@ -239,8 +239,8 @@ function HomeSection({ section }: { section: HomeSection }) {
 
   return (
     <motion.section
-      initial={{ opacity: 0, y: isMobile ? 24 : 40 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={isMobile ? false : { opacity: 0, y: 40 }}
+      whileInView={isMobile ? {} : { opacity: 1, y: 0 }}
       viewport={{ once: true, margin: isMobile ? "-60px" : "-100px" }}
       className="mb-20"
     >

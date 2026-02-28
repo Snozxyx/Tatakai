@@ -1,4 +1,4 @@
-import { LayoutGrid, Search, User, LogIn, Users, Heart, TrendingUp, Settings, Download, Shield, Bell } from "lucide-react";
+import { LayoutGrid, Search, User, LogIn, Users, Heart, TrendingUp, Settings, Shield, Bell } from "lucide-react";
 import { NavIcon } from "@/components/ui/NavIcon";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -95,15 +95,7 @@ export function MobileNav() {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Downloads - Shown on both mobile app and desktop app */}
-      {(isMobileNative || (typeof window !== 'undefined' && (window as any).electron)) && (
-        <NavIcon
-          icon={Download}
-          active={isActive("/downloads")}
-          onClick={() => hapticNavigate("/downloads")}
-          aria-label="Downloads"
-        />
-      )}
+      {/* Downloads removed from mobile nav - use desktop/electron only */}
 
       <NavIcon
         icon={Users}

@@ -34,7 +34,7 @@ export const CSP_POLICY = {
     'https://*.supabase.co',
     'https://*.datadoghq.com',
     'https://www.google-analytics.com',
-    'https://tatakaiapi.vercel.app',
+    'https://api.tatakai.me',
     'https://api.jikan.moe',
   ],
   'media-src': [

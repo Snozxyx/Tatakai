@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Clock, Play } from "lucide-react";
-import { getProxiedImageUrl } from "@/lib/api";
+import { getProxiedImageUrl, getHighQualityPoster } from "@/lib/api";
 
 interface ScheduleAnime {
     id: string;
@@ -8,6 +8,7 @@ interface ScheduleAnime {
     poster?: string;
     time?: string;
     episode?: string | number;
+    anilistId?: number | null;
 }
 
 interface TimelineScheduleProps {
@@ -75,7 +76,7 @@ export function TimelineSchedule({ schedule, accentColor = "var(--primary)" }: T
                                                 <div className="w-20 md:w-32 aspect-[3/4] rounded-xl overflow-hidden shadow-2xl flex-shrink-0 bg-muted/20 flex items-center justify-center">
                                                     {anime.poster ? (
                                                         <img
-                                                            src={getProxiedImageUrl(anime.poster)}
+                                                            src={getHighQualityPoster(anime.poster || '', anime.anilistId)}
                                                             alt={anime.title}
                                                             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                                                         />

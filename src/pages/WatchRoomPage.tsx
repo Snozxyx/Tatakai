@@ -31,6 +31,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEpisodes, useAnimeInfo } from '@/hooks/useAnimeData';
 import { VideoPlayer } from '@/components/video/VideoPlayer';
+import { EmbedPlayer } from '@/components/video/EmbedPlayer';
 import { CustomVideoSourceModal } from '@/components/video/CustomVideoSourceModal'; // Import the new modal
 import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -527,163 +528,178 @@ export default function WatchRoomPage() {
                         </GlassPanel>
                     </div>
                 ) : (
-                <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-4 min-h-0">
-                    {/* Video / Countdown */}
-                    <div className="lg:col-span-3 flex flex-col gap-4">
-                        <div className="aspect-video bg-black rounded-xl overflow-hidden relative group/video border border-white/5">
-                            {room.scheduled_start_at ? (
-                                <div className="absolute inset-0 z-50 flex flex-col items-center justify-center p-8 bg-black">
-                                    {room.anime_poster && <div className="absolute inset-0 opacity-20 blur-3xl scale-125" style={{ backgroundImage: `url(${getProxiedImageUrl(room.anime_poster)})`, backgroundSize: 'cover' }} />}
-                                    <div className="relative z-10 flex flex-col items-center text-center">
-                                        <div className="p-4 rounded-3xl bg-primary/20 border border-primary/30 mb-8"><Timer className="w-12 h-12 text-primary animate-pulse" /></div>
-                                        <h2 className="text-3xl font-black uppercase tracking-[0.4em] text-white mb-2 drop-shadow-2xl">Starting Soon</h2>
-                                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-8">The broadcast begins in:</p>
-                                        <div className="flex gap-4 mb-10">
-                                            <div className="text-center"><div className="text-7xl font-black font-mono text-primary tabular-nums">{countdown !== null ? Math.floor(countdown / 60) : '0'}</div><div className="text-[10px] font-black uppercase opacity-50">Min</div></div>
-                                            <div className="text-7xl font-black font-mono text-primary opacity-50">:</div>
-                                            <div className="text-center"><div className="text-7xl font-black font-mono text-primary tabular-nums">{(countdown !== null ? countdown % 60 : 0).toString().padStart(2, '0')}</div><div className="text-[10px] font-black uppercase opacity-50">Sec</div></div>
-                                        </div>
-                                        <div className="px-6 py-2 rounded-full bg-white/5 border border-white/10 flex items-center gap-4">
-                                            <div className="flex items-center gap-2"><Users className="w-4 h-4 text-emerald-400" /><span className="text-xs font-bold uppercase">{participants.length} Ready</span></div>
-                                            {isHost && <><div className="w-px h-4 bg-white/20" /><button onClick={handleForceStart} className="text-xs font-black text-primary hover:text-white transition-colors uppercase">Start Now</button></>}
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="w-full h-full relative">
-                                    {(room.manual_stream_url || (streamingData?.sources && room.anime_id && currentEpisodeId)) ? (
-                                        <VideoPlayer
-                                            key={`${currentEpisodeId}-${selectedServer}-${room.manual_stream_url}`}
-                                            externalRef={playerRef}
-                                            sources={room.manual_stream_url ? [{
-                                                url: room.manual_stream_url,
-                                                isM3U8: room.manual_stream_url.includes('.m3u8'),
-                                                quality: 'Custom',
-                                                isEmbed: (room as any).manual_stream_type === 'embed' || (!room.manual_stream_url.includes('.m3u8') && !room.manual_stream_url.includes('.mp4') && !room.manual_stream_url.includes('.webm'))
-                                            }] : streamingData?.sources!}
-                                            headers={room.manual_stream_url ? {} : streamingData?.headers}
-                                            subtitles={[
-                                                ...((sData) => {
-                                                    const all = [...(sData?.subtitles || []), ...(sData?.tracks || [])];
-                                                    const seen = new Set();
-                                                    return all.filter(s => {
-                                                        if (seen.has(s.url)) return false;
-                                                        seen.add(s.url);
-                                                        return true;
-                                                    });
-                                                })(streamingData || { subtitles: [], tracks: [] }),
-                                                ...(room.manual_subtitle_url ? [{ lang: 'Manual', url: room.manual_subtitle_url, label: 'Manual' }] : [])
-                                            ]}
-                                            isLive={!isHost}
-                                            initialSeekSeconds={room.current_time_seconds}
-                                            onPlay={isHost ? () => updatePlayback.mutate({ roomId: roomId!, isPlaying: true }) : undefined}
-                                            onPause={isHost ? () => updatePlayback.mutate({ roomId: roomId!, isPlaying: false }) : undefined}
-                                            onProgressUpdate={isHost ? (t) => {
-                                                if (Math.abs(t - lastUpdateRef.current) > 5) {
-                                                    lastUpdateRef.current = t;
-                                                    updatePlayback.mutate({ roomId: roomId!, currentTime: t });
-                                                }
-                                            } : undefined}
-                                            onError={handlePlayerError}
-                                            animeId={room.anime_id}
-                                            animeName={room.anime_title}
-                                            animePoster={room.anime_poster}
-                                            episodeNumber={room.episode_number}
-                                            episodeTitle={room.episode_title}
-                                        />
-                                    ) : (
-                                        <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                                            {loadingSources ? <div className="animate-spin h-10 w-10 border-t-2 border-primary rounded-full mb-4" /> : <><Film className="w-12 h-12 mb-2 opacity-20" /><p className="text-sm font-medium uppercase tracking-widest">{room.anime_title ? 'Loading...' : 'Waiting for Host...'}</p></>}
-                                        </div>
-                                    )}
-
-                                    {/* Live Indicator Overlay */}
-                                    {!isHost && room.is_playing && (
-                                        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
-                                            <div className="px-4 py-1.5 bg-background/60 backdrop-blur-xl rounded-full border border-primary/30 flex items-center gap-3 shadow-2xl">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                                                    <span className="text-[10px] font-black text-white/90 uppercase tracking-[0.2em]">Live Broadcast</span>
-                                                </div>
-                                                <div className="w-px h-3 bg-white/20" />
-                                                <span className="text-sm font-mono font-bold text-primary tracking-wider">
-                                                    {Math.floor((playerRef.current?.currentTime || 0) / 60)}:
-                                                    {Math.floor((playerRef.current?.currentTime || 0) % 60).toString().padStart(2, '0')}
-                                                </span>
+                    <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-4 min-h-0">
+                        {/* Video / Countdown */}
+                        <div className="lg:col-span-3 flex flex-col gap-4">
+                            <div className="aspect-video bg-black rounded-xl overflow-hidden relative group/video border border-white/5">
+                                {room.scheduled_start_at ? (
+                                    <div className="absolute inset-0 z-50 flex flex-col items-center justify-center p-8 bg-black">
+                                        {room.anime_poster && <div className="absolute inset-0 opacity-20 blur-3xl scale-125" style={{ backgroundImage: `url(${getProxiedImageUrl(room.anime_poster)})`, backgroundSize: 'cover' }} />}
+                                        <div className="relative z-10 flex flex-col items-center text-center">
+                                            <div className="p-4 rounded-3xl bg-primary/20 border border-primary/30 mb-8"><Timer className="w-12 h-12 text-primary animate-pulse" /></div>
+                                            <h2 className="text-3xl font-black uppercase tracking-[0.4em] text-white mb-2 drop-shadow-2xl">Starting Soon</h2>
+                                            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-8">The broadcast begins in:</p>
+                                            <div className="flex gap-4 mb-10">
+                                                <div className="text-center"><div className="text-7xl font-black font-mono text-primary tabular-nums">{countdown !== null ? Math.floor(countdown / 60) : '0'}</div><div className="text-[10px] font-black uppercase opacity-50">Min</div></div>
+                                                <div className="text-7xl font-black font-mono text-primary opacity-50">:</div>
+                                                <div className="text-center"><div className="text-7xl font-black font-mono text-primary tabular-nums">{(countdown !== null ? countdown % 60 : 0).toString().padStart(2, '0')}</div><div className="text-[10px] font-black uppercase opacity-50">Sec</div></div>
+                                            </div>
+                                            <div className="px-6 py-2 rounded-full bg-white/5 border border-white/10 flex items-center gap-4">
+                                                <div className="flex items-center gap-2"><Users className="w-4 h-4 text-emerald-400" /><span className="text-xs font-bold uppercase">{participants.length} Ready</span></div>
+                                                {isHost && <><div className="w-px h-4 bg-white/20" /><button onClick={handleForceStart} className="text-xs font-black text-primary hover:text-white transition-colors uppercase">Start Now</button></>}
                                             </div>
                                         </div>
-                                    )}
-                                    {/* Sync Pulse */}
-                                    {!isHost && room.is_playing && drift < 1.0 && (
-                                        <div className="absolute top-4 right-4 z-50 p-2 bg-emerald-500/20 backdrop-blur-md rounded-full border border-emerald-500/30 text-emerald-400">
-                                            <Zap className="w-3 h-3 fill-current" />
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Video Info Bottom Bar */}
-                        <div className="p-4 bg-white/5 rounded-xl border border-white/5 flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-4">
-                                <img src={room.anime_poster || ''} className="w-10 h-14 object-cover rounded shadow-lg" alt="" />
-                                <div><h2 className="font-bold text-sm truncate max-w-[200px]">{room.anime_title}</h2><p className="text-[10px] text-muted-foreground font-black uppercase">Episode {room.episode_number}</p></div>
-                            </div>
-                            {!isHost && (
-                                <Button variant={isParticipantReady ? "default" : "outline"} size="sm" onClick={handleToggleReady} className={`gap-2 h-9 px-4 ${isParticipantReady ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : ''}`}>
-                                    {isParticipantReady ? <Check className="w-4 h-4" /> : <Zap className="w-4 h-4" />}
-                                    <span className="font-black uppercase tracking-widest text-[10px]">{isParticipantReady ? "I'm Ready!" : "Mark Ready"}</span>
-                                </Button>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Sidebar: Viewers & Chat */}
-                    <div className="lg:col-span-1 flex flex-col gap-4 min-h-[400px]">
-                        <GlassPanel className="p-4 flex flex-col gap-3">
-                            <h3 className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2"><Users className="w-3 h-3 text-primary" /> Viewers ({participants.length})</h3>
-                            <div className="flex flex-wrap gap-1.5">
-                                {participants.map(p => (
-                                    <div key={p.id} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/5 border border-white/5" title={p.display_name}>
-                                        <Avatar className="w-5 h-5"><AvatarImage src={p.avatar_url || ''} /><AvatarFallback className="text-[8px]">{p.display_name[0]}</AvatarFallback></Avatar>
-                                        <span className="text-[10px] font-medium truncate max-w-[60px]">{p.display_name}</span>
-                                        {p.is_ready && <Zap className="w-2.5 h-2.5 text-emerald-400 fill-emerald-400" />}
-                                        {p.is_host && <Crown className="w-2.5 h-2.5 text-yellow-500" />}
                                     </div>
-                                ))}
-                            </div>
-                        </GlassPanel>
-
-                        <GlassPanel className="flex-1 flex flex-col p-4 overflow-hidden">
-                            <h3 className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2 mb-4"><MessageSquare className="w-3 h-3 text-primary" /> Live Chat</h3>
-                            <ScrollArea className="flex-1 -mr-2 pr-2">
-                                <div className="space-y-4">
-                                    {messages.map(m => (
-                                        <div key={m.id} className={`flex gap-3 ${m.message_type === 'system' ? 'justify-center py-2' : ''}`}>
-                                            {m.message_type === 'system' ? (
-                                                <p className="text-[10px] text-muted-foreground italic opacity-60 px-4 text-center">{m.message}</p>
+                                ) : (
+                                    <div className="w-full h-full relative">
+                                        {(room.manual_stream_url || (streamingData?.sources && room.anime_id && currentEpisodeId)) ? (
+                                            ((room.manual_stream_url ? ((room as any).manual_stream_type === 'embed' || (!room.manual_stream_url.includes('.m3u8') && !room.manual_stream_url.includes('.mp4') && !room.manual_stream_url.includes('.webm'))) : streamingData?.sources?.[0]?.isEmbed)) ? (
+                                                <div className="w-full h-full relative">
+                                                    <EmbedPlayer
+                                                        url={room.manual_stream_url || streamingData?.sources?.[0]?.url || ''}
+                                                        poster={room.anime_poster || undefined}
+                                                        language="Embed"
+                                                    />
+                                                    <div className="absolute top-4 inset-x-0 flex justify-center z-50 pointer-events-none">
+                                                        <div className="bg-red-500/90 backdrop-blur-md rounded-full px-4 py-2 border border-white/20 shadow-2xl flex items-center gap-2">
+                                                            <span className="text-[10px] font-black uppercase text-white tracking-widest">⚠️ Embed sources cannot be synced across rooms</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             ) : (
-                                                <>
-                                                    <Avatar className="w-7 h-7 flex-shrink-0 border border-white/10"><AvatarImage src={m.avatar_url || ''} /><AvatarFallback className="text-[10px]">{m.display_name[0]}</AvatarFallback></Avatar>
-                                                    <div className="min-w-0"><p className="text-[10px] font-black text-primary uppercase tracking-tighter mb-0.5">{m.display_name}</p><p className="text-sm leading-relaxed opacity-90 break-words">{m.message}</p></div>
-                                                </>
-                                            )}
+                                                <VideoPlayer
+                                                    key={`${currentEpisodeId}-${selectedServer}-${room.manual_stream_url}`}
+                                                    externalRef={playerRef}
+                                                    sources={room.manual_stream_url ? [{
+                                                        url: room.manual_stream_url,
+                                                        isM3U8: room.manual_stream_url.includes('.m3u8'),
+                                                        quality: 'Custom',
+                                                        isEmbed: false
+                                                    }] : streamingData?.sources!}
+                                                    headers={room.manual_stream_url ? {} : streamingData?.headers}
+                                                    subtitles={[
+                                                        ...((sData) => {
+                                                            const all = [...(sData?.subtitles || []), ...(sData?.tracks || [])];
+                                                            const seen = new Set();
+                                                            return all.filter(s => {
+                                                                if (seen.has(s.url)) return false;
+                                                                seen.add(s.url);
+                                                                return true;
+                                                            });
+                                                        })(streamingData || { subtitles: [], tracks: [] }),
+                                                        ...(room.manual_subtitle_url ? [{ lang: 'Manual', url: room.manual_subtitle_url, label: 'Manual' }] : [])
+                                                    ]}
+                                                    isLive={!isHost}
+                                                    initialSeekSeconds={room.current_time_seconds}
+                                                    onPlay={isHost ? () => updatePlayback.mutate({ roomId: roomId!, isPlaying: true }) : undefined}
+                                                    onPause={isHost ? () => updatePlayback.mutate({ roomId: roomId!, isPlaying: false }) : undefined}
+                                                    onProgressUpdate={isHost ? (t) => {
+                                                        if (Math.abs(t - lastUpdateRef.current) > 5) {
+                                                            lastUpdateRef.current = t;
+                                                            updatePlayback.mutate({ roomId: roomId!, currentTime: t });
+                                                        }
+                                                    } : undefined}
+                                                    onError={handlePlayerError}
+                                                    animeId={room.anime_id}
+                                                    animeName={room.anime_title}
+                                                    animePoster={room.anime_poster}
+                                                    episodeNumber={room.episode_number}
+                                                    episodeTitle={room.episode_title}
+                                                />
+                                            )
+                                        ) : (
+                                            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                                                {loadingSources ? <div className="animate-spin h-10 w-10 border-t-2 border-primary rounded-full mb-4" /> : <><Film className="w-12 h-12 mb-2 opacity-20" /><p className="text-sm font-medium uppercase tracking-widest">{room.anime_title ? 'Loading...' : 'Waiting for Host...'}</p></>}
+                                            </div>
+                                        )}
+
+                                        {/* Live Indicator Overlay */}
+                                        {!isHost && room.is_playing && (
+                                            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+                                                <div className="px-4 py-1.5 bg-background/60 backdrop-blur-xl rounded-full border border-primary/30 flex items-center gap-3 shadow-2xl">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                                                        <span className="text-[10px] font-black text-white/90 uppercase tracking-[0.2em]">Live Broadcast</span>
+                                                    </div>
+                                                    <div className="w-px h-3 bg-white/20" />
+                                                    <span className="text-sm font-mono font-bold text-primary tracking-wider">
+                                                        {Math.floor((playerRef.current?.currentTime || 0) / 60)}:
+                                                        {Math.floor((playerRef.current?.currentTime || 0) % 60).toString().padStart(2, '0')}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {/* Sync Pulse */}
+                                        {!isHost && room.is_playing && drift < 1.0 && (
+                                            <div className="absolute top-4 right-4 z-50 p-2 bg-emerald-500/20 backdrop-blur-md rounded-full border border-emerald-500/30 text-emerald-400">
+                                                <Zap className="w-3 h-3 fill-current" />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Video Info Bottom Bar */}
+                            <div className="p-4 bg-white/5 rounded-xl border border-white/5 flex items-center justify-between gap-4">
+                                <div className="flex items-center gap-4">
+                                    <img src={room.anime_poster || ''} className="w-10 h-14 object-cover rounded shadow-lg" alt="" />
+                                    <div><h2 className="font-bold text-sm truncate max-w-[200px]">{room.anime_title}</h2><p className="text-[10px] text-muted-foreground font-black uppercase">Episode {room.episode_number}</p></div>
+                                </div>
+                                {!isHost && (
+                                    <Button variant={isParticipantReady ? "default" : "outline"} size="sm" onClick={handleToggleReady} className={`gap-2 h-9 px-4 ${isParticipantReady ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : ''}`}>
+                                        {isParticipantReady ? <Check className="w-4 h-4" /> : <Zap className="w-4 h-4" />}
+                                        <span className="font-black uppercase tracking-widest text-[10px]">{isParticipantReady ? "I'm Ready!" : "Mark Ready"}</span>
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Sidebar: Viewers & Chat */}
+                        <div className="lg:col-span-1 flex flex-col gap-4 min-h-[400px]">
+                            <GlassPanel className="p-4 flex flex-col gap-3">
+                                <h3 className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2"><Users className="w-3 h-3 text-primary" /> Viewers ({participants.length})</h3>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {participants.map(p => (
+                                        <div key={p.id} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/5 border border-white/5" title={p.display_name}>
+                                            <Avatar className="w-5 h-5"><AvatarImage src={p.avatar_url || ''} /><AvatarFallback className="text-[8px]">{p.display_name[0]}</AvatarFallback></Avatar>
+                                            <span className="text-[10px] font-medium truncate max-w-[60px]">{p.display_name}</span>
+                                            {p.is_ready && <Zap className="w-2.5 h-2.5 text-emerald-400 fill-emerald-400" />}
+                                            {p.is_host && <Crown className="w-2.5 h-2.5 text-yellow-500" />}
                                         </div>
                                     ))}
-                                    <div ref={messagesEndRef} />
                                 </div>
-                            </ScrollArea>
-                            {isParticipant ? (
-                                <form onSubmit={handleSendMessage} className="mt-4 pt-4 border-t border-white/5 flex gap-2">
-                                    <Input value={message} onChange={e => setMessage(e.target.value)} placeholder="Say something..." className="bg-black/20 text-sm h-10" />
-                                    <Button type="submit" size="icon" className="h-10 w-10 shrink-0" disabled={!message.trim()}><Send className="w-4 h-4" /></Button>
-                                </form>
-                            ) : (
-                                <div className="mt-4 pt-4 border-t border-white/5"><Button className="w-full h-10 font-black uppercase tracking-widest text-[10px]" onClick={handleJoin}>Join to Chat</Button></div>
-                            )}
-                        </GlassPanel>
+                            </GlassPanel>
+
+                            <GlassPanel className="flex-1 flex flex-col p-4 overflow-hidden">
+                                <h3 className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2 mb-4"><MessageSquare className="w-3 h-3 text-primary" /> Live Chat</h3>
+                                <ScrollArea className="flex-1 -mr-2 pr-2">
+                                    <div className="space-y-4">
+                                        {messages.map(m => (
+                                            <div key={m.id} className={`flex gap-3 ${m.message_type === 'system' ? 'justify-center py-2' : ''}`}>
+                                                {m.message_type === 'system' ? (
+                                                    <p className="text-[10px] text-muted-foreground italic opacity-60 px-4 text-center">{m.message}</p>
+                                                ) : (
+                                                    <>
+                                                        <Avatar className="w-7 h-7 flex-shrink-0 border border-white/10"><AvatarImage src={m.avatar_url || ''} /><AvatarFallback className="text-[10px]">{m.display_name[0]}</AvatarFallback></Avatar>
+                                                        <div className="min-w-0"><p className="text-[10px] font-black text-primary uppercase tracking-tighter mb-0.5">{m.display_name}</p><p className="text-sm leading-relaxed opacity-90 break-words">{m.message}</p></div>
+                                                    </>
+                                                )}
+                                            </div>
+                                        ))}
+                                        <div ref={messagesEndRef} />
+                                    </div>
+                                </ScrollArea>
+                                {isParticipant ? (
+                                    <form onSubmit={handleSendMessage} className="mt-4 pt-4 border-t border-white/5 flex gap-2">
+                                        <Input value={message} onChange={e => setMessage(e.target.value)} placeholder="Say something..." className="bg-black/20 text-sm h-10" />
+                                        <Button type="submit" size="icon" className="h-10 w-10 shrink-0" disabled={!message.trim()}><Send className="w-4 h-4" /></Button>
+                                    </form>
+                                ) : (
+                                    <div className="mt-4 pt-4 border-t border-white/5"><Button className="w-full h-10 font-black uppercase tracking-widest text-[10px]" onClick={handleJoin}>Join to Chat</Button></div>
+                                )}
+                            </GlassPanel>
+                        </div>
                     </div>
-                </div>
                 )}
             </main>
 

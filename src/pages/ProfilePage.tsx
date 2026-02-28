@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -13,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { WatchStreaks } from '@/components/profile/WatchStreaks';
 import { useWatchlist } from '@/hooks/useWatchlist';
 import { useWatchHistory } from '@/hooks/useWatchHistory';
 import { usePublicProfile, usePublicWatchlist, usePublicWatchHistory } from '@/hooks/useProfileFeatures';
@@ -28,10 +30,12 @@ import { cn } from '@/lib/utils';
 import {
   User, Settings, List, History, LogOut, Edit2, Save, X,
   Play, Trash2, Clock, CheckCircle, Eye, Pause, XCircle, ArrowLeft, Camera, Shield, Sparkles, Globe, Lock, Share2, MessageSquare, AlertCircle, UserPlus, UserMinus, Bell, Check,
-  ShieldCheck, Loader2
+  ShieldCheck, Loader2, Flame
 } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { motion } from 'framer-motion';
+import { RankBadge } from '@/components/ui/RankBadge';
+import { getRankNameStyle } from '@/lib/rankUtils';
 // import { StatusVideoBackground } from '@/components/layout/StatusVideoBackground';
 
 const STATUS_LABELS: Record<string, { label: string; icon: React.ReactNode; color: string; bg: string }> = {
@@ -91,6 +95,31 @@ export default function ProfilePage() {
   const history = isViewingOther ? publicHistory : ownHistory;
   const loadingWatchlist = isViewingOther ? loadingPublicWatchlist : loadingOwnWatchlist;
   const loadingHistory = isViewingOther ? loadingPublicHistory : loadingOwnHistory;
+
+  // Fetch manual achievement grants for rank display
+  const { data: manualGrants = [] } = useQuery({
+    queryKey: ['user_achievements', profile?.user_id],
+    enabled: !!profile?.user_id,
+    queryFn: async () => {
+      const { data, error } = (await supabase
+        .from('user_achievements' as any)
+        .select('achievement_id')
+        .eq('user_id', profile!.user_id)) as any;
+      if (error) return [];
+      return (data ?? []).map((r: any) => r.achievement_id as string);
+    },
+  });
+
+  // Map achievement ID → minimum episodes implied by that rank
+  const ACHIEVEMENT_RANK_EPS: Record<string, number> = {
+    'filler-watcher': 0, 'genin': 5, 'chunin': 10, 'week-warrior': 20,
+    'plus-ultra': 35, 'pro-hero': 50, 'soul-reaper': 75, 'bankai': 100,
+    'survey-corps': 150, 'month-legend': 250, 'demon-slayer': 400, 'hashira': 600,
+  };
+  const grantedMaxEps = manualGrants.reduce(
+    (max, id) => Math.max(max, ACHIEVEMENT_RANK_EPS[id] ?? 0), 0
+  );
+  const effectiveEpisodeCount = Math.max(history?.length || 0, grantedMaxEps);
 
   // Check if tabs should be visible for public profiles
   const showWatchlistTab = !isViewingOther || (publicProfile?.is_public && publicProfile?.show_watchlist !== false);
@@ -372,25 +401,30 @@ export default function ProfilePage() {
                     </div>
                   ) : (
                     <>
-                      <div className="flex items-center gap-3 mb-1">
-                        <h1 className="text-3xl md:text-5xl font-black tracking-tighter mb-2 break-all drop-shadow-sm flex items-center gap-2">
-                          {profile?.display_name || (profile?.username && profile?.username !== 'null' ? profile?.username : 'User')}
-                          {profile?.role === 'admin' && (
-                            <span className="flex items-center gap-1 px-3 py-1 rounded-full text-[12px] font-bold bg-violet-500/20 text-violet-400 border border-violet-500/30">
-                              <ShieldCheck className="w-4 h-4" />
-                              ADMIN
-                            </span>
-                          )}
-                          {profile?.role === 'moderator' && (
-                            <span className="flex items-center gap-1 px-3 py-1 rounded-full text-[12px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                              <Shield className="w-4 h-4" />
-                              MODERATOR
-                            </span>
-                          )}
-                        </h1>
-                        <div className="flex items-center gap-3 text-muted-foreground/80 bg-background/30 backdrop-blur-sm px-3 py-1 rounded-full border border-white/5 w-fit">
-                          <span className="text-sm font-medium">@{profile?.username && profile?.username !== 'null' ? profile.username : 'anonymous'}</span>
-                        </div>
+                      {/* Row 1: Display name + role badges */}
+                      <div className="flex items-center gap-3 flex-wrap mb-2">
+                        {(() => {
+                          const rankStyle = getRankNameStyle(effectiveEpisodeCount);
+                          return (
+                            <h1 className="text-3xl md:text-5xl font-black tracking-tighter drop-shadow-sm">
+                              <span className={rankStyle.className} style={rankStyle.style}>
+                                {profile?.display_name || (profile?.username && profile?.username !== 'null' ? profile?.username : 'User')}
+                              </span>
+                            </h1>
+                          );
+                        })()}
+                        {profile?.role === 'admin' && (
+                          <span className="flex items-center gap-1 px-3 py-1 rounded-full text-[12px] font-bold bg-violet-500/20 text-violet-400 border border-violet-500/30">
+                            <ShieldCheck className="w-4 h-4" />
+                            ADMIN
+                          </span>
+                        )}
+                        {profile?.role === 'moderator' && (
+                          <span className="flex items-center gap-1 px-3 py-1 rounded-full text-[12px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                            <Shield className="w-4 h-4" />
+                            MODERATOR
+                          </span>
+                        )}
                         {isViewingOther && publicProfile?.is_public && (
                           <span title="Public Profile">
                             <Globe className="w-5 h-5 text-green-500" />
@@ -401,6 +435,20 @@ export default function ProfilePage() {
                             <Shield className="w-3 h-3" /> ADMIN
                           </span>
                         )}
+                      </div>
+
+                      {/* Row 2: @username + rank badge + episode count */}
+                      <div className="flex items-center gap-3 flex-wrap mb-3">
+                        <div className="flex items-center gap-2 bg-background/30 backdrop-blur-sm px-3 py-1 rounded-full border border-white/5">
+                          <span className="text-sm font-medium text-muted-foreground/80">@{profile?.username && profile?.username !== 'null' ? profile.username : 'anonymous'}</span>
+                        </div>
+                        <RankBadge
+                          episodeCount={effectiveEpisodeCount}
+                          size="sm"
+                        />
+                        <span className="text-xs text-muted-foreground">
+                          {history?.length || 0} episodes watched
+                        </span>
                       </div>
                       {!isViewingOther && user && (
                         <div className="text-muted-foreground mb-4 flex items-center gap-2">
@@ -541,6 +589,12 @@ export default function ProfilePage() {
                   <MessageSquare className="w-4 h-4" />
                   Forum Posts
                 </TabsTrigger>
+                {!isViewingOther && (
+                  <TabsTrigger value="streaks" className="flex-1 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg px-6">
+                    <Flame className="w-4 h-4" />
+                    Streaks
+                  </TabsTrigger>
+                )}
               </TabsList>
 
               {/* No data available message for public profiles with hidden data */}
@@ -791,6 +845,11 @@ export default function ProfilePage() {
                   )}
                 </GlassPanel>
               </TabsContent>
+              {!isViewingOther && (
+                <TabsContent value="streaks" className="mt-6">
+                  <WatchStreaks isOwnProfile={true} />
+                </TabsContent>
+              )}
               {!isViewingOther && (
                 <TabsContent value="notifications" className="mt-6">
                   <GlassPanel className="p-6 md:p-8">

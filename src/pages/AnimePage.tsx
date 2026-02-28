@@ -11,12 +11,14 @@ import { Skeleton } from "@/components/ui/skeleton-custom";
 import { AnimeGrid } from "@/components/anime/AnimeGrid";
 import { VideoBackground } from "@/components/anime/VideoBackground";
 import { CommentsSection } from "@/components/anime/CommentsSection";
+import { EpisodeComments } from "@/components/video/EpisodeComments";
 import { RatingsSection } from "@/components/anime/RatingsSection";
 import { WatchlistButton } from "@/components/anime/WatchlistButton";
 import { ShareButton } from "@/components/anime/ShareButton";
 import { AddToPlaylistButton } from "@/components/playlist/AddToPlaylistButton";
 import { NextEpisodeSchedule } from "@/components/anime/NextEpisodeSchedule";
-import { getProxiedImageUrl, searchAnime } from "@/lib/api";
+import { getProxiedImageUrl, fetchJikanCover, searchAnime } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { Loader2, Search, ArrowLeft, Play, Star, Calendar, Clock, Film, Tv, Layers, Users, Download, CloudDownload } from "lucide-react";
@@ -45,6 +47,14 @@ export default function AnimePage() {
   // Get MAL/AniList IDs from the robust multi-source hook
   const malId = externalIds?.malId || null;
   const anilistId = externalIds?.anilistId || null;
+
+  // Fetch highest quality cover from Jikan (MAL large_image_url) when malId is known
+  const { data: hqPoster } = useQuery({
+    queryKey: ['jikan-cover', malId],
+    queryFn: () => fetchJikanCover(malId, animeData?.anime?.info?.poster ?? ''),
+    enabled: !!malId,
+    staleTime: 1000 * 60 * 60 * 24, // 24h — covers don't change often
+  });
   
   // Debug log for tracking ID extraction
   console.log('[AnimePage] External IDs Debug:', {
@@ -234,7 +244,7 @@ export default function AnimePage() {
               {/* Poster */}
               <GlassPanel className="overflow-hidden">
                 <img
-                  src={getProxiedImageUrl(info.poster)}
+                  src={hqPoster ?? getProxiedImageUrl(info.poster)}
                   alt={info.name}
                   className="w-full aspect-[3/4] object-cover"
                 />
@@ -484,7 +494,7 @@ export default function AnimePage() {
 
           {/* Comments Section */}
           <section className="mb-16">
-            <CommentsSection animeId={animeId!} />
+            <EpisodeComments animeId={animeId!} animeName={info.name} />
           </section>
 
           {/* Related Animes */}

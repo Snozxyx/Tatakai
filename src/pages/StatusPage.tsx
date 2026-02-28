@@ -5,8 +5,8 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { motion } from 'framer-motion';
-import { 
-  ArrowLeft, CheckCircle, XCircle, AlertTriangle, 
+import {
+  ArrowLeft, CheckCircle, XCircle, AlertTriangle,
   RefreshCw, Server, Database, Wifi, Film, Globe, Clock, Zap, Image, Play
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -53,12 +53,12 @@ export default function StatusPage() {
   const checkService = async (name: string, checkFn: () => Promise<{ status: ServiceStatus['status']; latency: number }>): Promise<ServiceStatus['status']> => {
     try {
       const result = await checkFn();
-      setServices(prev => prev.map(s => 
+      setServices(prev => prev.map(s =>
         s.name === name ? { ...s, status: result.status, latency: result.latency } : s
       ));
       return result.status;
     } catch {
-      setServices(prev => prev.map(s => 
+      setServices(prev => prev.map(s =>
         s.name === name ? { ...s, status: 'down', latency: undefined } : s
       ));
       return 'down';
@@ -67,7 +67,7 @@ export default function StatusPage() {
 
   const checkServices = async () => {
     setIsRefreshing(true);
-    
+
     // Reset all to checking
     setServices(prev => prev.map(s => ({ ...s, status: 'checking' as const, latency: undefined })));
 
@@ -76,9 +76,9 @@ export default function StatusPage() {
       const start = Date.now();
       const res = await fetch(window.location.origin, { method: 'HEAD' });
       const latency = Date.now() - start;
-      return { 
+      return {
         status: res.ok ? (latency > 1000 ? 'degraded' : 'operational') : 'down',
-        latency 
+        latency
       };
     });
 
@@ -87,31 +87,22 @@ export default function StatusPage() {
       const start = Date.now();
       const { error } = await supabase.from('profiles').select('count').limit(1);
       const latency = Date.now() - start;
-      return { 
+      return {
         status: error ? 'down' : (latency > 500 ? 'degraded' : 'operational'),
-        latency 
+        latency
       };
     });
 
-    // Check Consumet API
-    await checkService('Consumet API', async () => {
-      const start = Date.now();
-      const res = await fetch('https://api.consumet.org/anime/gogoanime/info/naruto', { signal: AbortSignal.timeout(10000) });
-      const latency = Date.now() - start;
-      return { 
-        status: res.ok ? (latency > 2000 ? 'degraded' : 'operational') : 'down',
-        latency 
-      };
-    });
+
 
     // Check Jikan API
     await checkService('Jikan API', async () => {
       const start = Date.now();
       const res = await fetch('https://api.jikan.moe/v4/anime/1', { signal: AbortSignal.timeout(10000) });
       const latency = Date.now() - start;
-      return { 
+      return {
         status: res.ok ? (latency > 1500 ? 'degraded' : 'operational') : (res.status === 429 ? 'degraded' : 'down'),
-        latency 
+        latency
       };
     });
 
@@ -120,9 +111,9 @@ export default function StatusPage() {
       const start = Date.now();
       const res = await fetch('https://api.waifu.pics/sfw/waifu', { signal: AbortSignal.timeout(5000) });
       const latency = Date.now() - start;
-      return { 
+      return {
         status: res.ok ? (latency > 1000 ? 'degraded' : 'operational') : 'down',
-        latency 
+        latency
       };
     });
 
@@ -131,9 +122,9 @@ export default function StatusPage() {
       const start = Date.now();
       const res = await fetch('https://nekos.best/api/v2/neko', { signal: AbortSignal.timeout(5000) });
       const latency = Date.now() - start;
-      return { 
+      return {
         status: res.ok ? (latency > 1000 ? 'degraded' : 'operational') : 'down',
-        latency 
+        latency
       };
     });
 
@@ -141,7 +132,7 @@ export default function StatusPage() {
     await checkService('Video Proxy', async () => {
       const start = Date.now();
       try {
-        const { data } = await supabase.functions.invoke('video-proxy', { 
+        const { data } = await supabase.functions.invoke('video-proxy', {
           body: { test: true },
           method: 'POST'
         });
@@ -153,7 +144,7 @@ export default function StatusPage() {
         return { status: latency < 5000 ? 'operational' : 'degraded', latency };
       }
     });
-    
+
     setLastChecked(new Date());
     setIsRefreshing(false);
   };
@@ -188,19 +179,19 @@ export default function StatusPage() {
     }
   };
 
-  const overallStatus = services.some(s => s.status === 'down') 
-    ? 'Major Outage' 
+  const overallStatus = services.some(s => s.status === 'down')
+    ? 'Major Outage'
     : services.some(s => s.status === 'degraded')
-    ? 'Partial Outage'
-    : services.some(s => s.status === 'checking')
-    ? 'Checking...'
-    : 'All Systems Operational';
+      ? 'Partial Outage'
+      : services.some(s => s.status === 'checking')
+        ? 'Checking...'
+        : 'All Systems Operational';
 
   const overallColor = services.some(s => s.status === 'down')
     ? 'from-red-500 to-red-700'
     : services.some(s => s.status === 'degraded')
-    ? 'from-amber-500 to-amber-700'
-    : 'from-green-500 to-green-700';
+      ? 'from-amber-500 to-amber-700'
+      : 'from-green-500 to-green-700';
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
@@ -314,9 +305,8 @@ export default function StatusPage() {
                 {incidents.map((incident) => (
                   <div
                     key={incident.id}
-                    className={`p-4 rounded-xl border ${
-                      incident.is_active ? 'border-orange-500/50 bg-orange-500/5' : 'border-muted bg-muted/10'
-                    }`}
+                    className={`p-4 rounded-xl border ${incident.is_active ? 'border-orange-500/50 bg-orange-500/5' : 'border-muted bg-muted/10'
+                      }`}
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div>
@@ -335,7 +325,7 @@ export default function StatusPage() {
                         </div>
                         <h3 className="font-semibold">{incident.title}</h3>
                         <p className="text-sm text-muted-foreground mt-1">{incident.description}</p>
-                        
+
                         {incident.affected_services && incident.affected_services.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-2">
                             {incident.affected_services.map((service: string) => (
@@ -359,7 +349,7 @@ export default function StatusPage() {
                             ))}
                           </div>
                         )}
-                        
+
                         <p className="text-xs text-muted-foreground mt-3">
                           {incident.is_active ? 'Started' : 'Resolved'}{' '}
                           {formatDistanceToNow(new Date(incident.is_active ? incident.created_at : incident.resolved_at!), { addSuffix: true })}

@@ -43,6 +43,7 @@ import { useWatchTracking } from '@/hooks/useAnalytics';
 import { getProxiedVideoUrl } from "@/lib/api";
 import { ReportModal } from "@/components/ui/ReportModal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { EpisodeComments } from "@/components/video/EpisodeComments";
 import { ReviewPopup } from "@/components/ui/ReviewPopup";
 import { Button } from "@/components/ui/button";
 import { MarketplaceSubmitModal } from "@/components/ui/MarketplaceSubmitModal";
@@ -1161,7 +1162,17 @@ export default function WatchPage() {
               </div>
             </GlassPanel>
           </div>
+
+          {/* Episode Comments - aligned with video column */}
+          <div className="xl:col-span-9">
+            <EpisodeComments
+              animeId={animeId}
+              episodeId={decodedEpisodeId}
+              animeName={animeData?.anime.info.name}
+            />
+          </div>
         </div>
+
       </main >
 
       {!isDesktop && <MobileNav />

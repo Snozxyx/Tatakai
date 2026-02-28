@@ -16,6 +16,8 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
+      // Relative base so Electron can load via file:// without broken asset paths
+      base: process.env.ELECTRON_BUILD === 'true' ? './' : '/',
       // Only generate sourcemaps if explicitly enabled (for debugging)
       sourcemap: mode === 'production' && process.env.ENABLE_SOURCEMAPS === 'true',
       minify: 'terser',
@@ -38,6 +40,10 @@ export default defineConfig(({ mode }) => {
     server: {
       host: "::",
       port: isWebMode ? 8081 : 8088, // Standard port for Electron dev
+      // Allow Discord Activity iframe to embed the app
+      hmr: {
+        clientPort: 443,
+      },
       proxy: {
         // Proxy all calls starting with /api/proxy/aniwatch to the third-party API (dev only)
         '/api/proxy/aniwatch': {
@@ -46,6 +52,11 @@ export default defineConfig(({ mode }) => {
           secure: true,
           rewrite: (p) => p.replace(/^\/api\/proxy\/aniwatch/, '/api/v2/hianime'),
         },
+      },
+      // Allow embedding in Discord Activity iframe
+      headers: {
+        'Cross-Origin-Embedder-Policy': 'credentialless',
+        'Cross-Origin-Opener-Policy': 'same-origin',
       },
     },
     define: {

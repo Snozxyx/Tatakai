@@ -144,12 +144,26 @@ export function getAniListAuthUrl(): string {
 
 // Exchange code for tokens via Edge Function
 export async function exchangeAniListCode(code: string, userId: string): Promise<boolean> {
+  // Refresh session first to ensure we have a valid JWT
+  await supabase.auth.refreshSession().catch(() => { });
+  const { data: { session } } = await supabase.auth.getSession();
+
+  // Build explicit auth headers — gateway requires either a valid user JWT
+  // OR the anon/service key when verify_jwt=false is set on the function.
+  // We always include both so it works regardless of deployment mode.
+  const authHeaders: Record<string, string> = {
+    'Authorization': session?.access_token
+      ? `Bearer ${session.access_token}`
+      : `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+  };
+
   const { data: edgeFunctionData, error: edgeFunctionError } = await supabase.functions.invoke('external-auth', {
     body: {
       action: 'anilist',
       code,
       redirectUri: ANILIST_REDIRECT_URI,
     },
+    headers: authHeaders,
   });
 
   if (edgeFunctionError) throw new Error(edgeFunctionError.message);
@@ -172,23 +186,43 @@ export async function exchangeAniListCode(code: string, userId: string): Promise
   return true;
 }
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 // GraphQL query helper
-async function anilistQuery(query: string, variables: Record<string, any>, accessToken?: string): Promise<any> {
+async function anilistQuery(query: string, variables: Record<string, any>, accessToken?: string, retries = 3): Promise<any> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
   }
 
-  const response = await fetch(ANILIST_API_URL, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ query, variables }),
-  });
+  try {
+    const response = await fetch(ANILIST_API_URL, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ query, variables }),
+    });
 
-  if (!response.ok) throw new Error('AniList query failed');
-  const data = await response.json();
-  if (data.errors) throw new Error(data.errors[0].message);
-  return data.data;
+    if (response.status === 429 && retries > 0) {
+      const retryAfter = response.headers.get('Retry-After');
+      const delay = retryAfter ? parseInt(retryAfter) * 1000 : 2000;
+      console.warn(`[AniList] Rate limited. Retrying in ${delay}ms...`);
+      await sleep(delay);
+      return anilistQuery(query, variables, accessToken, retries - 1);
+    }
+
+    if (!response.ok) throw new Error(`AniList query failed with status ${response.status}`);
+    const data = await response.json();
+    if (data.errors) throw new Error(data.errors[0].message);
+    return data.data;
+  } catch (err: any) {
+    if (retries > 0 && (err.name === 'TypeError' || err.message === 'Failed to fetch')) {
+      // Network error or CORS block to due rate drop
+      console.warn(`[AniList] Network error/Fetch failed. Retrying in 2s...`, err);
+      await sleep(2000);
+      return anilistQuery(query, variables, accessToken, retries - 1);
+    }
+    throw err;
+  }
 }
 
 // Fetch AniList user info

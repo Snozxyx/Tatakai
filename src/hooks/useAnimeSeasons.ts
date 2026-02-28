@@ -17,7 +17,7 @@ export function useAnimeSeasons(animeId: string | undefined) {
       try {
         // Use TatakaiAPI for numeric IDs (Anilist)
         if (/^\d+$/.test(animeId)) {
-          const res = await fetch(`https://tatakaiapi.vercel.app/api/v1/animelok/anime/${animeId}/seasons`);
+          const res = await fetch(`https://api.tatakai.me/api/v1/animelok/anime/${animeId}/seasons`);
           if (res.ok) {
             const json = await res.json();
             if (json.status === 200 && json.data?.seasons) {

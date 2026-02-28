@@ -31,6 +31,21 @@ import {
 // Fallback changelog entries if database is empty
 const FALLBACK_CHANGELOG = [
   {
+    version: '4.1.18',
+    date: '2026-02-28',
+    changes: [
+      'High Quality Covers: Anime info page now fetches full-size cover art from Jikan (MAL) API',
+      'Achievement System: 12 rank-tier achievements from Filler Watcher to Hashira',
+      'Admin: Grant and revoke achievements manually per-user via Admin panel',
+      'Profile Rank: Manual achievement grants now reflect in rank badge and name color',
+      'Comments: Fixed focus border color on comment textarea',
+      'Comments: Rank name animated effects now visible in episode comments',
+      'Comments: Added anime title and episode context pill to comments header',
+      'Anime Page: Uses unified EpisodeComments component for consistent styling',
+      'Card Images: All anime cards upgraded to AniList large CDN resolution',
+    ],
+  },
+  {
     version: '4.0.0',
     date: '2026-01-26',
     changes: [
@@ -575,6 +590,9 @@ export default function SettingsPage() {
           console.warn(`Failed to sync ${item.anime_name} to AniList`, e);
           failCount++;
         }
+
+        // Respect AniList API rate limits (90 req/min)
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
 
       toast.success(`Synced ${successCount} items to AniList (${failCount} failed/skipped)`, { id: toastId });
@@ -660,7 +678,7 @@ export default function SettingsPage() {
             {isNative && (
               <TabsTrigger value="desktop" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Laptop className="w-4 h-4" />
-                 App
+                App
               </TabsTrigger>
             )}
             <TabsTrigger value="player" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">

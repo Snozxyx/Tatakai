@@ -8,7 +8,7 @@ Introduction
 Welcome to the Tatakai API documentation. This API provides a unified interface for accessing anime, manga, light novels, and comics from various sources.
 
 🚀 Base URL
-https://tatakaiapi.vercel.app/api/v1
+https://api.tatakai.me/api/v1
 
 📡 Response Format
 All responses follow a standard JSON structure:
@@ -23,7 +23,7 @@ All responses follow a standard JSON structure:
 The quickest way to start using Tatakai API is via fetch or curl.
 
 JavaScript Example
-const res = await fetch('https://tatakaiapi.vercel.app/api/v1/hianime/home');
+const res = await fetch('https://api.tatakai.me/api/v1/hianime/home');
 const data = await res.json();
 console.log(data);
 
@@ -46,7 +46,7 @@ X-RateLimit-Reset: Time (in ms) until the window resets.
 💻 Code Examples
 JavaScript (Fetch)
 async function getAnimeInfo(id) {
-  const response = await fetch(`https://tatakaiapi.vercel.app/api/v1/hianime/info/${id}`);
+  const response = await fetch(`https://api.tatakai.me/api/v1/hianime/info/${id}`);
   const data = await response.json();
   return data;
 }
@@ -55,13 +55,13 @@ Python (Requests)
 import requests
 
 def get_trending():
-    url = "https://tatakaiapi.vercel.app/api/v1/hianime/home"
+    url = "https://api.tatakai.me/api/v1/hianime/home"
     response = requests.get(url)
     return response.json()
 
 PHP (cURL)
 $ch = curl_init();
-curl_setopt($ch, CURLOPT_URL, "https://tatakaiapi.vercel.app/api/v1/hianime/home");
+curl_setopt($ch, CURLOPT_URL, "https://api.tatakai.me/api/v1/hianime/home");
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 $output = curl_exec($ch);
 curl_close($ch);
@@ -83,7 +83,7 @@ Get dashboard data including Spotlight, Trending, Latest Episodes, and New Added
 URL: /home
 Method: GET
 🧪 Test Module
-curl -X GET "https://tatakaiapi.vercel.app/api/v1/hianime/home"
+curl -X GET "https://api.tatakai.me/api/v1/hianime/home"
 
 2. Information & Details
 Anime Details
@@ -111,7 +111,7 @@ animeEpisodeId (required, e.g., one-piece-100?ep=107149)
 server (optional, default: vidstreaming)
 category (optional, sub or dub)
 🧪 Test Module
-curl -X GET "https://tatakaiapi.vercel.app/api/v1/hianime/episode/sources?animeEpisodeId=one-piece-100?ep=107149"
+curl -X GET "https://api.tatakai.me/api/v1/hianime/episode/sources?animeEpisodeId=one-piece-100?ep=107149"
 
 4. Discovery
 Search
@@ -152,7 +152,7 @@ Get trending and latest anime.
 URL: /anikai/home
 Method: GET
 🧪 Test Module
-curl -X GET "https://tatakaiapi.vercel.app/api/v1/anikai/home"
+curl -X GET "https://api.tatakai.me/api/v1/anikai/home"
 
 2. Search
 Search for anime by keywords.
@@ -162,7 +162,7 @@ Method: GET
 Query Params:
 q: Search keyword
 🧪 Test Module
-curl -X GET "https://tatakaiapi.vercel.app/api/v1/anikai/search?q=one+piece"
+curl -X GET "https://api.tatakai.me/api/v1/anikai/search?q=one+piece"
 
 3. Anime Information
 URL: /anikai/info/:id
@@ -175,7 +175,7 @@ Method: GET
 Query Params:
 ep: Episode number (default: 1)
 🧪 Test Module
-curl -X GET "https://tatakaiapi.vercel.app/api/v1/anikai/watch/one-piece-37?ep=1"
+curl -X GET "https://api.tatakai.me/api/v1/anikai/watch/one-piece-37?ep=1"
 
 === END FILE: anikai.md ===
 
@@ -210,7 +210,7 @@ Response Schema
 }
 
 🧪 Test Command
-curl -s "https://tatakaiapi.vercel.app/api/v1/animeya/home"
+curl -s "https://api.tatakai.me/api/v1/animeya/home"
 
 2. Search
 Search for anime by keyword.
@@ -234,7 +234,7 @@ Response Schema
 }
 
 🧪 Test Command
-curl -s "https://tatakaiapi.vercel.app/api/v1/animeya/search?q=one+piece"
+curl -s "https://api.tatakai.me/api/v1/animeya/search?q=one+piece"
 
 3. Anime Information
 Get detailed information and episode list for a specific anime.
@@ -264,7 +264,7 @@ Response Schema
 }
 
 🧪 Test Command
-curl -s "https://tatakaiapi.vercel.app/api/v1/animeya/info/one-piece-21"
+curl -s "https://api.tatakai.me/api/v1/animeya/info/one-piece-21"
 
 4. Streaming Sources
 Get direct video sources for a specific episode.
@@ -297,7 +297,7 @@ Response Schema
 }
 
 🧪 Test Command
-curl -s "https://tatakaiapi.vercel.app/api/v1/animeya/watch/16428"
+curl -s "https://api.tatakai.me/api/v1/animeya/watch/16428"
 
 === END FILE: animeya.md ===
 
@@ -315,7 +315,7 @@ Initialize the client and start making requests.
 import { TatakaClient } from "@Tatakai/api";
 
 const client = new TatakaClient({
-  baseUrl: "https://tatakaiapi.vercel.app/api/v1" // Optional, defaults to localhost:4000
+  baseUrl: "https://api.tatakai.me/api/v1" // Optional, defaults to localhost:4000
 });
 
 // Fetch trending anime
@@ -353,7 +353,7 @@ Homepage
 URL: /animelok/home
 Method: GET
 🧪 Example Request
-curl -X GET "https://tatakaiapi.vercel.app/api/v1/animelok/home"
+curl -X GET "https://api.tatakai.me/api/v1/animelok/home"
 
 Watch Episode
 URL: /animelok/watch/:id
@@ -361,7 +361,7 @@ Method: GET
 Query Params: ep (episode number)
 🧪 Example Request
 # Watch specific episode (ep query param)
-curl -X GET "https://tatakaiapi.vercel.app/api/v1/animelok/watch/naruto-shippuden-112233?ep=1"
+curl -X GET "https://api.tatakai.me/api/v1/animelok/watch/naruto-shippuden-112233?ep=1"
 
 2. WatchAnimeWorld (Supabase Proxy)
 Proxy-enabled scraper for watchanimeworld.in to bypass geoblocking.
@@ -372,7 +372,7 @@ Query Params:
 id: Slug (e.g., naruto-shippuden-1x1) OR
 episodeUrl: Full URL
 🧪 Test Module
-```bash curl -X GET "https://tatakaiapi.vercel.app/api/v1/watchaw/episode?id=naruto-shippuden-1x1" ```
+```bash curl -X GET "https://api.tatakai.me/api/v1/watchaw/episode?id=naruto-shippuden-1x1" ```
 
 📄 Result
 ```json { "status": 200, "data": { "sources": [ { "url": "https://...", "language": "Hindi", "isDub": true } ] } } ```
@@ -394,7 +394,7 @@ Browse anime by category (e.g., hindi-anime-movies, cartoon-shows).
 URL: /hindidubbed/category/:name
 Method: GET
 🧪 Test Module
-```bash curl -X GET "https://tatakaiapi.vercel.app/api/v1/hindidubbed/category/hindi-anime-movies" ```
+```bash curl -X GET "https://api.tatakai.me/api/v1/hindidubbed/category/hindi-anime-movies" ```
 
 Search
 Search for specific anime titles.
@@ -402,7 +402,7 @@ Search for specific anime titles.
 URL: /hindidubbed/search
 Query Params: title
 🧪 Test Module
-```bash curl -X GET "https://tatakaiapi.vercel.app/api/v1/hindidubbed/search?title=doraemon" ```
+```bash curl -X GET "https://api.tatakai.me/api/v1/hindidubbed/search?title=doraemon" ```
 
 Anime Info
 Get details and server links for a specific anime.
@@ -410,7 +410,7 @@ Get details and server links for a specific anime.
 URL: /hindidubbed/anime/:slug
 Method: GET
 🧪 Test Module
-```bash curl -X GET "https://tatakaiapi.vercel.app/api/v1/hindidubbed/anime/doraemon-movie" ```
+```bash curl -X GET "https://api.tatakai.me/api/v1/hindidubbed/anime/doraemon-movie" ```
 
 === END FILE: regional.md ===
 
@@ -426,7 +426,7 @@ URL: /anime-api/quotes/random
 Method: GET
 Query Params: anime (optional)
 🧪 Test Module
-curl -X GET "https://tatakaiapi.vercel.app/api/v1/anime-api/quotes/random?anime=Naruto"
+curl -X GET "https://api.tatakai.me/api/v1/anime-api/quotes/random?anime=Naruto"
 
 2. Anime Facts
 Get facts about a specific anime.
@@ -434,7 +434,7 @@ Get facts about a specific anime.
 URL: /anime-api/facts/:anime
 Method: GET
 🧪 Test Module
-curl -X GET "https://tatakaiapi.vercel.app/api/v1/anime-api/facts/naruto"
+curl -X GET "https://api.tatakai.me/api/v1/anime-api/facts/naruto"
 
 3. Image Trace (trace.moe)
 Trace back an anime scene from an image URL.
@@ -443,7 +443,7 @@ URL: /anime-api/trace
 Method: POST
 Body: { "imageUrl": "..." }
 🧪 Test Module
-curl -X POST "https://tatakaiapi.vercel.app/api/v1/anime-api/trace" \
+curl -X POST "https://api.tatakai.me/api/v1/anime-api/trace" \
      -H "Content-Type: application/json" \
      -d '{"imageUrl": "https://images.plurk.com/32B15UXxymfSMwKGTObY5e.jpg"}'
 
@@ -453,7 +453,7 @@ Get various types of anime images (waifu, neko, shinobu, etc.).
 URL: /anime-api/images/:type
 Method: GET
 🧪 Test Module
-curl -X GET "https://tatakaiapi.vercel.app/api/v1/anime-api/images/neko"
+curl -X GET "https://api.tatakai.me/api/v1/anime-api/images/neko"
 
 5. Advanced Waifu Search (waifu.im)
 Search specifically for waifu images with tag filtering.
@@ -462,7 +462,7 @@ URL: /anime-api/waifu
 Method: GET
 Query Params: tags (optional, e.g. maid)
 🧪 Test Module
-curl -X GET "https://tatakaiapi.vercel.app/api/v1/anime-api/waifu?tags=maid"
+curl -X GET "https://api.tatakai.me/api/v1/anime-api/waifu?tags=maid"
 
 === END FILE: utility.md ===
 
@@ -478,7 +478,7 @@ URL: /anime/gogoanime/:query
 Method: GET
 Response: Array of { title, link, img, released }
 🧪 Test Module
-curl -X GET "https://tatakaiapi.vercel.app/api/v1/anime/gogoanime/naruto"
+curl -X GET "https://api.tatakai.me/api/v1/anime/gogoanime/naruto"
 
 2. Chia-Anime
 Search Chia-Anime (chia-anime.su).(Not Working)
@@ -487,7 +487,7 @@ URL: /anime/chia-anime/:query
 Method: GET
 Response: Array of { title, link, img }
 🧪 Test Module
-curl -X GET "https://tatakaiapi.vercel.app/api/v1/anime/chia-anime/bleach"
+curl -X GET "https://api.tatakai.me/api/v1/anime/chia-anime/bleach"
 
 3. Anime-Freak
 Search Anime-Freak (animefreak.video).(Not Working)
@@ -496,7 +496,7 @@ URL: /anime/anime-freak/:query
 Method: GET
 Response: Array of { title, link, img }
 🧪 Test Module
-curl -X GET "https://tatakaiapi.vercel.app/api/v1/anime/anime-freak/one%20piece"
+curl -X GET "https://api.tatakai.me/api/v1/anime/anime-freak/one%20piece"
 
 4. Animeland
 Search Animeland (animeland.tv).
@@ -505,6 +505,6 @@ URL: /anime/animeland/:query
 Method: GET
 Response: Array of { title, link }
 🧪 Test Module
-curl -X GET "https://tatakaiapi.vercel.app/api/v1/anime/animeland/dragon%20ball"
+curl -X GET "https://api.tatakai.me/api/v1/anime/animeland/dragon%20ball"
 
 === END FILE: external.md ===

@@ -25,7 +25,8 @@ export type Theme =
   | 'matcha-light'
   | 'ocean-breeze'
   | 'ultra-lite'
-  | 'lite';
+  | 'lite'
+  | 'amoled';
 
 interface ThemeColors {
   primary: string;
@@ -549,6 +550,27 @@ export const THEME_COLORS: Record<Theme, ThemeColors> = {
     sidebarBorder: '220 10% 92%',
     isLight: true,
   },
+  'amoled': {
+    primary: '239 84% 67%',
+    primaryForeground: '0 0% 100%',
+    secondary: '270 60% 50%',
+    secondaryForeground: '0 0% 100%',
+    accent: '280 70% 55%',
+    background: '0 0% 0%',
+    foreground: '0 0% 98%',
+    card: '0 0% 3%',
+    cardForeground: '0 0% 98%',
+    muted: '0 0% 6%',
+    mutedForeground: '0 0% 55%',
+    border: '0 0% 10%',
+    glass: '0 0% 4%',
+    glowPrimary: '239 84% 67%',
+    glowSecondary: '270 60% 50%',
+    surface: '0 0% 2%',
+    surfaceHover: '0 0% 7%',
+    sidebarBackground: '0 0% 0%',
+    sidebarBorder: '0 0% 8%',
+  },
 };
 
 export const THEME_INFO: Record<Theme, { name: string; gradient: string; description: string; icon: string; category: 'dark' | 'light' }> = {
@@ -726,6 +748,13 @@ export const THEME_INFO: Record<Theme, { name: string; gradient: string; descrip
     description: 'Ultra-lightweight theme for maximum battery saving and performance',
     icon: '🔋',
     category: 'light',
+  },
+  'amoled': {
+    name: 'AMOLED',
+    gradient: 'from-black via-gray-950 to-black',
+    description: 'Pure black background — saves battery on OLED/AMOLED screens',
+    icon: '🖤',
+    category: 'dark',
   },
 };
 const THEME_KEY = 'anime-theme';

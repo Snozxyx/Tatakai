@@ -2,7 +2,7 @@ import { Play, Star, Plus, Check, Loader2 } from "lucide-react";
 
 import { GlassPanel } from "@/components/ui/GlassPanel";
 
-import { AnimeCard as AnimeCardType, getProxiedVideoUrl, getProxiedImageUrl } from "@/lib/api";
+import { AnimeCard as AnimeCardType, getProxiedVideoUrl, getProxiedImageUrl, getHighQualityPoster } from "@/lib/api";
 
 import { useNavigate } from "react-router-dom";
 
@@ -348,7 +348,7 @@ export function AnimeCardWithPreview({ anime, showPreview = true }: AnimeCardWit
 
         <img
 
-          src={getProxiedImageUrl(anime.poster)}
+          src={getHighQualityPoster(anime.poster, anime.anilistId)}
 
           alt={anime.name}
 

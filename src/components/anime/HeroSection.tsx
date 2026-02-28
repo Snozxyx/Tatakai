@@ -46,9 +46,11 @@ export function HeroSection({ spotlight, spotlights = [] }: HeroSectionProps) {
           <img 
             src={getProxiedImageUrl(activeSpotlight.poster)} 
             alt="" 
-            className="w-full h-full object-cover filter blur-sm scale-110 brightness-50"
+            fetchPriority="high"
+            decoding="async"
+            className="w-full h-full object-cover scale-105 brightness-50"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/80 to-background" />
+          <div className="absolute inset-0 bg-gradient-to-b from-background/50 via-background/85 to-background" />
         </div>
 
         {/* Mobile content */}

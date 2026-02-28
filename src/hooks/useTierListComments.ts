@@ -7,6 +7,7 @@ interface CommentProfile {
   display_name: string | null;
   avatar_url: string | null;
   username: string | null;
+  total_episodes: number;
 }
 
 interface TierListComment {
@@ -46,7 +47,17 @@ export function useTierListComments(tierListId: string | undefined) {
         .in('user_id', userIds);
       
       const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
-      
+
+      // Fetch episode counts for rank display
+      const { data: watchRows } = await supabase
+        .from('watch_history')
+        .select('user_id')
+        .in('user_id', userIds);
+      const episodeCountMap = new Map<string, number>();
+      watchRows?.forEach(w => {
+        episodeCountMap.set(w.user_id, (episodeCountMap.get(w.user_id) || 0) + 1);
+      });
+
       // Check if user has liked each comment
       let likedIds = new Set<string>();
       if (user) {
@@ -61,7 +72,10 @@ export function useTierListComments(tierListId: string | undefined) {
       
       return comments.map(c => ({
         ...c,
-        profile: profileMap.get(c.user_id),
+        profile: {
+          ...profileMap.get(c.user_id),
+          total_episodes: episodeCountMap.get(c.user_id) || 0,
+        },
         user_liked: likedIds.has(c.id),
       })) as TierListComment[];
     },
@@ -91,6 +105,16 @@ export function useTierListCommentReplies(parentId: string | undefined) {
         .in('user_id', userIds);
       
       const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
+
+      // Fetch episode counts for rank display
+      const { data: watchRows } = await supabase
+        .from('watch_history')
+        .select('user_id')
+        .in('user_id', userIds);
+      const episodeCountMap = new Map<string, number>();
+      watchRows?.forEach(w => {
+        episodeCountMap.set(w.user_id, (episodeCountMap.get(w.user_id) || 0) + 1);
+      });
       
       let likedIds = new Set<string>();
       if (user) {
@@ -105,7 +129,10 @@ export function useTierListCommentReplies(parentId: string | undefined) {
       
       return replies.map(r => ({
         ...r,
-        profile: profileMap.get(r.user_id),
+        profile: {
+          ...profileMap.get(r.user_id),
+          total_episodes: episodeCountMap.get(r.user_id) || 0,
+        },
         user_liked: likedIds.has(r.id),
       })) as TierListComment[];
     },

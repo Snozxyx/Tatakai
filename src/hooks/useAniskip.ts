@@ -59,18 +59,16 @@ export function useAniskip(initialSkipTimes: SkipTime[] = []) {
       if (response.status === 404 || !response.ok) {
         console.log(`v2 failed with ${response.status}, trying v1 fallback...`);
 
-        // Attempt v1 with op and ed types
-        // v1 uses types parameter (often not an array, or comma separated)
-        // We'll try common formats or just multiple requests if needed
-        const v1Url = `https://api.aniskip.com/v1/skip-times/${malId}/${episodeNumber}?types=op&types=ed&types=recap`;
+        // v1 uses singular 'type' param (not array), and only supports op/ed
+        const v1Url = `https://api.aniskip.com/v1/skip-times/${malId}/${episodeNumber}?type=op&type=ed`;
         console.log('Fetching skip times from v1:', v1Url);
 
         response = await fetch(v1Url, {
           headers: { 'Accept': 'application/json' },
         });
 
-        if (response.status === 404) {
-          console.log('No skip times found in v1 either (404)');
+        if (response.status === 404 || !response.ok) {
+          console.log(`No skip times found (v1 returned ${response.status})`);
           setSkipTimes([]);
           return [];
         }

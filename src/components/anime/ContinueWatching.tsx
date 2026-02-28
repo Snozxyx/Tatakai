@@ -41,6 +41,7 @@ export function ContinueWatching() {
               <img
                 src={getProxiedImageUrl(item.anime_poster || '/placeholder.svg')}
                 alt={item.anime_name}
+                loading="lazy"
                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
               />
               

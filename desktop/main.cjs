@@ -13,6 +13,15 @@ app.setName('Tatakai');
 // Disable Hardware Acceleration to prevent black screen issues on some GPUs
 app.disableHardwareAcceleration();
 
+// Additional flags to prevent blank/black screen rendering issues
+app.commandLine.appendSwitch('disable-gpu-sandbox');
+app.commandLine.appendSwitch('no-sandbox');
+app.commandLine.appendSwitch('ignore-gpu-blacklist');
+app.commandLine.appendSwitch('disable-gpu-driver-bug-workarounds');
+app.commandLine.appendSwitch('disable-software-rasterizer');
+app.commandLine.appendSwitch('enable-webgl');
+app.commandLine.appendSwitch('enable-accelerated-2d-canvas');
+
 let mainWindow;
 let splash;
 let tray;
@@ -120,10 +129,13 @@ function createWindow() {
             webviewTag: true,
             plugins: true,
             experimentalFeatures: true,
-            enableBlinkFeatures: 'CSSContainerQueries'
+            enableBlinkFeatures: 'CSSContainerQueries',
+            backgroundThrottling: false,
         },
         backgroundColor: '#09090b',
-        icon: path.join(__dirname, '..', 'resources', 'icon.ico')
+        icon: path.join(__dirname, '..', 'resources', 'icon.ico'),
+        // Prevent visual flicker / white flash before content loads
+        paintWhenInitiallyHidden: false,
     });
 
     const startUrl = isDev
@@ -138,6 +150,10 @@ function createWindow() {
             console.log(`[Loading] Attempting to load: ${url}`);
             await mainWindow.loadURL(url);
             console.log('[Loading] Successfully loaded URL:', url);
+            // Force a repaint to fix blank/black screen after loading
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.invalidate();
+            }
         } catch (err) {
             console.error(`[Loading] Failed to load URL ${url}:`, err);
 
@@ -184,6 +200,9 @@ function createWindow() {
             if (!mainWindow.isVisible()) {
                 console.log('[Safety] Forcing window show after timeout');
                 mainWindow.show();
+                mainWindow.focus();
+                // Repaint to ensure content renders
+                mainWindow.webContents.invalidate();
             }
 
             // If still black (or failed to load), force a reload in production
@@ -191,6 +210,12 @@ function createWindow() {
                 console.log('[Safety] Triggering emergency reload');
                 mainWindow.reload();
             }
+            // Additional repaint after 500ms for GPU-related black screen
+            setTimeout(() => {
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.webContents.invalidate();
+                }
+            }, 500);
         }
     }, 15000); // 15s absolute safety timeout for splash
 
@@ -266,6 +291,13 @@ function createWindow() {
         if (mainWindow && !mainWindow.isDestroyed()) {
             mainWindow.show();
             mainWindow.focus();
+            // Force repaint — eliminates black screen on some GPU drivers
+            mainWindow.webContents.invalidate();
+            setTimeout(() => {
+                if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) {
+                    mainWindow.webContents.invalidate();
+                }
+            }, 500);
 
             // Register keyboard shortcuts
             registerShortcuts();

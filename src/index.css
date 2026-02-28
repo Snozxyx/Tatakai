@@ -1113,3 +1113,146 @@ body[data-theme="harvest"] .glass-panel {
   background: #000000 !important;
   border-width: 2px !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   RANK NAME ANIMATIONS
+═══════════════════════════════════════════════════════════════ */
+
+@keyframes rn-scroll   { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+@keyframes rn-scroll-f { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+@keyframes rn-pulse    { 0%,100%{opacity:1} 50%{opacity:0.65} }
+
+@keyframes rn-ice-glow {
+  0%,100%{ filter: drop-shadow(0 0 4px #93c5fd) brightness(1); }
+  50%    { filter: drop-shadow(0 0 12px #e0f2fe) brightness(1.5); }
+}
+@keyframes rn-spectral {
+  0%    { filter: drop-shadow(0 0 5px #60a5fa); }
+  50%   { filter: drop-shadow(0 0 14px #a5b4fc) drop-shadow(0 0 3px #fff); }
+  100%  { filter: drop-shadow(0 0 5px #60a5fa); }
+}
+@keyframes rn-electric {
+  0%,100%{ filter: drop-shadow(0 0 4px #a78bfa); opacity:1; }
+  20%    { filter: drop-shadow(0 0 16px #fbbf24) drop-shadow(0 0 4px #fff); opacity:0.75; }
+  40%    { filter: drop-shadow(0 0 6px #c4b5fd); opacity:1; }
+  70%    { filter: drop-shadow(0 0 18px #fbbf24) drop-shadow(0 0 6px #ede9fe); opacity:0.8; }
+}
+@keyframes rn-demon {
+  0%,100%{ filter: drop-shadow(0 0 5px #a855f7); }
+  50%    { filter: drop-shadow(0 0 14px #dc2626) drop-shadow(0 0 5px #fbbf24); }
+}
+@keyframes rn-fire {
+  0%,100%{ filter: drop-shadow(0 0 5px #f97316); }
+  33%    { filter: drop-shadow(0 0 14px #ef4444) drop-shadow(0 0 3px #fbbf24); }
+  66%    { filter: drop-shadow(0 0 10px #f97316) drop-shadow(0 0 6px #fef08a); }
+}
+@keyframes rn-saiyan {
+  0%,100%{ filter: drop-shadow(0 0 6px #fbbf24); opacity:1; }
+  25%    { filter: drop-shadow(0 0 20px #fff) drop-shadow(0 0 8px #fbbf24); opacity:0.85; }
+  75%    { filter: drop-shadow(0 0 16px #fde047) drop-shadow(0 0 4px #fff); opacity:0.9; }
+}
+
+/* Rank 1-2: Filler / Genin — plain */
+.rn-gray  { color: #6b7280; font-weight: 500; }
+.rn-gray2 { color: #9ca3af; font-weight: 500; }
+
+/* Rank 3-4: Chunin / Jonin — nature green pulse */
+.rn-nature {
+  color: #4ade80;
+  font-weight: 600;
+  animation: rn-pulse 2.5s ease-in-out infinite;
+  text-shadow: 0 0 6px rgba(74,222,128,0.5);
+}
+
+/* Rank 5-6: Plus Ultra / Pro Hero — frost ice */
+.rn-frost {
+  background: linear-gradient(90deg, #67e8f9, #e0f2fe, #a5f3fc, #67e8f9);
+  background-size: 300% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+  animation: rn-scroll 3s ease-in-out infinite, rn-ice-glow 2.5s ease-in-out infinite;
+}
+
+/* Rank 7-8: Soul Reaper / Bankai — spectral blue ghost */
+.rn-spectral {
+  background: linear-gradient(90deg, #60a5fa, #c7d2fe, #818cf8, #ddd6fe, #60a5fa);
+  background-size: 300% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+  animation: rn-scroll 2.8s ease-in-out infinite, rn-spectral 2s ease-in-out infinite;
+}
+
+/* Rank 9-10: Survey Corps / Titan Shifter — electric crackle */
+.rn-electric {
+  background: linear-gradient(90deg, #818cf8, #fbbf24, #a78bfa, #fde047, #818cf8);
+  background-size: 400% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 800;
+  animation: rn-scroll-f 1.5s ease-in-out infinite, rn-electric 0.9s ease-in-out infinite;
+}
+
+/* Rank 11: Demon Slayer — demonic purple-red corruption */
+.rn-demon {
+  background: linear-gradient(90deg, #a855f7, #ef4444, #dc2626, #a855f7);
+  background-size: 300% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 800;
+  animation: rn-scroll 2s ease-in-out infinite, rn-demon 1.8s ease-in-out infinite;
+}
+
+/* Rank 12-13: Hashira / Sage Mode — sakura gold shimmer */
+.rn-sakura {
+  background: linear-gradient(90deg, #f472b6, #fde68a, #fb7185, #fbbf24, #f472b6);
+  background-size: 400% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 800;
+  animation: rn-scroll 2.5s ease-in-out infinite;
+  filter: drop-shadow(0 0 6px rgba(244,114,182,0.7));
+}
+
+/* Rank 14: Dragon Slayer — animated fire */
+.rn-fire {
+  background: linear-gradient(90deg, #ff4500, #ff8c00, #ffd700, #ff6600, #ef4444, #ff4500);
+  background-size: 400% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 900;
+  animation: rn-scroll-f 1s linear infinite, rn-fire 1.2s ease-in-out infinite;
+}
+
+/* Rank 15: Super Saiyan — gold lightning burst */
+.rn-saiyan {
+  background: linear-gradient(90deg, #fef08a, #facc15, #ffffff, #fb923c, #facc15, #fef08a);
+  background-size: 400% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  animation: rn-scroll-f 0.7s linear infinite, rn-saiyan 0.6s ease-in-out infinite;
+}
+
+/* Rank 16: One Punch — holographic prismatic rainbow */
+.rn-onepunch {
+  background: linear-gradient(90deg,
+    #ff0080, #ff4500, #ffd700, #00ff80, #0080ff, #8000ff, #ff0080);
+  background-size: 500% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  animation: rn-scroll 1.2s linear infinite;
+  filter: drop-shadow(0 0 10px rgba(255,255,255,0.6));
+}

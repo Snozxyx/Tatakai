@@ -1,5 +1,5 @@
 import { Play, Flame } from "lucide-react";
-import { TrendingAnime, getProxiedImageUrl, getProxiedVideoUrl } from "@/lib/api";
+import { TrendingAnime, getProxiedImageUrl, getProxiedVideoUrl, getHighQualityPoster } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
 import { fetchEpisodes, fetchStreamingSources } from "@/lib/api";
@@ -136,7 +136,7 @@ function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: s
       className={`relative group rounded-3xl overflow-hidden cursor-pointer ${spanClass} border border-border/30 min-h-[200px] md:min-h-0`}
     >
       <img 
-        src={getProxiedImageUrl(anime.poster)} 
+        src={getHighQualityPoster(anime.poster, anime.anilistId)} 
         alt={anime.name} 
         className={`w-full h-full object-cover transition-all duration-700 ${
           isHovering && previewUrl ? 'opacity-0' : 'group-hover:scale-110'

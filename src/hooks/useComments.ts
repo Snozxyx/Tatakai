@@ -11,6 +11,7 @@ interface CommentProfile {
   username: string | null;
   is_admin: boolean | null;
   role: string | null;
+  total_episodes: number;
 }
 
 interface Comment {
@@ -60,6 +61,32 @@ export function useComments(animeId: string | undefined, episodeId?: string) {
 
       const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
 
+      // Fetch episode counts from watch_history for rank display
+      const { data: watchRows } = await supabase
+        .from('watch_history')
+        .select('user_id')
+        .in('user_id', userIds);
+      const episodeCountMap = new Map<string, number>();
+      watchRows?.forEach(w => {
+        episodeCountMap.set(w.user_id, (episodeCountMap.get(w.user_id) || 0) + 1);
+      });
+
+      // Merge manual achievement grants for accurate rank display
+      const ACHIEVEMENT_RANK_EPS: Record<string, number> = {
+        'filler-watcher': 0, 'genin': 5, 'chunin': 10, 'week-warrior': 20,
+        'plus-ultra': 35, 'pro-hero': 50, 'soul-reaper': 75, 'bankai': 100,
+        'survey-corps': 150, 'month-legend': 250, 'demon-slayer': 400, 'hashira': 600,
+      };
+      const { data: achievementRows } = await (supabase
+        .from('user_achievements' as any)
+        .select('user_id, achievement_id')
+        .in('user_id', userIds)) as any;
+      achievementRows?.forEach((row: any) => {
+        const granted = ACHIEVEMENT_RANK_EPS[row.achievement_id] ?? 0;
+        const current = episodeCountMap.get(row.user_id) || 0;
+        if (granted > current) episodeCountMap.set(row.user_id, granted);
+      });
+
       // Check if user has liked each comment
       let likedIds = new Set<string>();
       if (user) {
@@ -74,7 +101,10 @@ export function useComments(animeId: string | undefined, episodeId?: string) {
 
       return comments.map(c => ({
         ...c,
-        profile: profileMap.get(c.user_id),
+        profile: {
+          ...profileMap.get(c.user_id),
+          total_episodes: episodeCountMap.get(c.user_id) || 0,
+        },
         user_liked: likedIds.has(c.id),
       })) as Comment[];
     },
@@ -105,6 +135,32 @@ export function useReplies(parentId: string | undefined) {
 
       const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
 
+      // Fetch episode counts from watch_history for rank display
+      const { data: watchRows } = await supabase
+        .from('watch_history')
+        .select('user_id')
+        .in('user_id', userIds);
+      const episodeCountMap = new Map<string, number>();
+      watchRows?.forEach(w => {
+        episodeCountMap.set(w.user_id, (episodeCountMap.get(w.user_id) || 0) + 1);
+      });
+
+      // Merge manual achievement grants for accurate rank display
+      const ACHIEVEMENT_RANK_EPS: Record<string, number> = {
+        'filler-watcher': 0, 'genin': 5, 'chunin': 10, 'week-warrior': 20,
+        'plus-ultra': 35, 'pro-hero': 50, 'soul-reaper': 75, 'bankai': 100,
+        'survey-corps': 150, 'month-legend': 250, 'demon-slayer': 400, 'hashira': 600,
+      };
+      const { data: achievementRows2 } = await (supabase
+        .from('user_achievements' as any)
+        .select('user_id, achievement_id')
+        .in('user_id', userIds)) as any;
+      achievementRows2?.forEach((row: any) => {
+        const granted = ACHIEVEMENT_RANK_EPS[row.achievement_id] ?? 0;
+        const current = episodeCountMap.get(row.user_id) || 0;
+        if (granted > current) episodeCountMap.set(row.user_id, granted);
+      });
+
       let likedIds = new Set<string>();
       if (user) {
         const { data: likes } = await supabase
@@ -118,7 +174,10 @@ export function useReplies(parentId: string | undefined) {
 
       return comments.map(c => ({
         ...c,
-        profile: profileMap.get(c.user_id),
+        profile: {
+          ...profileMap.get(c.user_id),
+          total_episodes: episodeCountMap.get(c.user_id) || 0,
+        },
         user_liked: likedIds.has(c.id),
       })) as Comment[];
     },
