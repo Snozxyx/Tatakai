@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, Notification, dialog, Tray, Menu, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Notification, dialog, Tray, Menu, globalShortcut, protocol } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
@@ -140,7 +140,7 @@ function createWindow() {
 
     const startUrl = isDev
         ? 'http://localhost:8088'
-        : `file://${path.join(__dirname, '../dist/index.html')}`;
+        : path.join(__dirname, '../dist/index.html');
 
     console.log('Loading URL:', startUrl);
     console.log('Is development mode:', isDev);
@@ -148,14 +148,27 @@ function createWindow() {
     const loadURL = async (url) => {
         try {
             console.log(`[Loading] Attempting to load: ${url}`);
-            await mainWindow.loadURL(url);
-            console.log('[Loading] Successfully loaded URL:', url);
+            
+            // Use loadURL with file:// protocol for production (better relative path handling)
+            if (!isDev) {
+                // Convert file path to proper file:/// URL (three slashes for local paths)
+                const normalizedPath = url.replace(/\\/g, '/');
+                const fileUrl = normalizedPath.startsWith('/') 
+                    ? `file://${normalizedPath}` 
+                    : `file:///${normalizedPath}`;
+                await mainWindow.loadURL(fileUrl);
+                console.log('[Loading] Successfully loaded file URL:', fileUrl);
+            } else {
+                await mainWindow.loadURL(url);
+                console.log('[Loading] Successfully loaded URL:', url);
+            }
+            
             // Force a repaint to fix blank/black screen after loading
             if (mainWindow && !mainWindow.isDestroyed()) {
                 mainWindow.webContents.invalidate();
             }
         } catch (err) {
-            console.error(`[Loading] Failed to load URL ${url}:`, err);
+            console.error(`[Loading] Failed to load ${isDev ? 'URL' : 'file'} ${url}:`, err);
 
             if (isDev && url.includes('localhost:8088')) {
                 console.log('[Loading] dev-server probably not ready, retrying in 2s...');
@@ -541,6 +554,14 @@ function createSplash() {
 }
 
 app.on('ready', () => {
+    // Register protocol handler for better file:// support in production
+    if (!isDev) {
+        protocol.registerFileProtocol('file', (request, callback) => {
+            const url = request.url.substr(7); // Remove "file://" prefix
+            callback({ path: path.normalize(decodeURI(url)) });
+        });
+    }
+    
     createSplash();
 
     // Initialize main window after a short delay

@@ -19,6 +19,7 @@ import {
   Download,
   Rewind,
   FastForward,
+  Camera,
 } from "lucide-react";
 import Hls from "hls.js";
 import { toast } from "sonner";
@@ -116,6 +117,9 @@ export function MobileVideoPlayer({
   // Double-tap seek
   const [doubleTapSide, setDoubleTapSide] = useState<'left' | 'right' | null>(null);
   const [seekAmount, setSeekAmount] = useState(0);
+  const [hoverTime, setHoverTime] = useState<number>(0);
+  const [showHoverTime, setShowHoverTime] = useState(false);
+  const [hoverPercent, setHoverPercent] = useState(0);
   const lastTapRef = useRef<{ time: number; x: number }>({ time: 0, x: 0 });
   const doubleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const seekAccumulatorRef = useRef(0);
@@ -372,7 +376,10 @@ export function MobileVideoPlayer({
   const seek = (time: number) => {
     const video = videoRef.current;
     if (!video) return;
-    video.currentTime = Math.max(0, Math.min(time, duration));
+    const newTime = Math.max(0, Math.min(time, duration));
+    video.currentTime = newTime;
+    // Update UI immediately for responsive feedback
+    setCurrentTime(newTime);
   };
 
   const skipIntro = () => {
@@ -430,6 +437,22 @@ export function MobileVideoPlayer({
     seek(percent * duration);
   };
 
+  // Handle progress bar hover (for mouse/pointer events)
+  const handleProgressBarHover = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clientX = e.clientX;
+    const percent = (clientX - rect.left) / rect.width;
+    const clampedPercent = Math.max(0, Math.min(1, percent));
+    const time = clampedPercent * duration;
+    setHoverPercent(clampedPercent * 100);
+    setHoverTime(time);
+    setShowHoverTime(true);
+  };
+
+  const handleProgressBarLeave = () => {
+    setShowHoverTime(false);
+  };
+
   // Subtitle change
   const handleSubtitleChange = (lang: string) => {
     setCurrentSubtitle(lang);
@@ -443,6 +466,55 @@ export function MobileVideoPlayer({
       videoRef.current.playbackRate = speed;
     }
     setShowSettingsMenu(false);
+  };
+
+  // Handle screenshot
+  const handleScreenshot = () => {
+    if (!videoRef.current) return;
+
+    try {
+      // Create a canvas with the current video frame
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      
+      // Draw the video frame to canvas
+      ctx.drawImage(videoRef.current, 0, 0);
+      
+      // Convert canvas to blob and create download link
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        
+        // Create filename with timestamp and episode info
+        const timestamp = new Date().toLocaleString('en-US', { 
+          year: 'numeric', 
+          month: '2-digit', 
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        }).replace(/[/,: ]/g, '-');
+        const filename = `screenshot-${animeName || 'anime'}-ep${episodeNumber || '?'}-${timestamp}.png`;
+        
+        // Create download link
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        toast.success(`Screenshot saved: ${filename}`);
+      }, 'image/png');
+    } catch (err) {
+      console.error('Screenshot failed:', err);
+      toast.error('Failed to create screenshot');
+    }
   };
 
   // Handle download
@@ -665,7 +737,18 @@ export function MobileVideoPlayer({
               className="relative h-1.5 bg-white/20 rounded-full mb-3 touch-none"
               onTouchStart={handleProgressSeek}
               onTouchMove={handleProgressSeek}
+              onMouseMove={handleProgressBarHover}
+              onMouseLeave={handleProgressBarLeave}
             >
+              {/* Hover Time Tooltip */}
+              {showHoverTime && (
+                <div
+                  className="absolute bottom-full mb-2 bg-black/90 text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none z-50 font-medium"
+                  style={{ left: `calc(${hoverPercent}% - 24px)` }}
+                >
+                  {formatTime(hoverTime)}
+                </div>
+              )}
               {/* Buffered */}
               <div 
                 className="absolute h-full bg-white/30 rounded-full"
@@ -775,6 +858,15 @@ export function MobileVideoPlayer({
                   ) : (
                     <Maximize className="w-5 h-5 text-white" />
                   )}
+                </button>
+
+                {/* Screenshot */}
+                <button
+                  onClick={handleScreenshot}
+                  className="p-2.5 rounded-full bg-white/10 backdrop-blur-md active:scale-95 transition-transform border border-white/10"
+                  title="Take Screenshot"
+                >
+                  <Camera className="w-5 h-5 text-white" />
                 </button>
               </div>
             </div>

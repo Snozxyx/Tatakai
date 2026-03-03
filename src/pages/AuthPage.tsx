@@ -15,11 +15,11 @@ const passwordSchema = z.string().min(6, 'Password must be at least 6 characters
 
 // Random video backgrounds
 const VIDEO_SOURCES = [
-  'https://xkbzamfyupjafugqeaby.supabase.co/storage/v1/object/public/Public/bg/3.mp4',
-  'https://xkbzamfyupjafugqeaby.supabase.co/storage/v1/object/public/Public/bg/2.webm',
-  'https://xkbzamfyupjafugqeaby.supabase.co/storage/v1/object/public/Public/bg/1.mp4',
-  '/videos/5.mp4',
-  '/videos/6.mp4',
+  'https://tatakai.jiobase.com/storage/v1/object/public/Public/bg/3.mp4',
+  'https://tatakai.jiobase.com/storage/v1/object/public/Public/bg/2.webm',
+  'https://tatakai.jiobase.com/storage/v1/object/public/Public/bg/1.mp4',
+  `${window.location.origin}/videos/5.mp4`,
+  `${window.location.origin}/videos/6.mp4`,
 ];
 
 // Random text variations

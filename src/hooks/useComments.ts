@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { moderateContent, getViolationMessage } from '@/lib/autoModeration';
 import { sanitizeComment } from '@/lib/sanitize';
+import { notifyComment } from '@/services/discordWebhook';
 
 interface CommentProfile {
   display_name: string | null;
@@ -229,12 +230,21 @@ export function useAddComment() {
       if (error) throw error;
       return data;
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['comments', variables.animeId] });
       if (variables.parentId) {
         queryClient.invalidateQueries({ queryKey: ['replies', variables.parentId] });
       }
       toast.success('Comment posted');
+
+      // Notify Discord comment channel
+      notifyComment({
+        userName: user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'Anonymous',
+        animeName: variables.animeId,
+        episodeId: variables.episodeId,
+        content: variables.content,
+        isSpoiler: variables.isSpoiler,
+      });
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to post comment');

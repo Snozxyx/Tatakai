@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 
 const VIDEO_SOURCES = [
-  'https://xkbzamfyupjafugqeaby.supabase.co/storage/v1/object/public/Public/bg/3.mp4',
-  'https://xkbzamfyupjafugqeaby.supabase.co/storage/v1/object/public/Public/bg/2.webm',
-  'https://xkbzamfyupjafugqeaby.supabase.co/storage/v1/object/public/Public/bg/1.mp4',
+  'https://tatakai.jiobase.com/storage/v1/object/public/Public/bg/3.mp4',
+  'https://tatakai.jiobase.com/storage/v1/object/public/Public/bg/2.webm',
+  'https://tatakai.jiobase.com/storage/v1/object/public/Public/bg/1.mp4',
 ];
 
 interface StatusVideoBackgroundProps {

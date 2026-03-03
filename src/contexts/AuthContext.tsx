@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { getLocalContinueWatching, clearLocalContinueWatching } from '@/lib/localStorage';
+import { notifyUserCreated } from '@/services/discordWebhook';
 
 export interface Profile {
   id: string;
@@ -68,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
       return;
     }
-    
+
     // Use maybeSingle() to avoid 406 when a profile doesn't exist yet
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
@@ -117,18 +118,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
       return;
     }
-    
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
+
+        // Notify Discord when a new OAuth user signs up
+        if (event === 'SIGNED_IN' && session?.user) {
+          const u = session.user;
+          const createdAt = new Date(u.created_at).getTime();
+          const justCreated = Date.now() - createdAt < 30_000; // within 30s
+          if (justCreated && u.app_metadata?.provider !== 'email') {
+            notifyUserCreated({
+              email: u.email,
+              displayName: u.user_metadata?.display_name || u.user_metadata?.full_name || u.email?.split('@')[0],
+              provider: u.app_metadata?.provider || 'oauth',
+            });
+          }
+        }
 
         if (session?.user) {
           setTimeout(() => {
             fetchProfile(session.user.id);
             // Migrate local continue-watching entries to the database (only when online)
             if (!isOnline()) return;
-            
+
             (async () => {
               try {
                 const local = getLocalContinueWatching();
@@ -179,6 +194,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       setIsLoading(false);
+    }).catch(err => {
+      console.error('[Auth] Initial session fetch failed:', err);
+      setIsLoading(false);
     });
 
     return () => subscription.unsubscribe();
@@ -202,6 +220,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
       },
     });
+
+    // Notify Discord on successful signup
+    if (!error) {
+      notifyUserCreated({
+        email,
+        displayName: displayName || email.split('@')[0],
+        provider: 'email',
+      });
+    }
+
     return { error };
   };
 

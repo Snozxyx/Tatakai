@@ -6,12 +6,16 @@ import { useIsDesktopApp } from './useIsNativeApp';
  * Detects if the browser developer tools are open and redirects to a
  * blocked page. Skipped entirely in the desktop (Electron) app and in
  * non‑production environments so developers can work normally.
+ *
+ * Uses the `disable-devtool` library (https://github.com/theajack/disable-devtool)
+ * for robust detection in production, plus custom checks as fallback.
  */
 export function useAntiDevTools() {
   const navigate = useNavigate();
   const isDesktop = useIsDesktopApp();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const triggeredRef = useRef(false);
+  const disableDevtoolRef = useRef<any>(null);
 
   useEffect(() => {
     // Skip detection in:
@@ -34,6 +38,27 @@ export function useAntiDevTools() {
       triggeredRef.current = true;
       navigate('/devtools-blocked', { replace: true });
     };
+
+    // ── Primary: disable-devtool library ──────────────────────────────
+    // Dynamically import to keep bundle light in dev
+    import('disable-devtool').then((mod) => {
+      const DisableDevtool: any = mod.default;
+      disableDevtoolRef.current = DisableDevtool({
+        ondevtoolopen: (_type: string) => {
+          redirect();
+        },
+        // Disable the built-in "close window" behaviour — we redirect instead
+        disableMenu: true,
+        clearLog: true,
+        clearIntervalWhenDev: false,
+        // Check interval in ms
+        interval: 2000,
+        // Detect all methods
+        detectors: [0, 1, 2, 3, 4, 5, 6, 7],
+      });
+    }).catch(() => {
+      // Fallback: if dynamic import fails, rely on manual checks below
+    });
 
     // ── Method 1: Size-based detection ────────────────────────────────
     // DevTools adds ~100–400 px when docked.
@@ -112,6 +137,10 @@ export function useAntiDevTools() {
       clearTimeout(initTimer);
       if (intervalRef.current) clearInterval(intervalRef.current);
       window.removeEventListener('resize', handleResize);
+      // Tear down disable-devtool if it was initialised
+      if (disableDevtoolRef.current && typeof disableDevtoolRef.current === 'function') {
+        try { disableDevtoolRef.current(); } catch { /* ignore */ }
+      }
     };
   }, [isDesktop, navigate]);
 }

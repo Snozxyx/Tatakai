@@ -274,6 +274,22 @@ export default function WatchPage() {
     return servers.filter(s => s.serverName !== 'hd-1');
   }, [category, serversData]);
 
+  // Reset server index when category changes if current server is not available
+  useEffect(() => {
+    if (selectedServerIndex >= 0 && availableServers.length > 0) {
+      const currentServerName = availableServers[selectedServerIndex]?.serverName;
+      // Check if the currently selected server exists in the new category
+      const stillExists = availableServers.some(s => s.serverName === currentServerName);
+      if (!stillExists) {
+        // Reset to first available server when switching categories
+        setSelectedServerIndex(-1);
+        setSelectedLangCode(null);
+        setPreferredServerName(null);
+        setFailedServers(new Set());
+      }
+    }
+  }, [category, availableServers, selectedServerIndex]);
+
   // Auto-select server when servers load: prefer saved server, then hd-2, then first
   useEffect(() => {
     if (availableServers.length > 0 && selectedServerIndex === -1) {
@@ -296,7 +312,17 @@ export default function WatchPage() {
     }
   }, [availableServers, selectedServerIndex, preferredServerName]);
 
-  const currentServer = availableServers[Math.max(0, selectedServerIndex)];
+  const currentServer = useMemo(() => {
+    // If selectedServerIndex is valid, use it; otherwise try to find a default
+    if (selectedServerIndex >= 0 && availableServers[selectedServerIndex]) {
+      return availableServers[selectedServerIndex];
+    }
+    // Fallback to hd-2 if available
+    const hd2 = availableServers.find(s => s.serverName === 'hd-2');
+    if (hd2) return hd2;
+    // Otherwise use first available server
+    return availableServers[0] || null;
+  }, [availableServers, selectedServerIndex]);
 
   // Find current episode BEFORE using it in hooks
   const currentEpisodeIndex = useMemo(() => {

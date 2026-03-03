@@ -2,8 +2,14 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const VITE_SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+// Standardize URL to avoid framing/CORS blocks on custom domains
+// Project Ref: xkbzamfyupjafugqeaby
+const SUPABASE_URL = (VITE_SUPABASE_URL?.includes("jiobase.com") || !VITE_SUPABASE_URL)
+  ? "https://xkbzamfyupjafugqeaby.supabase.co"
+  : VITE_SUPABASE_URL;
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";

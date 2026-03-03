@@ -1,4 +1,5 @@
 import { getClientIdSync } from '@/hooks/useClientId';
+import { isApiCryptoEnabled, generateApiSignature } from '@/lib/apiCrypto';
 
 const API_URL = "http://de-fsn01.na1.host:4270/api/v2/hianime";
 const CHAR_API_URL = "https://anime-api.canelacho.com/api/v1";
@@ -151,19 +152,43 @@ function withClientHeaders(extra: Record<string, string> = {}): Record<string, s
 }
 
 /**
+ * Build headers with optional CID + API signature for authenticated requests
+ * to TatakaiAPI endpoints.
+ */
+async function withSignedHeaders(
+  path: string,
+  extra: Record<string, string> = {},
+): Promise<Record<string, string>> {
+  const headers = withClientHeaders(extra);
+  if (isApiCryptoEnabled()) {
+    const { timestamp, signature } = await generateApiSignature(path);
+    headers['X-Api-Timestamp'] = timestamp;
+    headers['X-Api-Signature'] = signature;
+  }
+  return headers;
+}
+
+/**
  * Generic fetcher for external APIs with retry logic
  */
 export async function externalApiGet<T>(baseUrl: string, path: string, retries = 2, timeoutMs: number = 25000): Promise<T> {
   const url = `${baseUrl}${path}`;
   let lastError: Error | null = null;
 
+  // Use signed headers when calling our own TatakaiAPI
+  const isTatakaiApi = baseUrl === TATAKAI_API_URL;
+
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
+      const headers = isTatakaiApi
+        ? await withSignedHeaders(path)
+        : withClientHeaders();
+
       const response = await fetch(url, {
-        headers: withClientHeaders(),
+        headers,
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -2156,7 +2181,8 @@ export async function fetchCombinedSources(
 
   const allSources = [
     ...(primaryData.sources || []),
-    ...(watchAwVal?.sources || []).map((s: any) => ({ ...s, isEmbed: !s.isM3U8 && s.needsHeadless })),
+    // Filter out WatchAnimeWorld needsHeadless sources - they require extraction and can't be directly embedded
+    ...(watchAwVal?.sources || []).filter((s: any) => !s.needsHeadless),
     ...(Array.isArray(animeyaVal) ? animeyaVal : []),
     ...(Array.isArray(animelokVal) ? animelokVal : []),
     ...(Array.isArray(desidubArray) ? desidubArray : []),

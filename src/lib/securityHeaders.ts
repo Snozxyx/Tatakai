@@ -32,10 +32,12 @@ export const CSP_POLICY = {
   'connect-src': [
     "'self'",
     'https://*.supabase.co',
+    'https://tatakai.jiobase.com',
     'https://*.datadoghq.com',
     'https://www.google-analytics.com',
     'https://api.tatakai.me',
     'https://api.jikan.moe',
+    ""
   ],
   'media-src': [
     "'self'",

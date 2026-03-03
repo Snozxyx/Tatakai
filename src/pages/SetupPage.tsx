@@ -9,11 +9,11 @@ import { Filesystem, Directory } from '@capacitor/filesystem';
 
 // Video sources - local videos bundled with the app (in public/videos)
 const VIDEO_SOURCES = [
-  '/videos/1.mp4',
-  '/videos/2.webm',
-  '/videos/3.mp4',
-  '/videos/5.mp4',
-  '/videos/6.mp4',
+  './videos/1.mp4',
+  './videos/2.webm',
+  './videos/3.mp4',
+  './videos/5.mp4',
+  './videos/6.mp4',
 ];
 
 // Text variations for the right side

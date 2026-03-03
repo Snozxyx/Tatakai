@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { notifyError } from '@/services/discordWebhook';
 
 function generateErrorId() {
   return `err_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,8)}`;
@@ -39,6 +40,15 @@ export async function logClientError(err: unknown, context: Record<string, any> 
       entity_type: 'frontend',
       entity_id: null,
       details,
+    });
+
+    // Also notify Discord error channel
+    notifyError({
+      message,
+      stack,
+      url: details.url || undefined,
+      userId: userId || undefined,
+      context: context ? JSON.stringify(context).slice(0, 500) : undefined,
     });
 
     return { errorId };

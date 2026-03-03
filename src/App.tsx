@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ReduceMotionPrompt } from '@/components/layout/ReduceMotionPrompt';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams, useNavigate } from "react-router-dom";
+import { BrowserRouter, HashRouter, Routes, Route, Navigate, useLocation, useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { useSmartTV } from "@/hooks/useSmartTV";
@@ -521,20 +521,30 @@ function ConditionalFooter() {
   return <Footer />;
 }
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <BrowserRouter
-          future={{
-            v7_startTransition: true,
-            v7_relativeSplatPath: true,
-          }}
-        >
-          <AppContent />
-        </BrowserRouter>
-      </TooltipProvider>
-    </AuthProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  // Detect if running in Electron/file:// protocol
+  const isElectron = window.location.protocol === 'file:';
+
+  const routerFutureFlags = {
+    v7_startTransition: true,
+    v7_relativeSplatPath: true,
+  };
+
+  // Use HashRouter for Electron production builds (file:// protocol)
+  // BrowserRouter's History API doesn't work with file:// — routes resolve to
+  // non-existent filesystem paths, causing 404 errors.
+  const Router = isElectron ? HashRouter : BrowserRouter;
+  
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <TooltipProvider>
+          <Router future={routerFutureFlags}>
+            <AppContent />
+          </Router>
+        </TooltipProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  );
+};
 export default App;

@@ -5,6 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, range, accept',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Content-Type',
+  'Cross-Origin-Resource-Policy': 'cross-origin',
 };
 
 async function fetchWithRetry(url: string, options: RequestInit, retries = 3): Promise<Response> {

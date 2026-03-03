@@ -33,6 +33,7 @@ import {
   Download,
   DownloadCloud,
   PictureInPicture2,
+  Camera,
 } from "lucide-react";
 
 import Hls from "hls.js";
@@ -277,6 +278,9 @@ export function VideoPlayer({
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
   const [downloads, setDownloads] = useState<Record<string, any>>({});
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+  const [hoverTime, setHoverTime] = useState<number>(0);
+  const [showHoverTime, setShowHoverTime] = useState(false);
+  const [hoverPercent, setHoverPercent] = useState(0);
   const isNative = useIsNativeApp();
   const { startDownload, downloadStates } = useDownload();
 
@@ -1652,6 +1656,22 @@ export function VideoPlayer({
 
 
 
+  const handleProgressBarHover = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isLive) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clientX = e.clientX;
+    const percent = (clientX - rect.left) / rect.width;
+    const clampedPercent = Math.max(0, Math.min(1, percent));
+    const time = clampedPercent * duration;
+    setHoverPercent(clampedPercent * 100);
+    setHoverTime(time);
+    setShowHoverTime(true);
+  };
+
+  const handleProgressBarLeave = () => {
+    setShowHoverTime(false);
+  };
+
   const handleSeek = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
 
     const rect = e.currentTarget.getBoundingClientRect();
@@ -1660,15 +1680,69 @@ export function VideoPlayer({
 
     const percent = (clientX - rect.left) / rect.width;
 
+    const newTime = Math.max(0, Math.min(duration, percent * duration));
+
     if (videoRef.current) {
 
-      videoRef.current.currentTime = Math.max(0, Math.min(duration, percent * duration));
+      videoRef.current.currentTime = newTime;
+
+      // Update UI immediately for responsive feedback
+
+      setCurrentTime(newTime);
 
     }
 
   };
 
 
+
+  const handleScreenshot = () => {
+    if (!videoRef.current) return;
+
+    try {
+      // Create a canvas with the current video frame
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      
+      // Draw the video frame to canvas
+      ctx.drawImage(videoRef.current, 0, 0);
+      
+      // Convert canvas to blob and create download link
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        
+        // Create filename with timestamp and episode info
+        const timestamp = new Date().toLocaleString('en-US', { 
+          year: 'numeric', 
+          month: '2-digit', 
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        }).replace(/[/,: ]/g, '-');
+        const filename = `screenshot-${animeName || 'anime'}-ep${episodeNumber || '?'}-${timestamp}.png`;
+        
+        // Create download link
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        toast.success(`Screenshot saved: ${filename}`);
+      }, 'image/png');
+    } catch (err) {
+      console.error('Screenshot failed:', err);
+      toast.error('Failed to create screenshot');
+    }
+  };
 
   const togglePiP = async () => {
     if (!videoRef.current) return;
@@ -2015,7 +2089,29 @@ export function VideoPlayer({
 
           onTouchMove={!isLive ? handleSeek : undefined}
 
+          onMouseMove={!isLive ? handleProgressBarHover : undefined}
+
+          onMouseLeave={!isLive ? handleProgressBarLeave : undefined}
+
         >
+
+          {/* Hover Time Tooltip */}
+
+          {showHoverTime && !isLive && (
+
+            <div
+
+              className="absolute bottom-full mb-2 bg-black/90 text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none z-50 font-medium"
+
+              style={{ left: `calc(${hoverPercent}% - 24px)` }}
+
+            >
+
+              {formatTime(hoverTime)}
+
+            </div>
+
+          )}
 
           {/* Skip Time Markers (yellow) */}
 
@@ -2442,6 +2538,17 @@ export function VideoPlayer({
             )}
 
 
+
+            {/* Screenshot Button */}
+            {!isLive && (
+              <button
+                onClick={handleScreenshot}
+                className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+                title="Take Screenshot"
+              >
+                <Camera className="w-4 h-4 md:w-5 md:h-5" />
+              </button>
+            )}
 
             {/* Picture in Picture */}
             {!isMobile && typeof document !== 'undefined' && 'pictureInPictureEnabled' in document && (document as any).pictureInPictureEnabled && (

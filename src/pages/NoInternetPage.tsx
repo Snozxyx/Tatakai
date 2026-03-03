@@ -8,13 +8,19 @@ interface NoInternetPageProps {
   isNative?: boolean;
 }
 
+// Helper function to get correct video path
+const getVideoPath = (filename: string) => {
+  const isElectron = typeof window !== 'undefined' && (window as any).electron;
+  return isElectron ? `./${filename}` : `/${filename}`;
+};
+
 // Video sources - local videos bundled with the app (in public/videos)
 const VIDEO_SOURCES = [
-  '/videos/1.mp4',
-  '/videos/3.mp4',
-  '/videos/2.webm',
-  '/videos/5.mp4',
-  '/videos/6.mp4',
+  getVideoPath('videos/1.mp4'),
+  getVideoPath('videos/3.mp4'),
+  getVideoPath('videos/2.webm'),
+  getVideoPath('videos/5.mp4'),
+  getVideoPath('videos/6.mp4'),
 ];
 
 // Text variations for the right side

@@ -7,17 +7,17 @@ import packageJson from "./package.json";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const isWebMode = mode === 'web';
+  const isElectronBuild = process.env.ELECTRON_BUILD === 'true';
 
   return {
     plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+    base: isElectronBuild ? './' : '/',
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
       },
     },
     build: {
-      // Relative base so Electron can load via file:// without broken asset paths
-      base: process.env.ELECTRON_BUILD === 'true' ? './' : '/',
       // Only generate sourcemaps if explicitly enabled (for debugging)
       sourcemap: mode === 'production' && process.env.ENABLE_SOURCEMAPS === 'true',
       minify: 'terser',

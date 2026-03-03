@@ -68,21 +68,7 @@
   </head>
 
   <body>
-    <!-- Anti-clickjacking: break out of hostile iframes -->
-    <script>
-      if (window.top !== window.self) {
-        try {
-          // Attempt to access top — will throw if cross-origin
-          if (window.top.location.hostname !== window.self.location.hostname) {
-            window.top.location.replace(window.self.location.href);
-          }
-        } catch (e) {
-          // Cross-origin frame — hide content and redirect
-          document.documentElement.style.display = 'none';
-          window.top.location.replace(window.self.location.href);
-        }
-      }
-    </script>
+
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -61,7 +61,7 @@ export async function exchangeMalCode(code: string) {
         throw new Error('You must be logged in to link MyAnimeList.');
     }
 
-    const functionUrl = `https://xkbzamfyupjafugqeaby.supabase.co/functions/v1/mal-auth`;
+    const functionUrl = `https://tatakai.jiobase.com/functions/v1/mal-auth`;
 
     console.debug('[MAL Auth] Calling Edge Function:', functionUrl, 'action:', 'exchange');
 
@@ -235,7 +235,7 @@ export async function updateMalAnimeStatus(
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) throw new Error('Not authenticated');
 
-    const functionUrl = `https://xkbzamfyupjafugqeaby.supabase.co/functions/v1/mal-auth`;
+    const functionUrl = `https://tatakai.jiobase.com/functions/v1/mal-auth`;
 
     const response = await fetch(functionUrl, {
         method: 'POST',
@@ -278,7 +278,7 @@ export async function fetchMalUserList() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) throw new Error('Not authenticated');
 
-    const functionUrl = `https://xkbzamfyupjafugqeaby.supabase.co/functions/v1/mal-auth`;
+    const functionUrl = `https://tatakai.jiobase.com/functions/v1/mal-auth`;
 
     console.log('[MAL Sync] REQ - Fetching user list via Edge Function');
 
@@ -359,7 +359,7 @@ export async function deleteMalAnimeStatus(animeIdOrMalId: string): Promise<void
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) throw new Error('Not authenticated');
 
-    const functionUrl = `https://xkbzamfyupjafugqeaby.supabase.co/functions/v1/mal-auth`;
+    const functionUrl = `https://tatakai.jiobase.com/functions/v1/mal-auth`;
 
     console.log('[MAL Sync] REQ - Calling Edge Function delete for malId:', malId);
 

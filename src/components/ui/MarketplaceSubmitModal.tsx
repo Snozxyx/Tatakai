@@ -146,7 +146,7 @@ export function MarketplaceSubmitModal({ isOpen, onClose, animeId, animeName, ep
                         <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
                             <div className="space-y-0.5">
                                 <label className="text-sm font-medium">Is Embed?</label>
-                                <p className="text-[10px] text-muted-foreground">Toggle this if the URL is an iframe/embed link.</p>
+                                <p className="text-[10px] text-muted-foreground">Toggle this if the URL is an iframe/embed link (player page URL).</p>
                             </div>
                             <Switch checked={isEmbed} onCheckedChange={setIsEmbed} />
                         </div>

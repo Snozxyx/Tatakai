@@ -12,6 +12,7 @@ export function Sidebar() {
   const isNative = useIsNativeApp();
   const isDesktopApp = useIsDesktopApp(); // Only Electron/Tauri
   const isMobileApp = useIsMobileApp(); // Only Capacitor
+  const domain = import.meta.env.VITE_PUBLIC_DOMAIN || "https://tatakai.me"; // Ensure domain is defined
   
   // Don't render sidebar on mobile apps at all
   if (isMobileApp) return null;
@@ -34,7 +35,7 @@ export function Sidebar() {
         style={!isDesktopApp ? { boxShadow: "0 0 20px hsl(var(--primary) / 0.3)" } : {}}
        >    
        <img
-    src="/tatakai-logo-square.png"
+    src={`${domain}/tatakai-logo-square.png`}
     alt="Tatakai Logo"
     className="w-full h-full object-contain"
   />
