@@ -53,11 +53,7 @@ export default defineConfig(({ mode }) => {
           rewrite: (p) => p.replace(/^\/api\/proxy\/aniwatch/, '/api/v2/hianime'),
         },
       },
-      // Allow embedding in Discord Activity iframe
-      headers: {
-        'Cross-Origin-Embedder-Policy': 'credentialless',
-        'Cross-Origin-Opener-Policy': 'same-origin',
-      },
+    
     },
     define: {
       __APP_VERSION__: JSON.stringify(packageJson.version),
