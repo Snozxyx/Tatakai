@@ -31,6 +31,14 @@ import {
 // Fallback changelog entries if database is empty
 const FALLBACK_CHANGELOG = [
   {
+    version: '4.1.20',
+    date: '2026-03-03',
+    changes: [
+      'Release Sync: Synchronized version metadata in package files, changelog, and desktop splash screen',
+      'Publish Consistency: Finalized v4.1.20 release alignment for tagging and deployment',
+    ],
+  },
+  {
     version: '4.1.19',
     date: '2026-03-03',
     changes: [

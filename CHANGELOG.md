@@ -4,6 +4,14 @@ All notable changes to Tatakai are documented here.
 
 ---
 
+## [4.1.20] - 2026-03-03
+
+### Changed
+- **Release Sync** — Synchronized release metadata across package versioning, changelog, and desktop splash screen
+- **Publish Consistency** — Finalized `v4.1.20` release alignment for repository push and tagging
+
+---
+
 ## [4.1.19] - 2026-03-03
 
 ### Added
