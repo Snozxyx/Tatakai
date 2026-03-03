@@ -1,7 +1,7 @@
 {
   "name": "tatakai",
   "private": true,
-  "version": "4.1.18",
+  "version": "4.1.19",
   "description": "Tatakai - Watch anime online",
   "author": {
     "name": "Tatakai",
@@ -19,7 +19,7 @@
     "preview": "vite preview",
     "start": "npm run build && cross-env NODE_ENV=production vite preview --port 3000",
     "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:8088 && electron desktop/main.cjs\"",
-    "electron:build": "cross-env ELECTRON_BUILD=true vite build && electron-builder",
+    "electron:build": "cross-env ELECTRON_BUILD=true vite build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder",
     "assets:generate": "node scripts/generate-assets.cjs",
     "mobile:dev": "npm run build && npx cap open android",
     "mobile:sync": "npm run build && npx cap sync",
@@ -88,6 +88,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^3.6.0",
+    "disable-devtool": "^0.3.9",
     "discord-rpc": "^4.0.1",
     "dompurify": "^3.3.1",
     "electron-updater": "^6.7.3",
@@ -169,6 +170,7 @@
       }
     ],
     "win": {
+      "signAndEditExecutable": false,
       "target": [
         "nsis",
         "portable"

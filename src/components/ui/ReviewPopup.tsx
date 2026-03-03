@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GlassPanel } from './GlassPanel';
 import { Button } from './button';
-import { Star, X, MessageSquare, Heart, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Star, X, Heart, ThumbsUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { notifyReviewPopup } from '@/services/discordWebhook';
 
 interface ReviewPopupProps {
     isOpen?: boolean;
@@ -57,6 +58,15 @@ export function ReviewPopup({ isOpen: propIsOpen, onClose, animeId, animeName, u
                     created_at: new Date().toISOString()
                 });
             }
+
+            notifyReviewPopup({
+                userId: user?.id,
+                animeId,
+                animeName,
+                rating,
+                feedback,
+            });
+
             setStep('thanks');
             localStorage.setItem('tatakai_review_shown', 'true');
             toast.success('Thank you for your feedback!');

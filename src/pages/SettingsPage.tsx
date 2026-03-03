@@ -31,6 +31,17 @@ import {
 // Fallback changelog entries if database is empty
 const FALLBACK_CHANGELOG = [
   {
+    version: '4.1.19',
+    date: '2026-03-03',
+    changes: [
+      'Production Security: Request signature verification is now production-only with replay protection',
+      'Public API Stability: Signature checks are selective so public scraper routes remain accessible',
+      'Review Popup Webhook: Review submissions now trigger Discord notifications via secure backend webhook proxy',
+      'Security Hardening: Discord webhook URLs remain server-side env vars only and are never exposed in frontend',
+      'Version Sync: Updated app version references and desktop splash screen to match release version',
+    ],
+  },
+  {
     version: '4.1.18',
     date: '2026-02-28',
     changes: [
@@ -309,15 +320,24 @@ export default function SettingsPage() {
 
     const toastId = toast.loading(`Importing ${selectedItems.length} items...`);
     try {
-      const watchlistItems = selectedItems.map(item => ({
-        user_id: user!.id,
-        anime_id: item.targetId,
-        anime_name: item.malTitle,
-        anime_poster: item.poster,
-        status: item.status,
-        mal_id: item.malId,
-        updated_at: new Date().toISOString()
-      }));
+      // Deduplicate items by (user_id, anime_id) to prevent conflicts
+      const seen = new Set<string>();
+      const watchlistItems = selectedItems
+        .map(item => ({
+          user_id: user!.id,
+          anime_id: item.targetId,
+          anime_name: item.malTitle,
+          anime_poster: item.poster,
+          status: item.status,
+          mal_id: item.malId,
+          updated_at: new Date().toISOString()
+        }))
+        .filter(item => {
+          const key = `${item.user_id}:${item.anime_id}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
 
       const { error } = await supabase
         .from('watchlist')
@@ -325,7 +345,7 @@ export default function SettingsPage() {
 
       if (error) throw error;
 
-      toast.success(`Successfully imported ${selectedItems.length} items!`, { id: toastId });
+      toast.success(`Successfully imported ${watchlistItems.length} items!`, { id: toastId });
       setIsImportModalOpen(false);
       refreshProfile();
     } catch (err: any) {

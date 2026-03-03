@@ -4,6 +4,22 @@ All notable changes to Tatakai are documented here.
 
 ---
 
+## [4.1.19] - 2026-03-03
+
+### Added
+- **API Request Security (Production)** — Added production-only request signature verification path for protected API routes, with replay-window checks and shared-secret key derivation
+- **Discord Review Notifications** — Review popup submissions now send webhook notifications through TatakaiAPI proxy (server-side env webhooks only)
+- **Webhook Channel Expansion** — Added dedicated `review_popup` webhook channel support on API proxy
+
+### Changed
+- **Version Alignment** — App release version updated to `4.1.19` and synced in desktop splash screen
+- **Desktop Settings Version Display** — Replaced hardcoded desktop settings version values with runtime app version constant
+
+### Security
+- **No Public Webhook URLs** — Review popup webhook uses backend env var mapping only; no Discord webhook URL is exposed in frontend code
+
+---
+
 ## [4.1.18] - 2026-02-28
 
 ### Added

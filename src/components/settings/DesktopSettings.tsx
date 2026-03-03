@@ -59,7 +59,7 @@ export function DesktopSettings() {
                 setSystemInfo({
                     platform: 'unknown',
                     arch: 'unknown',
-                    version: '4.1.0',
+                    version: __APP_VERSION__,
                     electronVersion: 'unknown',
                     nodeVersion: 'unknown',
                     totalMemory: 0,
@@ -260,7 +260,7 @@ export function DesktopSettings() {
                 <div className="p-4 rounded-xl bg-muted/30">
                     <div className="flex items-center justify-between">
                         <div className="flex-1 mr-4">
-                            <p className="font-medium">Current Version: v4.1.0</p>
+                            <p className="font-medium">Current Version: v{__APP_VERSION__}</p>
                             <p className="text-xs text-muted-foreground">You are on the stable channel</p>
                             {updateAvailable && (
                                  <p className="text-xs text-green-500 mt-1 flex items-center gap-1">
