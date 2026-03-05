@@ -1,7 +1,7 @@
 import { getClientIdSync } from '@/hooks/useClientId';
 import { isApiCryptoEnabled, generateApiSignature } from '@/lib/apiCrypto';
 
-const API_URL = "http://de-fsn01.na1.host:4270/api/v2/hianime";
+const API_URL = "https://core.tatakai.me/api/v2/hianime";
 const CHAR_API_URL = "https://anime-api.canelacho.com/api/v1";
 
 // TatakaiAPI URL - configurable for development
