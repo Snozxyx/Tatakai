@@ -41,6 +41,11 @@ export default defineConfig(({ mode }) => {
       host: "::",
       port: isWebMode ? 8081 : 8088, // Standard port for Electron dev
       // Allow Discord Activity iframe to embed the app
+        allowedHosts: [
+        "tatakai.me",
+        "gabhasti.tech",
+        ".gabhasti.tech" // The dot allows all subdomains like api.gabhasti.tech
+      ],
       hmr: {
         clientPort: 443,
       },
@@ -53,7 +58,8 @@ export default defineConfig(({ mode }) => {
           rewrite: (p) => p.replace(/^\/api\/proxy\/aniwatch/, '/api/v2/hianime'),
         },
       },
-    
+      // Allow embedding in Discord Activity iframe
+   
     },
     define: {
       __APP_VERSION__: JSON.stringify(packageJson.version),
