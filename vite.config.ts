@@ -57,36 +57,36 @@ export default defineConfig(({ mode }) => {
       proxy: {
         // Preferred dev proxy for provider calls
         '/api/v2/anime': {
-          target: process.env.VITE_LOCAL_HIANIME_ORIGIN || 'http://localhost:9000',
+          target: process.env.VITE_LOCAL_HIANIME_ORIGIN || 'https://api.tatakai.me',
           changeOrigin: true,
           secure: false,
         },
         // Dev proxy for all provider calls → local TatakaiCore (localhost:9000)
         '/api/providers': {
-          target: process.env.VITE_LOCAL_HIANIME_ORIGIN || 'http://localhost:9000',
+          target: process.env.VITE_LOCAL_HIANIME_ORIGIN || 'https://api.tatakai.me',
           changeOrigin: true,
           secure: false,
           rewrite: (p) => p.replace(/^\/api\/providers/, ''),
         },
         // Same-origin dev proxy to local HiAnime API (prevents browser CORS errors)
         '/api/tatakai': {
-          target: process.env.VITE_LOCAL_HIANIME_ORIGIN || 'http://localhost:9000',
+          target: process.env.VITE_LOCAL_HIANIME_ORIGIN || 'https://api.tatakai.me',
           changeOrigin: true,
           secure: false,
           rewrite: (p) => p.replace(/^\/api\/tatakai/, '/api/v2/hianime'),
         },
         '/api/stream': {
-          target: process.env.VITE_LOCAL_HIANIME_ORIGIN || 'http://localhost:9000',
+          target: process.env.VITE_LOCAL_HIANIME_ORIGIN || 'https://api.tatakai.me',
           changeOrigin: true,
           secure: false,
         },
         '/api/servers': {
-          target: process.env.VITE_LOCAL_HIANIME_ORIGIN || 'http://localhost:9000',
+          target: process.env.VITE_LOCAL_HIANIME_ORIGIN || 'https://api.tatakai.me',
           changeOrigin: true,
           secure: false,
         },
         '/api/proxy': {
-          target: process.env.VITE_LOCAL_HIANIME_ORIGIN || 'http://localhost:9000',
+          target: process.env.VITE_LOCAL_HIANIME_ORIGIN || 'https://api.tatakai.me',
           changeOrigin: true,
           secure: false,
         },
