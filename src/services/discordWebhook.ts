@@ -27,10 +27,12 @@ function normalizeWebhookBase(url: string): string {
 }
 
 function resolveWebhookBase(url: string): string {
-  const normalized = normalizeWebhookBase(url);
-  if (import.meta.env.DEV && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/api\/v2\/anime$/i.test(normalized)) {
+  // In dev, always use same-origin so Vite proxy handles CORS.
+  if (import.meta.env.DEV) {
     return '/api/v2/anime';
   }
+
+  const normalized = normalizeWebhookBase(url);
   return normalized;
 }
 
@@ -79,14 +81,20 @@ async function sendToDiscord(payload: WebhookPayload): Promise<void> {
 
     if (!res.ok) {
       if (res.status === 404) {
-        console.warn('[Discord Webhook] Endpoint reachable but webhook env is not configured for this channel.');
+        if (!import.meta.env.PROD) {
+          console.warn('[Discord Webhook] Endpoint reachable but webhook env is not configured for this channel.');
+        }
         return;
       }
-      console.warn(`[Discord Webhook] Failed (${res.status}):`, await res.text().catch(() => ''));
+      if (!import.meta.env.PROD) {
+        console.warn(`[Discord Webhook] Failed (${res.status}):`, await res.text().catch(() => ''));
+      }
     }
   } catch (err) {
     // Never let webhook errors break the app
-    console.warn('[Discord Webhook] Send failed:', err);
+    if (!import.meta.env.PROD) {
+      console.warn('[Discord Webhook] Send failed:', err);
+    }
   }
 }
 

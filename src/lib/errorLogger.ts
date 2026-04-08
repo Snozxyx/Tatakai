@@ -42,7 +42,8 @@ export async function logClientError(err: unknown, context: Record<string, any> 
       details,
     });
 
-    const enableDiscordLogging = import.meta.env.PROD || import.meta.env.VITE_ENABLE_DISCORD_WEBHOOKS === 'true';
+    const isLocalhost = typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
+    const enableDiscordLogging = (import.meta.env.PROD && !isLocalhost) || import.meta.env.VITE_ENABLE_DISCORD_WEBHOOKS === 'true';
 
     if (enableDiscordLogging) {
       // Also notify Discord error channel in production or when explicitly enabled.

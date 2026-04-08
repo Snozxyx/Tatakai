@@ -110,10 +110,8 @@ function ConditionalFooter() {
   const location = useLocation();
   const isNative = useIsNativeApp();
   if (isNative) return null;
-  const hideFooter = ['/watch/', '/banned', '/maintenance', '/service-unavailable', '/error', '/auth', '/mal-redirect', '/anilist-redirect'].some(path => location.pathname.startsWith(path));
-  if (hideFooter) {
-    return <div aria-hidden="true" className="h-0 overflow-hidden pointer-events-none select-none" />;
-  }
+  const hideFooter = ['/watch/', '/isshoni/', '/search', '/image-search', '/status', '/banned', '/maintenance', '/service-unavailable', '/503', '/error', '/auth', '/reset-password', '/update-password', '/onboarding', '/setup', '/mal-redirect', '/anilist-redirect', '/favorites', '/trending', '/settings' , '/recommendations' , '/admin'].some(path => location.pathname.startsWith(path));
+  if (hideFooter) return null;
   return <Footer />;
 }
 

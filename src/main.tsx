@@ -48,8 +48,17 @@ if (typeof window !== 'undefined') {
     } catch { }
   });
 
-  // Register service worker for PWA (only in non-webapp mode)
-  if ('serviceWorker' in navigator && import.meta.env.MODE !== 'web') {
+  // Keep development builds free of stale cached bundles.
+  if ('serviceWorker' in navigator && !import.meta.env.PROD) {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      registrations.forEach((registration) => {
+        void registration.unregister();
+      });
+    });
+  }
+
+  // Register service worker for PWA only in production (non-webapp mode).
+  if ('serviceWorker' in navigator && import.meta.env.PROD && import.meta.env.MODE !== 'web') {
     window.addEventListener('load', () => {
       navigator.serviceWorker
         .register('/sw.js')

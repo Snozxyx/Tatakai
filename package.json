@@ -12,7 +12,7 @@
   "main": "desktop/main.cjs",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "cross-env NODE_ENV=development vite",
     "build": "cross-env NODE_ENV=production vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
