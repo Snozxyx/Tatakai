@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, User, Star, MapPin, Zap, Shield, Users, AlertCircle, Heart, ExternalLink } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import {
-    getCharacterById,
+    fetchCharacterById,
     searchCharacters,
     CharacterDetail,
     fetchJikanCharacter,
@@ -64,7 +64,7 @@ export default function CharacterPage() {
             // Try as MongoDB ID first
             if (isMongoId) {
                 try {
-                    const response = await getCharacterById(charname);
+                    const response = await fetchCharacterById(charname);
                     if (response.success) return response.data;
                 } catch (e) {
                     console.warn('ID lookup failed, falling back to name search');
@@ -77,7 +77,7 @@ export default function CharacterPage() {
 
             if (searchResponse.success && searchResponse.data.length > 0) {
                 const firstResultId = searchResponse.data[0]._id;
-                const detailedResp = await getCharacterById(firstResultId);
+                const detailedResp = await fetchCharacterById(firstResultId);
                 if (detailedResp.success) return detailedResp.data;
             }
 
@@ -85,7 +85,7 @@ export default function CharacterPage() {
             if (fallbackName && searchTerms !== charname) {
                 const retrySearch = await searchCharacters(charname);
                 if (retrySearch.success && retrySearch.data.length > 0) {
-                    const detailedResp = await getCharacterById(retrySearch.data[0]._id);
+                    const detailedResp = await fetchCharacterById(retrySearch.data[0]._id);
                     if (detailedResp.success) return detailedResp.data;
                 }
             }
