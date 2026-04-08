@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 
 import {
 
@@ -62,6 +62,99 @@ function convertFileSrc(filePath: string): string {
   return `file:///${normalized}`;
 }
 
+function looksLikeHlsManifest(payload: string): boolean {
+  const text = String(payload || '').trim();
+  if (!text.startsWith('#EXTM3U')) return false;
+  return (
+    text.includes('#EXT-X-STREAM-INF') ||
+    text.includes('#EXT-X-TARGETDURATION') ||
+    text.includes('#EXTINF')
+  );
+}
+
+function readProxyQuerySnapshot(candidateUrl: string): { streamUrl?: string; referer?: string; userAgent?: string } {
+  try {
+    const resolved = new URL(candidateUrl, window.location.origin);
+    const streamUrl = resolved.searchParams.get('url') || undefined;
+    const referer = resolved.searchParams.get('referer') || undefined;
+    const userAgent = resolved.searchParams.get('userAgent') || undefined;
+    return { streamUrl, referer, userAgent };
+  } catch {
+    return {};
+  }
+}
+
+function buildProxyCandidateUrls(
+  streamUrl: string,
+  referer?: string,
+  userAgent?: string,
+  preferredUrl?: string
+): string[] {
+  const params = new URLSearchParams({
+    url: streamUrl,
+    type: 'video',
+  });
+  if (referer) params.set('referer', referer);
+  if (userAgent) params.set('userAgent', userAgent);
+
+  const localProxyBase = (import.meta.env.VITE_STREAM_PROXY_URL || '/api/proxy/m3u8-streaming-proxy').replace(/\/$/, '');
+  const poolBases = [
+    localProxyBase,
+    import.meta.env.VITE_PROXY_CF_URL,
+    import.meta.env.VITE_PROXY_NODE_URL,
+    import.meta.env.VITE_PROXY_BUN_URL,
+    ...(String(import.meta.env.VITE_PROXY_POOL_URLS || '')
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean)),
+  ]
+    .map((entry) => String(entry || '').trim())
+    .filter(Boolean)
+    .map((entry) => entry.replace(/\/$/, ''));
+
+  const candidates = [
+    preferredUrl,
+    ...poolBases.map((base) => `${base}${base.includes('?') ? '&' : '?'}${params.toString()}`),
+  ].filter((entry): entry is string => Boolean(entry && entry.trim()));
+
+  const seen = new Set<string>();
+  const unique: string[] = [];
+
+  for (const candidate of candidates) {
+    const canonical = (() => {
+      try {
+        return new URL(candidate, window.location.origin).toString();
+      } catch {
+        return candidate;
+      }
+    })();
+
+    if (seen.has(canonical)) continue;
+    seen.add(canonical);
+    unique.push(candidate);
+  }
+
+  return unique;
+}
+
+function getSubtitleSelectionKey(subtitle: { lang: string; url: string; label?: string }, index: number): string {
+  const baseKey = subtitle.url || subtitle.label || subtitle.lang || `subtitle-${index}`;
+  return `${subtitle.lang === 'custom' ? 'custom' : 'sub'}:${baseKey}`;
+}
+
+function toTrackLanguageCode(lang?: string): string {
+  const value = String(lang || '').trim().toLowerCase();
+  if (!value) return 'en';
+  if (value === 'en' || value.includes('eng') || value.includes('english')) return 'en';
+  if (value === 'ja' || value.includes('jap') || value.includes('japanese')) return 'ja';
+  if (value === 'hi' || value.includes('hin') || value.includes('hindi')) return 'hi';
+  if (value === 'ta' || value.includes('tam') || value.includes('tamil')) return 'ta';
+  if (value === 'te' || value.includes('tel') || value.includes('telugu')) return 'te';
+  if (value === 'ml' || value.includes('mal') || value.includes('malayalam')) return 'ml';
+  if (value.length >= 2) return value.slice(0, 2);
+  return 'en';
+}
+
 
 
 interface VideoPlayerProps {
@@ -87,6 +180,10 @@ interface VideoPlayerProps {
   malId?: number | null;
 
   episodeNumber?: number;
+
+  introWindow?: { start: number; end: number } | null;
+
+  outroWindow?: { start: number; end: number } | null;
 
   initialSeekSeconds?: number;
 
@@ -139,6 +236,10 @@ export function VideoPlayer({
   malId,
 
   episodeNumber,
+
+  introWindow,
+
+  outroWindow,
 
   viewCount,
 
@@ -224,7 +325,39 @@ export function VideoPlayer({
 
   const { settings } = useVideoSettings();
 
-  const { skipTimes, fetchSkipTimes, getActiveSkip, getSkipLabel } = useAniskip();
+  const { skipTimes, fetchSkipTimes, getSkipLabel } = useAniskip();
+
+  const tatakaiSkipTimes = useMemo(() => {
+    const windows: Array<{ interval: { startTime: number; endTime: number }; skipType: 'op' | 'ed' | 'mixed-op' | 'mixed-ed' | 'recap'; skipId: string; episodeLength: number }> = [];
+
+    if (introWindow && Number.isFinite(introWindow.start) && Number.isFinite(introWindow.end) && introWindow.end > introWindow.start) {
+      windows.push({
+        interval: { startTime: introWindow.start, endTime: introWindow.end },
+        skipType: 'op',
+        skipId: `tatakai-op-${episodeId || episodeNumber || 'current'}`,
+        episodeLength: 0,
+      });
+    }
+
+    if (outroWindow && Number.isFinite(outroWindow.start) && Number.isFinite(outroWindow.end) && outroWindow.end > outroWindow.start) {
+      windows.push({
+        interval: { startTime: outroWindow.start, endTime: outroWindow.end },
+        skipType: 'ed',
+        skipId: `tatakai-ed-${episodeId || episodeNumber || 'current'}`,
+        episodeLength: 0,
+      });
+    }
+
+    return windows;
+  }, [introWindow?.start, introWindow?.end, outroWindow?.start, outroWindow?.end, episodeId, episodeNumber]);
+
+  const hasTatakaiSkipWindows = tatakaiSkipTimes.length > 0;
+  const effectiveSkipTimes = hasTatakaiSkipWindows ? tatakaiSkipTimes : skipTimes;
+  const hasTatakaiSkipWindowsRef = useRef(hasTatakaiSkipWindows);
+
+  useEffect(() => {
+    hasTatakaiSkipWindowsRef.current = hasTatakaiSkipWindows;
+  }, [hasTatakaiSkipWindows]);
 
 
 
@@ -262,6 +395,7 @@ export function VideoPlayer({
   const [isBuffering, setIsBuffering] = useState(false);
 
   const [retryCount, setRetryCount] = useState(0);
+  const retryCountRef = useRef(0);
 
   const [showSettings, setShowSettings] = useState(false);
 
@@ -296,12 +430,11 @@ export function VideoPlayer({
     };
 
     setCustomSubtitles(prev => [...prev, newSub]);
+    setCurrentSubtitle(getSubtitleSelectionKey(newSub, customSubtitles.length));
 
     // Also add to blobs map immediately so it renders
     setSubtitleBlobs(prev => ({ ...prev, [url]: url }));
 
-    // Select it
-    handleSubtitleChange('custom');
     toast.success(`Loaded subtitle: ${file.name}`);
   };
 
@@ -320,6 +453,10 @@ export function VideoPlayer({
   const initialSeekDoneRef = useRef(false);
 
   const manifestFallbackRef = useRef(false);
+  const manifestRetryRef = useRef(0);
+  const bufferingTimeoutRef = useRef<number | null>(null);
+  const lastProgressAtRef = useRef<number>(Date.now());
+  const lastObservedTimeRef = useRef<number>(0);
 
   const initialSeekRef = useRef(initialSeekSeconds);
 
@@ -402,63 +539,60 @@ export function VideoPlayer({
 
     console.log('[VideoPlayer] Applying subtitle:', lang, 'Tracks:', tracks.length);
 
+    const orderedSubtitles = [...subtitles, ...customSubtitles];
+    const selectedKey = lang.trim();
+    const selectedKeyLower = selectedKey.toLowerCase();
+
+    const englishIndex = (() => {
+      for (let i = 0; i < tracks.length; i++) {
+        const track = tracks[i];
+        const trackLang = String(track.language || '').toLowerCase();
+        const trackLabel = String(track.label || '').toLowerCase();
+        if (trackLang === 'en' || trackLang.includes('eng') || trackLabel.includes('english')) return i;
+      }
+      return -1;
+    })();
+
+    let selectedIndex = -1;
+
+    if (lang === 'auto') {
+      selectedIndex = englishIndex >= 0 ? englishIndex : (tracks.length > 0 ? 0 : -1);
+    } else if (lang !== 'off') {
+      for (let i = 0; i < tracks.length; i++) {
+        const mappedSubtitle = orderedSubtitles[i];
+        const mappedKey = mappedSubtitle ? getSubtitleSelectionKey(mappedSubtitle, i).toLowerCase() : '';
+        if (mappedKey === selectedKeyLower) {
+          selectedIndex = i;
+          break;
+        }
+      }
+
+      if (selectedIndex < 0) {
+        for (let i = 0; i < tracks.length; i++) {
+          const track = tracks[i];
+          const trackLang = String(track.language || '').toLowerCase();
+          const trackLabel = String(track.label || '').toLowerCase();
+          if (trackLang === selectedKeyLower || trackLabel === selectedKeyLower) {
+            selectedIndex = i;
+            break;
+          }
+        }
+      }
+    }
+
 
 
     for (let i = 0; i < tracks.length; i++) {
 
       const track = tracks[i];
 
-      const trackLang = (track.language || '').toLowerCase();
-
-      const trackLabel = (track.label || '').toLowerCase();
-
-
-
-      // Reset first
-
-      track.mode = 'disabled';
-
-
-
-      if (lang === 'off') {
-
-        // Already disabled
-
-      } else if (lang === 'auto') {
-
-        // Auto: prefer English
-
-        if (trackLang === 'en' || trackLang.includes('eng') || trackLabel.includes('english') || i === 0) {
-
-          track.mode = 'showing';
-
-        }
-
-      } else {
-
-        const target = lang.toLowerCase();
-
-        if (
-
-          trackLang === target ||
-
-          trackLabel.includes(target) ||
-
-          target.includes(trackLang && trackLang.length > 1 ? trackLang : '___never___')
-
-        ) {
-
-          track.mode = 'showing';
-
-        }
-
-      }
+      track.mode = i === selectedIndex ? 'showing' : 'disabled';
 
     }
 
     setCurrentSubtitle(lang);
 
-  }, []);
+  }, [subtitles, customSubtitles]);
 
 
 
@@ -473,8 +607,10 @@ export function VideoPlayer({
   // Create a key from subtitle URLs to detect changes
 
   const subtitleKey = subtitles?.map(s => s.url).join('|') ?? '';
-
-  const headersKey = JSON.stringify(headers || {});
+  const subtitleReferer = headers?.Referer || '';
+  const subtitleUserAgent = headers?.["User-Agent"] || '';
+  const playbackReferer = headers?.Referer || '';
+  const playbackUserAgent = headers?.["User-Agent"] || '';
 
 
 
@@ -527,7 +663,11 @@ export function VideoPlayer({
             continue;
           }
 
-          const res = await fetch(sub.url, {
+          const proxiedSubtitleUrl = !isOffline
+            ? getProxiedSubtitleUrl(sub.url, headers?.Referer)
+            : sub.url;
+
+          let res = await fetch(proxiedSubtitleUrl, {
 
             headers: {
 
@@ -539,6 +679,14 @@ export function VideoPlayer({
             }
 
           });
+
+          if (!res.ok && proxiedSubtitleUrl !== sub.url) {
+            res = await fetch(sub.url, {
+              headers: {
+                Accept: 'text/vtt, text/plain, */*'
+              }
+            });
+          }
 
           if (res.ok) {
 
@@ -610,7 +758,7 @@ export function VideoPlayer({
 
     };
 
-  }, [subtitleKey, headersKey]);
+  }, [subtitleKey, subtitleReferer, subtitleUserAgent]);
 
 
 
@@ -636,13 +784,15 @@ export function VideoPlayer({
 
     return () => clearTimeout(timeout);
 
-  }, [subtitleBlobs]);
+  }, [subtitleBlobs, customSubtitles, currentSubtitle, subtitles]);
 
 
 
   // Fetch skip times after manifest parsed when duration is known
 
   useEffect(() => {
+
+    if (hasTatakaiSkipWindows) return;
 
     if (!malId || !episodeNumber) return;
 
@@ -684,7 +834,7 @@ export function VideoPlayer({
 
     };
 
-  }, [malId, episodeNumber, fetchSkipTimes]);
+  }, [malId, episodeNumber, fetchSkipTimes, hasTatakaiSkipWindows]);
 
 
 
@@ -736,7 +886,7 @@ export function VideoPlayer({
 
     return () => clearInterval(interval);
 
-  }, [currentSubtitle, subtitles]);
+  }, [currentSubtitle, subtitles, customSubtitles]);
 
 
 
@@ -744,11 +894,13 @@ export function VideoPlayer({
 
   useEffect(() => {
 
-    const skip = getActiveSkip(currentTime);
+    const skip = effectiveSkipTimes.find((candidate) => (
+      currentTime >= candidate.interval.startTime && currentTime < candidate.interval.endTime
+    )) || null;
 
     setActiveSkip(skip);
 
-  }, [currentTime, getActiveSkip]);
+  }, [currentTime, effectiveSkipTimes]);
 
 
 
@@ -797,6 +949,10 @@ export function VideoPlayer({
       setVideoError(null);
 
       setIsBuffering(true);
+      manifestFallbackRef.current = false;
+      manifestRetryRef.current = 0;
+      lastProgressAtRef.current = Date.now();
+      lastObservedTimeRef.current = 0;
 
 
 
@@ -828,9 +984,9 @@ export function VideoPlayer({
       }
 
       const isM3U8 = !isOffline && (currentSource.isM3U8 || videoUrl.includes(".m3u8") || videoUrl.includes("playlist.m3u8")) && !videoUrl.endsWith('.mp4');
-      const referer = headers?.Referer;
+      const referer = playbackReferer || undefined;
       // Fallback to browser UA if not provided by source (crucial for Cloudflare bypass)
-      const userAgent = headers?.["User-Agent"] || navigator.userAgent;
+      const userAgent = playbackUserAgent || navigator.userAgent;
 
       // Use our backend proxy if not local and not already proxied
       // CRITICAL FIX: Do not proxy local assets (asset:// or asset.localhost)
@@ -842,9 +998,20 @@ export function VideoPlayer({
         ? videoUrl
         : (videoUrl.startsWith('http') ? getProxiedVideoUrl(videoUrl, referer, userAgent) : videoUrl);
 
-      console.log('Loading video:', { original: videoUrl, final: proxiedUrl, isLocal, isOffline });
+      const proxySnapshot = readProxyQuerySnapshot(proxiedUrl);
+      const sourceSnapshot = readProxyQuerySnapshot(videoUrl);
+      const originalStreamUrl = proxySnapshot.streamUrl || sourceSnapshot.streamUrl || videoUrl;
+      const effectiveReferer = proxySnapshot.referer || sourceSnapshot.referer || referer;
+      const effectiveUserAgent = proxySnapshot.userAgent || sourceSnapshot.userAgent || userAgent;
+      const proxyCandidates = isM3U8
+        ? buildProxyCandidateUrls(originalStreamUrl, effectiveReferer, effectiveUserAgent, proxiedUrl)
+        : [proxiedUrl];
+      let activeProxyIndex = Math.max(0, proxyCandidates.findIndex((candidate) => candidate === proxiedUrl));
+      let activePlaybackUrl = proxyCandidates[activeProxyIndex] || proxiedUrl;
 
-      trackEvent('Video', 'Initialize', `${animeName} Ep ${episodeNumber}`, episodeNumber);
+      console.log('Loading video:', { original: videoUrl, final: activePlaybackUrl, isLocal, isOffline, proxyCandidates: proxyCandidates.length });
+
+      trackEvent('video_initialize', { animeName, episodeNumber, sourceType: isM3U8 ? 'hls' : 'file' });
 
       if (isM3U8 && Hls.isSupported()) {
         const hls = new Hls({
@@ -853,40 +1020,65 @@ export function VideoPlayer({
             if (url.startsWith('asset://') || url.startsWith('http://asset.localhost')) {
               return;
             }
-
             xhr.timeout = 30000;
-
-            if (url.includes('rapid-service') || url.includes('supabase.co')) {
-
-              try {
-
-                const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-                if (key) {
-
-                  xhr.setRequestHeader('apikey', key);
-
-                  xhr.setRequestHeader('Authorization', `Bearer ${key}`);
-
-                }
-
-              } catch (e) {
-
-                // Some browsers may disallow setting certain headers; fail silently
-
-              }
-
-            }
-
           },
-
           enableWorker: true,
-
-          lowLatencyMode: false,
-
+          lowLatencyMode: true,
           backBufferLength: 90,
 
+          // FastStream-inspired optimization for aggressive buffering:
+          maxBufferLength: 300,             // pre-buffer up to 5 minutes
+          maxMaxBufferLength: 1200,         // absolute max 20 mins buffer
+          maxBufferSize: 500 * 1000 * 1000, // 500 MB max size
+          maxBufferHole: 0.5,
+          highBufferWatchdogPeriod: 2,
+          nudgeOffset: 0.1,
+          nudgeMaxRetry: 5,
+          maxFragLookUpTolerance: 0.25,
+          appendErrorMaxRetry: 4,
+          fragLoadingMaxRetry: 5,
+          manifestLoadingMaxRetry: 5,
+          levelLoadingMaxRetry: 5,
+          startFragPrefetch: true,          // parallelize fragment loading
         });
+
+        const trySwitchProxyCandidate = async () => {
+          if (proxyCandidates.length <= 1) return false;
+
+          for (let candidateIndex = activeProxyIndex + 1; candidateIndex < proxyCandidates.length; candidateIndex += 1) {
+            const candidateUrl = proxyCandidates[candidateIndex];
+            try {
+              const probeResponse = await fetch(candidateUrl, { redirect: 'follow', cache: 'no-store' });
+              const probeText = await probeResponse.text().catch(() => '');
+              if (!probeResponse.ok || !looksLikeHlsManifest(probeText)) {
+                continue;
+              }
+
+              activeProxyIndex = candidateIndex;
+              activePlaybackUrl = candidateUrl;
+              manifestFallbackRef.current = false;
+              manifestRetryRef.current = 0;
+
+              setVideoError(null);
+              setIsBuffering(true);
+
+              try {
+                hls.stopLoad();
+              } catch {
+                // noop
+              }
+
+              hls.loadSource(candidateUrl);
+              hls.startLoad();
+              toast.success(`Switched proxy route (${candidateIndex + 1}/${proxyCandidates.length})`, { id: 'proxy-failover' });
+              return true;
+            } catch {
+              // Keep scanning candidates until a valid manifest is found.
+            }
+          }
+
+          return false;
+        };
 
 
 
@@ -918,7 +1110,7 @@ export function VideoPlayer({
 
 
 
-        hls.loadSource(proxiedUrl);
+        hls.loadSource(activePlaybackUrl);
 
         hls.attachMedia(videoRef.current);
 
@@ -927,6 +1119,8 @@ export function VideoPlayer({
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
 
           console.log('HLS manifest parsed successfully');
+          manifestRetryRef.current = 0;
+          manifestFallbackRef.current = false;
 
           setIsBuffering(false);
 
@@ -938,7 +1132,7 @@ export function VideoPlayer({
 
           const length = videoRef.current?.duration;
 
-          if (malId && episodeNumber) {
+          if (!hasTatakaiSkipWindowsRef.current && malId && episodeNumber) {
 
             fetchSkipTimes(malId, episodeNumber, isFinite(length) && length > 0 ? Math.floor(length) : undefined);
 
@@ -998,23 +1192,9 @@ export function VideoPlayer({
 
             try {
 
-              console.log('Attempting client-side manifest fetch fallback for', proxiedUrl);
+              console.log('Attempting client-side manifest fetch fallback for', activePlaybackUrl);
 
-              const apikey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-              const headers: Record<string, string> = {
-
-                'apikey': apikey || '',
-
-              };
-
-              if (apikey) {
-
-                headers['Authorization'] = `Bearer ${apikey}`;
-
-              }
-
-              const res = await fetch(proxiedUrl, { headers, redirect: 'follow' });
+              const res = await fetch(activePlaybackUrl, { redirect: 'follow', cache: 'no-store' });
 
               const text = await res.text().catch(() => '');
 
@@ -1022,14 +1202,31 @@ export function VideoPlayer({
 
               // Check if we got a valid manifest
 
-              if (!text || !text.trim().startsWith('#EXTM3U')) {
+              if (!looksLikeHlsManifest(text)) {
 
                 console.warn('Manifest fallback returned invalid content');
 
-                setVideoError('Manifest blocked or invalid - try another server');
+                const switchedProxy = await trySwitchProxyCandidate();
+                if (switchedProxy) {
+                  return;
+                }
 
-                if (onError) onError();
-
+                if (manifestRetryRef.current < 2) {
+                  manifestRetryRef.current += 1;
+                  setVideoError(null);
+                  setIsBuffering(true);
+                  setTimeout(() => {
+                    try {
+                      hls.stopLoad();
+                      hls.startLoad();
+                    } catch {
+                      // noop
+                    }
+                  }, 250);
+                } else {
+                  setVideoError('Manifest blocked or invalid - switching server');
+                  if (onError) onError();
+                }
                 return;
 
               }
@@ -1037,6 +1234,11 @@ export function VideoPlayer({
             } catch (e) {
 
               console.warn('Client-side manifest fetch fallback failed:', e);
+
+              const switchedProxy = await trySwitchProxyCandidate();
+              if (switchedProxy) {
+                return;
+              }
 
             }
 
@@ -1050,12 +1252,28 @@ export function VideoPlayer({
 
             if (data.details && String(data.details).toLowerCase().includes('manifest')) {
 
-              setVideoError('Manifest blocked or invalid - switching server');
+              const switchedProxy = await trySwitchProxyCandidate();
+              if (switchedProxy) {
+                return;
+              }
 
-              if (onError) onError();
-
-              hls.stopLoad();
-
+              if (manifestRetryRef.current < 2) {
+                manifestRetryRef.current += 1;
+                setVideoError(null);
+                setIsBuffering(true);
+                hls.stopLoad();
+                setTimeout(() => {
+                  try {
+                    hls.startLoad();
+                  } catch {
+                    // noop
+                  }
+                }, 300);
+              } else {
+                setVideoError('Manifest blocked or invalid - switching server');
+                if (onError) onError();
+                hls.stopLoad();
+              }
               return;
 
             }
@@ -1068,13 +1286,24 @@ export function VideoPlayer({
 
                 console.error('Network error - attempting recovery');
 
-                if (retryCount < 2) {
+                if (retryCountRef.current < 2) {
 
-                  setRetryCount(prev => prev + 1);
+                  setRetryCount(prev => {
+                    const next = prev + 1;
+                    retryCountRef.current = next;
+                    return next;
+                  });
 
                   hls.startLoad();
 
                 } else {
+
+                  const switchedProxy = await trySwitchProxyCandidate();
+                  if (switchedProxy) {
+                    retryCountRef.current = 0;
+                    setRetryCount(0);
+                    return;
+                  }
 
                   setVideoError("Network error - try another server");
 
@@ -1128,7 +1357,7 @@ export function VideoPlayer({
 
           const length = videoRef.current?.duration;
 
-          if (malId && episodeNumber) {
+          if (!hasTatakaiSkipWindowsRef.current && malId && episodeNumber) {
 
             fetchSkipTimes(malId, episodeNumber, isFinite(length) && length > 0 ? Math.floor(length) : undefined);
 
@@ -1284,7 +1513,7 @@ export function VideoPlayer({
 
     },
 
-    [sourceKey, headersKey, retryCount, animeName, episodeNumber, malId, isOffline]
+    [sourceKey, isOffline, playbackReferer, playbackUserAgent]
 
   );
 
@@ -1322,7 +1551,13 @@ export function VideoPlayer({
 
 
 
-    const handleTimeUpdate = () => setCurrentTime(video.currentTime);
+    const handleTimeUpdate = () => {
+      setCurrentTime(video.currentTime);
+      if (video.currentTime > lastObservedTimeRef.current + 0.05) {
+        lastObservedTimeRef.current = video.currentTime;
+        lastProgressAtRef.current = Date.now();
+      }
+    };
 
     const handleDurationChange = () => setDuration(video.duration);
 
@@ -1330,9 +1565,14 @@ export function VideoPlayer({
 
     const handlePause = () => { setIsPlaying(false); onPause?.(); };
 
-    const handleWaiting = () => setIsBuffering(true);
+    const handleWaiting = () => {
+      setIsBuffering(true);
+    };
 
-    const handlePlaying = () => setIsBuffering(false);
+    const handlePlaying = () => {
+      setIsBuffering(false);
+      lastProgressAtRef.current = Date.now();
+    };
 
     const handleProgress = () => {
 
@@ -1366,6 +1606,7 @@ export function VideoPlayer({
       } else {
         setVideoError('Playback failed');
       }
+      if (onError) onError();
     };
 
     video.addEventListener("timeupdate", handleTimeUpdate);
@@ -1391,6 +1632,30 @@ export function VideoPlayer({
     };
 
   }, [settings.autoNextEpisode, onEpisodeEnd]);
+
+  useEffect(() => {
+    if (bufferingTimeoutRef.current !== null) {
+      clearTimeout(bufferingTimeoutRef.current);
+      bufferingTimeoutRef.current = null;
+    }
+
+    if (!isBuffering || !currentSource?.url) return;
+
+    bufferingTimeoutRef.current = window.setTimeout(() => {
+      const stalledMs = Date.now() - lastProgressAtRef.current;
+      if (stalledMs >= 15000) {
+        setVideoError("Server timed out - switching server");
+        if (onError) onError();
+      }
+    }, 16000);
+
+    return () => {
+      if (bufferingTimeoutRef.current !== null) {
+        clearTimeout(bufferingTimeoutRef.current);
+        bufferingTimeoutRef.current = null;
+      }
+    };
+  }, [isBuffering, currentSource?.url, onError]);
 
 
 
@@ -1704,28 +1969,28 @@ export function VideoPlayer({
       const canvas = document.createElement('canvas');
       canvas.width = videoRef.current.videoWidth;
       canvas.height = videoRef.current.videoHeight;
-      
+
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
-      
+
       // Draw the video frame to canvas
       ctx.drawImage(videoRef.current, 0, 0);
-      
+
       // Convert canvas to blob and create download link
       canvas.toBlob((blob) => {
         if (!blob) return;
-        
+
         // Create filename with timestamp and episode info
-        const timestamp = new Date().toLocaleString('en-US', { 
-          year: 'numeric', 
-          month: '2-digit', 
+        const timestamp = new Date().toLocaleString('en-US', {
+          year: 'numeric',
+          month: '2-digit',
           day: '2-digit',
           hour: '2-digit',
           minute: '2-digit',
           second: '2-digit'
         }).replace(/[/,: ]/g, '-');
         const filename = `screenshot-${animeName || 'anime'}-ep${episodeNumber || '?'}-${timestamp}.png`;
-        
+
         // Create download link
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -1735,7 +2000,7 @@ export function VideoPlayer({
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-        
+
         toast.success(`Screenshot saved: ${filename}`);
       }, 'image/png');
     } catch (err) {
@@ -1757,6 +2022,29 @@ export function VideoPlayer({
     }
   };
 
+  const lockLandscapeOnMobile = useCallback(async () => {
+    if (!isMobile) return;
+    try {
+      const orientationApi = screen.orientation as any;
+      if (orientationApi?.lock) {
+        await orientationApi.lock('landscape');
+      }
+    } catch {
+      // Some mobile browsers block orientation lock; ignore silently.
+    }
+  }, [isMobile]);
+
+  const unlockOrientationOnMobile = useCallback(() => {
+    if (!isMobile) return;
+    try {
+      if (screen.orientation?.unlock) {
+        screen.orientation.unlock();
+      }
+    } catch {
+      // Ignore unlock failures.
+    }
+  }, [isMobile]);
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -1770,7 +2058,7 @@ export function VideoPlayer({
     };
   }, []);
 
-  const toggleFullscreen = () => {
+  const toggleFullscreen = async () => {
 
     if (!containerRef.current) return;
 
@@ -1778,27 +2066,31 @@ export function VideoPlayer({
 
     if (!isFullscreen) {
 
-      if (containerRef.current.requestFullscreen) {
-
-        containerRef.current.requestFullscreen();
-
-      } else if ((containerRef.current as any).webkitRequestFullscreen) {
-
-        (containerRef.current as any).webkitRequestFullscreen();
-
+      try {
+        if (containerRef.current.requestFullscreen) {
+          await containerRef.current.requestFullscreen();
+        } else if ((containerRef.current as any).webkitRequestFullscreen) {
+          await Promise.resolve((containerRef.current as any).webkitRequestFullscreen());
+        }
+      } catch {
+        // Ignore fullscreen API errors.
       }
+
+      await lockLandscapeOnMobile();
 
     } else {
 
-      if (document.exitFullscreen) {
-
-        document.exitFullscreen();
-
-      } else if ((document as any).webkitExitFullscreen) {
-
-        (document as any).webkitExitFullscreen();
-
+      try {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if ((document as any).webkitExitFullscreen) {
+          await Promise.resolve((document as any).webkitExitFullscreen());
+        }
+      } catch {
+        // Ignore fullscreen API errors.
       }
+
+      unlockOrientationOnMobile();
 
     }
 
@@ -1810,7 +2102,11 @@ export function VideoPlayer({
 
     const handleFullscreenChange = () => {
 
-      setIsFullscreen(!!document.fullscreenElement);
+      const activeFullscreen = !!document.fullscreenElement || !!(document as any).webkitFullscreenElement;
+      setIsFullscreen(activeFullscreen);
+      if (!activeFullscreen) {
+        unlockOrientationOnMobile();
+      }
 
     };
 
@@ -1826,7 +2122,7 @@ export function VideoPlayer({
 
     };
 
-  }, []);
+  }, [unlockOrientationOnMobile]);
 
 
 
@@ -1883,21 +2179,21 @@ export function VideoPlayer({
       >
 
         {[...subtitles, ...customSubtitles].map((sub, idx) => {
+          const subtitleKey = getSubtitleSelectionKey(sub, idx);
           const blobUrl = subtitleBlobs[sub.url];
-          // For custom subs, the url IS the blob url (or local url)
-          const src = sub.lang === 'custom' ? sub.url : blobUrl;
-
-          // Only render track if we have a blob URL (prefetched) to avoid CORS issues
-          if (!src) return null;
+          // For custom subs, the URL is already local/user-selected.
+          // For provider subs, prefer prefetched blob, then proxy URL, then original URL.
+          const proxiedUrl = !isOffline ? getProxiedSubtitleUrl(sub.url, headers?.Referer) : sub.url;
+          const src = sub.lang === 'custom' ? sub.url : (blobUrl || proxiedUrl || sub.url);
 
           return (
             <track
-              key={`${sub.url}-${idx}`}
+              key={subtitleKey}
               kind="subtitles"
               src={src}
-              srcLang={sub.lang}
+              srcLang={toTrackLanguageCode(sub.lang)}
               label={sub.label || sub.lang}
-              default={idx === 0 && currentSubtitle !== 'off'}
+              default={currentSubtitle !== 'off' && currentSubtitle === subtitleKey}
             />
           );
         })}
@@ -1973,7 +2269,11 @@ export function VideoPlayer({
               </div>
             )}
 
-            <p className="text-sm text-white/60">Try switching to a different server</p>
+            <p className="text-sm text-white/60">
+              {videoError.toLowerCase().includes('retrying')
+                ? 'Retrying automatically...'
+                : 'Try switching to a different server'}
+            </p>
 
             <div className="flex flex-col sm:flex-row gap-3 mt-2">
 
@@ -1981,6 +2281,7 @@ export function VideoPlayer({
 
                 onClick={() => {
 
+                  retryCountRef.current = 0;
                   setRetryCount(0);
 
                   loadVideo();
@@ -2115,7 +2416,7 @@ export function VideoPlayer({
 
           {/* Skip Time Markers (yellow) */}
 
-          {skipTimes.map((skip) => {
+          {effectiveSkipTimes.map((skip) => {
 
             const startPercent = duration > 0 ? (skip.interval.startTime / duration) * 100 : 0;
 
@@ -2383,19 +2684,24 @@ export function VideoPlayer({
 
                     {/* Native Subtitles */}
                     {[...subtitles, ...customSubtitles].map((sub, idx) => (
+                      (() => {
+                        const subtitleSelectionKey = getSubtitleSelectionKey(sub, idx);
+                        return (
                       <button
                         key={idx}
                         onClick={() => {
-                          handleSubtitleChange(sub.lang === 'custom' ? 'custom' : sub.lang); // Simple toggle for now, ideally unique IDs
+                          handleSubtitleChange(subtitleSelectionKey);
                           setShowSubtitleMenu(false);
                         }}
-                        className={`w-full px-3 py-1.5 text-left text-xs md:text-sm rounded-lg hover:bg-muted transition-colors ${currentSubtitle === (sub.lang === 'custom' ? 'custom' : sub.lang)
+                        className={`w-full px-3 py-1.5 text-left text-xs md:text-sm rounded-lg hover:bg-muted transition-colors ${currentSubtitle === subtitleSelectionKey
                           ? "text-primary font-medium"
                           : "text-foreground"
                           }`}
                       >
                         <span className="truncate block max-w-[120px]">{sub.label || sub.lang}</span>
                       </button>
+                        );
+                      })()
                     ))}
 
                     <div className="h-px bg-border my-1" />
@@ -2599,7 +2905,11 @@ export function VideoPlayer({
 
         onClose={() => setShowSettingsPanel(false)}
 
-        availableSubtitles={subtitles.map(s => ({ lang: s.lang, label: s.label || s.lang, value: s.lang }))}
+        availableSubtitles={[...subtitles, ...customSubtitles].map((s, idx) => ({
+          lang: s.lang,
+          label: s.label || s.lang,
+          value: getSubtitleSelectionKey(s, idx),
+        }))}
 
       />
 

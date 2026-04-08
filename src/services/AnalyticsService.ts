@@ -184,3 +184,14 @@ class AnalyticsService {
 }
 
 export const analytics = AnalyticsService.getInstance();
+
+// Export individual functions for easier importing
+export const trackEvent = (eventName: string, params?: Record<string, any>) => analytics.trackEvent(eventName, params);
+export const trackPageView = (path: string, title?: string) => analytics.trackPageView(path, title);
+export const trackError = (error: Error, context?: Record<string, any>) => analytics.trackError(error, context);
+export const trackAnimeInteraction = (type: 'view' | 'search' | 'add_to_list' | 'remove_from_list', animeId: string, metadata?: Record<string, any>) => 
+    analytics.trackAnimeInteraction(type, animeId, metadata);
+export const trackSocialInteraction = (type: 'follow' | 'unfollow' | 'comment' | 'rate' | 'share', targetId: string, metadata?: Record<string, any>) => 
+    analytics.trackSocialInteraction(type, targetId, metadata);
+export const trackWatchProgress = (animeId: string, episode: number, progress: number, duration: number) => 
+    analytics.trackWatchProgress(animeId, episode, progress, duration);

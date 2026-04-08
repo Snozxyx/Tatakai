@@ -316,8 +316,9 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
       }
       onSave?.({ name, description, items, is_public: isPublic });
       onClose?.();
-    } catch (error) {
-      toast.error('Failed to save tier list');
+    } catch (error: any) {
+      const message = error?.message || error?.details || 'Failed to save tier list';
+      toast.error(message);
     }
   };
 

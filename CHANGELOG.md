@@ -4,6 +4,45 @@ All notable changes to Tatakai are documented here.
 
 ---
 
+## [5.0.0] - 2026-04-08
+
+### Added
+- **V5 Release UX** — Replaced legacy V4 announcement flow with a dedicated V5 banner/release surface
+- **Route Architecture Split** — Migrated pages into structured route domains (`base`, `auth`, `watch`, `profile`, `forum`, `admin`, `legal`, `error`) with centralized route composition
+- **Provider Aggregation Core** — Added unified multi-provider source pipeline for Animelok, AnimeKai, Animepahe, Animeya, WatchAW, DesiDub, Toonstream, ToonWorld, and Hindi APIs
+- **Playback Telemetry Schema** — Added `playback_telemetry` table and indexes for source latency/failure instrumentation
+- **Recommendation Feedback Schema** — Added `recommendation_feedback` table for like/dislike/already-seen explainability feedback
+- **Watch2Together Controls** — Added reconnect recovery, host transfer, scheduled start countdown controls, and chat export
+- **AniList-Assisted Search** — Added optional AniList mapping panel with richer filter metadata for mapping to Tatakai IDs
+- **Hybrid Discovery Filters** — Added anime/character result mode, type filter, minimum rating, dub-only filter, and screenshot confidence control
+- **Provider Test Coverage** — Added provider fix and source selection tests/fixtures
+
+### Changed
+- **ID-first Integrations** — MyAnimeList/AniList imports now use stable `mal_id`/`anilist_id` mapping first, with manual override kept available in import review
+- **Watch Runtime Intelligence** — Improved source health scoring, preflight checks, referer fallback retry, and provider failover behavior
+- **Search Mapping Quality** — Expanded AniList search payload fields (`format`, `status`, `genres`, `score`, `popularity`, `country`, `season`) to improve mapping decisions
+- **Desktop/Web Source Stack** — Updated watch/provider services and proxy manager to support balanced proxy pool routing and better provider fallback behavior
+- **Version Surfaces** — Updated settings/about/changelog surfaces to align with V5 release scope
+
+### Fixed
+- **Provider Resolution Regressions** — Improved search-first fallback paths for providers where direct slug mapping fails
+- **Import UX Clarity** — Made manual remapping entry points in integration import flow explicit instead of icon-only
+- **CORS/Proxy Flow** — Applied CORS and proxy fixes around rapid-service and provider routing paths
+
+### Security
+- **Auth/Headers Hardening** — Tightened security headers and external auth handling while keeping JWT verification behavior compatible with current deployment
+- **CI Quality Gate** — Added stronger quality gate checks (lint/type/test) in build workflow
+
+### Notes (V4 → V5)
+- **Latest tagged V4 baseline**: `v4.1.20`
+- **Post-v4 commits currently on `main` include**:
+	- `b17b629` — fix CORS headers and remove dev proxy
+	- `800a685` — changed core anime provider stack
+	- `3299102` — fixed `vite.config.ts`
+- **V5 workspace changes extend beyond those commits** and are now captured in this 5.0.0 entry.
+
+---
+
 ## [4.1.20] - 2026-03-03
 
 ### Changed

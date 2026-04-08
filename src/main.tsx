@@ -22,6 +22,9 @@ initConsoleProtection();
 import { analytics } from '@/services/AnalyticsService';
 analytics.init();
 
+// Initialize Discord Activity SDK when running inside Discord embedded mode.
+void initDiscordActivity();
+
 // Global error handlers (captures window errors and unhandled promise rejections)
 if (typeof window !== 'undefined') {
   // Check and expose Tauri API

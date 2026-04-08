@@ -127,7 +127,8 @@ npm run dev
 4. Run unit/type checks
 ```bash
 npm run lint
-# add type-check script if needed: npm run type-check
+npm run type-check
+npm run test
 ```
 
 ---
@@ -154,7 +155,7 @@ npm run preview
   1. `npm run build` (produces web assets)
   2. `npm run mobile:sync` or `npm run mobile:dev`
   3. Open/Run in Android Studio or `cd android && ./gradlew assembleRelease`
-- CI signing: workflow reads `ANDROID_KEYSTORE`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` secrets.
+- Release strategy: Android remains a manual release track for now. Desktop/web CI is automated in GitHub Actions, while Android signing/builds run locally or in a dedicated Android workflow when secrets/cadence are ready.
 
 ---
 
@@ -185,13 +186,14 @@ Security note: Do NOT commit keystore files or secrets to the repository. Use Gi
 ## CI / Release process (GitHub Actions)
 - Workflow: `.github/workflows/build.yml`
 - Jobs:
-  - build-desktop → builds Electron packages and optionally publishes on tag
-  - build-android → builds unsigned/signed APKs (signing runs only when `ANDROID_KEYSTORE` secret exists)
-  - release → collects artifacts and attaches APK to GitHub Release when tagging
+  - quality-gates → runs `lint`, `type-check`, and `test`
+  - build-desktop → builds Electron packages and optionally publishes on tag (after quality gates pass)
+  - build-android → currently disabled in this workflow (manual Android release track)
+  - release → collects desktop artifacts and publishes GitHub Release assets when tagging
 
 Tag-release flow:
 1. Create a tag (e.g. `v4.1.0`) and push
-2. Actions build desktop installers and Android APK (if secrets present)
+2. Actions run quality gates and build desktop installers
 3. Release job uploads artifacts and updates the GitHub Release
 
 ---
@@ -204,7 +206,7 @@ Tag-release flow:
   - `npm run mobile:dev` / `mobile:sync` — Capacitor workflows
   - `npm run electron:dev` / `electron:build` — Electron workflows
 
-- Tests: Add unit/integration tests under `src/` and wire any test runner (Jest/Playwright) as needed.
+- Tests: `npm run test` executes Bun-based tests under `tests/`.
 
 ---
 

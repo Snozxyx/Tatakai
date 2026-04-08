@@ -35,15 +35,31 @@ export function usePlaylistCollaborators(playlistId: string | undefined) {
 
       const { data, error } = await supabase
         .from('playlist_collaborators')
-        .select(`
-          *,
-          profiles:user_id(user_id, display_name, username, avatar_url)
-        `)
+        .select('*')
         .eq('playlist_id', playlistId)
         .order('added_at', { ascending: true });
 
       if (error) throw error;
-      return (data || []) as Collaborator[];
+
+      const collaborators = data || [];
+      if (collaborators.length === 0) return [] as Collaborator[];
+
+      const userIds = [...new Set(collaborators.map((row: any) => row.user_id).filter(Boolean))] as string[];
+      let profileMap = new Map<string, { user_id: string; display_name: string | null; username: string | null; avatar_url: string | null }>();
+
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('user_id, display_name, username, avatar_url')
+          .in('user_id', userIds);
+
+        profileMap = new Map((profiles || []).map((profile) => [profile.user_id, profile]));
+      }
+
+      return collaborators.map((row: any) => ({
+        ...row,
+        profile: profileMap.get(row.user_id) || null,
+      })) as Collaborator[];
     },
     enabled: !!playlistId,
   });
@@ -139,21 +155,25 @@ export function useUpdateCollaborator() {
 
   return useMutation({
     mutationFn: async ({
+      playlistId,
       collaboratorId,
       role,
     }: {
+      playlistId: string;
       collaboratorId: string;
       role: CollaboratorRole;
     }) => {
       const { error } = await supabase
         .from('playlist_collaborators')
         .update({ role })
-        .eq('id', collaboratorId);
+        .eq('id', collaboratorId)
+        .eq('playlist_id', playlistId);
 
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['playlist_collaborators'] });
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['playlist_collaborators', variables.playlistId] });
+      queryClient.invalidateQueries({ queryKey: ['can_edit_playlist', variables.playlistId] });
       toast.success('Collaborator updated');
     },
     onError: () => {
@@ -169,16 +189,18 @@ export function useRemoveCollaborator() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (collaboratorId: string) => {
+    mutationFn: async ({ playlistId, collaboratorId }: { playlistId: string; collaboratorId: string }) => {
       const { error } = await supabase
         .from('playlist_collaborators')
         .delete()
-        .eq('id', collaboratorId);
+        .eq('id', collaboratorId)
+        .eq('playlist_id', playlistId);
 
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['playlist_collaborators'] });
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['playlist_collaborators', variables.playlistId] });
+      queryClient.invalidateQueries({ queryKey: ['can_edit_playlist', variables.playlistId] });
       toast.success('Collaborator removed');
     },
     onError: () => {

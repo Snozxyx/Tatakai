@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { updateMalAnimeStatus } from '@/lib/mal';
 import { updateAniListAnimeStatus, mapTatakaiStatusToAniList, disconnectAniList } from '@/lib/externalIntegrations';
+import { fetchExternalIds } from './useExternalIds';
 
 export type WatchlistStatus = 'watching' | 'completed' | 'plan_to_watch' | 'dropped' | 'on_hold';
 
@@ -78,8 +79,16 @@ export function useAddToWatchlist() {
       anilistId?: number | null;
     }) => {
       // Ensure numeric IDs are actually numbers (not NaN or strings)
-      const cleanMalId = malId ? Number(malId) : null;
-      const cleanAnilistId = anilistId ? Number(anilistId) : null;
+      let cleanMalId = malId ? Number(malId) : null;
+      let cleanAnilistId = anilistId ? Number(anilistId) : null;
+
+      // Auto-resolve if missing
+      if (!cleanMalId || !cleanAnilistId) {
+        console.log('[useWatchlist] Auto-resolving missing external IDs for:', animeId);
+        const resolved = await fetchExternalIds(animeId, user?.id);
+        if (!cleanMalId && resolved.malId) cleanMalId = resolved.malId;
+        if (!cleanAnilistId && resolved.anilistId) cleanAnilistId = resolved.anilistId;
+      }
 
       const upsertData: any = {
         user_id: user!.id,
@@ -90,8 +99,8 @@ export function useAddToWatchlist() {
         updated_at: new Date().toISOString()
       };
 
-      if (!isNaN(cleanMalId as number) && cleanMalId !== null) upsertData.mal_id = cleanMalId;
-      if (!isNaN(cleanAnilistId as number) && cleanAnilistId !== null) upsertData.anilist_id = cleanAnilistId;
+      if (cleanMalId && !isNaN(cleanMalId)) upsertData.mal_id = cleanMalId;
+      if (cleanAnilistId && !isNaN(cleanAnilistId)) upsertData.anilist_id = cleanAnilistId;
 
       console.log('[useWatchlist] Upserting to watchlist:', upsertData);
 

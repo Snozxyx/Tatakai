@@ -8,6 +8,9 @@ import packageJson from "./package.json";
 export default defineConfig(({ mode }) => {
   const isWebMode = mode === 'web';
   const isElectronBuild = process.env.ELECTRON_BUILD === 'true';
+  const hmrClientPort = process.env.VITE_HMR_CLIENT_PORT
+    ? Number(process.env.VITE_HMR_CLIENT_PORT)
+    : undefined;
 
   return {
     plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
@@ -41,15 +44,52 @@ export default defineConfig(({ mode }) => {
       host: "::",
       port: isWebMode ? 8081 : 8088, // Standard port for Electron dev
       // Allow Discord Activity iframe to embed the app
-        allowedHosts: [
+      allowedHosts: [
         "tatakai.me",
         "gabhasti.tech",
         ".gabhasti.tech" // The dot allows all subdomains like api.gabhasti.tech
       ],
       hmr: {
-        clientPort: 443,
+        // In local development, let Vite infer the correct WS port.
+        // Set VITE_HMR_CLIENT_PORT=443 only when reverse-proxied behind TLS.
+        ...(hmrClientPort ? { clientPort: hmrClientPort } : {}),
       },
       proxy: {
+        // Preferred dev proxy for provider calls
+        '/api/v2/anime': {
+          target: process.env.VITE_LOCAL_HIANIME_ORIGIN || 'http://localhost:9000',
+          changeOrigin: true,
+          secure: false,
+        },
+        // Dev proxy for all provider calls → local TatakaiCore (localhost:9000)
+        '/api/providers': {
+          target: process.env.VITE_LOCAL_HIANIME_ORIGIN || 'http://localhost:9000',
+          changeOrigin: true,
+          secure: false,
+          rewrite: (p) => p.replace(/^\/api\/providers/, ''),
+        },
+        // Same-origin dev proxy to local HiAnime API (prevents browser CORS errors)
+        '/api/tatakai': {
+          target: process.env.VITE_LOCAL_HIANIME_ORIGIN || 'http://localhost:9000',
+          changeOrigin: true,
+          secure: false,
+          rewrite: (p) => p.replace(/^\/api\/tatakai/, '/api/v2/hianime'),
+        },
+        '/api/stream': {
+          target: process.env.VITE_LOCAL_HIANIME_ORIGIN || 'http://localhost:9000',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/api/servers': {
+          target: process.env.VITE_LOCAL_HIANIME_ORIGIN || 'http://localhost:9000',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/api/proxy': {
+          target: process.env.VITE_LOCAL_HIANIME_ORIGIN || 'http://localhost:9000',
+          changeOrigin: true,
+          secure: false,
+        },
         // Proxy all calls starting with /api/proxy/aniwatch to the third-party API (dev only)
         '/api/proxy/aniwatch': {
           target: 'https://aniwatch-api-taupe-eight.vercel.app',
@@ -59,7 +99,7 @@ export default defineConfig(({ mode }) => {
         },
       },
       // Allow embedding in Discord Activity iframe
-   
+
     },
     define: {
       __APP_VERSION__: JSON.stringify(packageJson.version),

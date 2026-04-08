@@ -1,79 +1,26 @@
 import { supabase } from '@/integrations/supabase/client';
+import { disconnectMal, exchangeMalCode, getMalAuthUrl } from '@/lib/mal';
 
 // ===========================================
 // MyAnimeList Integration
 // ===========================================
 
 const MAL_CLIENT_ID = import.meta.env.VITE_MAL_CLIENT_ID;
-const MAL_CLIENT_SECRET = import.meta.env.VITE_MAL_CLIENT_SECRET;
-const MAL_REDIRECT_URI = import.meta.env.VITE_MAL_REDIRECT_URI;
-const MAL_AUTH_URL = 'https://myanimelist.net/v1/oauth2/authorize';
-const MAL_TOKEN_URL = 'https://myanimelist.net/v1/oauth2/token';
 const MAL_API_URL = 'https://api.myanimelist.net/v2';
-
-// Generate code verifier for PKCE
-function generateCodeVerifier(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
-  let result = '';
-  for (let i = 0; i < 128; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-}
 
 // Generate MAL OAuth URL
 export function getMALAuthUrl(): string {
-  const codeVerifier = generateCodeVerifier();
-  localStorage.setItem('mal_code_verifier', codeVerifier);
-
-  const params = new URLSearchParams({
-    response_type: 'code',
-    client_id: MAL_CLIENT_ID,
-    redirect_uri: MAL_REDIRECT_URI,
-    code_challenge: codeVerifier, // MAL uses plain code challenge
-    code_challenge_method: 'plain',
-    state: crypto.randomUUID(),
-  });
-
-  return `${MAL_AUTH_URL}?${params.toString()}`;
+  if (!MAL_CLIENT_ID) {
+    throw new Error('Missing VITE_MAL_CLIENT_ID');
+  }
+  return getMalAuthUrl();
 }
 
 // Exchange code for tokens
 export async function exchangeMALCode(code: string, userId: string): Promise<boolean> {
-  const codeVerifier = localStorage.getItem('mal_code_verifier');
-  if (!codeVerifier) throw new Error('Code verifier not found');
-
-  const response = await fetch(MAL_TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: MAL_CLIENT_ID,
-      client_secret: MAL_CLIENT_SECRET,
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: MAL_REDIRECT_URI,
-      code_verifier: codeVerifier,
-    }),
-  });
-
-  if (!response.ok) throw new Error('Failed to exchange code');
-
-  const data = await response.json();
-  const expiresAt = new Date(Date.now() + data.expires_in * 1000);
-
-  // Store tokens in profile
-  const { error } = await supabase
-    .from('profiles')
-    .update({
-      mal_access_token: data.access_token,
-      mal_refresh_token: data.refresh_token,
-      mal_token_expires_at: expiresAt.toISOString(),
-    })
-    .eq('user_id', userId);
-
-  if (error) throw error;
-
-  localStorage.removeItem('mal_code_verifier');
+  // userId is kept for backward compatibility with existing callers.
+  void userId;
+  await exchangeMalCode(code);
   return true;
 }
 
@@ -124,15 +71,17 @@ export async function updateMALAnimeStatus(
 // AniList Integration
 // ===========================================
 
-const ANILIST_CLIENT_ID = import.meta.env.VITE_ANILIST_CLIENT_ID || '35225';
-const ANILIST_CLIENT_SECRET = import.meta.env.VITE_ANILIST_CLIENT_SECRET || 'dHFhq9meRB8viWTAVHbzyc6ECVNMhKezji6Sklzq';
-const ANILIST_REDIRECT_URI = import.meta.env.VITE_ANILIST_REDIRECT_URI || 'http://localhost:8080/integration/anilist/redirect';
+const ANILIST_CLIENT_ID = import.meta.env.VITE_ANILIST_CLIENT_ID;
+const ANILIST_REDIRECT_URI = import.meta.env.VITE_ANILIST_REDIRECT_URI || `${window.location.origin}/integration/anilist/redirect`;
 const ANILIST_AUTH_URL = 'https://anilist.co/api/v2/oauth/authorize';
-const ANILIST_TOKEN_URL = 'https://anilist.co/api/v2/oauth/token';
 const ANILIST_API_URL = 'https://graphql.anilist.co';
 
 // Generate AniList OAuth URL
 export function getAniListAuthUrl(): string {
+  if (!ANILIST_CLIENT_ID) {
+    throw new Error('Missing VITE_ANILIST_CLIENT_ID');
+  }
+
   const params = new URLSearchParams({
     client_id: ANILIST_CLIENT_ID,
     redirect_uri: ANILIST_REDIRECT_URI,
@@ -148,13 +97,11 @@ export async function exchangeAniListCode(code: string, userId: string): Promise
   await supabase.auth.refreshSession().catch(() => { });
   const { data: { session } } = await supabase.auth.getSession();
 
-  // Build explicit auth headers — gateway requires either a valid user JWT
-  // OR the anon/service key when verify_jwt=false is set on the function.
-  // We always include both so it works regardless of deployment mode.
+  const bearer = session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY;
+  if (!bearer) throw new Error('Missing auth token for AniList exchange');
+
   const authHeaders: Record<string, string> = {
-    'Authorization': session?.access_token
-      ? `Bearer ${session.access_token}`
-      : `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+    'Authorization': `Bearer ${bearer}`,
   };
 
   const { data: edgeFunctionData, error: edgeFunctionError } = await supabase.functions.invoke('external-auth', {
@@ -300,41 +247,174 @@ export async function updateAniListAnimeStatus(
   return true;
 }
 
+export type AniListSort =
+  | 'POPULARITY_DESC'
+  | 'SCORE_DESC'
+  | 'TRENDING_DESC'
+  | 'START_DATE_DESC'
+  | 'FAVOURITES_DESC';
+
+export type AniListSearchFilters = {
+  perPage?: number;
+  format?: 'TV' | 'TV_SHORT' | 'MOVIE' | 'SPECIAL' | 'OVA' | 'ONA' | 'MUSIC';
+  status?: 'FINISHED' | 'RELEASING' | 'NOT_YET_RELEASED' | 'CANCELLED' | 'HIATUS';
+  season?: 'WINTER' | 'SPRING' | 'SUMMER' | 'FALL';
+  seasonYear?: number;
+  countryOfOrigin?: 'JP' | 'KR' | 'CN' | 'TW' | 'US';
+  genres?: string[];
+  sort?: AniListSort;
+};
+
+export interface AniListMedia {
+  id: number;
+  idMal?: number | null;
+  format?: string | null;
+  title?: {
+    romaji?: string | null;
+    english?: string | null;
+    native?: string | null;
+  };
+  coverImage?: {
+    medium?: string | null;
+    large?: string | null;
+  };
+  episodes?: number | null;
+  status?: string | null;
+  seasonYear?: number | null;
+  season?: string | null;
+  genres?: string[];
+  averageScore?: number | null;
+  popularity?: number | null;
+  favourites?: number | null;
+  trending?: number | null;
+  countryOfOrigin?: string | null;
+  startDate?: { year?: number | null };
+}
+
 // Search anime on AniList
-export async function searchAniListAnime(title: string): Promise<any[]> {
+export async function searchAniListAnime(title: string, filters: AniListSearchFilters = {}): Promise<AniListMedia[]> {
   const query = `
-    query ($search: String) {
-      Page(perPage: 10) {
-        media(search: $search, type: ANIME) {
+    query (
+      $search: String,
+      $perPage: Int,
+      $format: MediaFormat,
+      $status: MediaStatus,
+      $season: MediaSeason,
+      $seasonYear: Int,
+      $countryOfOrigin: CountryCode,
+      $genreIn: [String],
+      $sort: [MediaSort]
+    ) {
+      Page(perPage: $perPage) {
+        media(
+          search: $search,
+          type: ANIME,
+          format: $format,
+          status: $status,
+          season: $season,
+          seasonYear: $seasonYear,
+          countryOfOrigin: $countryOfOrigin,
+          genre_in: $genreIn,
+          sort: $sort
+        ) {
           id
           idMal
+          format
           title { romaji english native }
           coverImage { medium large }
           episodes
           status
           seasonYear
           season
+          genres
+          averageScore
+          popularity
+          favourites
+          trending
+          countryOfOrigin
+          startDate { year }
         }
       }
     }
   `;
-  const data = await anilistQuery(query, { search: title });
+  const variables = {
+    search: title,
+    perPage: filters.perPage || 10,
+    format: filters.format,
+    status: filters.status,
+    season: filters.season,
+    seasonYear: filters.seasonYear,
+    countryOfOrigin: filters.countryOfOrigin,
+    genreIn: filters.genres,
+    sort: filters.sort ? [filters.sort] : undefined,
+  };
+
+  const data = await anilistQuery(query, variables);
+  return data.Page?.media || [];
+}
+
+export async function fetchAniListDiscover(filters: AniListSearchFilters = {}): Promise<AniListMedia[]> {
+  const query = `
+    query (
+      $perPage: Int,
+      $format: MediaFormat,
+      $status: MediaStatus,
+      $season: MediaSeason,
+      $seasonYear: Int,
+      $countryOfOrigin: CountryCode,
+      $genreIn: [String],
+      $sort: [MediaSort]
+    ) {
+      Page(perPage: $perPage) {
+        media(
+          type: ANIME,
+          format: $format,
+          status: $status,
+          season: $season,
+          seasonYear: $seasonYear,
+          countryOfOrigin: $countryOfOrigin,
+          genre_in: $genreIn,
+          sort: $sort
+        ) {
+          id
+          idMal
+          format
+          title { romaji english native }
+          coverImage { medium large }
+          episodes
+          status
+          seasonYear
+          season
+          genres
+          averageScore
+          popularity
+          favourites
+          trending
+          countryOfOrigin
+          startDate { year }
+        }
+      }
+    }
+  `;
+
+  const variables = {
+    perPage: filters.perPage || 20,
+    format: filters.format,
+    status: filters.status,
+    season: filters.season,
+    seasonYear: filters.seasonYear,
+    countryOfOrigin: filters.countryOfOrigin,
+    genreIn: filters.genres,
+    sort: filters.sort ? [filters.sort] : ['TRENDING_DESC'],
+  };
+
+  const data = await anilistQuery(query, variables);
   return data.Page?.media || [];
 }
 
 // Disconnect integrations
 export async function disconnectMAL(userId: string): Promise<void> {
-  const { error } = await supabase
-    .from('profiles')
-    .update({
-      mal_user_id: null,
-      mal_access_token: null,
-      mal_refresh_token: null,
-      mal_token_expires_at: null,
-    })
-    .eq('user_id', userId);
-
-  if (error) throw error;
+  await disconnectMal(userId);
 }
 
 export async function disconnectAniList(userId: string): Promise<void> {

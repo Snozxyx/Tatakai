@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiGet } from '@/lib/api';
+import { queryClient } from '@/lib/queryClient';
+import { HiAnimeData } from './useHiAnimeSeasons';
 
 export interface ExternalIds {
   malId: number | null;
@@ -13,27 +15,35 @@ export interface ExternalIds {
  * Multi-source external ID resolver
  * Priority: 1. HiAnime API -> 2. Database (watchlist/history) -> 3. Episode sources -> 4. None (needs manual)
  */
-async function fetchExternalIds(
+export async function fetchExternalIds(
   animeId: string,
   userId?: string
 ): Promise<ExternalIds> {
   console.log('[ExternalIds] Starting ID resolution for:', animeId);
 
-  // 1. Try HiAnime API first
+  // 1. Try HiAnime API first (using shared cache)
   try {
-    console.log('[ExternalIds] Trying HiAnime API...');
-    const data = await apiGet<any>(`/anime/${animeId}`);
+    console.log('[ExternalIds] Checking HiAnime Cache/API...');
+    // We use the same query logic as useHiAnimeInfo to leverage the cache
+    const data = await queryClient.fetchQuery({
+      queryKey: ['hianime-anime', animeId],
+      queryFn: async () => {
+        console.log('[ExternalIds] Cache miss - Fetching HiAnime API...');
+        return apiGet<any>(`/anime/${animeId}`);
+      },
+      staleTime: 1000 * 60 * 60,
+    });
     
     const malId = data?.anime?.info?.malId;
     const anilistId = data?.anime?.info?.anilistId;
     
     if (malId || anilistId) {
-      console.log('[ExternalIds] ✓ Found from HiAnime:', { malId, anilistId });
+      console.log('[ExternalIds] ✓ Found IDs (cached or fetched):', { malId, anilistId });
       return { malId: malId || null, anilistId: anilistId || null, source: 'hianime' };
     }
     console.log('[ExternalIds] ✗ HiAnime returned no IDs');
   } catch (error) {
-    console.warn('[ExternalIds] ✗ HiAnime API failed:', error);
+    console.warn('[ExternalIds] ✗ HiAnime API/Cache lookup failed:', error);
   }
 
   // 2. Try database lookup (watchlist and watch_history)

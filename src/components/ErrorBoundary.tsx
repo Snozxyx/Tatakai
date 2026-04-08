@@ -1,6 +1,6 @@
 import React from 'react';
 import { logClientError } from '@/lib/errorLogger';
-import ErrorPage from '@/pages/ErrorPage';
+import ErrorPage from '@/pages/error/ErrorPage';
 
 interface Props {
   children: React.ReactNode;

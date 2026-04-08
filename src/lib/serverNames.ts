@@ -6,9 +6,8 @@ export interface ServerNameInfo {
 
 export const ANIME_SERVER_NAMES: Record<string, ServerNameInfo> = {
   // TatakaiAPI / HiAnime servers - Main characters
-  'hd-1': { name: 'Goku', description: 'Ultra HD Server' },
-  'hd-2': { name: 'Luffy', description: 'HD Pro - Recommended' },
-  'hd-3': { name: 'Saitama', description: 'HD Elite' },
+  'hd-1': { name: 'Goku', description: 'Ultra HD (Vidstreaming)' },
+  'hd-2': { name: 'Saitama', description: 'HD Elite (T-Cloud)' },
   'megacloud': { name: 'Domo', description: 'MegaCloud HLS Streaming' },
   'streamsb': { name: 'Oni', description: 'StreamSB Server' },
   'streamtape': { name: 'Shinigami', description: 'StreamTape Server' },
@@ -58,6 +57,80 @@ export const ANIME_SERVER_NAMES: Record<string, ServerNameInfo> = {
   'animeya-mp4': { name: 'Mp4', description: 'Mp4Upload' },
 };
 
+const SIMPLE_CHARACTER_POOL = [
+  "Naruto",
+  "Hinata",
+  "Sasuke",
+  "Haikyuu",
+  "Luffy",
+  "Zoro",
+  "Nami",
+  "Itachi",
+  "Madara",
+  "Levi",
+  "Eren",
+  "Mikasa",
+  "Gojo",
+  "Yuji",
+  "Tanjiro",
+  "Nezuko",
+  "Saitama",
+  "Goku",
+  "Vegeta",
+  "Kakashi",
+  "Aizen",
+  "Ichigo",
+  "Rukia",
+  "Kenpachi",
+  "Killua",
+  "Gon",
+  "Kurapika",
+  "Hisoka",
+  "Light",
+  "L",
+  "Ryuk",
+  "Natsu",
+  "Erza",
+  "Gray",
+  "Lucy",
+  "Jotaro",
+  "Dio",
+  "Joseph",
+  "Mob",
+  "Reigen",
+  "Rimuru",
+  "Anos",
+  "Sung",
+  "Jinwoo",
+  "Frieren",
+  "Fern",
+  "Stark",
+  "Senku",
+  "Inosuke",
+  "Zenitsu",
+  "Rengoku",
+  "Akaza",
+  "Bakugo",
+  "Deku",
+  "Todoroki",
+  "AllMight",
+  "Shanks",
+  "Sanji",
+  "Usopp",
+  "Robin",
+  "Chopper",
+  "Ace",
+  "Law",
+] as const;
+
+function hashStable(input: string): number {
+  let hash = 0;
+  for (let i = 0; i < input.length; i += 1) {
+    hash = (hash * 31 + input.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
 export function getAnimeServerName(serverKey: string, fallback?: string): ServerNameInfo {
   const key = serverKey.toLowerCase();
 
@@ -78,6 +151,70 @@ export function getAnimeServerName(serverKey: string, fallback?: string): Server
     name: displayName,
     description: fallback ? `${fallback} Server` : 'Video Server'
   };
+}
+
+export function getSimpleServerDisplayName(serverKey: string, fallback?: string): string {
+  const key = (serverKey || "").toLowerCase().trim();
+  if (!key) return "Naruto";
+
+  if (ANIME_SERVER_NAMES[key]) {
+    return ANIME_SERVER_NAMES[key].name;
+  }
+
+  const partialMatch = Object.keys(ANIME_SERVER_NAMES).find(k => key.includes(k));
+  if (partialMatch) {
+    return ANIME_SERVER_NAMES[partialMatch].name;
+  }
+
+  if (fallback) {
+    const fallbackKey = fallback.toLowerCase().trim();
+    if (ANIME_SERVER_NAMES[fallbackKey]) {
+      return ANIME_SERVER_NAMES[fallbackKey].name;
+    }
+  }
+
+  const picked = SIMPLE_CHARACTER_POOL[hashStable(key) % SIMPLE_CHARACTER_POOL.length];
+  return picked;
+}
+
+export function buildUniqueSimpleNameMap(
+  keys: string[],
+  fallbackByKey: Record<string, string> = {}
+): Record<string, string> {
+  const uniqueKeys = Array.from(new Set(keys.filter(Boolean)));
+  const used = new Set<string>();
+  const out: Record<string, string> = {};
+
+  for (const key of uniqueKeys) {
+    const fallback = fallbackByKey[key];
+    const preferred = getSimpleServerDisplayName(key, fallback);
+    if (!used.has(preferred)) {
+      out[key] = preferred;
+      used.add(preferred);
+      continue;
+    }
+
+    let resolved = "";
+    const start = hashStable(key) % SIMPLE_CHARACTER_POOL.length;
+    for (let i = 0; i < SIMPLE_CHARACTER_POOL.length; i += 1) {
+      const candidate = SIMPLE_CHARACTER_POOL[(start + i) % SIMPLE_CHARACTER_POOL.length];
+      if (!used.has(candidate)) {
+        resolved = candidate;
+        break;
+      }
+    }
+
+    if (!resolved) {
+      let n = 2;
+      while (used.has(`${preferred} ${n}`)) n += 1;
+      resolved = `${preferred} ${n}`;
+    }
+
+    out[key] = resolved;
+    used.add(resolved);
+  }
+
+  return out;
 }
 
 // Legacy function for compatibility

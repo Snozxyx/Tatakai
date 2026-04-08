@@ -32,12 +32,14 @@ export const CSP_POLICY = {
   'connect-src': [
     "'self'",
     'https://*.supabase.co',
-    'https://tatakai.jiobase.com',
+    'https://*.tatakai.me',
     'https://*.datadoghq.com',
     'https://www.google-analytics.com',
     'https://api.tatakai.me',
     'https://api.jikan.moe',
-    ""
+    'https://api.trace.moe',
+    'https://graphql.anilist.co',
+    'https://api.myanimelist.net'
   ],
   'media-src': [
     "'self'",

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { usePublicWatchRooms } from '@/hooks/useWatchRoom';
-import { WatchRoomCard } from '@/pages/IsshoNiPage';
+import { WatchRoomCard } from '@/pages/watch/IsshoNiPage';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
 import { Sparkles, ChevronRight, Radio, Users, Tv } from 'lucide-react';

@@ -55,14 +55,7 @@ export function VideoBackground({ animeId, poster, children }: VideoBackgroundPr
           backBufferLength: 30,
           maxBufferLength: 30,
           maxMaxBufferLength: 60,
-          xhrSetup: (xhr) => {
-            // Include Supabase anon key for function invocation
-            try {
-              xhr.setRequestHeader('apikey', import.meta.env.VITE_SUPABASE_ANON_KEY || '');
-            } catch (e) {
-              // Some browsers may disallow setting certain headers
-            }
-          },
+          xhrSetup: () => {},
         });
 
         hls.loadSource(proxiedUrl);

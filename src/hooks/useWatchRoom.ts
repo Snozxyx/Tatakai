@@ -1,5 +1,3 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -55,6 +53,43 @@ export interface RoomMessage {
     message: string;
     message_type: 'chat' | 'system' | 'reaction';
     created_at: string;
+}
+
+export interface WatchRoomQueueItem {
+    id: string;
+    room_id: string;
+    anime_id: string;
+    anime_title: string;
+    anime_poster: string | null;
+    episode_id: string | null;
+    episode_number: number | null;
+    episode_title: string | null;
+    added_by: string | null;
+    position: number;
+    created_at: string;
+    added_by_profile?: {
+        user_id: string;
+        username: string | null;
+        display_name: string | null;
+    } | null;
+}
+
+export interface WatchRoomPoll {
+    id: string;
+    room_id: string;
+    question: string;
+    options: string[];
+    created_by: string;
+    is_active: boolean;
+    ends_at: string | null;
+    created_at: string;
+    votes_count: number;
+    user_vote: number | null;
+    results: Array<{
+        option: string;
+        votes: number;
+        percent: number;
+    }>;
 }
 
 export interface CreateRoomInput {
@@ -270,6 +305,320 @@ export function useRoomMessages(roomId: string | undefined) {
             return data as RoomMessage[];
         },
         enabled: !!roomId,
+    });
+}
+
+// Fetch room queue (host queue feature)
+export function useRoomQueue(roomId: string | undefined) {
+    return useQuery({
+        queryKey: ['watch-room-queue', roomId],
+        queryFn: async () => {
+            if (!roomId) return [];
+
+            const db = supabase as any;
+            const { data, error } = await db
+                .from('watch_room_queue')
+                .select('*')
+                .eq('room_id', roomId)
+                .order('position', { ascending: true })
+                .order('created_at', { ascending: true });
+
+            if (error) throw error;
+            if (!data || data.length === 0) return [] as WatchRoomQueueItem[];
+
+            const addedByIds = [...new Set(data.map((item: any) => item.added_by).filter(Boolean))] as string[];
+            const profileMap = new Map<string, any>();
+
+            if (addedByIds.length > 0) {
+                const { data: profiles } = await supabase
+                    .from('profiles')
+                    .select('user_id, username, display_name')
+                    .in('user_id', addedByIds);
+
+                (profiles || []).forEach((profile: any) => {
+                    profileMap.set(profile.user_id, profile);
+                });
+            }
+
+            return data.map((item: any) => ({
+                ...item,
+                added_by_profile: item.added_by ? (profileMap.get(item.added_by) || null) : null,
+            })) as WatchRoomQueueItem[];
+        },
+        enabled: !!roomId,
+    });
+}
+
+// Add item to host queue
+export function useAddQueueItem() {
+    const queryClient = useQueryClient();
+    const { user } = useAuth();
+
+    return useMutation({
+        mutationFn: async ({
+            roomId,
+            animeId,
+            animeTitle,
+            animePoster,
+            episodeId,
+            episodeNumber,
+            episodeTitle,
+        }: {
+            roomId: string;
+            animeId: string;
+            animeTitle: string;
+            animePoster?: string | null;
+            episodeId?: string | null;
+            episodeNumber?: number | null;
+            episodeTitle?: string | null;
+        }) => {
+            if (!user) throw new Error('Must be logged in');
+
+            const db = supabase as any;
+            const { data: lastItem } = await db
+                .from('watch_room_queue')
+                .select('position')
+                .eq('room_id', roomId)
+                .order('position', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            const nextPosition = typeof lastItem?.position === 'number' ? lastItem.position + 1 : 0;
+
+            const { error } = await db
+                .from('watch_room_queue')
+                .insert({
+                    room_id: roomId,
+                    anime_id: animeId,
+                    anime_title: animeTitle,
+                    anime_poster: animePoster || null,
+                    episode_id: episodeId || null,
+                    episode_number: episodeNumber ?? null,
+                    episode_title: episodeTitle || null,
+                    added_by: user.id,
+                    position: nextPosition,
+                });
+
+            if (error) throw error;
+        },
+        onSuccess: (_, { roomId }) => {
+            queryClient.invalidateQueries({ queryKey: ['watch-room-queue', roomId] });
+        },
+    });
+}
+
+// Remove queue item
+export function useRemoveQueueItem() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ roomId, queueItemId }: { roomId: string; queueItemId: string }) => {
+            const db = supabase as any;
+            const { error } = await db
+                .from('watch_room_queue')
+                .delete()
+                .eq('id', queueItemId)
+                .eq('room_id', roomId);
+
+            if (error) throw error;
+        },
+        onSuccess: (_, { roomId }) => {
+            queryClient.invalidateQueries({ queryKey: ['watch-room-queue', roomId] });
+        },
+    });
+}
+
+// Reorder queue items
+export function useReorderQueueItems() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ roomId, queueItemIds }: { roomId: string; queueItemIds: string[] }) => {
+            const db = supabase as any;
+            const updates = queueItemIds.map((queueItemId, index) =>
+                db
+                    .from('watch_room_queue')
+                    .update({ position: index })
+                    .eq('id', queueItemId)
+                    .eq('room_id', roomId)
+            );
+
+            await Promise.all(updates);
+        },
+        onSuccess: (_, { roomId }) => {
+            queryClient.invalidateQueries({ queryKey: ['watch-room-queue', roomId] });
+        },
+    });
+}
+
+// Fetch currently active poll and computed vote breakdown
+export function useActiveRoomPoll(roomId: string | undefined) {
+    const { user } = useAuth();
+
+    return useQuery({
+        queryKey: ['watch-room-active-poll', roomId, user?.id],
+        queryFn: async () => {
+            if (!roomId) return null;
+
+            const db = supabase as any;
+            const { data: poll, error: pollError } = await db
+                .from('watch_room_polls')
+                .select('*')
+                .eq('room_id', roomId)
+                .eq('is_active', true)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (pollError) throw pollError;
+            if (!poll) return null;
+
+            if (poll.ends_at && new Date(poll.ends_at).getTime() <= Date.now()) {
+                await db.from('watch_room_polls').update({ is_active: false }).eq('id', poll.id);
+                return null;
+            }
+
+            const options = Array.isArray(poll.options) ? poll.options : [];
+            const { data: votes, error: votesError } = await db
+                .from('watch_room_poll_votes')
+                .select('user_id, option_index')
+                .eq('poll_id', poll.id);
+
+            if (votesError) throw votesError;
+
+            const counts = new Array(options.length).fill(0);
+            let userVote: number | null = null;
+
+            (votes || []).forEach((vote: any) => {
+                if (typeof vote.option_index === 'number' && vote.option_index >= 0 && vote.option_index < counts.length) {
+                    counts[vote.option_index] += 1;
+                }
+
+                if (user?.id && vote.user_id === user.id && typeof vote.option_index === 'number') {
+                    userVote = vote.option_index;
+                }
+            });
+
+            const totalVotes = counts.reduce((sum, count) => sum + count, 0);
+            const results = options.map((option: string, index: number) => ({
+                option,
+                votes: counts[index] || 0,
+                percent: totalVotes > 0 ? Math.round(((counts[index] || 0) / totalVotes) * 100) : 0,
+            }));
+
+            return {
+                ...poll,
+                options,
+                votes_count: totalVotes,
+                user_vote: userVote,
+                results,
+            } as WatchRoomPoll;
+        },
+        enabled: !!roomId,
+    });
+}
+
+// Host: create a poll in room
+export function useCreateRoomPoll() {
+    const queryClient = useQueryClient();
+    const { user } = useAuth();
+
+    return useMutation({
+        mutationFn: async ({
+            roomId,
+            question,
+            options,
+            endsAt,
+        }: {
+            roomId: string;
+            question: string;
+            options: string[];
+            endsAt?: string | null;
+        }) => {
+            if (!user) throw new Error('Must be logged in');
+
+            const db = supabase as any;
+
+            // Ensure only one active poll at a time.
+            await db
+                .from('watch_room_polls')
+                .update({ is_active: false })
+                .eq('room_id', roomId)
+                .eq('is_active', true);
+
+            const { error } = await db
+                .from('watch_room_polls')
+                .insert({
+                    room_id: roomId,
+                    question,
+                    options,
+                    created_by: user.id,
+                    is_active: true,
+                    ends_at: endsAt || null,
+                });
+
+            if (error) throw error;
+        },
+        onSuccess: (_, { roomId }) => {
+            queryClient.invalidateQueries({ queryKey: ['watch-room-active-poll', roomId] });
+        },
+    });
+}
+
+// Participant: vote on active poll
+export function useVoteRoomPoll() {
+    const queryClient = useQueryClient();
+    const { user } = useAuth();
+
+    return useMutation({
+        mutationFn: async ({
+            roomId,
+            pollId,
+            optionIndex,
+        }: {
+            roomId: string;
+            pollId: string;
+            optionIndex: number;
+        }) => {
+            if (!user) throw new Error('Must be logged in');
+
+            const db = supabase as any;
+            const { error } = await db
+                .from('watch_room_poll_votes')
+                .upsert({
+                    room_id: roomId,
+                    poll_id: pollId,
+                    user_id: user.id,
+                    option_index: optionIndex,
+                    created_at: new Date().toISOString(),
+                }, { onConflict: 'poll_id,user_id' });
+
+            if (error) throw error;
+        },
+        onSuccess: (_, { roomId }) => {
+            queryClient.invalidateQueries({ queryKey: ['watch-room-active-poll', roomId] });
+        },
+    });
+}
+
+// Host: close poll
+export function useCloseRoomPoll() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ roomId, pollId }: { roomId: string; pollId: string }) => {
+            const db = supabase as any;
+            const { error } = await db
+                .from('watch_room_polls')
+                .update({ is_active: false })
+                .eq('id', pollId)
+                .eq('room_id', roomId);
+
+            if (error) throw error;
+        },
+        onSuccess: (_, { roomId }) => {
+            queryClient.invalidateQueries({ queryKey: ['watch-room-active-poll', roomId] });
+        },
     });
 }
 

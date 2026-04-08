@@ -4,10 +4,23 @@
  * Uses PKCE flow for security.
  */
 
-const MAL_CLIENT_ID = "95c3ad3639e1840ee700cb5485d11135";
-const REDIRECT_URI = typeof window !== 'undefined'
-    ? `${window.location.origin}/integration/mal/redirect`
-    : "https://tatakai.qzz.io/integration/mal/redirect";
+const MAL_CLIENT_ID = import.meta.env.VITE_MAL_CLIENT_ID;
+const REDIRECT_URI = import.meta.env.VITE_MAL_REDIRECT_URI || (
+    typeof window !== 'undefined'
+        ? `${window.location.origin}/integration/mal/redirect`
+        : ""
+);
+
+function getMalAuthFunctionUrl(): string {
+    const explicit = import.meta.env.VITE_MAL_AUTH_FUNCTION_URL;
+    if (explicit) return explicit.replace(/\/$/, '');
+
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    if (!supabaseUrl) {
+        throw new Error('Missing VITE_MAL_AUTH_FUNCTION_URL or VITE_SUPABASE_URL');
+    }
+    return `${supabaseUrl.replace(/\/$/, '')}/functions/v1/mal-auth`;
+}
 
 // Helper to generate a random string for code_verifier
 function generateRandomString(length: number) {
@@ -23,7 +36,14 @@ function generateRandomString(length: number) {
  * Generates the MAL authorization URL.
  * Also stores the code_verifier in localStorage for later use.
  */
-export async function getMalAuthUrl() {
+export function getMalAuthUrl() {
+    if (!MAL_CLIENT_ID) {
+        throw new Error('Missing VITE_MAL_CLIENT_ID');
+    }
+    if (!REDIRECT_URI) {
+        throw new Error('Missing VITE_MAL_REDIRECT_URI or window location context');
+    }
+
     const codeVerifier = generateRandomString(128);
     localStorage.setItem('mal_code_verifier', codeVerifier);
 
@@ -61,7 +81,7 @@ export async function exchangeMalCode(code: string) {
         throw new Error('You must be logged in to link MyAnimeList.');
     }
 
-    const functionUrl = `https://tatakai.jiobase.com/functions/v1/mal-auth`;
+    const functionUrl = getMalAuthFunctionUrl();
 
     console.debug('[MAL Auth] Calling Edge Function:', functionUrl, 'action:', 'exchange');
 
@@ -113,7 +133,7 @@ export async function exchangeMalCode(code: string) {
 export async function resolveMalIdFromEpisodes(animeId: string): Promise<number | null> {
     console.log(`[MAL Sync] Fallback - Resolving MAL ID for ${animeId} via Episode 1...`);
     try {
-        const { fetchEpisodes, fetchTatakaiEpisodeSources } = await import('@/lib/api');
+        const { fetchEpisodes, fetchTatakaiEpisodeSources, fetchCombinedSources } = await import('@/lib/api');
 
         // 1. Get episode list
         const { episodes } = await fetchEpisodes(animeId);
@@ -129,6 +149,14 @@ export async function resolveMalIdFromEpisodes(animeId: string): Promise<number 
         if (sourceData?.malID) {
             const malId = Number(sourceData.malID);
             console.log(`[MAL Sync] Fallback - Successfully resolved MAL ID: ${malId}`);
+            return malId;
+        }
+
+        // 3. Broader fallback: combined sources often carry provider-derived IDs.
+        const combined = await fetchCombinedSources(firstEpisode.episodeId, animeId, 1, 'hd-2', 'sub');
+        if (combined?.malID) {
+            const malId = Number(combined.malID);
+            console.log(`[MAL Sync] Fallback - Resolved MAL ID via combined sources: ${malId}`);
             return malId;
         }
 
@@ -235,7 +263,7 @@ export async function updateMalAnimeStatus(
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) throw new Error('Not authenticated');
 
-    const functionUrl = `https://tatakai.jiobase.com/functions/v1/mal-auth`;
+    const functionUrl = getMalAuthFunctionUrl();
 
     const response = await fetch(functionUrl, {
         method: 'POST',
@@ -278,7 +306,7 @@ export async function fetchMalUserList() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) throw new Error('Not authenticated');
 
-    const functionUrl = `https://tatakai.jiobase.com/functions/v1/mal-auth`;
+    const functionUrl = getMalAuthFunctionUrl();
 
     console.log('[MAL Sync] REQ - Fetching user list via Edge Function');
 
@@ -359,7 +387,7 @@ export async function deleteMalAnimeStatus(animeIdOrMalId: string): Promise<void
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) throw new Error('Not authenticated');
 
-    const functionUrl = `https://tatakai.jiobase.com/functions/v1/mal-auth`;
+    const functionUrl = getMalAuthFunctionUrl();
 
     console.log('[MAL Sync] REQ - Calling Edge Function delete for malId:', malId);
 

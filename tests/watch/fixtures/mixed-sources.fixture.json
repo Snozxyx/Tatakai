@@ -1,0 +1,25 @@
+{
+  "name": "mixed-source-payload-fixture",
+  "sources": [
+    {
+      "url": "https://example.com/manifest-a.m3u8",
+      "isM3U8": true,
+      "server": "HD-2",
+      "providerName": "HD-2",
+      "language": "Dub"
+    },
+    {
+      "url": "https://example.com/manifest-b.m3u8",
+      "isM3U8": true,
+      "providerName": "hd-1",
+      "language": "Dub"
+    },
+    {
+      "url": "https://example.com/video-c.mp4",
+      "isM3U8": false,
+      "server": "Animeya",
+      "providerName": "Animeya",
+      "language": "Sub"
+    }
+  ]
+}

@@ -26,6 +26,9 @@ let mainWindow;
 let splash;
 let tray;
 const clientId = '1466113024929697836';
+let rpc;
+let rpcReady = false;
+let pendingRpcActivity = null;
 
 // ── Client ID (CID) — persistent device identifier for rate limiting ──
 function getOrCreateCID() {
@@ -505,22 +508,49 @@ function handleDeepLink(url) {
     }
 }
 
-// Discord RPC
-let rpc;
 function initRPC() {
+    try {
+        DiscordRPC.register(clientId);
+    } catch (err) {
+        logger.warn('Discord RPC register failed', err);
+    }
+
     rpc = new DiscordRPC.Client({ transport: 'ipc' });
     rpc.on('ready', () => {
+        rpcReady = true;
+        if (pendingRpcActivity) {
+            const { details, state, extra } = pendingRpcActivity;
+            pendingRpcActivity = null;
+            setActivity(details, state, extra);
+            return;
+        }
         setActivity('Browsing Anime', 'Main Menu');
     });
-    rpc.login({ clientId }).catch(console.error);
+    rpc.on('disconnected', () => {
+        rpcReady = false;
+    });
+    rpc.on('error', (err) => {
+        rpcReady = false;
+        logger.warn('Discord RPC error', err);
+    });
+    rpc.login({ clientId }).catch((err) => {
+        logger.warn('Discord RPC login failed', err);
+    });
 }
 
 async function setActivity(details, state, extra = {}) {
-    if (!rpc || !mainWindow) return;
+    if (!rpc) return;
+
+    const normalizedExtra = extra && typeof extra === 'object' ? extra : {};
+    if (!rpcReady) {
+        pendingRpcActivity = { details, state, extra: normalizedExtra };
+        return;
+    }
+
     const activity = {
         details: details || 'Browsing Anime',
         state: state || 'In Main Menu',
-        startTimestamp: extra.startTime || new Date(),
+        startTimestamp: normalizedExtra.startTime || new Date(),
         largeImageKey: 'logo',
         largeImageText: 'Tatakai - Watch Anime Online',
         instance: false,
@@ -529,11 +559,15 @@ async function setActivity(details, state, extra = {}) {
         ]
     };
 
-    if (extra.endTime) activity.endTimestamp = extra.endTime;
-    if (extra.smallImageKey) activity.smallImageKey = extra.smallImageKey;
-    if (extra.smallImageText) activity.smallImageText = extra.smallImageText;
+    if (normalizedExtra.endTime) activity.endTimestamp = normalizedExtra.endTime;
+    if (normalizedExtra.smallImageKey) activity.smallImageKey = normalizedExtra.smallImageKey;
+    if (normalizedExtra.smallImageText) activity.smallImageText = normalizedExtra.smallImageText;
 
-    rpc.setActivity(activity);
+    try {
+        await rpc.setActivity(activity);
+    } catch (err) {
+        logger.warn('Discord RPC setActivity failed', err);
+    }
 }
 
 function createSplash() {

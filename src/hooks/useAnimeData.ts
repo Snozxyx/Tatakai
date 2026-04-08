@@ -35,17 +35,18 @@ export function useAnimeInfo(animeId: string | undefined) {
   return useQuery({
     queryKey: ["anime", animeId],
     queryFn: () => fetchAnimeInfo(animeId!),
-    enabled: !!animeId && !animeId.startsWith('mal-'),
+    enabled: !!animeId,
     staleTime: STALE_TIME.anime,
     gcTime: isMobileNative ? 60 * 60 * 1000 : 30 * 60 * 1000,
   });
 }
 
 export function useEpisodes(animeId: string | undefined) {
+  const isExternalId = !!animeId && (animeId.startsWith('mal-') || animeId.startsWith('anilist-'));
   return useQuery({
     queryKey: ["episodes", animeId],
     queryFn: () => fetchEpisodes(animeId!),
-    enabled: !!animeId && !animeId.startsWith('mal-'),
+    enabled: !!animeId && !isExternalId,
     staleTime: STALE_TIME.episodes,
     gcTime: isMobileNative ? 60 * 60 * 1000 : 30 * 60 * 1000,
   });
@@ -90,10 +91,11 @@ export function useGenreAnimes(genre: string | undefined, page: number = 1) {
 }
 
 export function useNextEpisodeSchedule(animeId: string | undefined) {
+  const isExternalId = !!animeId && (animeId.startsWith('mal-') || animeId.startsWith('anilist-'));
   return useQuery({
     queryKey: ["next-episode-schedule", animeId],
     queryFn: () => fetchNextEpisodeSchedule(animeId!),
-    enabled: !!animeId && !animeId.startsWith('mal-'),
+    enabled: !!animeId && !isExternalId,
     staleTime: 5 * 60 * 1000,
     retry: false, // Don't retry if anime doesn't have schedule
   });

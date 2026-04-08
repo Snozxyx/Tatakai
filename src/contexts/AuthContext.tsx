@@ -28,6 +28,7 @@ export interface Profile {
   showcase_anime?: any | null;
   is_premium?: boolean;
   role?: string;
+  preferred_title_language?: 'romaji' | 'english' | 'native';
 }
 
 interface AuthContextType {

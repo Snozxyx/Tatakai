@@ -12,8 +12,29 @@
  *  3. Comments      — fires when a new comment is posted
  */
 
-const TATAKAI_API_URL =
-  import.meta.env.VITE_TATAKAI_API_URL || 'https://api.tatakai.me/api/v1';
+const RAW_TATAKAI_API_URL =
+  import.meta.env.VITE_TATAKAI_API_URL || 'https://api.tatakai.me/api/v2/anime';
+
+function normalizeWebhookBase(url: string): string {
+  const trimmed = (url || '').replace(/\/+$/, '');
+  if (!trimmed) return 'https://api.tatakai.me/api/v2/anime';
+  if (/^https?:\/\/[^/]+$/i.test(trimmed)) return `${trimmed}/api/v2/anime`;
+  if (/\/api\/v2\/anime$/i.test(trimmed)) return trimmed;
+  if (/\/api\/v1$/i.test(trimmed)) return `${trimmed.replace(/\/api\/v1$/i, '')}/api/v2/anime`;
+  if (/\/api\/v2$/i.test(trimmed)) return `${trimmed}/anime`;
+  if (/\/api$/i.test(trimmed)) return `${trimmed}/v2/anime`;
+  return trimmed;
+}
+
+function resolveWebhookBase(url: string): string {
+  const normalized = normalizeWebhookBase(url);
+  if (import.meta.env.DEV && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/api\/v2\/anime$/i.test(normalized)) {
+    return '/api/v2/anime';
+  }
+  return normalized;
+}
+
+const TATAKAI_WEBHOOK_BASE = resolveWebhookBase(RAW_TATAKAI_API_URL);
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -50,13 +71,17 @@ const COLORS = {
 async function sendToDiscord(payload: WebhookPayload): Promise<void> {
   try {
     // Route through TatakaiAPI which holds the actual webhook URLs
-    const res = await fetch(`${TATAKAI_API_URL}/webhooks/discord`, {
+    const res = await fetch(`${TATAKAI_WEBHOOK_BASE}/webhooks/discord`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
 
     if (!res.ok) {
+      if (res.status === 404) {
+        console.warn('[Discord Webhook] Endpoint reachable but webhook env is not configured for this channel.');
+        return;
+      }
       console.warn(`[Discord Webhook] Failed (${res.status}):`, await res.text().catch(() => ''));
     }
   } catch (err) {

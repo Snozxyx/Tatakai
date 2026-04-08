@@ -11,7 +11,7 @@ const corsHeaders = {
 // Retry fetch with exponential backoff
 async function fetchWithRetry(url: string, options: RequestInit, retries = 3): Promise<Response> {
   let lastError: Error | null = null;
-  
+
   for (let i = 0; i < retries; i++) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 30000); // 30 second timeout
@@ -22,39 +22,39 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3): P
         signal: controller.signal,
       });
       clearTimeout(timer);
-      
+
       // Return if successful or if it's a range response
       if (response.ok || response.status === 206) {
         return response;
       }
-      
+
       // Don't retry 4xx errors except 429 (rate limit)
       if (response.status >= 400 && response.status < 500 && response.status !== 429) {
         return response;
       }
-      
+
       lastError = new Error(`HTTP ${response.status}: ${response.statusText}`);
     } catch (error) {
       clearTimeout(timer);
       lastError = error instanceof Error ? error : new Error(String(error));
       console.warn(`Fetch attempt ${i + 1} failed:`, lastError.message);
     }
-    
+
     // Wait before retry with exponential backoff
     if (i < retries - 1) {
       await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 500));
     }
   }
-  
+
   throw lastError || new Error('Failed to fetch after retries');
 }
 
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { 
+    return new Response(null, {
       status: 204,
-      headers: corsHeaders 
+      headers: corsHeaders
     });
   }
 
@@ -224,7 +224,7 @@ serve(async (req) => {
         'Content-Type': upstreamContentType,
       };
       if (upstreamLength) streamHeaders['Content-Length'] = upstreamLength;
-      
+
       return new Response(upstreamBody, {
         status: passthroughStatus,
         headers: streamHeaders,
@@ -258,7 +258,7 @@ serve(async (req) => {
         });
       }
 
-      return new Response(JSON.stringify({ 
+      return new Response(JSON.stringify({
         error: `Upstream error: ${response.status}`,
         url: targetUrl.substring(0, 50) + '...'
       }), {
@@ -269,7 +269,7 @@ serve(async (req) => {
 
     // Determine content type
     let contentType = response.headers.get('content-type') || 'application/octet-stream';
-    
+
     if (type === 'subtitle') {
       if (targetUrl.includes('.vtt')) {
         contentType = 'text/vtt; charset=utf-8';
@@ -319,7 +319,7 @@ serve(async (req) => {
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Proxy error';
     console.error('Proxy error:', errorMessage);
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       error: errorMessage,
       timestamp: new Date().toISOString(),
     }), {

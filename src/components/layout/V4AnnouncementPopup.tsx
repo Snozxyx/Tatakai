@@ -4,23 +4,21 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
     Sparkles,
-    Users,
     Zap,
     Settings,
-    Play,
+    Users,
     ShieldCheck,
-    MessageSquare,
-    Globe,
-    Gauge
+    Gauge,
+    Target,
+    Search
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
-export function V4AnnouncementPopup() {
+export function V5AnnouncementPopup() {
     const [isOpen, setIsOpen] = useState(false);
 
     useEffect(() => {
-        const hasSeenV4 = localStorage.getItem('tatakai_v4_announced') === 'true';
-        if (!hasSeenV4) {
+        const hasSeenV5 = localStorage.getItem('tatakai_v5_announced') === 'true';
+        if (!hasSeenV5) {
             const timer = setTimeout(() => setIsOpen(true), 2000);
             return () => clearTimeout(timer);
         }
@@ -28,7 +26,7 @@ export function V4AnnouncementPopup() {
 
     const handleClose = () => {
         setIsOpen(false);
-        localStorage.setItem('tatakai_v4_announced', 'true');
+        localStorage.setItem('tatakai_v5_announced', 'true');
     };
 
     const handleGoToSettings = () => {
@@ -38,44 +36,44 @@ export function V4AnnouncementPopup() {
 
     const features = [
         {
-            icon: <Users className="w-5 h-5 text-blue-400" />,
-            title: "Social Marketplace",
-            description: "See exactly who shared community links. Click usernames to visit profiles!"
+            icon: <ShieldCheck className="w-5 h-5 text-emerald-400" />,
+            title: "Playback Reliability",
+            description: "Smarter failover and source quality memory reduce dead streams and repeated retries."
         },
         {
-            icon: <Gauge className="w-5 h-5 text-purple-400" />,
-            title: "Custom Playback Speed",
-            description: "Fine-tune your experience. Type any speed from 0.1x to 10x in player settings."
+            icon: <Users className="w-5 h-5 text-cyan-400" />,
+            title: "Watch2Together Upgrades",
+            description: "Host transfer, reconnect recovery, and cleaner room sync for smoother group sessions."
         },
         {
-            icon: <Zap className="w-5 h-5 text-yellow-400" />,
-            title: "Advanced Scraper Repair",
-            description: "Desidubanime & Aniworld are back! Improved matching for titles like Hell's Paradise."
+            icon: <Target className="w-5 h-5 text-amber-400" />,
+            title: "Explainable Recommendations",
+            description: "See recommendation reasons, factor breakdowns, and give direct feedback controls."
         },
         {
-            icon: <ShieldCheck className="w-5 h-5 text-green-400" />,
-            title: "Pending Item Visibility",
-            description: "Shared a new link? You can now see your own entries while they await approval."
+            icon: <Search className="w-5 h-5 text-violet-400" />,
+            title: "Hybrid Search",
+            description: "Anime + character results, advanced filters, and image-search confidence controls."
         }
     ];
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-            <DialogContent 
-                className="sm:max-w-[600px] p-0 overflow-hidden bg-background/40 border-white/10 shadow-2xl rounded-3xl animate-in fade-in zoom-in duration-500"
-                style={{ backdropFilter: 'blur(40px)' }}
+            <DialogContent
+                className="sm:max-w-[660px] p-0 overflow-hidden bg-background/70 border-white/10 shadow-2xl rounded-3xl animate-in fade-in zoom-in duration-500"
+                style={{ backdropFilter: 'blur(30px)' }}
             >
-                {/* Header/Banner */}
-                <div className="relative h-48 w-full overflow-hidden bg-gradient-to-br from-primary/20 via-primary/5 to-transparent">
-                    <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1578632738981-43c9ad4698d8?q=80&w=1000&auto=format&fit=crop')] bg-cover bg-center opacity-20 mix-blend-overlay" />
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 bg-gradient-to-t from-background/80 to-transparent">
-                        <Badge variant="outline" className="mb-3 border-primary/50 text-primary bg-primary/10 px-3 py-1 font-black uppercase tracking-[0.2em] text-[10px]" style={{ backdropFilter: 'blur(12px)' }}>
+                <div className="relative h-52 w-full overflow-hidden">
+                    <img src="/tatakaibanner.png" alt="Tatakai V5" className="absolute inset-0 w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/40 to-transparent" />
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
+                        <Badge variant="outline" className="mb-3 border-primary/50 text-primary bg-primary/10 px-3 py-1 font-black uppercase tracking-[0.2em] text-[10px]">
                             Major Update
                         </Badge>
                         <h1 className="text-5xl font-black tracking-tighter text-foreground drop-shadow-2xl">
-                            TATAKAI <span className="text-primary">V4</span>
+                            TATAKAI <span className="text-primary">V5</span>
                         </h1>
-                        <p className="text-muted-foreground text-xs mt-2 font-medium tracking-widest uppercase">The Social Streaming Revolution</p>
+                        <p className="text-muted-foreground text-xs mt-2 font-medium tracking-widest uppercase">Reliability + Discovery Upgrade</p>
                     </div>
                 </div>
 
@@ -100,7 +98,7 @@ export function V4AnnouncementPopup() {
                             size="lg"
                             className="flex-1 rounded-2xl font-black uppercase tracking-widest text-xs gap-2 group hover:scale-[1.02] transition-transform shadow-lg shadow-primary/20 px-4 sm:px-6 py-3"
                         >
-                            <Sparkles className="w-4 h-4 group-hover:animate-spin" /> Let's Go
+                            <Sparkles className="w-4 h-4 group-hover:animate-spin" /> Continue
                         </Button>
                         <Button
                             onClick={handleGoToSettings}
@@ -120,3 +118,5 @@ export function V4AnnouncementPopup() {
         </Dialog>
     );
 }
+
+export const V4AnnouncementPopup = V5AnnouncementPopup;

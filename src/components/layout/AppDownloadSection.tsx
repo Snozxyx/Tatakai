@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Smartphone, Download, ExternalLink, Apple } from 'lucide-react';
+import { Smartphone, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 
@@ -57,28 +57,28 @@ export function AppDownloadSection() {
           </div>
           
           <p className="text-muted-foreground">
-            Watch anime on the go! Download our mobile app for the best streaming experience 
-            with offline downloads, push notifications, and more.
+            We are building the next Tatakai apps across Android, Windows, Linux, and macOS
+            with features like P2P assist, offline downloads, smart alerts, and sync.
           </p>
 
           <div className="space-y-2 py-4">
             <div className="flex items-center gap-2 text-sm">
               <div className="w-2 h-2 rounded-full bg-primary"></div>
-              <span>Download episodes for offline viewing</span>
+              <span>Desktop builds in progress: Windows, Linux, and macOS</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <div className="w-2 h-2 rounded-full bg-primary"></div>
-              <span>Get notified when new episodes air</span>
+              <span>P2P-assisted delivery for smoother playback on weak networks</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <div className="w-2 h-2 rounded-full bg-primary"></div>
-              <span>Seamless sync across all devices</span>
+              <span>Offline downloads, alerts, and seamless cross-device sync</span>
             </div>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
             <Button
-              onClick={() => window.location.href = '/download'}
+              onClick={() => window.location.href = '/mobile-app'}
               className="flex-1 gap-2"
               size="lg"
             >
@@ -86,10 +86,6 @@ export function AppDownloadSection() {
               Download Our App
             </Button>
           </div>
-
-          <p className="text-xs text-muted-foreground">
-            Free to download. Available on Android 8.0+ and iOS 13+
-          </p>
         </div>
       </div>
     </GlassPanel>

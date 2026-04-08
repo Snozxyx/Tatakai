@@ -1,7 +1,7 @@
 {
   "name": "tatakai",
   "private": true,
-  "version": "4.1.20",
+  "version": "5.0.00",
   "description": "Tatakai - Watch anime online",
   "author": {
     "name": "Tatakai",
@@ -16,6 +16,9 @@
     "build": "cross-env NODE_ENV=production vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
+    "type-check": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json",
+    "test": "bun test tests",
+    "test:watch": "bun test --watch tests",
     "preview": "vite preview",
     "start": "npm run build && cross-env NODE_ENV=production vite preview --port 3000",
     "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:8088 && electron desktop/main.cjs\"",

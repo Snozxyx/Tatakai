@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '@/lib/api';
+import { queryClient } from '@/lib/queryClient';
 
 export interface HiAnimeSeason {
   id: string;
@@ -69,26 +70,27 @@ async function fetchHiAnimeData(animeId: string): Promise<HiAnimeData | null> {
   }
 }
 
+export function useHiAnimeInfo(animeId: string | undefined) {
+  return useQuery({
+    queryKey: ['hianime-anime', animeId],
+    queryFn: () => fetchHiAnimeData(animeId!),
+    enabled: !!animeId,
+    staleTime: 1000 * 60 * 60, // 1 hour
+    gcTime: 1000 * 60 * 60 * 24, // 24 hours cache
+    retry: 2,
+    select: (data) => data?.anime?.info,
+  });
+}
+
 export function useHiAnimeSeasons(animeId: string | undefined) {
   return useQuery({
-    queryKey: ['hianime-seasons', animeId],
+    queryKey: ['hianime-anime', animeId],
     queryFn: () => fetchHiAnimeData(animeId!),
     enabled: !!animeId,
     staleTime: 1000 * 60 * 60, // 1 hour
     gcTime: 1000 * 60 * 60 * 24, // 24 hours cache
     retry: 2,
     select: (data) => data?.seasons || [],
-  });
-}
-
-export function useHiAnimeInfo(animeId: string | undefined) {
-  return useQuery({
-    queryKey: ['hianime-info', animeId],
-    queryFn: () => fetchHiAnimeData(animeId!),
-    enabled: !!animeId,
-    staleTime: 1000 * 60 * 60, // 1 hour
-    gcTime: 1000 * 60 * 60 * 24, // 24 hours cache
-    retry: 2,
   });
 }
 

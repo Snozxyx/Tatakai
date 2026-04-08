@@ -6,7 +6,7 @@ import { AnimeCard as AnimeCardType, getProxiedVideoUrl, getProxiedImageUrl, get
 
 import { useNavigate } from "react-router-dom";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 
 import { fetchEpisodes, fetchStreamingSources } from "@/lib/api";
 
@@ -42,6 +42,8 @@ export function AnimeCardWithPreview({ anime, showPreview = true }: AnimeCardWit
 
   const [previewError, setPreviewError] = useState(false);
 
+  const [posterIndex, setPosterIndex] = useState(0);
+
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const hlsRef = useRef<Hls | null>(null);
@@ -57,6 +59,54 @@ export function AnimeCardWithPreview({ anime, showPreview = true }: AnimeCardWit
   const addToWatchlist = useAddToWatchlist();
 
   const removeFromWatchlist = useRemoveFromWatchlist();
+
+  const posterCandidates = useMemo(() => {
+
+    const directPoster = anime.poster?.trim() || "";
+
+    const directLargeAniList = directPoster
+
+      .replace('/cover/medium/', '/cover/large/')
+
+      .replace(/\/banner\/(small|medium)\//, '/banner/large/');
+
+
+
+    return [
+
+      getHighQualityPoster(directPoster, anime.anilistId),
+
+      directLargeAniList,
+
+      directPoster,
+
+      '/placeholder.svg',
+
+    ].filter((value, index, arr) => Boolean(value) && arr.indexOf(value) === index);
+
+  }, [anime.poster, anime.anilistId]);
+
+
+
+  useEffect(() => {
+
+    setPosterIndex(0);
+
+  }, [anime.id, anime.poster, anime.anilistId]);
+
+
+
+  const handlePosterError = useCallback(() => {
+
+    setPosterIndex((current) => {
+
+      if (current >= posterCandidates.length - 1) return current;
+
+      return current + 1;
+
+    });
+
+  }, [posterCandidates.length]);
 
 
 
@@ -144,15 +194,7 @@ export function AnimeCardWithPreview({ anime, showPreview = true }: AnimeCardWit
 
               maxBufferLength: 10,
 
-              xhrSetup: (xhr) => {
-
-                try {
-
-                  xhr.setRequestHeader('apikey', import.meta.env.VITE_SUPABASE_ANON_KEY || '');
-
-                } catch (e) { }
-
-              },
+              xhrSetup: () => {},
 
             });
 
@@ -348,7 +390,7 @@ export function AnimeCardWithPreview({ anime, showPreview = true }: AnimeCardWit
 
         <img
 
-          src={getHighQualityPoster(anime.poster, anime.anilistId)}
+          src={posterCandidates[posterIndex] || '/placeholder.svg'}
 
           alt={anime.name}
 
@@ -357,6 +399,8 @@ export function AnimeCardWithPreview({ anime, showPreview = true }: AnimeCardWit
           className={`w-full h-full object-cover transition-all duration-700 filter brightness-[0.98] contrast-[1.05] saturate-[1.1] md:group-hover:contrast-[1.1] md:group-hover:saturate-[1.2] ${isHovering && previewUrl ? 'opacity-0' : 'opacity-100 group-hover:scale-110 group-hover:brightness-110'
 
             }`}
+
+          onError={handlePosterError}
 
           style={{ imageRendering: 'high-quality' as any }}
 

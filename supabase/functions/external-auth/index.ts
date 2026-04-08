@@ -5,19 +5,53 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+const allowedOrigins = new Set(
+    (Deno.env.get('ALLOWED_ORIGINS') || '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean)
+)
+
+function getCorsHeaders(origin: string | null) {
+    const isOriginAllowed = !!origin && (allowedOrigins.size === 0 || allowedOrigins.has(origin))
+    const allowOrigin = allowedOrigins.size === 0
+        ? (origin || '*')
+        : (isOriginAllowed ? origin : 'null')
+
+    return {
+        'Access-Control-Allow-Origin': allowOrigin,
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Vary': 'Origin',
+    }
 }
 
 serve(async (req) => {
+    const origin = req.headers.get('origin')
+    const corsHeaders = getCorsHeaders(origin)
+
     // Handle CORS preflight requests
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders })
     }
 
+    if (req.method !== 'POST') {
+        return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+            status: 405,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+    }
+
+    if (allowedOrigins.size > 0 && origin && !allowedOrigins.has(origin)) {
+        return new Response(JSON.stringify({ error: 'Origin not allowed' }), {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+    }
+
     try {
-        const { action, code, redirectUri } = await req.json()
+        const body = await req.json()
+        const { action, code, redirectUri } = body
 
         if (action === 'anilist') {
             const ANILIST_CLIENT_ID = Deno.env.get('ANILIST_CLIENT_ID') 
@@ -27,6 +61,13 @@ serve(async (req) => {
                 console.error('[AniList] Missing ANILIST_CLIENT_ID or ANILIST_CLIENT_SECRET env vars')
                 return new Response(JSON.stringify({ error: 'AniList integration not configured on server' }), {
                     status: 500,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                })
+            }
+
+            if (!code || !redirectUri) {
+                return new Response(JSON.stringify({ error: 'Missing code or redirectUri' }), {
+                    status: 400,
                     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 })
             }

@@ -1,5 +1,5 @@
 import { Play, Flame } from "lucide-react";
-import { TrendingAnime, getProxiedImageUrl, getProxiedVideoUrl, getHighQualityPoster } from "@/lib/api";
+import { TrendingAnime, getProxiedVideoUrl } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
 import { fetchEpisodes, fetchStreamingSources } from "@/lib/api";
@@ -16,15 +16,45 @@ const SPAN_CLASSES = [
   "col-span-1 row-span-1",
 ];
 
+type CachedTrendingPreview = {
+  url: string;
+  isM3U8: boolean;
+  cachedAt: number;
+};
+
+const TRENDING_PREVIEW_CACHE_TTL = 20 * 60 * 1000;
+const trendingPreviewCache = new Map<string, CachedTrendingPreview>();
+
+const getTrendingPoster = (poster: string) => {
+  if (!poster) return '/placeholder.svg';
+  return poster
+    .replace('/cover/medium/', '/cover/large/')
+    .replace(/\/banner\/(small|medium)\//, '/banner/large/');
+};
+
 function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: string }) {
   const navigate = useNavigate();
   const [isHovering, setIsHovering] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isPreviewM3U8, setIsPreviewM3U8] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [previewError, setPreviewError] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const cached = trendingPreviewCache.get(anime.id);
+    if (!cached) return;
+
+    if (Date.now() - cached.cachedAt > TRENDING_PREVIEW_CACHE_TTL) {
+      trendingPreviewCache.delete(anime.id);
+      return;
+    }
+
+    setPreviewUrl(cached.url);
+    setIsPreviewM3U8(cached.isM3U8);
+  }, [anime.id]);
 
   // Cleanup HLS on unmount
   useEffect(() => {
@@ -46,61 +76,32 @@ function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: s
         if (episodes.episodes.length > 0) {
           // Pick a random episode for preview
           const randomEpisode = episodes.episodes[Math.floor(Math.random() * episodes.episodes.length)];
-          const sources = await fetchStreamingSources(randomEpisode.episodeId, "hd-2", "sub");
-          if (sources.sources.length > 0) {
+          let sources: Awaited<ReturnType<typeof fetchStreamingSources>> | null = null;
+          const preferredServers = ["hd-2", "hd-1", "hd-3"];
+          for (const server of preferredServers) {
+            try {
+              const candidate = await fetchStreamingSources(randomEpisode.episodeId, server, "sub");
+              if (candidate?.sources?.length) {
+                sources = candidate;
+                break;
+              }
+            } catch {
+              // Try next server.
+            }
+          }
+
+          if (sources?.sources?.length) {
             const source = sources.sources[0];
             const proxiedUrl = getProxiedVideoUrl(source.url, sources.headers?.Referer);
             setPreviewUrl(proxiedUrl);
-
-            // Use HLS.js for m3u8 streams
-            if (source.isM3U8 && Hls.isSupported() && videoRef.current) {
-              if (hlsRef.current) {
-                hlsRef.current.destroy();
-              }
-              const hls = new Hls({
-                enableWorker: true,
-                lowLatencyMode: false,
-                maxBufferLength: 10,
-                xhrSetup: (xhr) => {
-                  try {
-                    xhr.setRequestHeader('apikey', import.meta.env.VITE_SUPABASE_ANON_KEY || '');
-                  } catch (e) {}
-                },
-              });
-              hls.loadSource(proxiedUrl);
-              hls.attachMedia(videoRef.current);
-              hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                if (videoRef.current) {
-                  // Jump to a random timeframe after metadata loads
-                  const setRandomTime = () => {
-                    if (videoRef.current && videoRef.current.duration && !isNaN(videoRef.current.duration)) {
-                      const duration = videoRef.current.duration;
-                      // Skip intro (first 90s) and outro (last 90s)
-                      const minTime = Math.min(90, duration * 0.1);
-                      const maxTime = Math.max(duration - 90, duration * 0.8);
-                      const randomTime = minTime + Math.random() * (maxTime - minTime);
-                      videoRef.current.currentTime = randomTime;
-                      videoRef.current.play().catch(() => {});
-                    } else {
-                      videoRef.current!.currentTime = 30 + Math.random() * 90;
-                      videoRef.current!.play().catch(() => {});
-                    }
-                  };
-                  if (videoRef.current.duration && !isNaN(videoRef.current.duration)) {
-                    setRandomTime();
-                  } else {
-                    videoRef.current.addEventListener('loadedmetadata', setRandomTime, { once: true });
-                    setTimeout(setRandomTime, 500);
-                  }
-                }
-              });
-              hls.on(Hls.Events.ERROR, (_, data) => {
-                if (data.fatal) setPreviewError(true);
-              });
-              hlsRef.current = hls;
-            } else if (videoRef.current) {
-              videoRef.current.src = proxiedUrl;
-            }
+            setIsPreviewM3U8(Boolean(source.isM3U8));
+            trendingPreviewCache.set(anime.id, {
+              url: proxiedUrl,
+              isM3U8: Boolean(source.isM3U8),
+              cachedAt: Date.now(),
+            });
+          } else {
+            setPreviewError(true);
           }
         }
       } catch (error) {
@@ -108,7 +109,7 @@ function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: s
       } finally {
         setIsLoading(false);
       }
-    }, 600);
+    }, 220);
 
     return () => {
       if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
@@ -116,8 +117,54 @@ function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: s
   }, [isHovering, anime.id, previewUrl, previewError]);
 
   useEffect(() => {
+    if (!previewUrl || !videoRef.current) return;
+
+    const videoEl = videoRef.current;
+
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+
+    if (isPreviewM3U8) {
+      if (Hls.isSupported()) {
+        const hls = new Hls({
+          enableWorker: true,
+          lowLatencyMode: false,
+          maxBufferLength: 8,
+          xhrSetup: () => {},
+        });
+
+        hls.loadSource(previewUrl);
+        hls.attachMedia(videoEl);
+        hls.on(Hls.Events.ERROR, (_, data) => {
+          if (data.fatal) setPreviewError(true);
+        });
+
+        hlsRef.current = hls;
+      } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+        videoEl.src = previewUrl;
+      } else {
+        setPreviewError(true);
+      }
+    } else {
+      videoEl.src = previewUrl;
+    }
+
+    return () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+    };
+  }, [previewUrl, isPreviewM3U8]);
+
+  useEffect(() => {
     if (videoRef.current) {
       if (isHovering && previewUrl) {
+        if (hlsRef.current) {
+          hlsRef.current.startLoad(-1);
+        }
         videoRef.current.play().catch(() => {});
       } else {
         videoRef.current.pause();
@@ -136,26 +183,25 @@ function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: s
       className={`relative group rounded-3xl overflow-hidden cursor-pointer ${spanClass} border border-border/30 min-h-[200px] md:min-h-0`}
     >
       <img 
-        src={getHighQualityPoster(anime.poster, anime.anilistId)} 
+        src={getTrendingPoster(anime.poster)} 
         alt={anime.name} 
         className={`w-full h-full object-cover transition-all duration-700 ${
           isHovering && previewUrl ? 'opacity-0' : 'group-hover:scale-110'
         }`}
       />
       
-      {/* Video Preview - HLS.js handles via attachMedia */}
-      {previewUrl && (
-        <video
-          ref={videoRef}
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
-            isHovering ? 'opacity-100' : 'opacity-0'
-          }`}
-          muted
-          loop
-          playsInline
-          crossOrigin="anonymous"
-        />
-      )}
+      {/* Video Preview */}
+      <video
+        ref={videoRef}
+        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
+          isHovering && previewUrl ? 'opacity-100' : 'opacity-0'
+        }`}
+        muted
+        loop
+        playsInline
+        preload="metadata"
+        crossOrigin="anonymous"
+      />
 
       {/* Loading indicator */}
       {isHovering && isLoading && (

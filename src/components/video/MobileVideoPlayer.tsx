@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
   Play,
   Pause,
@@ -45,6 +45,8 @@ interface MobileVideoPlayerProps {
   onEpisodeEnd?: () => void;
   malId?: number | null;
   episodeNumber?: number;
+  introWindow?: { start: number; end: number } | null;
+  outroWindow?: { start: number; end: number } | null;
   initialSeekSeconds?: number;
   onProgressUpdate?: (progressSeconds: number, durationSeconds?: number, completed?: boolean) => void;
   animeId?: string;
@@ -63,6 +65,17 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
+function getSubtitleSelectionKey(subtitle: { lang: string; url: string; label?: string }, index: number): string {
+  const baseKey = subtitle.url || subtitle.label || subtitle.lang || `subtitle-${index}`;
+  return `${subtitle.lang === 'custom' ? 'custom' : 'sub'}:${baseKey}`;
+}
+
+type SkipSegment = {
+  startTime: number;
+  endTime: number;
+  type: 'op' | 'ed' | 'mixed-op' | 'mixed-ed' | 'recap';
+};
+
 export function MobileVideoPlayer({
   sources,
   subtitles = [],
@@ -75,6 +88,8 @@ export function MobileVideoPlayer({
   onEpisodeEnd,
   malId,
   episodeNumber,
+  introWindow,
+  outroWindow,
   initialSeekSeconds,
   onProgressUpdate,
   animeId,
@@ -91,8 +106,35 @@ export function MobileVideoPlayer({
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const { settings } = useVideoSettings();
-  const { skipTimes, fetchSkipTimes, getActiveSkip } = useAniskip();
+  const { skipTimes, fetchSkipTimes } = useAniskip();
   const { startDownload, queue } = useMobileDownload();
+
+  const tatakaiSkipSegments = useMemo<SkipSegment[]>(() => {
+    const segments: SkipSegment[] = [];
+
+    if (introWindow && Number.isFinite(introWindow.start) && Number.isFinite(introWindow.end) && introWindow.end > introWindow.start) {
+      segments.push({ startTime: introWindow.start, endTime: introWindow.end, type: 'op' });
+    }
+
+    if (outroWindow && Number.isFinite(outroWindow.start) && Number.isFinite(outroWindow.end) && outroWindow.end > outroWindow.start) {
+      segments.push({ startTime: outroWindow.start, endTime: outroWindow.end, type: 'ed' });
+    }
+
+    return segments;
+  }, [introWindow?.start, introWindow?.end, outroWindow?.start, outroWindow?.end]);
+
+  const aniskipSegments = useMemo<SkipSegment[]>(() => {
+    return (skipTimes || [])
+      .filter((skip) => Number.isFinite(skip?.interval?.startTime) && Number.isFinite(skip?.interval?.endTime) && skip.interval.endTime > skip.interval.startTime)
+      .map((skip) => ({
+        startTime: skip.interval.startTime,
+        endTime: skip.interval.endTime,
+        type: skip.skipType,
+      }));
+  }, [skipTimes]);
+
+  const hasTatakaiSkipSegments = tatakaiSkipSegments.length > 0;
+  const effectiveSkipSegments = hasTatakaiSkipSegments ? tatakaiSkipSegments : aniskipSegments;
 
   const resolvedPoster = poster ? getProxiedImageUrl(poster) : undefined;
 
@@ -106,11 +148,12 @@ export function MobileVideoPlayer({
   const [videoError, setVideoError] = useState<string | null>(null);
   const [isBuffering, setIsBuffering] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const retryCountRef = useRef(0);
   const [currentSubtitle, setCurrentSubtitle] = useState<string>(settings.subtitleLanguage);
   const [showSubtitleMenu, setShowSubtitleMenu] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
-  const [activeSkip, setActiveSkip] = useState<any>(null);
+  const [activeSkip, setActiveSkip] = useState<SkipSegment | null>(null);
   const [playbackRate, setPlaybackRate] = useState(settings.playbackSpeed);
   const [subtitleBlobs, setSubtitleBlobs] = useState<Record<string, string>>({});
   
@@ -127,21 +170,31 @@ export function MobileVideoPlayer({
   // Progress tracking
   const lastSavedProgressRef = useRef<number>(0);
   const PROGRESS_SAVE_INTERVAL = 15;
+  const sourceUrlKey = sources[0]?.url || '';
+  const sourceTypeKey = sources[0]?.isM3U8 ? 'm3u8' : 'file';
+  const playbackReferer = headers?.Referer || '';
+  const playbackUserAgent = headers?.["User-Agent"] || '';
 
   // Fetch skip times for intro/outro
   useEffect(() => {
+    if (hasTatakaiSkipSegments) return;
     if (malId && episodeNumber && duration > 0) {
       fetchSkipTimes(malId, episodeNumber, Math.floor(duration));
     }
-  }, [malId, episodeNumber, duration, fetchSkipTimes]);
+  }, [malId, episodeNumber, duration, fetchSkipTimes, hasTatakaiSkipSegments]);
 
   // Check for active skip
   useEffect(() => {
-    if (skipTimes.length > 0) {
-      const skip = getActiveSkip(currentTime);
-      setActiveSkip(skip);
+    if (effectiveSkipSegments.length === 0) {
+      setActiveSkip(null);
+      return;
     }
-  }, [currentTime, skipTimes, getActiveSkip]);
+
+    const skip = effectiveSkipSegments.find((candidate) => (
+      currentTime >= candidate.startTime && currentTime < candidate.endTime
+    )) || null;
+    setActiveSkip(skip);
+  }, [currentTime, effectiveSkipSegments]);
 
   // Keep screen awake while playing
   useEffect(() => {
@@ -172,11 +225,11 @@ export function MobileVideoPlayer({
   // Initialize HLS
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || sources.length === 0) return;
+    if (!video || !sources[0]?.url) return;
 
     const source = sources[0];
-    const finalUrl = !isOffline && headers?.Referer
-      ? getProxiedVideoUrl(source.url, headers.Referer, headers?.["User-Agent"])
+    const finalUrl = !isOffline && playbackReferer
+      ? getProxiedVideoUrl(source.url, playbackReferer, playbackUserAgent || undefined)
       : source.url;
 
     // Cleanup previous HLS instance
@@ -207,8 +260,12 @@ export function MobileVideoPlayer({
 
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (data.fatal) {
-          if (retryCount < 3) {
-            setRetryCount(prev => prev + 1);
+          if (retryCountRef.current < 3) {
+            setRetryCount(prev => {
+              const next = prev + 1;
+              retryCountRef.current = next;
+              return next;
+            });
             hls.loadSource(finalUrl);
           } else {
             setVideoError("Failed to load video. Please try another server.");
@@ -235,13 +292,15 @@ export function MobileVideoPlayer({
         hlsRef.current = null;
       }
     };
-  }, [sources, headers, initialSeekSeconds, retryCount, isOffline]);
+  }, [sourceUrlKey, sourceTypeKey, initialSeekSeconds, isOffline, playbackReferer, playbackUserAgent]);
 
   // Load subtitles
   useEffect(() => {
     const loadSubtitles = async () => {
       const blobs: Record<string, string> = {};
-      for (const sub of subtitles) {
+      for (let i = 0; i < subtitles.length; i += 1) {
+        const sub = subtitles[i];
+        const subtitleKey = getSubtitleSelectionKey(sub, i);
         try {
           const url = !isOffline && headers?.Referer
             ? getProxiedSubtitleUrl(sub.url, headers.Referer)
@@ -249,7 +308,7 @@ export function MobileVideoPlayer({
           const response = await fetch(url);
           const text = await response.text();
           const blob = new Blob([text], { type: 'text/vtt' });
-          blobs[sub.lang] = URL.createObjectURL(blob);
+          blobs[subtitleKey] = URL.createObjectURL(blob);
         } catch (e) {
           console.warn('Failed to load subtitle:', sub.lang, e);
         }
@@ -260,6 +319,20 @@ export function MobileVideoPlayer({
       loadSubtitles();
     }
   }, [subtitles, headers, isOffline]);
+
+  useEffect(() => {
+    if (!subtitles.length || currentSubtitle === 'off') return;
+
+    const keys = subtitles.map((sub, idx) => getSubtitleSelectionKey(sub, idx));
+    if (keys.includes(currentSubtitle)) return;
+
+    const englishIndex = subtitles.findIndex((sub) => {
+      const label = `${sub.lang || ''} ${sub.label || ''}`.toLowerCase();
+      return label.includes('english') || label === 'en';
+    });
+    const fallbackIndex = englishIndex >= 0 ? englishIndex : 0;
+    setCurrentSubtitle(getSubtitleSelectionKey(subtitles[fallbackIndex], fallbackIndex));
+  }, [subtitles, currentSubtitle]);
 
   // Video event handlers
   useEffect(() => {
@@ -320,47 +393,110 @@ export function MobileVideoPlayer({
   }, [onEpisodeEnd, onProgressUpdate, onError]);
 
   // Fullscreen toggle
+  const lockLandscapeOrientation = useCallback(async () => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await ScreenOrientation.lock({ orientation: 'landscape' });
+      } catch (e) {
+        console.warn('Native orientation lock failed:', e);
+      }
+    }
+
+    try {
+      const orientationApi = screen.orientation as any;
+      if (orientationApi?.lock) {
+        await orientationApi.lock('landscape');
+      }
+    } catch {
+      // Mobile browsers may block lock() unless fully user-gesture compatible.
+    }
+  }, []);
+
+  const unlockOrientation = useCallback(async () => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await ScreenOrientation.unlock();
+      } catch (e) {
+        console.warn('Native orientation unlock failed:', e);
+      }
+    }
+
+    try {
+      if (screen.orientation?.unlock) {
+        screen.orientation.unlock();
+      }
+    } catch {
+      // Ignore browser unlock failures.
+    }
+  }, []);
+
+  const applyFullscreenStyles = useCallback(() => {
+    if (!containerRef.current) return;
+
+    document.body.style.overflow = 'hidden';
+    containerRef.current.style.position = 'fixed';
+    containerRef.current.style.top = '0';
+    containerRef.current.style.left = '0';
+    containerRef.current.style.width = '100vw';
+    containerRef.current.style.height = '100vh';
+    containerRef.current.style.zIndex = '99999';
+    containerRef.current.style.backgroundColor = 'black';
+  }, []);
+
+  const clearFullscreenStyles = useCallback(() => {
+    if (!containerRef.current) return;
+
+    document.body.style.overflow = '';
+    containerRef.current.style.position = '';
+    containerRef.current.style.top = '';
+    containerRef.current.style.left = '';
+    containerRef.current.style.width = '';
+    containerRef.current.style.height = '';
+    containerRef.current.style.zIndex = '';
+    containerRef.current.style.backgroundColor = '';
+  }, []);
+
   const toggleFullscreen = async () => {
     if (!containerRef.current) return;
 
     if (!isFullscreen) {
-      try {
-        await StatusBar.hide();
-        await ScreenOrientation.lock({ orientation: 'landscape' });
-        
-        document.body.style.overflow = 'hidden';
-        containerRef.current.style.position = 'fixed';
-        containerRef.current.style.top = '0';
-        containerRef.current.style.left = '0';
-        containerRef.current.style.width = '100vw';
-        containerRef.current.style.height = '100vh';
-        containerRef.current.style.zIndex = '99999';
-        containerRef.current.style.backgroundColor = 'black';
-        
-        setIsFullscreen(true);
-      } catch (e) {
-        console.warn('Failed to enter fullscreen:', e);
+      if (Capacitor.isNativePlatform()) {
+        try {
+          await StatusBar.hide();
+        } catch (e) {
+          console.warn('Failed to hide status bar:', e);
+        }
       }
+
+      await lockLandscapeOrientation();
+      applyFullscreenStyles();
+      setIsFullscreen(true);
     } else {
-      try {
-        await StatusBar.show();
-        await ScreenOrientation.unlock();
-        
-        document.body.style.overflow = '';
-        containerRef.current.style.position = '';
-        containerRef.current.style.top = '';
-        containerRef.current.style.left = '';
-        containerRef.current.style.width = '';
-        containerRef.current.style.height = '';
-        containerRef.current.style.zIndex = '';
-        containerRef.current.style.backgroundColor = '';
-        
-        setIsFullscreen(false);
-      } catch (e) {
-        console.warn('Failed to exit fullscreen:', e);
+      if (Capacitor.isNativePlatform()) {
+        try {
+          await StatusBar.show();
+        } catch (e) {
+          console.warn('Failed to show status bar:', e);
+        }
       }
+
+      await unlockOrientation();
+      clearFullscreenStyles();
+      setIsFullscreen(false);
     }
   };
+
+  useEffect(() => {
+    return () => {
+      clearFullscreenStyles();
+
+      if (Capacitor.isNativePlatform()) {
+        StatusBar.show().catch(() => undefined);
+      }
+
+      unlockOrientation().catch(() => undefined);
+    };
+  }, [clearFullscreenStyles, unlockOrientation]);
 
   // Playback controls
   const togglePlay = () => {
@@ -529,16 +665,12 @@ export function MobileVideoPlayer({
       return;
     }
     await startDownload({
-      id: episodeId,
       animeId,
-      animeName,
+      animeTitle: animeName,
       season: 1,
       episode: episodeNumber || 1,
-      episodeTitle: episodeTitle || `Episode ${episodeNumber || 1}`,
-      posterUrl: animePoster || poster || '',
+      poster: animePoster || poster || '',
       videoUrl: source.url,
-      isM3U8: source.isM3U8,
-      headers,
     });
     toast.success("Download started");
   };
@@ -546,6 +678,7 @@ export function MobileVideoPlayer({
   // Retry on error
   const handleRetry = () => {
     setVideoError(null);
+    retryCountRef.current = 0;
     setRetryCount(0);
   };
 
@@ -592,16 +725,21 @@ export function MobileVideoPlayer({
         crossOrigin="anonymous"
       >
         {/* Subtitles */}
-        {subtitles.map((sub) => (
+        {subtitles.map((sub, idx) => {
+          const subtitleKey = getSubtitleSelectionKey(sub, idx);
+          const proxiedSubtitleUrl = !isOffline && headers?.Referer
+            ? getProxiedSubtitleUrl(sub.url, headers.Referer)
+            : sub.url;
+          return (
           <track
-            key={sub.lang}
+            key={subtitleKey}
             kind="subtitles"
             label={sub.label || sub.lang}
             srcLang={sub.lang}
-            src={subtitleBlobs[sub.lang] || ''}
-            default={sub.lang === currentSubtitle}
+            src={subtitleBlobs[subtitleKey] || proxiedSubtitleUrl || ''}
+            default={subtitleKey === currentSubtitle}
           />
-        ))}
+        )})}
       </video>
 
       {/* Loading Overlay */}
@@ -726,7 +864,7 @@ export function MobileVideoPlayer({
               onClick={skipIntro}
               className="absolute right-4 bottom-32 px-8 py-4 bg-white/95 backdrop-blur-md rounded-2xl text-black font-bold text-base shadow-2xl border-2 border-white/20 active:scale-95 transition-transform"
             >
-              Skip {activeSkip.type === 'op' ? 'Intro' : 'Outro'}
+              Skip {activeSkip.type === 'op' || activeSkip.type === 'mixed-op' ? 'Intro' : activeSkip.type === 'recap' ? 'Recap' : 'Outro'}
             </button>
           )}
 
@@ -801,18 +939,20 @@ export function MobileVideoPlayer({
                       >
                         Off
                       </button>
-                      {subtitles.map((sub) => (
+                      {subtitles.map((sub, idx) => {
+                        const subtitleKey = getSubtitleSelectionKey(sub, idx);
+                        return (
                         <button
-                          key={sub.lang}
-                          onClick={() => handleSubtitleChange(sub.lang)}
+                          key={subtitleKey}
+                          onClick={() => handleSubtitleChange(subtitleKey)}
                           className={cn(
                             "w-full px-4 py-3 text-left text-sm rounded-xl transition-colors",
-                            currentSubtitle === sub.lang ? 'bg-primary text-white font-semibold' : 'text-white/80 hover:bg-white/5'
+                            currentSubtitle === subtitleKey ? 'bg-primary text-white font-semibold' : 'text-white/80 hover:bg-white/5'
                           )}
                         >
                           {sub.label || sub.lang}
                         </button>
-                      ))}
+                      )})}
                     </div>
                   )}
                 </div>

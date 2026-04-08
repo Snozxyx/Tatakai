@@ -21,12 +21,44 @@ env:
   NODE_VERSION: '22'
 
 jobs:
+  quality-gates:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: npm ci
+        shell: bash
+        env:
+          PATH: /bin:/usr/bin:/usr/local/bin:$PATH
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Test
+        run: npm run test
+
   # ──────────────────────────────────────────────────────
   #  Desktop — electron-builder with auto-update manifests
   #  Publishes latest.yml / latest-mac.yml / latest-linux.yml
   #  which electron-updater reads to detect new versions
   # ──────────────────────────────────────────────────────
   build-desktop:
+    needs: [quality-gates]
     strategy:
       fail-fast: false
       matrix:
@@ -102,6 +134,9 @@ jobs:
   # ──────────────────────────────────────────────────────
   #  Android — Capacitor APK
   # ──────────────────────────────────────────────────────
+  # Strategy note: Android CI remains intentionally disabled in this workflow.
+  # Desktop releases are automated here; Android is currently a manual track
+  # until signing secrets and release cadence are finalized.
   # build-android:
   #   runs-on: ubuntu-latest
   #   env:
@@ -205,9 +240,9 @@ jobs:
   #         retention-days: 30
 
   # ──────────────────────────────────────────────────────
-  #  Finalize Release — upload Android APK & mark non-draft
-  #  electron-builder already created the draft release and
-  #  uploaded desktop installers + latest*.yml manifests
+  #  Finalize Release — mark non-draft and attach desktop artifacts
+  #  electron-builder created the draft release and uploaded
+  #  desktop installers + latest*.yml manifests
   # ──────────────────────────────────────────────────────
   release:
     needs: [build-desktop]

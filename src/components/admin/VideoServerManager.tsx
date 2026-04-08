@@ -156,7 +156,7 @@ export function VideoServerManager() {
 
     try {
       // Try internal HiAnime API first (for correct Tatakai IDs)
-      const internalRes = await fetch(`https://core.tatakai.me/api/v2/hianime/search?q=${encodeURIComponent(query)}&page=1`);
+      const internalRes = await fetch(`http://localhost:9000/api/v2/hianime/search?q=${encodeURIComponent(query)}&page=1`);
       if (internalRes.ok) {
         const internalData = await internalRes.json();
         const animes = internalData.data?.animes || internalData.animes || [];

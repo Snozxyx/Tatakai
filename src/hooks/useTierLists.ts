@@ -36,6 +36,113 @@ export interface Tier {
   color: string;
 }
 
+function normalizeTierListRow(row: any): TierList {
+  return {
+    ...row,
+    name: row?.title || row?.name,
+    title: row?.title || row?.name,
+    items: (row?.items || row?.tiers || []) as TierListItem[],
+  } as TierList;
+}
+
+function isSchemaColumnError(error: any): boolean {
+  const message = String(error?.message || error?.details || '').toLowerCase();
+  return (
+    message.includes('column') ||
+    message.includes('schema cache') ||
+    message.includes('could not find') ||
+    message.includes('does not exist')
+  );
+}
+
+async function insertTierListWithFallback(
+  payload: {
+    user_id: string;
+    title: string;
+    description?: string;
+    items: TierListItem[];
+    is_public: boolean;
+  }
+) {
+  const attempts = [
+    {
+      user_id: payload.user_id,
+      title: payload.title,
+      description: payload.description,
+      items: payload.items as any,
+      is_public: payload.is_public,
+    },
+    {
+      user_id: payload.user_id,
+      name: payload.title,
+      description: payload.description,
+      items: payload.items as any,
+      is_public: payload.is_public,
+    },
+    {
+      user_id: payload.user_id,
+      title: payload.title,
+      description: payload.description,
+      tiers: payload.items as any,
+      is_public: payload.is_public,
+    },
+    {
+      user_id: payload.user_id,
+      name: payload.title,
+      description: payload.description,
+      tiers: payload.items as any,
+      is_public: payload.is_public,
+    },
+  ];
+
+  let lastError: any = null;
+  for (const attempt of attempts) {
+    const { data, error } = await supabase
+      .from('tier_lists')
+      .insert(attempt as any)
+      .select()
+      .single();
+
+    if (!error) return data;
+    lastError = error;
+    if (!isSchemaColumnError(error)) break;
+  }
+
+  throw lastError;
+}
+
+async function updateTierListWithFallback(id: string, updates: Record<string, any>) {
+  const variants: Record<string, any>[] = [updates];
+  const mapped: Record<string, any> = { ...updates };
+
+  if ('title' in mapped) {
+    mapped.name = mapped.title;
+    delete mapped.title;
+  }
+  if ('items' in mapped) {
+    mapped.tiers = mapped.items;
+    delete mapped.items;
+  }
+
+  variants.push(mapped);
+
+  let lastError: any = null;
+  for (const attempt of variants) {
+    const { data, error } = await supabase
+      .from('tier_lists')
+      .update(attempt)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (!error) return data;
+    lastError = error;
+    if (!isSchemaColumnError(error)) break;
+  }
+
+  throw lastError;
+}
+
 // Default tier colors
 export const DEFAULT_TIERS: Tier[] = [
   { name: 'S', color: '#ff7f7f' },
@@ -75,10 +182,8 @@ export function useUserTierLists(userId?: string) {
         .single();
       
       // Map title to name for component compatibility
-      return (data || []).map(t => ({
-        ...t,
-        name: t.title,
-        items: (t.items as unknown as TierListItem[]) || [],
+      return (data || []).map((t) => ({
+        ...normalizeTierListRow(t),
         profiles: profile || null,
       })) as unknown as TierList[];
     },
@@ -93,16 +198,29 @@ export function usePublicTierLists(limit = 20) {
   return useQuery({
     queryKey: ['tier_lists', 'public', limit],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const primary = await supabase
         .from('tier_lists')
         .select('*')
         .eq('is_public', true)
         .order('likes_count', { ascending: false })
         .limit(limit);
 
-      if (error) {
-        console.error('Failed to fetch public tier lists:', error);
-        throw error;
+      let data = primary.data;
+      if (primary.error) {
+        console.warn('Public tier list primary query failed, falling back to recent ordering:', primary.error);
+        const fallback = await supabase
+          .from('tier_lists')
+          .select('*')
+          .eq('is_public', true)
+          .order('created_at', { ascending: false })
+          .limit(limit);
+
+        if (fallback.error) {
+          console.error('Failed to fetch public tier lists:', fallback.error);
+          return [] as TierList[];
+        }
+
+        data = fallback.data;
       }
 
       // Fetch profiles for all users
@@ -126,12 +244,10 @@ export function usePublicTierLists(limit = 20) {
         likedIds = new Set(likes?.map(l => l.tier_list_id) || []);
       }
 
-      return (data || []).map(t => ({ 
-        ...t, 
-        name: t.title,
-        items: (t.items as unknown as TierListItem[]) || [],
+      return (data || []).map(t => ({
+        ...normalizeTierListRow(t),
         profiles: profileMap.get(t.user_id) || null,
-        user_liked: likedIds.has(t.id) 
+        user_liked: likedIds.has(t.id)
       })) as unknown as TierList[];
     },
   });
@@ -174,19 +290,15 @@ export function useTierListByShareCode(shareCode: string) {
           .eq('tier_list_id', data.id)
           .single();
 
-        return { 
-          ...data, 
-          name: data.title,
-          items: (data.items as unknown as TierListItem[]) || [],
+        return {
+          ...normalizeTierListRow(data),
           profiles: profile,
-          user_liked: !!like 
+          user_liked: !!like
         } as unknown as TierList;
       }
 
       return {
-        ...data,
-        name: data.title,
-        items: (data.items as unknown as TierListItem[]) || [],
+        ...normalizeTierListRow(data),
         profiles: profile,
       } as unknown as TierList;
     },
@@ -212,20 +324,16 @@ export function useCreateTierList() {
       is_public?: boolean;
     }) => {
       if (!user) throw new Error('Must be logged in');
+      const trimmedName = name.trim();
+      if (!trimmedName) throw new Error('Tier list name is required');
 
-      const { data, error } = await supabase
-        .from('tier_lists')
-        .insert({
-          user_id: user.id,
-          title: name,
-          description,
-          items: items as any,
-          is_public,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
+      const data = await insertTierListWithFallback({
+        user_id: user.id,
+        title: trimmedName,
+        description,
+        items,
+        is_public,
+      });
       return data;
     },
     onSuccess: () => {
@@ -253,19 +361,15 @@ export function useUpdateTierList() {
       is_public?: boolean;
     }) => {
       const updates: Record<string, any> = { updated_at: new Date().toISOString() };
-      if (name !== undefined) updates.title = name;
+      if (name !== undefined) updates.title = name.trim();
       if (description !== undefined) updates.description = description;
       if (items !== undefined) updates.items = items;
       if (is_public !== undefined) updates.is_public = is_public;
+      if (typeof updates.title === 'string' && !updates.title) {
+        throw new Error('Tier list name is required');
+      }
 
-      const { data, error } = await supabase
-        .from('tier_lists')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
+      const data = await updateTierListWithFallback(id, updates);
       return data;
     },
     onSuccess: () => {

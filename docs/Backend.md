@@ -1299,7 +1299,7 @@ console.log(data);
 #### Endpoint
 
 ```sh
-/api/v2/hianime/episode/sources?animeEpisodeId={id}?server={server}&category={dub || sub || raw}
+/api/v2/hianime/episode/sources?animeEpisodeId={id}&server={server}&category={dub || sub || raw}
 ```
 
 #### Query Parameters
@@ -1314,7 +1314,7 @@ console.log(data);
 
 ```javascript
 const resp = await fetch(
-    "/api/v2/hianime/episode/sources?animeEpisodeId=steinsgate-3?ep=230&server=hd-1&category=dub"
+    "/api/v2/hianime/episode/sources?animeEpisodeId=steinsgate-3%3Fep%3D230&server=hd-1&category=dub"
 );
 const data = await resp.json();
 console.log(data);

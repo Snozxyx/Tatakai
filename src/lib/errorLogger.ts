@@ -42,14 +42,18 @@ export async function logClientError(err: unknown, context: Record<string, any> 
       details,
     });
 
-    // Also notify Discord error channel
-    notifyError({
-      message,
-      stack,
-      url: details.url || undefined,
-      userId: userId || undefined,
-      context: context ? JSON.stringify(context).slice(0, 500) : undefined,
-    });
+    const enableDiscordLogging = import.meta.env.PROD || import.meta.env.VITE_ENABLE_DISCORD_WEBHOOKS === 'true';
+
+    if (enableDiscordLogging) {
+      // Also notify Discord error channel in production or when explicitly enabled.
+      notifyError({
+        message,
+        stack,
+        url: details.url || undefined,
+        userId: userId || undefined,
+        context: context ? JSON.stringify(context).slice(0, 500) : undefined,
+      });
+    }
 
     return { errorId };
   } catch (e) {
