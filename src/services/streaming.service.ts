@@ -1,5 +1,5 @@
 import { apiGet, externalApiGet, TATAKAI_API_URL } from "@/lib/api/api-client";
-import { StreamingData, StreamingSource } from "@/types/anime";
+import { StreamingData, StreamingSource, Subtitle } from "@/types/anime";
 import { fetchStreamingSources, fetchTatakaiEpisodeSources } from "./anime.service";
 import { fetchCustomSupabaseSources, fetchTatakaiProviderSources } from "./provider.service";
 
@@ -25,16 +25,30 @@ function inferSeasonFromContext(animeName?: string, episodeId?: string): number 
 function mergeSubtitleLikeLists(
   ...lists: Array<Array<{ url?: string; file?: string; lang?: string; label?: string; [key: string]: any }> | undefined>
 ) {
-  const merged: Array<{ url?: string; file?: string; lang?: string; label?: string; [key: string]: any }> = [];
+  const merged: Subtitle[] = [];
   const seen = new Set<string>();
 
   for (const list of lists) {
     for (const item of list || []) {
       if (!item) continue;
-      const identity = `${item.url || item.file || ""}|${item.lang || ""}|${item.label || ""}`.toLowerCase();
+      const url = typeof item.url === 'string' && item.url.trim()
+        ? item.url.trim()
+        : (typeof item.file === 'string' ? item.file.trim() : '');
+      if (!url) continue;
+      const lang = typeof item.lang === 'string' && item.lang.trim()
+        ? item.lang.trim()
+        : (typeof item.label === 'string' && item.label.trim() ? item.label.trim() : 'Unknown');
+      const label = typeof item.label === 'string' && item.label.trim() ? item.label.trim() : lang;
+      const identity = `${url}|${lang}|${label}`.toLowerCase();
       if (!identity || seen.has(identity)) continue;
       seen.add(identity);
-      merged.push(item);
+      merged.push({
+        ...(item as Record<string, unknown>),
+        url,
+        lang,
+        label,
+        file: typeof item.file === 'string' && item.file.trim() ? item.file.trim() : url,
+      } as Subtitle);
     }
   }
 

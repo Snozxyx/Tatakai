@@ -7,7 +7,7 @@ interface LogEntry {
   timestamp: Date;
   level: 'log' | 'warn' | 'error' | 'info';
   message: string;
-  data?: any;
+  data?: unknown;
 }
 
 export function DevConsole() {
@@ -29,44 +29,34 @@ export function DevConsole() {
     const originalError = console.error;
     const originalInfo = console.info;
 
-    console.log = (...args: any[]) => {
+    const appendLog = (level: LogEntry['level'], args: unknown[]) => {
+      const entry: LogEntry = {
+        timestamp: new Date(),
+        level,
+        message: args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)).join(' '),
+        data: args.length === 1 ? args[0] : args,
+      };
+      setLogs(prev => [...prev, entry].slice(-500));
+    };
+
+    console.log = (...args: unknown[]) => {
       originalLog(...args);
-      setLogs(prev => [...prev, {
-        timestamp: new Date(),
-        level: 'log',
-        message: args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)).join(' '),
-        data: args.length === 1 ? args[0] : args
-      }].slice(-500)); // Keep last 500 logs
+      appendLog('log', args);
     };
 
-    console.warn = (...args: any[]) => {
+    console.warn = (...args: unknown[]) => {
       originalWarn(...args);
-      setLogs(prev => [...prev, {
-        timestamp: new Date(),
-        level: 'warn',
-        message: args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)).join(' '),
-        data: args.length === 1 ? args[0] : args
-      }].slice(-500));
+      appendLog('warn', args);
     };
 
-    console.error = (...args: any[]) => {
+    console.error = (...args: unknown[]) => {
       originalError(...args);
-      setLogs(prev => [...prev, {
-        timestamp: new Date(),
-        level: 'error',
-        message: args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)).join(' '),
-        data: args.length === 1 ? args[0] : args
-      }].slice(-500));
+      appendLog('error', args);
     };
 
-    console.info = (...args: any[]) => {
+    console.info = (...args: unknown[]) => {
       originalInfo(...args);
-      setLogs(prev => [...prev, {
-        timestamp: new Date(),
-        level: 'info',
-        message: args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)).join(' '),
-        data: args.length === 1 ? args[0] : args
-      }].slice(-500));
+      appendLog('info', args);
     };
 
     return () => {

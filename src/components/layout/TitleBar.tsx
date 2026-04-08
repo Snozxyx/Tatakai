@@ -84,7 +84,7 @@ export function TitleBar() {
                 <div className="space-y-2">
                   <div className="text-[10px] font-semibold text-white/50 uppercase tracking-wider mb-2">Active Downloads</div>
                   {activeDownloads.slice(0, 3).map((state) => (
-                    <div key={state.episodeId} className="flex items-center gap-2 py-1.5 px-2 rounded-lg bg-white/5">
+                    <div key={`${state.animeName || 'anime'}-${state.episodeNumber || 0}`} className="flex items-center gap-2 py-1.5 px-2 rounded-lg bg-white/5">
                       <div className="flex-1 min-w-0">
                         <div className="text-[11px] font-medium text-white/90 truncate">{state.animeName}</div>
                         <div className="text-[10px] text-white/50">Episode {state.episodeNumber}</div>

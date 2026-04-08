@@ -102,6 +102,7 @@ class MobileDownloadService {
           id: NOTIFICATION_ID,
           title: 'Downloading...',
           body: title,
+          smallIcon: 'ic_notification',
         });
       }
     } catch (err) {
@@ -117,6 +118,7 @@ class MobileDownloadService {
         id: NOTIFICATION_ID,
         title: `Downloading ${progress}%`,
         body: title,
+        smallIcon: 'ic_notification',
       });
     } catch (err) {
       // Ignore update errors

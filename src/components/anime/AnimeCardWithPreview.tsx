@@ -24,11 +24,13 @@ interface AnimeCardWithPreviewProps {
 
   showPreview?: boolean;
 
+  disableClick?: boolean;
+
 }
 
 
 
-export function AnimeCardWithPreview({ anime, showPreview = true }: AnimeCardWithPreviewProps) {
+export function AnimeCardWithPreview({ anime, showPreview = true, disableClick = false }: AnimeCardWithPreviewProps) {
 
   const navigate = useNavigate();
 
@@ -376,7 +378,9 @@ export function AnimeCardWithPreview({ anime, showPreview = true }: AnimeCardWit
 
       className="group cursor-pointer overflow-hidden rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500"
 
-      onClick={() => navigate(`/anime/${anime.id}`)}
+      onClick={() => {
+        if (!disableClick) navigate(`/anime/${anime.id}`);
+      }}
 
       onMouseEnter={() => setIsHovering(true)}
 

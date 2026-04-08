@@ -7,11 +7,9 @@ export async function initSentryClient() {
     if (!dsn) return;
     // Import lazily so build doesn't fail if the package isn't installed
     const Sentry = (await import('@sentry/react')).default;
-    const { BrowserTracing } = await import('@sentry/tracing');
 
     Sentry.init({
       dsn,
-      integrations: [new BrowserTracing()],
       tracesSampleRate: Number(import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE) || 0.05,
       release: __APP_VERSION__,
       environment: import.meta.env.VITE_SENTRY_ENV || 'production',

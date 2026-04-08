@@ -1,3 +1,5 @@
+import type { StreamingSource } from '@/types/anime';
+
 // Fetch from Animeya using Supabase proxy
 export async function fetchAnimeyaSources(
     episodeId: string

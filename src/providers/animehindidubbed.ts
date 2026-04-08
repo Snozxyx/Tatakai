@@ -3,7 +3,7 @@
  * Client-side wrapper for the animehindidubbed-scraper Supabase function
  */
 
-import { supabase } from './supabase/client';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface ServerVideo {
   name: string; // Episode identifier like "01", "02", "S5E1", etc.

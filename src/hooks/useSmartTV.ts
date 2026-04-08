@@ -4,7 +4,7 @@ interface SmartTVInfo {
   isSmartTV: boolean;
   platform: 'webos' | 'tizen' | 'android_tv' | 'fire_tv' | 'roku' | 'xbox' | 'playstation' | 'generic' | 'desktop';
   supportsRemote: boolean;
-  focusedElement: HTMLElement | null;
+  focusedElement?: HTMLElement | null;
 }
 
 interface DPadNavigationOptions {

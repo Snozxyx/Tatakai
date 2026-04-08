@@ -28,6 +28,8 @@ export interface TopAnime {
   poster: string;
   rank: number;
   episodes: Episode;
+  malId?: number;
+  anilistId?: number;
 }
 
 export interface AnimeCard {
@@ -223,4 +225,5 @@ export interface NextEpisodeSchedule {
   airingAt: number;
   timeUntilAiring: number;
   episode: number;
+  airingISOTimestamp?: string;
 }
