@@ -86,7 +86,7 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           secure: false,
         },
-        // Dev proxy for all provider calls → local TatakaiCore (localhost:9000)
+        // Dev proxy for all provider calls → local TatakaiCore (https://api.tatakai.me)
         '/api/providers': {
           target: backendOrigin,
           changeOrigin: true,

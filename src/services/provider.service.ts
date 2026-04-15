@@ -3,7 +3,7 @@ import { EpisodeServer, StreamingData, StreamingSource, Subtitle } from "@/types
 
 // ──────────────────────────────────────────────────────────────
 // Shared helper — every provider just uses plain fetch() now.
-// The Vite dev proxy handles CORS (→ localhost:9000).
+// The Vite dev proxy handles CORS (→ https://api.tatakai.me).
 // ──────────────────────────────────────────────────────────────
 const TIMEOUT = 12000; // Single-pass provider mode: allow slower upstreams enough time to resolve.
 const RAW_ANIME_MAPPER_API = String(import.meta.env.VITE_ANIME_MAPPER_API || "").trim();

@@ -1,12 +1,32 @@
 import { getClientIdSync } from '@/hooks/useClientId';
 import { isApiCryptoEnabled, generateApiSignature } from '@/lib/apiCrypto';
 
-const DEFAULT_API_BASE = "http://localhost:9000/api/v2";
+const DEFAULT_API_BASE = "https://api.tatakai.me/api/v2";
 const BACKEND_ORIGIN = (import.meta.env.VITE_BACKEND_ORIGIN || '').replace(/\/$/, '');
-const CONFIGURED_API_BASE =
-  import.meta.env.VITE_API_BASE_URL ||
-  import.meta.env.VITE_HIANIME_API_URL ||
-  (BACKEND_ORIGIN ? `${BACKEND_ORIGIN}/api/v2` : DEFAULT_API_BASE);
+
+function isAbsoluteHttpUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value);
+}
+
+function normalizeConfiguredApiBase(): string {
+  const rawApiBase = String(import.meta.env.VITE_API_BASE_URL || '').trim();
+  const rawHianimeBase = String(import.meta.env.VITE_HIANIME_API_URL || '').trim();
+
+  if (rawApiBase) {
+    if (isAbsoluteHttpUrl(rawApiBase)) return rawApiBase;
+    if (BACKEND_ORIGIN) return `${BACKEND_ORIGIN}${rawApiBase.startsWith('/') ? '' : '/'}${rawApiBase}`;
+  }
+
+  if (rawHianimeBase) {
+    if (isAbsoluteHttpUrl(rawHianimeBase)) return rawHianimeBase;
+    if (BACKEND_ORIGIN) return `${BACKEND_ORIGIN}${rawHianimeBase.startsWith('/') ? '' : '/'}${rawHianimeBase}`;
+  }
+
+  if (BACKEND_ORIGIN) return `${BACKEND_ORIGIN}/api/v2`;
+  return DEFAULT_API_BASE;
+}
+
+const CONFIGURED_API_BASE = normalizeConfiguredApiBase();
 
 // Remove /hianime or /anime from the end if present to get the clean base
 const CLEAN_API_BASE = CONFIGURED_API_BASE.replace(/\/+(hianime|anime|tatakai)$/i, '');
