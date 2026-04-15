@@ -40,6 +40,7 @@ interface MobileVideoPlayerProps {
   poster?: string;
   onError?: () => void;
   onServerSwitch?: () => void;
+  onRetryCurrentServer?: () => void;
   isLoading?: boolean;
   serverName?: string;
   onEpisodeEnd?: () => void;
@@ -70,6 +71,40 @@ function getSubtitleSelectionKey(subtitle: { lang: string; url: string; label?: 
   return `${subtitle.lang === 'custom' ? 'custom' : 'sub'}:${baseKey}`;
 }
 
+function parseQualityScore(quality?: string): number | null {
+  const normalized = String(quality || '').toLowerCase();
+  const match = normalized.match(/(\d{3,4})\s*p?/);
+  if (!match) return null;
+  const value = Number(match[1]);
+  return Number.isFinite(value) ? value : null;
+}
+
+function selectPreferredSource(
+  sources: Array<{ url: string; isM3U8: boolean; quality?: string }>,
+  preferredQuality: 'auto' | '1080p' | '720p' | '480p' | '360p',
+) {
+  if (!sources.length) return undefined;
+  if (preferredQuality === 'auto') return sources[0];
+
+  const preferredScore = parseQualityScore(preferredQuality);
+  if (!preferredScore) {
+    return sources.find((source) => String(source.quality || '').toLowerCase() === preferredQuality) || sources[0];
+  }
+
+  const candidates = sources
+    .map((source) => ({ source, score: parseQualityScore(source.quality) }))
+    .filter((entry): entry is { source: { url: string; isM3U8: boolean; quality?: string }; score: number } => entry.score != null)
+    .sort((left, right) => {
+      const distanceDiff = Math.abs(left.score - preferredScore) - Math.abs(right.score - preferredScore);
+      if (distanceDiff !== 0) return distanceDiff;
+      return right.score - left.score;
+    });
+
+  if (candidates.length > 0) return candidates[0].source;
+
+  return sources.find((source) => String(source.quality || '').toLowerCase() === preferredQuality) || sources[0];
+}
+
 type SkipSegment = {
   startTime: number;
   endTime: number;
@@ -83,6 +118,7 @@ export function MobileVideoPlayer({
   poster,
   onError,
   onServerSwitch,
+  onRetryCurrentServer,
   isLoading = false,
   serverName,
   onEpisodeEnd,
@@ -103,7 +139,7 @@ export function MobileVideoPlayer({
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hlsRef = useRef<Hls | null>(null);
-  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const { settings } = useVideoSettings();
   const { skipTimes, fetchSkipTimes } = useAniskip();
@@ -164,16 +200,21 @@ export function MobileVideoPlayer({
   const [showHoverTime, setShowHoverTime] = useState(false);
   const [hoverPercent, setHoverPercent] = useState(0);
   const lastTapRef = useRef<{ time: number; x: number }>({ time: 0, x: 0 });
-  const doubleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const doubleTapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seekAccumulatorRef = useRef(0);
 
   // Progress tracking
   const lastSavedProgressRef = useRef<number>(0);
   const PROGRESS_SAVE_INTERVAL = 15;
-  const sourceUrlKey = sources[0]?.url || '';
-  const sourceTypeKey = sources[0]?.isM3U8 ? 'm3u8' : 'file';
+  const currentSource = useMemo(
+    () => selectPreferredSource(sources, settings.defaultQuality),
+    [sources, settings.defaultQuality],
+  );
+  const sourceUrlKey = currentSource?.url || '';
+  const sourceTypeKey = currentSource?.isM3U8 ? 'm3u8' : 'file';
   const playbackReferer = headers?.Referer || '';
   const playbackUserAgent = headers?.["User-Agent"] || '';
+  const autoSkippedWindowRef = useRef<string | null>(null);
 
   // Fetch skip times for intro/outro
   useEffect(() => {
@@ -195,6 +236,23 @@ export function MobileVideoPlayer({
     )) || null;
     setActiveSkip(skip);
   }, [currentTime, effectiveSkipSegments]);
+
+  useEffect(() => {
+    autoSkippedWindowRef.current = null;
+  }, [sourceUrlKey]);
+
+  useEffect(() => {
+    if (!settings.autoSkipIntro || !activeSkip || !videoRef.current) return;
+    if (activeSkip.type !== 'op' && activeSkip.type !== 'mixed-op' && activeSkip.type !== 'recap') return;
+
+    const key = `${activeSkip.type}:${activeSkip.startTime}:${activeSkip.endTime}`;
+    if (autoSkippedWindowRef.current === key) return;
+
+    videoRef.current.currentTime = activeSkip.endTime;
+    autoSkippedWindowRef.current = key;
+    setCurrentTime(activeSkip.endTime);
+    setActiveSkip(null);
+  }, [activeSkip, settings.autoSkipIntro]);
 
   // Keep screen awake while playing
   useEffect(() => {
@@ -222,12 +280,80 @@ export function MobileVideoPlayer({
     };
   }, [showControls, isPlaying, isLocked]);
 
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.playbackRate = settings.playbackSpeed;
+    }
+    setPlaybackRate(settings.playbackSpeed);
+  }, [settings.playbackSpeed]);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.volume = settings.volume;
+    }
+  }, [settings.volume]);
+
+  useEffect(() => {
+    setCurrentSubtitle(settings.subtitleLanguage);
+  }, [settings.subtitleLanguage]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const applySubtitleMode = () => {
+      const tracks = video.textTracks;
+      if (!tracks || tracks.length === 0) return;
+
+      let selectedIndex = -1;
+
+      if (currentSubtitle !== 'off') {
+        if (currentSubtitle === 'auto') {
+          const englishIndex = subtitles.findIndex((sub) => {
+            const label = `${sub.lang || ''} ${sub.label || ''}`.toLowerCase();
+            return label.includes('english') || label === 'en';
+          });
+          selectedIndex = englishIndex >= 0 ? englishIndex : 0;
+        } else {
+          selectedIndex = subtitles.findIndex((sub, idx) => getSubtitleSelectionKey(sub, idx) === currentSubtitle);
+
+          if (selectedIndex < 0) {
+            const key = currentSubtitle.toLowerCase();
+            selectedIndex = subtitles.findIndex((sub) => {
+              const label = `${sub.lang || ''} ${sub.label || ''}`.toLowerCase();
+              if (key === 'english') return label.includes('english') || label === 'en';
+              if (key === 'spanish') return label.includes('spanish') || label.includes('espanol') || label === 'es';
+              if (key === 'french') return label.includes('french') || label === 'fr';
+              if (key === 'german') return label.includes('german') || label === 'de';
+              if (key === 'japanese') return label.includes('japanese') || label === 'ja';
+              if (key === 'portuguese') return label.includes('portuguese') || label === 'pt';
+              if (key === 'arabic') return label.includes('arabic') || label === 'ar';
+              if (key === 'hindi') return label.includes('hindi') || label === 'hi';
+              return false;
+            });
+          }
+        }
+      }
+
+      for (let i = 0; i < tracks.length; i += 1) {
+        tracks[i].mode = i === selectedIndex ? 'showing' : 'disabled';
+      }
+    };
+
+    applySubtitleMode();
+    video.addEventListener('loadedmetadata', applySubtitleMode);
+
+    return () => {
+      video.removeEventListener('loadedmetadata', applySubtitleMode);
+    };
+  }, [currentSubtitle, subtitles, subtitleBlobs]);
+
   // Initialize HLS
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !sources[0]?.url) return;
+    if (!video || !currentSource?.url) return;
 
-    const source = sources[0];
+    const source = currentSource;
     const finalUrl = !isOffline && playbackReferer
       ? getProxiedVideoUrl(source.url, playbackReferer, playbackUserAgent || undefined)
       : source.url;
@@ -237,6 +363,8 @@ export function MobileVideoPlayer({
       hlsRef.current.destroy();
       hlsRef.current = null;
     }
+
+    let metadataAutoplayHandler: (() => void) | null = null;
 
     if (source.isM3U8 && Hls.isSupported()) {
       const hls = new Hls({
@@ -255,7 +383,9 @@ export function MobileVideoPlayer({
         if (initialSeekSeconds && initialSeekSeconds > 0) {
           video.currentTime = initialSeekSeconds;
         }
-        video.play().catch(console.error);
+        if (settings.autoplay) {
+          video.play().catch(console.error);
+        }
       });
 
       hls.on(Hls.Events.ERROR, (_, data) => {
@@ -278,21 +408,51 @@ export function MobileVideoPlayer({
       if (initialSeekSeconds && initialSeekSeconds > 0) {
         video.currentTime = initialSeekSeconds;
       }
+
+      if (settings.autoplay) {
+        metadataAutoplayHandler = () => {
+          video.play().catch(console.error);
+          video.removeEventListener('loadedmetadata', metadataAutoplayHandler!);
+        };
+
+        if (video.readyState >= 1) {
+          video.play().catch(console.error);
+        } else {
+          video.addEventListener('loadedmetadata', metadataAutoplayHandler);
+        }
+      }
     } else {
       // Direct MP4
       video.src = finalUrl;
       if (initialSeekSeconds && initialSeekSeconds > 0) {
         video.currentTime = initialSeekSeconds;
       }
+
+      if (settings.autoplay) {
+        metadataAutoplayHandler = () => {
+          video.play().catch(console.error);
+          video.removeEventListener('loadedmetadata', metadataAutoplayHandler!);
+        };
+
+        if (video.readyState >= 1) {
+          video.play().catch(console.error);
+        } else {
+          video.addEventListener('loadedmetadata', metadataAutoplayHandler);
+        }
+      }
     }
 
     return () => {
+      if (metadataAutoplayHandler) {
+        video.removeEventListener('loadedmetadata', metadataAutoplayHandler);
+      }
+
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
     };
-  }, [sourceUrlKey, sourceTypeKey, initialSeekSeconds, isOffline, playbackReferer, playbackUserAgent]);
+  }, [sourceUrlKey, sourceTypeKey, initialSeekSeconds, isOffline, playbackReferer, playbackUserAgent, settings.autoplay]);
 
   // Load subtitles
   useEffect(() => {
@@ -677,6 +837,7 @@ export function MobileVideoPlayer({
 
   // Retry on error
   const handleRetry = () => {
+    if (onRetryCurrentServer) onRetryCurrentServer();
     setVideoError(null);
     retryCountRef.current = 0;
     setRetryCount(0);

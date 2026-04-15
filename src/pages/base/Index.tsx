@@ -18,6 +18,7 @@ import { LocalContinueWatching } from "@/components/anime/LocalContinueWatching"
 import { PlaylistSection } from "@/components/anime/PlaylistSection";
 import { UpcomingAnimeSection } from "@/components/anime/UpcomingAnimeSection";
 import { InfiniteHomeSections } from "@/components/anime/InfiniteHomeSections";
+import { MobileInfiniteHomeSections } from "@/components/anime/MobileInfiniteHomeSections";
 import { TrendingForumSection } from "@/components/anime/TrendingForumSection";
 import { WatchRoomSection } from "@/components/home/WatchRoomSection";
 import { HeroSkeleton, CardSkeleton } from "@/components/ui/skeleton-custom";
@@ -27,6 +28,8 @@ import { ReviewPopup } from "@/components/ui/ReviewPopup";
 import { LanguagesSection } from "@/components/anime/LanguagesSection";
 import { AppDownloadSection } from "@/components/layout/AppDownloadSection";
 import { ReleaseV5Banner } from "@/components/layout/ReleaseV5Banner";
+import { IndexMangaShowcase } from "@/components/manga/IndexMangaShowcase";
+import { LastReadMangaSection } from "@/components/manga/LastReadMangaSection";
 import { Heart, Sparkles } from "lucide-react";
 import { DiscordSection } from "@/components/home/DiscordSection";
 import { useEffect } from "react";
@@ -38,6 +41,7 @@ const Index = () => {
   const isDesktopApp = useIsDesktopApp(); // Only Electron/Tauri
   const isMobile = useIsMobile();
   const isMobileApp = Capacitor.isNativePlatform();
+  const showInfiniteEarly = isMobile || isMobileApp;
   
   // Show sidebar on desktop (web or app), but not on mobile (web or app)
   const showSidebar = !isMobile && !isMobileApp;
@@ -101,14 +105,22 @@ const Index = () => {
 
 
 
+
+
             {/* Continue Watching - Database backed for logged in users */}
             <ContinueWatching />
 
             {/* Continue Watching - LocalStorage for guests */}
             <LocalContinueWatching />
+            <LastReadMangaSection />
 
             {/* Because You Watched — Personalised recommendations */}
             <BecauseYouWatched className="mb-12" />
+
+            {/* Last manga/manhwa/comics progress */}
+
+                        <IndexMangaShowcase />
+
 
             {/* My Playlists */}
             <PlaylistSection />
@@ -135,6 +147,8 @@ const Index = () => {
               week={data.top10Animes.week}
               month={data.top10Animes.month}
             />
+
+
             {/* Join Discord */}
             <div className="mb-24">
               <DiscordSection />
@@ -150,7 +164,7 @@ const Index = () => {
               <div className="mt-24">
                 <AppDownloadSection />
               </div>
-            )}
+            )} <br />  <br />
             {/* Genre Cloud */}
             <GenreCloud genres={data.genres} />
 
@@ -167,9 +181,10 @@ const Index = () => {
               title="Most Favorite"
               icon={<Sparkles className="w-5 h-5 text-amber" />}
             />
-
             {/* Infinite Scrolling Genre Sections */}
-            <InfiniteHomeSections />
+
+            {showInfiniteEarly && <MobileInfiniteHomeSections />}
+            {!showInfiniteEarly && <InfiniteHomeSections />}
 
          
 

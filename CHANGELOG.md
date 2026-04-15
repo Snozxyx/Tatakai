@@ -8,6 +8,10 @@ All notable changes to Tatakai are documented here.
 
 ### Added
 - **V5 Release UX** — Replaced legacy V4 announcement flow with a dedicated V5 banner/release surface
+- **V4 Announcement Popup Migration** — Repurposed the legacy V4 popup into a V5 launch popup with direct deep-link to `Settings > Changelog`
+- **Mobile Launch Guardrails** — While the launch popup is active on mobile, bottom navigation is hidden and reduce-motion prompt display is delayed by 1 minute
+- **Manga V5 Surface** — Added Manga release banner, hero spotlight, trending grid, index showcase, continue-reading rail, and infinite discovery sections
+- **Manga Reader Navigation Controls** — Added chapter search/grouping, volume-to-chapter quick filtering, and improved source/language controls
 - **Route Architecture Split** — Migrated pages into structured route domains (`base`, `auth`, `watch`, `profile`, `forum`, `admin`, `legal`, `error`) with centralized route composition
 - **Provider Aggregation Core** — Added unified multi-provider source pipeline for Animelok, AnimeKai, Animepahe, Animeya, WatchAW, DesiDub, Toonstream, ToonWorld, and Hindi APIs
 - **Playback Telemetry Schema** — Added `playback_telemetry` table and indexes for source latency/failure instrumentation
@@ -19,6 +23,7 @@ All notable changes to Tatakai are documented here.
 
 ### Changed
 - **ID-first Integrations** — MyAnimeList/AniList imports now use stable `mal_id`/`anilist_id` mapping first, with manual override kept available in import review
+- **In-app Release Notes** — Expanded Settings changelog content to reflect the full V5 manga rollout and popup behavior updates
 - **Watch Runtime Intelligence** — Improved source health scoring, preflight checks, referer fallback retry, and provider failover behavior
 - **Search Mapping Quality** — Expanded AniList search payload fields (`format`, `status`, `genres`, `score`, `popularity`, `country`, `season`) to improve mapping decisions
 - **Desktop/Web Source Stack** — Updated watch/provider services and proxy manager to support balanced proxy pool routing and better provider fallback behavior
@@ -28,6 +33,7 @@ All notable changes to Tatakai are documented here.
 - **Provider Resolution Regressions** — Improved search-first fallback paths for providers where direct slug mapping fails
 - **Import UX Clarity** — Made manual remapping entry points in integration import flow explicit instead of icon-only
 - **CORS/Proxy Flow** — Applied CORS and proxy fixes around rapid-service and provider routing paths
+- **Mobile Popup Interference** — Prevented mobile nav overlap and motion prompt contention during V5 announcement display
 
 ### Security
 - **Auth/Headers Hardening** — Tightened security headers and external auth handling while keeping JWT verification behavior compatible with current deployment

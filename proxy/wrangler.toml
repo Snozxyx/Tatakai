@@ -1,0 +1,15 @@
+name = "streaming-proxy-worker"
+main = "cloudflare/worker.js"
+compatibility_date = "2026-04-09"
+workers_dev = true
+
+[vars]
+# Set PROXY_PASSWORD via `wrangler secret put PROXY_PASSWORD`.
+ALLOWED_ORIGINS = "*"
+REFERER_URL = "https://megacloud.club/"
+PLAYLIST_TIMEOUT_MS = "9000"
+PLAYLIST_TOTAL_TIMEOUT_MS = "14000"
+PLAYLIST_MAX_RETRIES = "1"
+SEGMENT_TIMEOUT_MS = "18000"
+TIMEOUT_COOLDOWN_SEC = "45"
+BLOCKED_HOST_COOLDOWN_SEC = "180"

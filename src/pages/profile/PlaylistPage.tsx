@@ -57,7 +57,7 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   ArrowLeft, Plus, Music2, Globe, Lock, Play,
   Trash2, Edit2, Share2, GripVertical,
-  Loader2, Calendar, Users, UserPlus, Send, MessageSquare
+  Loader2, Calendar, Users, UserPlus, Send, MessageSquare, BookOpen
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -65,6 +65,27 @@ import { toast } from 'sonner';
 
 function isUuidLike(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+type PlaylistMediaKind = 'anime' | 'manga';
+
+function parsePlaylistMediaRef(value: string): { kind: PlaylistMediaKind; id: string } {
+  const raw = String(value || '').trim();
+  if (raw.toLowerCase().startsWith('manga:')) {
+    return { kind: 'manga', id: raw.slice(6) };
+  }
+  if (raw.toLowerCase().startsWith('anime:')) {
+    return { kind: 'anime', id: raw.slice(6) };
+  }
+  return { kind: 'anime', id: raw };
+}
+
+function getPlaylistItemHref(animeId: string): string {
+  const media = parsePlaylistMediaRef(animeId);
+  if (media.kind === 'manga') {
+    return `/manga/${encodeURIComponent(media.id)}`;
+  }
+  return `/anime/${encodeURIComponent(media.id)}`;
 }
 
 // Playlists list page
@@ -110,7 +131,7 @@ export default function PlaylistsPage() {
           <div className="max-w-7xl mx-auto px-4 md:px-8 py-20 text-center">
             <Music2 className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
             <h1 className="text-2xl font-bold mb-2">Sign in to create playlists</h1>
-            <p className="text-muted-foreground mb-6">Create and manage your anime playlists</p>
+            <p className="text-muted-foreground mb-6">Create and manage your anime and manga playlists</p>
             <Button onClick={() => navigate('/auth')}>Sign In</Button>
           </div>
         </main>
@@ -240,7 +261,7 @@ export default function PlaylistsPage() {
               <Music2 className="w-16 h-16 mx-auto text-muted-foreground/30 mb-4" />
               <h2 className="text-xl font-bold mb-2">No playlists yet</h2>
               <p className="text-muted-foreground mb-6">
-                Create your first playlist to start organizing your anime!
+                Create your first playlist to start organizing your anime and manga!
               </p>
               <Button onClick={() => setShowCreate(true)} className="gap-2">
                 <Plus className="w-4 h-4" />
@@ -457,8 +478,14 @@ export function PlaylistViewPage() {
   };
 
   const handleLaunchWatchRoom = (animeId: string, animeName: string, animePoster?: string | null) => {
+    const media = parsePlaylistMediaRef(animeId);
+    if (media.kind !== 'anime' || !media.id) {
+      toast.error('Watch rooms currently support anime items only.');
+      return;
+    }
+
     const params = new URLSearchParams({
-      anime: animeId,
+      anime: media.id,
       title: animeName,
     });
 
@@ -573,6 +600,8 @@ export function PlaylistViewPage() {
 
   // Get cover images from first 4 items
   const coverImages = items.slice(0, 4).map(item => item.anime_poster).filter(Boolean) as string[];
+  const firstItem = items[0];
+  const firstItemMedia = firstItem ? parsePlaylistMediaRef(firstItem.anime_id) : null;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -643,25 +672,25 @@ export function PlaylistViewPage() {
                 <Calendar className="w-4 h-4" />
                 Created {new Date(playlist.created_at).toLocaleDateString()}
                 <span>•</span>
-                {playlist.items_count} {playlist.items_count === 1 ? 'anime' : 'anime'}
+                {playlist.items_count} {playlist.items_count === 1 ? 'item' : 'items'}
               </p>
 
               <div className="flex flex-wrap gap-3">
-                {items.length > 0 && (
+                {firstItem && (
                   <Button
                     className="gap-2"
-                    onClick={() => navigate(`/anime/${items[0].anime_id}`)}
+                    onClick={() => navigate(getPlaylistItemHref(firstItem.anime_id))}
                   >
-                    <Play className="w-4 h-4" />
-                    Start Watching
+                    {firstItemMedia?.kind === 'manga' ? <BookOpen className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                    {firstItemMedia?.kind === 'manga' ? 'Start Reading' : 'Start Watching'}
                   </Button>
                 )}
 
-                {items.length > 0 && (
+                {firstItem && firstItemMedia?.kind === 'anime' && (
                   <Button
                     variant="outline"
                     className="gap-2"
-                    onClick={() => handleLaunchWatchRoom(items[0].anime_id, items[0].anime_name, items[0].anime_poster)}
+                    onClick={() => handleLaunchWatchRoom(firstItem.anime_id, firstItem.anime_name, firstItem.anime_poster)}
                   >
                     <Users className="w-4 h-4" />
                     Watch With Friends
@@ -703,7 +732,7 @@ export function PlaylistViewPage() {
           {/* Items list */}
           <GlassPanel className="p-6">
             <h2 className="text-xl font-bold mb-6">
-              Anime in this playlist
+              Items in this playlist
             </h2>
 
             {loadingItems ? (
@@ -714,19 +743,23 @@ export function PlaylistViewPage() {
               </div>
             ) : items.length > 0 ? (
               <div className="space-y-2">
-                {items.map((item, index) => (
-                  <motion.div
-                    key={item.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.03 }}
-                    className="flex items-center gap-4 p-3 rounded-xl hover:bg-muted/50 transition-colors group"
-                  >
+                {items.map((item, index) => {
+                  const itemMedia = parsePlaylistMediaRef(item.anime_id);
+                  const itemHref = getPlaylistItemHref(item.anime_id);
+
+                  return (
+                    <motion.div
+                      key={item.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.03 }}
+                      className="flex items-center gap-4 p-3 rounded-xl hover:bg-muted/50 transition-colors group"
+                    >
                     <span className="text-muted-foreground w-8 text-center font-mono">
                       {index + 1}
                     </span>
 
-                    <Link to={`/anime/${item.anime_id}`} className="flex items-center gap-4 flex-1 min-w-0">
+                    <Link to={itemHref} className="flex items-center gap-4 flex-1 min-w-0">
                       <div className="relative w-16 h-20 rounded-lg overflow-hidden flex-shrink-0">
                         <img
                           src={getProxiedImageUrl(item.anime_poster || '/placeholder.svg')}
@@ -743,24 +776,28 @@ export function PlaylistViewPage() {
                           {item.anime_name}
                         </h3>
                         <p className="text-sm text-muted-foreground">
+                          {itemMedia.kind === 'manga' ? 'Manga' : 'Anime'} •
+                          {' '}
                           Added {new Date(item.added_at).toLocaleDateString()}
                         </p>
                       </div>
                     </Link>
 
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          handleLaunchWatchRoom(item.anime_id, item.anime_name, item.anime_poster);
-                        }}
-                        className="text-muted-foreground hover:text-primary"
-                      >
-                        <Users className="w-4 h-4" />
-                      </Button>
+                      {itemMedia.kind === 'anime' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            handleLaunchWatchRoom(item.anime_id, item.anime_name, item.anime_poster);
+                          }}
+                          className="text-muted-foreground hover:text-primary"
+                        >
+                          <Users className="w-4 h-4" />
+                        </Button>
+                      )}
 
                       {canEdit && (
                         <Button
@@ -774,7 +811,8 @@ export function PlaylistViewPage() {
                       )}
                     </div>
                   </motion.div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-12">
@@ -782,7 +820,7 @@ export function PlaylistViewPage() {
                 <p className="text-muted-foreground">This playlist is empty</p>
                 {canEdit && (
                   <p className="text-sm text-muted-foreground mt-2">
-                    Add anime from any anime page using the "Add to Playlist" button
+                    Add anime or manga from any detail page using the Add to Playlist button
                   </p>
                 )}
               </div>

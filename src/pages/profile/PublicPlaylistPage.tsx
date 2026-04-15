@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Loader2, Share2 } from 'lucide-react';
 import { getProxiedImageUrl } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -34,6 +34,27 @@ function resolveOwnerFromPayload(payload: any): string | null {
     normalizeOwnerName(payload?.owner?.display_name) ||
     normalizeOwnerName(payload?.owner?.username)
   );
+}
+
+type PlaylistMediaKind = 'anime' | 'manga';
+
+function parsePlaylistMediaRef(value: string): { kind: PlaylistMediaKind; id: string } {
+  const raw = String(value || '').trim();
+  if (raw.toLowerCase().startsWith('manga:')) {
+    return { kind: 'manga', id: raw.slice(6) };
+  }
+  if (raw.toLowerCase().startsWith('anime:')) {
+    return { kind: 'anime', id: raw.slice(6) };
+  }
+  return { kind: 'anime', id: raw };
+}
+
+function getPlaylistItemHref(mediaRef: string): string {
+  const media = parsePlaylistMediaRef(mediaRef);
+  if (!media.id) return '#';
+  return media.kind === 'manga'
+    ? `/manga/${encodeURIComponent(media.id)}`
+    : `/anime/${encodeURIComponent(media.id)}`;
 }
 
 export default function PublicPlaylistPage() {
@@ -119,6 +140,7 @@ export default function PublicPlaylistPage() {
             <h1 className="text-2xl font-bold">{name}</h1>
             <p className="text-sm text-muted-foreground">By {ownerName}</p>
             {share_description && <p className="mt-2 text-sm text-muted-foreground">{share_description}</p>}
+            <p className="mt-1 text-xs text-muted-foreground">{playlist_items.length} item(s)</p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={() => { navigator.clipboard.writeText(shareUrl); toast.success('Link copied'); }} className="gap-2">
@@ -135,15 +157,20 @@ export default function PublicPlaylistPage() {
 
         {playlist_items.length > 0 ? (
           <div className="space-y-2">
-            {playlist_items.map((item: any, idx: number) => (
-              <div key={item.id} className="flex items-center gap-4 p-3 rounded-xl bg-muted/10">
-                <div className="w-16 h-20 rounded overflow-hidden">
-                  <img src={getProxiedImageUrl(item.anime_poster || '/placeholder.svg')} alt={item.anime_name} className="w-full h-full object-cover" />
-                </div>
-                <div>
-                  <div className="font-semibold">{item.anime_name}</div>
-                  <div className="text-sm text-muted-foreground">Added {new Date(item.added_at).toLocaleDateString()}</div>
-                </div>
+            {playlist_items.map((item: any) => (
+              <div key={item.id} className="flex items-center justify-between gap-4 p-3 rounded-xl bg-muted/10">
+                <Link to={getPlaylistItemHref(item.anime_id)} className="min-w-0 flex items-center gap-4 hover:opacity-90 transition-opacity">
+                  <div className="w-16 h-20 rounded overflow-hidden">
+                    <img src={getProxiedImageUrl(item.anime_poster || '/placeholder.svg')} alt={item.anime_name} className="w-full h-full object-cover" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-semibold line-clamp-1">{item.anime_name}</div>
+                    <div className="text-sm text-muted-foreground">{parsePlaylistMediaRef(item.anime_id).kind === 'manga' ? 'Manga' : 'Anime'} • Added {new Date(item.added_at).toLocaleDateString()}</div>
+                  </div>
+                </Link>
+                <Link to={getPlaylistItemHref(item.anime_id)} className="text-xs font-bold uppercase tracking-wider text-primary hover:underline">
+                  Open
+                </Link>
               </div>
             ))}
           </div>

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { TATAKAI_API_URL } from '@/lib/api/api-client';
 
 // ============================================
 // STATUS INCIDENTS
@@ -28,6 +29,52 @@ export interface StatusIncidentUpdate {
   status: 'investigating' | 'identified' | 'monitoring' | 'resolved';
   created_by: string;
   created_at: string;
+}
+
+async function sendStatusIncidentWebhook(payload: {
+  action: 'created' | 'updated';
+  title: string;
+  status: StatusIncident['status'];
+  severity: StatusIncident['severity'];
+  affectedServices?: string[];
+  message?: string;
+}) {
+  try {
+    const colorBySeverity: Record<StatusIncident['severity'], number> = {
+      minor: 0xfacc15,
+      major: 0xf97316,
+      critical: 0xef4444,
+    };
+
+    const endpoint = `${TATAKAI_API_URL}/webhooks/discord`;
+    const affected = (payload.affectedServices || []).filter(Boolean);
+
+    await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        channel: 'status',
+        username: 'Tatakai Status Bot',
+        embeds: [
+          {
+            title: `Status Incident ${payload.action === 'created' ? 'Created' : 'Updated'}`,
+            description: payload.message || payload.title,
+            color: colorBySeverity[payload.severity],
+            fields: [
+              { name: 'Title', value: payload.title || 'Untitled', inline: false },
+              { name: 'Severity', value: payload.severity, inline: true },
+              { name: 'Status', value: payload.status, inline: true },
+              { name: 'Affected Services', value: affected.length > 0 ? affected.join(', ') : 'N/A', inline: false },
+            ],
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch {
+    // Intentionally ignored: webhook delivery should not block admin incident workflows.
+  }
 }
 
 export function useStatusIncidents(activeOnly = true) {
@@ -97,6 +144,16 @@ export function useCreateIncident() {
         .single();
 
       if (error) throw error;
+
+      void sendStatusIncidentWebhook({
+        action: 'created',
+        title: incident.title,
+        status: incident.status,
+        severity: incident.severity,
+        affectedServices: incident.affected_services || [],
+        message: incident.description,
+      });
+
       return data;
     },
     onSuccess: () => {
@@ -134,6 +191,9 @@ export function useUpdateIncident() {
 
       if (updateError) throw updateError;
 
+      const resolvedStatus = (updates.status || 'investigating') as StatusIncident['status'];
+      const resolvedSeverity = (updates.severity || 'minor') as StatusIncident['severity'];
+
       // Add update message if provided
       if (updateMessage && updates.status) {
         const { error: msgError } = await supabase
@@ -147,6 +207,15 @@ export function useUpdateIncident() {
 
         if (msgError) throw msgError;
       }
+
+      void sendStatusIncidentWebhook({
+        action: 'updated',
+        title: `Incident ${incidentId}`,
+        status: resolvedStatus,
+        severity: resolvedSeverity,
+        affectedServices: updates.affected_services || [],
+        message: updateMessage || `Incident ${incidentId} updated to ${resolvedStatus}`,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['status_incidents'] });

@@ -59,6 +59,138 @@ interface ScraperHealthSummary {
 
 const SERVICE_CHECK_FREQ_SECONDS = 30;
 const PROXY_POLL_FREQ_SECONDS = 4;
+const DEFAULT_BACKEND_HEALTH_URL = 'https://api.tatakai.me/health';
+
+type KnownProxyNode = {
+  id: string;
+  url: string;
+  type: string;
+};
+
+const KNOWN_PROXY_NODES: KnownProxyNode[] = [
+  {
+    id: 'proxy-node-hoko',
+    url: 'https://hoko.tatakai.me/api/v1/streamingProxy',
+    type: 'nodejs',
+  },
+  {
+    id: 'proxy-cf-moko',
+    url: 'https://moko.tatakai.me/api/v1/streamingProxy',
+    type: 'cf',
+  },
+];
+
+function resolveProxyStatusEndpoint(apiBaseUrl: string, explicitBackendOrigin?: string): string {
+  const backendOrigin = String(explicitBackendOrigin || '').trim().replace(/\/$/, '');
+  if (backendOrigin) {
+    return `${backendOrigin}/api/proxy/status`;
+  }
+
+  const apiBase = String(apiBaseUrl || '').trim();
+  if (!apiBase || !/^https?:\/\//i.test(apiBase)) {
+    return '/api/proxy/status';
+  }
+
+  try {
+    const parsed = new URL(apiBase);
+    return `${parsed.origin}/api/proxy/status`;
+  } catch {
+    return '/api/proxy/status';
+  }
+}
+
+function resolveBackendHealthEndpoint(apiBaseUrl: string, explicitBackendOrigin?: string): string {
+  const backendOrigin = String(explicitBackendOrigin || '').trim().replace(/\/$/, '');
+  if (backendOrigin) {
+    return `${backendOrigin}/health`;
+  }
+
+  const apiBase = String(apiBaseUrl || '').trim();
+  if (!apiBase || !/^https?:\/\//i.test(apiBase)) {
+    return DEFAULT_BACKEND_HEALTH_URL;
+  }
+
+  try {
+    const parsed = new URL(apiBase);
+    return `${parsed.origin}/health`;
+  } catch {
+    return DEFAULT_BACKEND_HEALTH_URL;
+  }
+}
+
+function buildProxyProbeUrls(proxyUrl: string, proxyPassword: string): string[] {
+  const normalized = String(proxyUrl || '').trim().replace(/\/$/, '');
+  if (!normalized) return [];
+
+  const streamEndpoint = /\/api\/v1\/streamingproxy$/i.test(normalized)
+    ? normalized
+    : `${normalized}/api/v1/streamingProxy`;
+  const rootEndpoint = normalized.replace(/\/api\/v1\/streamingproxy$/i, '');
+
+  const params = new URLSearchParams({
+    url: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    type: 'video',
+  });
+  if (proxyPassword) {
+    params.set('password', proxyPassword);
+  }
+
+  return Array.from(
+    new Set([
+      `${rootEndpoint}/health`,
+      `${streamEndpoint}?${params.toString()}`,
+    ])
+  );
+}
+
+async function probeKnownProxyNode(node: KnownProxyNode, proxyPassword: string): Promise<ProxyDisplayNode> {
+  const probeUrls = buildProxyProbeUrls(node.url, proxyPassword);
+
+  for (const probeUrl of probeUrls) {
+    const requestStart = performance.now();
+    try {
+      const response = await fetch(probeUrl, { signal: AbortSignal.timeout(5000) });
+      const latency = Math.round(performance.now() - requestStart);
+
+      // 401/403/405 still indicate the proxy is reachable and alive.
+      const onlineLike =
+        response.ok || response.status === 401 || response.status === 403 || response.status === 405;
+
+      if (onlineLike) {
+        return {
+          id: node.id,
+          url: node.url,
+          type: node.type,
+          status: 'online',
+          latencyMs: latency,
+          score: 1,
+        };
+      }
+
+      if (response.status >= 400 && response.status < 500) {
+        return {
+          id: node.id,
+          url: node.url,
+          type: node.type,
+          status: 'degraded',
+          latencyMs: latency,
+          score: 0,
+        };
+      }
+    } catch {
+      // Try next probe URL.
+    }
+  }
+
+  return {
+    id: node.id,
+    url: node.url,
+    type: node.type,
+    status: 'offline',
+    latencyMs: 0,
+    score: 0,
+  };
+}
 
 export default function StatusPage() {
   const navigate = useNavigate();
@@ -73,7 +205,7 @@ export default function StatusPage() {
   });
   const [services, setServices] = useState<ServiceStatus[]>([
     { name: 'Tatakai Website', status: 'checking', icon: <Globe className="w-5 h-5" />, description: 'Main website frontend', url: window.location.origin },
-    { name: 'Tatakai Backend', status: 'checking', icon: <Zap className="w-5 h-5" />, description: 'Unified Hono API', url: 'https://api.tatakai.me/api/v1/health' },
+    { name: 'Tatakai Backend', status: 'checking', icon: <Zap className="w-5 h-5" />, description: 'Unified Hono API', url: DEFAULT_BACKEND_HEALTH_URL },
     { name: 'Supabase API', status: 'checking', icon: <Database className="w-5 h-5" />, description: 'Database & Auth infrastructure' },
     { name: 'Jikan API', status: 'checking', icon: <Server className="w-5 h-5" />, description: 'MyAnimeList metadata provider', url: 'https://api.jikan.moe/v4/health' },
     { name: 'Image Assets', status: 'checking', icon: <Image className="w-5 h-5" />, description: 'Anime posters & thumbnails', url: 'https://api.waifu.pics/sfw/waifu' },
@@ -81,6 +213,17 @@ export default function StatusPage() {
   ]);
   const [lastChecked, setLastChecked] = useState<Date>(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const proxyStatusEndpoint = useMemo(
+    () => resolveProxyStatusEndpoint(TATAKAI_API_URL, import.meta.env.VITE_BACKEND_ORIGIN),
+    []
+  );
+  const backendHealthEndpoint = useMemo(
+    () => resolveBackendHealthEndpoint(TATAKAI_API_URL, import.meta.env.VITE_BACKEND_ORIGIN),
+    []
+  );
+  const sharedProxyPassword = String(
+    import.meta.env.VITE_STREAM_PROXY_PASSWORD || import.meta.env.VITE_PROXY_PASSWORD || ''
+  ).trim();
 
   const SEVERITY_COLORS = {
     minor: 'bg-yellow-500/20 text-yellow-500 border-yellow-500/50',
@@ -97,7 +240,8 @@ export default function StatusPage() {
 
   const classifyProxyType = (url: string) => {
     const lower = (url || '').toLowerCase();
-    if (lower.includes('workers.dev') || lower.includes('cloudflare') || lower.includes('kira.tatakai.me')) return 'cf';
+    if (lower.includes('workers.dev') || lower.includes('cloudflare') || lower.includes('kira.tatakai.me') || lower.includes('moko.tatakai.me')) return 'cf';
+    if (lower.includes('hoko.tatakai.me')) return 'nodejs';
     if (lower.includes('bun')) return 'bun';
     return 'nodejs';
   };
@@ -138,23 +282,44 @@ export default function StatusPage() {
   }, []);
 
   const loadProxyStatus = useCallback(async () => {
-    const response = await fetch('/api/proxy/status', { signal: AbortSignal.timeout(7000) });
-    if (!response.ok) throw new Error(`Proxy status failed: ${response.status}`);
-    const json = await response.json();
-    const nodes: ProxyStatusNode[] = Array.isArray(json?.nodes) ? json.nodes : [];
+    let mappedFromBackend: ProxyDisplayNode[] = [];
 
-    const mapped: ProxyDisplayNode[] = nodes.map((node) => ({
-      id: node.id,
-      url: node.url,
-      type: classifyProxyType(node.url),
-      status: node.status,
-      latencyMs: node.lastLatencyMs || 0,
-      score: Math.max(0, node.successes - node.failures),
-    }));
+    try {
+      const response = await fetch(proxyStatusEndpoint, { signal: AbortSignal.timeout(7000) });
+      if (response.ok) {
+        const json = await response.json();
+        const nodes: ProxyStatusNode[] = Array.isArray(json?.nodes) ? json.nodes : [];
+        mappedFromBackend = nodes.map((node) => ({
+          id: node.id,
+          url: node.url,
+          type: classifyProxyType(node.url),
+          status: node.status,
+          latencyMs: node.lastLatencyMs || 0,
+          score: Math.max(0, node.successes - node.failures),
+        }));
+      }
+    } catch {
+      // Fall back to direct node probes below.
+    }
 
-    setProxies(mapped);
-    return mapped;
-  }, []);
+    const backendHasHoko = mappedFromBackend.some((node) =>
+      String(node.url || '').toLowerCase().includes('hoko.tatakai.me')
+    );
+    const backendHasMoko = mappedFromBackend.some((node) =>
+      String(node.url || '').toLowerCase().includes('moko.tatakai.me')
+    );
+
+    if (mappedFromBackend.length > 0 && backendHasHoko && backendHasMoko) {
+      setProxies(mappedFromBackend);
+      return mappedFromBackend;
+    }
+
+    const probedFallback = await Promise.all(
+      KNOWN_PROXY_NODES.map((node) => probeKnownProxyNode(node, sharedProxyPassword))
+    );
+    setProxies(probedFallback);
+    return probedFallback;
+  }, [proxyStatusEndpoint, sharedProxyPassword]);
 
   const checkService = async (name: string, checkFn: () => Promise<{ status: ServiceStatus['status']; latency: number }>): Promise<ServiceStatus['status']> => {
     try {
@@ -193,7 +358,7 @@ export default function StatusPage() {
       await checkService('Tatakai Backend', async () => {
         const start = Date.now();
         try {
-          const res = await fetch('https://api.tatakai.me/api/v1/health', { signal: AbortSignal.timeout(5000) });
+          const res = await fetch(backendHealthEndpoint, { signal: AbortSignal.timeout(5000) });
           const text = await res.text();
           const latency = Date.now() - start;
           return {

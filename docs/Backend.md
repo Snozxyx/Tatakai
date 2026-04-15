@@ -1209,7 +1209,7 @@ console.log(data);
 ```javascript
 {
   success: true,
-  data: {
+  data: { 
     airingISOTimestamp: string | null,
     airingTimestamp: number | null,
     secondsUntilAiring: number | null

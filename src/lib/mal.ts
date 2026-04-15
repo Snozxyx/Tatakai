@@ -355,6 +355,212 @@ export function mapMalStatusToTatakai(malStatus: string): any {
     return map[malStatus] || 'plan_to_watch';
 }
 
+function parseMalNumericId(value: string | number): number | null {
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+        return Math.trunc(value);
+    }
+
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+
+    if (/^\d+$/.test(raw)) {
+        return parseInt(raw, 10);
+    }
+
+    const prefixed = raw.match(/^mal[:-](\d+)$/i);
+    if (prefixed?.[1]) {
+        return parseInt(prefixed[1], 10);
+    }
+
+    return null;
+}
+
+async function resolveMalMangaId(mangaIdOrMalId: string | number): Promise<number> {
+    const parsed = parseMalNumericId(mangaIdOrMalId);
+    if (parsed) return parsed;
+
+    const { supabase } = await import('@/integrations/supabase/client');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const mangaId = String(mangaIdOrMalId || '').trim();
+    if (!mangaId) throw new Error('Missing manga ID');
+
+    const { data: mappedByMangaId } = await supabase
+        .from('manga_readlist')
+        .select('mal_id')
+        .eq('user_id', user.id)
+        .eq('manga_id', mangaId)
+        .maybeSingle();
+
+    if (mappedByMangaId?.mal_id) {
+        return Number(mappedByMangaId.mal_id);
+    }
+
+    const anilistPrefixed = mangaId.match(/^anilist:(\d+)$/i);
+    if (anilistPrefixed?.[1]) {
+        const { data: mappedByAniListId } = await supabase
+            .from('manga_readlist')
+            .select('mal_id')
+            .eq('user_id', user.id)
+            .eq('anilist_id', Number(anilistPrefixed[1]))
+            .maybeSingle();
+
+        if (mappedByAniListId?.mal_id) {
+            return Number(mappedByAniListId.mal_id);
+        }
+    }
+
+    throw new Error('MAL manga ID not found for this entry');
+}
+
+/**
+ * Fetches the user's entire manga list from MyAnimeList.
+ */
+export async function fetchMalMangaList() {
+    const { supabase } = await import('@/integrations/supabase/client');
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) throw new Error('Not authenticated');
+
+    const functionUrl = getMalAuthFunctionUrl();
+
+    const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify({
+            action: 'fetch_manga_list'
+        })
+    });
+
+    if (!response.ok) {
+        let errorData;
+        try {
+            errorData = await response.json();
+        } catch {
+            errorData = { error: 'Unknown server error' };
+        }
+
+        const details = errorData.details
+            ? (typeof errorData.details === 'string' ? errorData.details : JSON.stringify(errorData.details))
+            : '';
+        const message = errorData.error || 'Failed to fetch manga list';
+
+        throw new Error(`MAL Manga Fetch Error: ${message}${details ? ` (${details})` : ''}`);
+    }
+
+    const { data } = await response.json();
+    return data;
+}
+
+/**
+ * Maps MAL manga status strings to local manga readlist status strings.
+ */
+export function mapMalMangaStatusToTatakai(malStatus: string): any {
+    const normalized = String(malStatus || '').trim().toLowerCase();
+    const map: Record<string, string> = {
+        'reading': 'reading',
+        'completed': 'completed',
+        'plan_to_read': 'plan_to_read',
+        'dropped': 'dropped',
+        'on_hold': 'on_hold'
+    };
+    return map[normalized] || 'plan_to_read';
+}
+
+/**
+ * Maps local manga readlist status strings to MAL manga status strings.
+ */
+export function mapTatakaiMangaStatusToMal(status: string): any {
+    const normalized = String(status || '').trim().toLowerCase();
+    const map: Record<string, string> = {
+        'reading': 'reading',
+        'completed': 'completed',
+        'plan_to_read': 'plan_to_read',
+        'dropped': 'dropped',
+        'on_hold': 'on_hold'
+    };
+    return map[normalized] || 'plan_to_read';
+}
+
+/**
+ * Updates the status of a manga on the user's MyAnimeList.
+ */
+export async function updateMalMangaStatus(
+    mangaIdOrMalId: string | number,
+    status: string,
+    score?: number,
+    numReadChapters?: number
+) {
+    const { supabase } = await import('@/integrations/supabase/client');
+    const malId = await resolveMalMangaId(mangaIdOrMalId);
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) throw new Error('Not authenticated');
+
+    const functionUrl = getMalAuthFunctionUrl();
+    const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify({
+            action: 'sync_manga',
+            malId,
+            status: mapTatakaiMangaStatusToMal(status),
+            score,
+            numReadChapters,
+        })
+    });
+
+    if (!response.ok) {
+        let errorData;
+        try {
+            errorData = await response.json();
+        } catch {
+            errorData = { error: 'Unknown server error' };
+        }
+
+        throw new Error(`MAL Manga Sync Error: ${errorData.error || 'Failed to update MAL manga status'}`);
+    }
+
+    return response.json();
+}
+
+/**
+ * Removes a manga from the user's MyAnimeList library.
+ */
+export async function deleteMalMangaStatus(mangaIdOrMalId: string): Promise<void> {
+    const { supabase } = await import('@/integrations/supabase/client');
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) throw new Error('Not authenticated');
+
+    const malId = await resolveMalMangaId(mangaIdOrMalId);
+    const functionUrl = getMalAuthFunctionUrl();
+
+    const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify({
+            action: 'delete_manga',
+            malId,
+        })
+    });
+
+    if (!response.ok) {
+        console.error('[MAL Manga Sync] Delete failed in Edge Function');
+    }
+}
+
 
 /**
  * Removes an anime from the user's MyAnimeList library.

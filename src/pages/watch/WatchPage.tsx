@@ -32,6 +32,7 @@ import {
   Share2,
   Users,
   TrendingUp,
+  CircleCheck,
 } from "lucide-react";
 import { useVideoSettings } from "@/hooks/useVideoSettings";
 import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from "@/hooks/useIsNativeApp";
@@ -187,6 +188,7 @@ export default function WatchPage() {
   const previousProviderCountRef = useRef<number | null>(null);
   const selectedServerNameRef = useRef<string | null>(null);
   const pendingPlaybackCommitRef = useRef(true);
+  const failoverTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!isDeveloperMode && showSourceDebug) {
@@ -351,13 +353,27 @@ export default function WatchPage() {
     });
 
     const sorted = sortServersByHealth(dedupedServers, category, category === "dub" ? dubProfile : "stability");
-    const savedPref = getPreferredServer(animeId, category);
-    if (!savedPref) return sorted;
+    const pinServerFirst = (servers: typeof sorted, targetName: string) => {
+      const target = String(targetName || "").trim().toLowerCase();
+      if (!target) return servers;
+      const index = servers.findIndex((server) => String(server.serverName || "").trim().toLowerCase() === target);
+      if (index <= 0) return servers;
+      const pinned = servers[index];
+      return [pinned, ...servers.slice(0, index), ...servers.slice(index + 1)];
+    };
 
-    const prefIndex = sorted.findIndex((s) => s.serverName.toLowerCase() === savedPref.toLowerCase());
-    if (prefIndex <= 0) return sorted;
-    const pinned = sorted[prefIndex];
-    return [pinned, ...sorted.slice(0, prefIndex), ...sorted.slice(prefIndex + 1)];
+    const savedPref = getPreferredServer(animeId, category);
+    let ordered = sorted;
+    if (savedPref) {
+      const prefIndex = ordered.findIndex((s) => s.serverName.toLowerCase() === savedPref.toLowerCase());
+      if (prefIndex > 0) {
+        const pinned = ordered[prefIndex];
+        ordered = [pinned, ...ordered.slice(0, prefIndex), ...ordered.slice(prefIndex + 1)];
+      }
+    }
+
+    // Keep Koro (justanime) as first server when available.
+    return pinServerFirst(ordered, "justanime");
   }, [category, serversData, animeId, dubProfile]);
 
   const availableServersRef = useRef(availableServers);
@@ -437,6 +453,12 @@ export default function WatchPage() {
         const key = comboFailureKey(animeId, decodedEpisodeId, serverName, category);
         return !shouldAutoSkipSource(key);
       };
+
+      const koroIndex = availableServers.findIndex((s) => s.serverName.toLowerCase() === 'justanime' && isEligible(s.serverName));
+      if (koroIndex !== -1) {
+        selectRegularServer(koroIndex);
+        return;
+      }
 
       // First try the saved server preference (but not hd-1)
       if (preferredServerName && preferredServerName !== 'hd-1') {
@@ -558,7 +580,9 @@ export default function WatchPage() {
     currentEpisode?.number,
     combinedSourceServer,
     category,
-    user?.id
+    user?.id,
+    (animeData as any)?.anilistID || animeData?.anime?.moreInfo?.anilistId || null,
+    (animeData as any)?.malID || animeData?.anime?.moreInfo?.malId || null
   );
 
   const { data: fastStartData, isLoading: loadingFastStart } = useQuery({
@@ -577,7 +601,10 @@ export default function WatchPage() {
         outro: null,
       };
       try {
-        return await fetchStreamingSources(decodedEpisodeId, currentServer?.serverName || "hd-1", category);
+        return await fetchStreamingSources(decodedEpisodeId, currentServer?.serverName || "hd-1", category, {
+          animeName: animeData?.anime?.info?.name,
+          anilistId: animeData?.anime?.moreInfo?.anilistId || null,
+        });
       } catch {
         try {
           return await fetchTatakaiEpisodeSources(decodedEpisodeId, currentServer?.serverName || "hd-1", category);
@@ -853,6 +880,14 @@ export default function WatchPage() {
       });
 
       if (!result.ok) {
+        const isLikelyHls = Boolean(activePlaybackSource?.isM3U8) || /\.m3u8(?:$|[?#])/i.test(activePlaybackSource?.url || "");
+        if (isLikelyHls) {
+          // HLS preflight can fail on strict CDNs while actual playback succeeds via proxy failover.
+          setSourceReady(true);
+          setSourcePreflightError("Stream preflight failed. Trying HLS fallback...");
+          return;
+        }
+
         setSourceReady(false);
         setSourcePreflightError("Stream preflight failed. Retrying server...");
       } else {
@@ -873,13 +908,35 @@ export default function WatchPage() {
     return visibleSources.filter(s => s.langCode?.startsWith('marketplace-'));
   }, [visibleSources]);
 
+  const officialServerNameSet = useMemo(() => {
+    return new Set(availableServers.map((server) => String(server.serverName || "").trim().toLowerCase()).filter(Boolean));
+  }, [availableServers]);
+
+  const isOfficialSource = useCallback((source: any) => {
+    if (!source) return false;
+
+    if (String(source.providerKey || "").trim().toLowerCase() === "justanime") {
+      return false;
+    }
+
+    const candidates = [
+      String(source.server || "").trim().toLowerCase(),
+      String(source.providerKey || "").trim().toLowerCase(),
+      String(source.providerName || "").trim().toLowerCase(),
+    ].filter(Boolean);
+
+    if (candidates.some((value) => /^hd-\d+$/i.test(value))) return true;
+    return candidates.some((value) => officialServerNameSet.has(value));
+  }, [officialServerNameSet]);
+
   const providerSourceCount = useMemo(() => {
     return visibleSources.filter((source) =>
+      !isOfficialSource(source) &&
       !!source.providerName &&
       source.providerName !== 'TatakaiAPI' &&
       !source.langCode?.startsWith('marketplace-')
     ).length;
-  }, [visibleSources]);
+  }, [visibleSources, isOfficialSource]);
 
   useEffect(() => {
     previousProviderCountRef.current = null;
@@ -919,6 +976,7 @@ export default function WatchPage() {
     return visibleSources.reduce((acc: Record<string, any[]>, source) => {
       // Only group external providers (Animelok, WatchAnimeWorld, Animeya, etc.)
       // AND exclude marketplace sources (they have their own section)
+      if (isOfficialSource(source)) return acc;
       if (!source.providerName || source.providerName === 'TatakaiAPI' || source.langCode?.startsWith('marketplace-')) return acc;
 
       let lang = source.language || "Unknown";
@@ -951,7 +1009,7 @@ export default function WatchPage() {
       acc[lang].push(source);
       return acc;
     }, {});
-  }, [visibleSources]);
+  }, [visibleSources, isOfficialSource]);
 
   const uniqueLabelMap = useMemo(() => {
     const keys: string[] = [];
@@ -973,6 +1031,16 @@ export default function WatchPage() {
 
     return buildUniqueSimpleNameMap(keys, fallbackByKey);
   }, [availableServers, languageGroups]);
+
+  const isVerifiedProvider = (providerKey?: string, serverName?: string) => {
+    const key = String(providerKey || '').toLowerCase();
+    const name = String(serverName || '').toLowerCase();
+    
+    // Strictly limited to official HiAnime/Tatakai servers only
+    const verified = ['hianime', 'tatakaiapi'];
+    
+    return verified.includes(key);
+  };
 
   const getSimpleSourceLabel = (source: any, fallbackKey: string) => {
     const key = String(source?.langCode || source?.server || source?.providerKey || source?.providerName || fallbackKey);
@@ -1068,6 +1136,8 @@ export default function WatchPage() {
 
   // Auto-switch to next working server on error
   const errorThrottleRef = useRef(0);
+  const forceRefreshLockUntilRef = useRef(0);
+  const forceRefreshInFlightRef = useRef(false);
   const attemptedFailoverRef = useRef<Set<string>>(new Set());
   const handleVideoError = useCallback(() => {
     // Throttle repeated errors to avoid rapid state updates
@@ -1076,6 +1146,7 @@ export default function WatchPage() {
     errorThrottleRef.current = now;
 
     if (!currentServer) return;
+    if (failoverTimeoutRef.current !== null) return;
 
     const comboKey = comboFailureKey(animeId, decodedEpisodeId, currentServer.serverName, category);
     recordSourceFailure(comboKey);
@@ -1138,15 +1209,31 @@ export default function WatchPage() {
     }
 
     if (nextIndex !== -1) {
-      setSelectedProviderServerKey(null);
-      selectRegularServer(nextIndex);
-      setRefererRetryIndex(0);
+      failoverTimeoutRef.current = window.setTimeout(() => {
+        setSelectedProviderServerKey(null);
+        selectRegularServer(nextIndex);
+        setRefererRetryIndex(0);
+        failoverTimeoutRef.current = null;
+      }, 3000);
     }
   }, [currentServer, availableServers, selectedServerIndex, failedServers, animeId, decodedEpisodeId, category, user?.id, refererRetryIndex, activePlaybackHeaders?.Referer, activePlaybackSource?.isM3U8, activePlaybackSource?.url, activePlaybackSource?.providerName, activePlaybackSource?.server, activePlaybackSource?.quality, selectRegularServer]);
 
   useEffect(() => {
     attemptedFailoverRef.current.clear();
+    if (failoverTimeoutRef.current !== null) {
+      window.clearTimeout(failoverTimeoutRef.current);
+      failoverTimeoutRef.current = null;
+    }
   }, [selectedServerIndex, activePlaybackSource?.url]);
+
+  useEffect(() => {
+    return () => {
+      if (failoverTimeoutRef.current !== null) {
+        window.clearTimeout(failoverTimeoutRef.current);
+        failoverTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (sourceReady || !activePlaybackSource) return;
@@ -1157,6 +1244,10 @@ export default function WatchPage() {
   }, [sourceReady, activePlaybackSource?.url, handleVideoError]);
 
   const handleServerSwitch = () => {
+    if (failoverTimeoutRef.current !== null) {
+      window.clearTimeout(failoverTimeoutRef.current);
+      failoverTimeoutRef.current = null;
+    }
     const nextIndex = (selectedServerIndex + 1) % availableServers.length;
     selectRegularServer(nextIndex);
     setSelectedProviderServerKey(null);
@@ -1165,19 +1256,54 @@ export default function WatchPage() {
     }
   };
 
-  const handleForceRefreshSources = useCallback(async () => {
-    clearCachedCombinedSourcesByEpisodeAndCategory(decodedEpisodeId, category);
-    await queryClient.invalidateQueries({
-      predicate: (query) => {
-        const key = query.queryKey as any[];
-        return key?.[0] === "combined-sources" && key?.[1] === decodedEpisodeId && key?.[4] === category;
-      },
+  const handleRetryCurrentServer = useCallback(() => {
+    if (failoverTimeoutRef.current !== null) {
+      window.clearTimeout(failoverTimeoutRef.current);
+      failoverTimeoutRef.current = null;
+    }
+
+    const currentServerName = currentServer?.serverName;
+    if (!currentServerName) return;
+
+    attemptedFailoverRef.current.delete(currentServerName);
+    setFailedServers((prev) => {
+      if (!prev.has(currentServerName)) return prev;
+      const copy = new Set(prev);
+      copy.delete(currentServerName);
+      return copy;
     });
-    refetchSources();
-  }, [decodedEpisodeId, category, queryClient, refetchSources]);
+  }, [currentServer?.serverName]);
+
+  const handleForceRefreshSources = useCallback(async () => {
+    const now = Date.now();
+    if (forceRefreshInFlightRef.current) return;
+    if (fetchingSources) return;
+    if (now < forceRefreshLockUntilRef.current) return;
+
+    forceRefreshLockUntilRef.current = now + 3000;
+    forceRefreshInFlightRef.current = true;
+
+    try {
+      clearCachedCombinedSourcesByEpisodeAndCategory(decodedEpisodeId, category);
+      await queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey as any[];
+          return key?.[0] === "combined-sources" && key?.[1] === decodedEpisodeId && key?.[4] === category;
+        },
+      });
+      await refetchSources();
+    } finally {
+      forceRefreshInFlightRef.current = false;
+    }
+  }, [decodedEpisodeId, category, queryClient, refetchSources, fetchingSources]);
 
   const handleCategoryChange = useCallback((nextCategory: "sub" | "dub") => {
     if (nextCategory === category) return;
+
+    if (failoverTimeoutRef.current !== null) {
+      window.clearTimeout(failoverTimeoutRef.current);
+      failoverTimeoutRef.current = null;
+    }
 
     trackEvent("watch_category_switch", {
       animeId,
@@ -1242,6 +1368,10 @@ export default function WatchPage() {
   }, [user, animeData, currentEpisode, animeId, decodedEpisodeId, updateWatchHistory, currentServer, category, selectedLangCode]);
 
   const handleEpisodeChange = (epId: string) => {
+    if (failoverTimeoutRef.current !== null) {
+      window.clearTimeout(failoverTimeoutRef.current);
+      failoverTimeoutRef.current = null;
+    }
     setFailedServers(new Set());
     setSelectedProviderServerKey(null);
     if (isOfflineMode) {
@@ -1253,6 +1383,10 @@ export default function WatchPage() {
 
   // Reset failed servers when category changes - also reset to find hd-1 again
   useEffect(() => {
+    if (failoverTimeoutRef.current !== null) {
+      window.clearTimeout(failoverTimeoutRef.current);
+      failoverTimeoutRef.current = null;
+    }
     setFailedServers(new Set());
     selectRegularServer(-1); // Reset to let auto-select logic find hd-1
     setSelectedProviderServerKey(null);
@@ -1271,9 +1405,12 @@ export default function WatchPage() {
   }, [sourceReady, currentServer?.serverName, animeId, decodedEpisodeId, category]);
 
   const handleEpisodeEnd = () => {
-    if (!settings.autoNextEpisode) {
-      setShowReviewPopup(true);
+    if (settings.autoNextEpisode && nextEpisode?.episodeId) {
+      handleEpisodeChange(nextEpisode.episodeId);
+      return;
     }
+
+    setShowReviewPopup(true);
   };
 
   return (
@@ -1338,6 +1475,7 @@ export default function WatchPage() {
                   poster={animeData?.anime.info.poster || (isOfflineMode ? `file://${offlinePath}/poster.jpg` : undefined)}
                   onError={handleVideoError}
                   onServerSwitch={handleServerSwitch}
+                  onRetryCurrentServer={handleRetryCurrentServer}
                   isLoading={!isOfflineMode && loadingSources && loadingFastStart && !(sourceDataForPlayback?.sources?.length)}
                   serverName={activeServerDisplayName}
                   malId={sourcesData?.malID || animeData?.anime?.moreInfo?.malId}
@@ -1369,6 +1507,7 @@ export default function WatchPage() {
                   poster={animeData?.anime.info.poster || (isOfflineMode ? `file://${offlinePath}/poster.jpg` : undefined)}
                   onError={handleVideoError}
                   onServerSwitch={handleServerSwitch}
+                  onRetryCurrentServer={handleRetryCurrentServer}
                   isLoading={!isOfflineMode && loadingSources && loadingFastStart && !(sourceDataForPlayback?.sources?.length)}
                   serverName={activeServerDisplayName}
                   malId={sourcesData?.malID || animeData?.anime?.moreInfo?.malId}
@@ -1577,7 +1716,7 @@ export default function WatchPage() {
                                           setRefererRetryIndex(0);
                                         }}
                                         title={serverDescription}
-                                        className={`h-9 px-3 md:px-4 rounded-xl font-medium transition-all text-sm ${idx === selectedServerIndex
+                                        className={`h-9 px-3 md:px-4 rounded-xl font-medium transition-all text-sm flex items-center justify-center gap-1.5 ${idx === selectedServerIndex
                                           ? "bg-foreground text-background shadow-lg"
                                           : failedServers.has(server.serverName)
                                             ? "bg-destructive/20 text-destructive"
@@ -1587,6 +1726,9 @@ export default function WatchPage() {
                                           }`}
                                       >
                                         {serverLabel}
+                                        {isVerifiedProvider(server.providerKey || (server as any).providerName, server.serverName) && (
+                                          <CircleCheck className="w-3 h-3 text-primary animate-in zoom-in duration-300" />
+                                        )}
                                         {failedServers.has(server.serverName) && " ✗"}
                                       </button>
                                     </TooltipTrigger>
@@ -1678,6 +1820,12 @@ export default function WatchPage() {
                                         >
                                           {source.isEmbed ? <Globe className="w-3 h-3" /> : <Server className="w-3 h-3 text-muted-foreground" />}
                                           {label}
+                                          {isVerifiedProvider(source.providerKey, source.server || source.providerName) && (
+                                            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-primary/20 text-[9px] font-bold text-primary border border-primary/30 ml-auto animate-in fade-in slide-in-from-right-2">
+                                              <CircleCheck className="w-2.5 h-2.5" />
+                                              <span>VERIFIED</span>
+                                            </div>
+                                          )}
                                           {source.isM3U8 && <span className="text-[10px] opacity-60 font-mono tracking-tighter">HLS</span>}
                                         </button>
                                       </TooltipTrigger>

@@ -1,4 +1,4 @@
-import { Play, LayoutGrid, Search, TrendingUp, Heart, User, Settings, LogIn, Users, Download, Smartphone } from "lucide-react";
+import { Play, LayoutGrid, Search, TrendingUp, Heart, User, Settings, LogIn, Users, Download, Smartphone, BookOpen } from "lucide-react";
 import { NavIcon } from "@/components/ui/NavIcon";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -53,6 +53,12 @@ export function Sidebar() {
           active={isActive("/search")}
           onClick={() => navigate("/search")}
           label="Search"
+        />
+        <NavIcon
+          icon={BookOpen}
+          active={location.pathname === "/manga" || location.pathname.startsWith("/manga/")}
+          onClick={() => navigate("/manga")}
+          label="Manga"
         />
         <NavIcon
           icon={TrendingUp}

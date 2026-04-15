@@ -358,6 +358,64 @@ html.high-contrast a {
   }
 }
 
+/* Brutalist Theme Overrides */
+body[data-theme='brutalist-concrete'] {
+  --radius: 0rem;
+  background-image: none !important;
+  font-family: 'Outfit', 'Space Grotesk', sans-serif;
+}
+
+body[data-theme='brutalist-concrete'] .glass-panel {
+  border: 3px solid hsl(var(--border)) !important;
+  border-radius: 0 !important;
+  background: hsl(var(--card)) !important;
+  backdrop-filter: none !important;
+  box-shadow: 8px 8px 0 hsl(var(--border) / 0.9) !important;
+}
+
+body[data-theme='brutalist-concrete'] .glass-panel-hover:hover {
+  transform: translate(-3px, -3px) !important;
+  box-shadow: 12px 12px 0 hsl(var(--accent) / 0.95) !important;
+  border-color: hsl(var(--accent)) !important;
+}
+
+body[data-theme='brutalist-concrete'] button,
+body[data-theme='brutalist-concrete'] [role='button'],
+body[data-theme='brutalist-concrete'] .btn,
+body[data-theme='brutalist-concrete'] .nav-icon {
+  border-radius: 0 !important;
+  border-width: 2px !important;
+  border-color: hsl(var(--border)) !important;
+  box-shadow: 4px 4px 0 hsl(var(--border) / 0.85);
+}
+
+body[data-theme='brutalist-concrete'] button:active,
+body[data-theme='brutalist-concrete'] [role='button']:active,
+body[data-theme='brutalist-concrete'] .btn:active {
+  transform: translate(2px, 2px) !important;
+  box-shadow: 2px 2px 0 hsl(var(--border) / 0.85) !important;
+}
+
+body[data-theme='brutalist-concrete'] img {
+  border-radius: 0 !important;
+}
+
+body[data-theme='brutalist-concrete'] h1,
+body[data-theme='brutalist-concrete'] h2,
+body[data-theme='brutalist-concrete'] h3,
+body[data-theme='brutalist-concrete'] h4,
+body[data-theme='brutalist-concrete'] h5,
+body[data-theme='brutalist-concrete'] h6 {
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+}
+
+body[data-theme='brutalist-concrete'] .gradient-text {
+  background-image: none !important;
+  color: hsl(var(--foreground)) !important;
+  -webkit-text-fill-color: hsl(var(--foreground)) !important;
+}
+
 @keyframes float {
 
   0%,

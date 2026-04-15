@@ -1,7 +1,9 @@
 // src/lib/api.ts - Barrel file for modular services
 export * from "@/types/anime";
+export * from "@/types/manga";
 export * from "@/lib/api/api-client";
 export * from "@/services/anime.service";
+export * from "@/services/manga.service";
 export * from "@/services/home.service";
 export * from "@/services/character.service";
 export * from "@/services/provider.service";

@@ -13,6 +13,7 @@ export const ANIME_SERVER_NAMES: Record<string, ServerNameInfo> = {
   'streamtape': { name: 'Shinigami', description: 'StreamTape Server' },
   'vidstreaming': { name: 'Titan', description: 'VidStreaming' },
   'vidcloud': { name: 'Mecha', description: 'VidCloud Server' },
+  'justanime': { name: 'Koro', description: 'Koro Fast Server' },
 
   // WatchAnimeWorld - Named by language
   'watchaw-ita': { name: 'Sakura (ITA)', description: 'Italian Audio' },

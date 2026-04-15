@@ -74,10 +74,10 @@ export default function WatchRoomPage() {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const playerRef = useRef<HTMLVideoElement>(null);
     const lastUpdateRef = useRef<number>(0);
-    const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const countdownIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const reconnectAttemptRef = useRef(0);
     const hasAutoJoinRef = useRef(false);
-    const presenceIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const presenceIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Queries & Hooks
     const { data: room, isLoading: loadingRoom } = useWatchRoom(roomId);
@@ -792,36 +792,6 @@ export default function WatchRoomPage() {
                                         </div>
                                     )}
 
-                                    {/* External Providers (Animeya, Animelok, Custom) */}
-                                    {streamingData?.sources && streamingData.sources.some((s: any) => s.providerName) && (
-                                        <div className="space-y-1">
-                                            <p className="text-[10px] font-black uppercase opacity-30 px-2">External Sources</p>
-                                            <ScrollArea className="h-[120px] bg-black/20 rounded-lg p-2">
-                                                <div className="space-y-1">
-                                                    {streamingData.sources.filter((s: any) => s.providerName).map((s: any, i) => (
-                                                        <Button
-                                                            key={`ext-${i}`}
-                                                            variant={room.manual_stream_url === s.url ? "default" : "outline"}
-                                                            className="w-full justify-start h-8 text-[11px] gap-2"
-                                                            onClick={() => {
-                                                                updateRoom.mutate({
-                                                                    roomId: roomId!,
-                                                                    updates: {
-                                                                        manual_stream_url: s.url,
-                                                                        manual_stream_type: s.isEmbed ? 'embed' : 'direct',
-                                                                        selected_server: s.providerName
-                                                                    } as any
-                                                                });
-                                                            }}
-                                                        >
-                                                            <Zap className="w-3 h-3 text-yellow-400" />
-                                                            <span className="truncate">{s.providerName} ({s.quality})</span>
-                                                        </Button>
-                                                    ))}
-                                                </div>
-                                            </ScrollArea>
-                                        </div>
-                                    )}
                                 </div>
 
                                 {/* Manual Stream & Subtitle */}

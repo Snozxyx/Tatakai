@@ -72,69 +72,161 @@ function looksLikeHlsManifest(payload: string): boolean {
   );
 }
 
-function readProxyQuerySnapshot(candidateUrl: string): { streamUrl?: string; referer?: string; userAgent?: string } {
+function readProxyQuerySnapshot(candidateUrl: string): { streamUrl?: string; referer?: string; userAgent?: string; password?: string } {
   try {
     const resolved = new URL(candidateUrl, window.location.origin);
     const streamUrl = resolved.searchParams.get('url') || undefined;
     const referer = resolved.searchParams.get('referer') || undefined;
     const userAgent = resolved.searchParams.get('userAgent') || undefined;
-    return { streamUrl, referer, userAgent };
+    const password = resolved.searchParams.get('password') || undefined;
+    return { streamUrl, referer, userAgent, password };
   } catch {
     return {};
   }
+}
+
+const REMOTE_NODE_STREAM_PROXY = 'https://hoko.tatakai.me/api/v1/streamingProxy';
+const REMOTE_CF_STREAM_PROXY = 'https://moko.tatakai.me/api/v1/streamingProxy';
+const DEFAULT_STREAM_PROXY_PATH = '/api/v1/streamingProxy';
+const LEGACY_STREAM_PROXY_PATHS = [
+  '/api/v2/hianime/proxy/m3u8-streaming-proxy',
+  '/api/proxy/m3u8-streaming-proxy',
+];
+const STREAM_PROXY_PASSWORD = String(
+  import.meta.env.VITE_STREAM_PROXY_PASSWORD || import.meta.env.VITE_PROXY_PASSWORD || ''
+).trim();
+
+function isLoopbackProxyUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+  } catch {
+    return false;
+  }
+}
+
+function resolveSingleStreamProxyBase(): string {
+  const explicitProxyBase = String(
+    import.meta.env.VITE_SINGLE_STREAM_PROXY_URL ||
+      import.meta.env.VITE_STREAM_PROXY_URL ||
+      import.meta.env.VITE_PROXY_DEV_URL ||
+      ''
+  ).trim();
+
+  if (explicitProxyBase && !isLoopbackProxyUrl(explicitProxyBase)) {
+    return explicitProxyBase.replace(/\/$/, '');
+  }
+
+  return REMOTE_NODE_STREAM_PROXY;
+}
+
+function buildProxyBaseCandidates(): string[] {
+  const candidates: string[] = [];
+  const add = (value?: string) => {
+    const normalized = String(value || '').trim().replace(/\/$/, '');
+    if (!normalized) return;
+    if (!candidates.includes(normalized)) candidates.push(normalized);
+  };
+
+  add(resolveSingleStreamProxyBase());
+  add(REMOTE_CF_STREAM_PROXY);
+
+  if (typeof window !== 'undefined') {
+    add(`${window.location.origin}${DEFAULT_STREAM_PROXY_PATH}`);
+    LEGACY_STREAM_PROXY_PATHS.forEach((legacyPath) => {
+      add(`${window.location.origin}${legacyPath}`);
+    });
+  }
+
+  return candidates;
+}
+
+function buildRefererCandidatesForStream(streamUrl: string, primaryReferer?: string): string[] {
+  const candidates: string[] = [];
+  const add = (value?: string) => {
+    const raw = String(value || '').trim();
+    if (!raw) return;
+    try {
+      const normalized = new URL(raw).href;
+      if (!candidates.includes(normalized)) candidates.push(normalized);
+    } catch {
+      // Ignore invalid referer values.
+    }
+  };
+
+  add(primaryReferer);
+
+  try {
+    const host = String(new URL(streamUrl).hostname || '').toLowerCase();
+    if (host.includes('watching.onl')) {
+      add('https://rabbitstream.net/');
+      add('https://dokicloud.one/');
+      add('https://hianime.to/');
+      add('https://aniwatchtv.to/');
+      add('https://megacloud.blog/');
+      add('https://megacloud.club/');
+      add('https://megacloud.tv/');
+    }
+
+    if (host.includes('owocdn') || host.includes('kwik') || host.includes('kwics')) {
+      add('https://kwik.cx/');
+      add('https://kwik.si/');
+    }
+  } catch {
+    // Ignore malformed stream URL.
+  }
+
+  return candidates.slice(0, 8);
 }
 
 function buildProxyCandidateUrls(
   streamUrl: string,
   referer?: string,
   userAgent?: string,
-  preferredUrl?: string
+  preferredUrl?: string,
+  proxyPassword?: string,
 ): string[] {
-  const params = new URLSearchParams({
-    url: streamUrl,
-    type: 'video',
-  });
-  if (referer) params.set('referer', referer);
-  if (userAgent) params.set('userAgent', userAgent);
-
-  const localProxyBase = (import.meta.env.VITE_STREAM_PROXY_URL || '/api/proxy/m3u8-streaming-proxy').replace(/\/$/, '');
-  const poolBases = [
-    localProxyBase,
-    import.meta.env.VITE_PROXY_CF_URL,
-    import.meta.env.VITE_PROXY_NODE_URL,
-    import.meta.env.VITE_PROXY_BUN_URL,
-    ...(String(import.meta.env.VITE_PROXY_POOL_URLS || '')
-      .split(',')
-      .map((entry) => entry.trim())
-      .filter(Boolean)),
-  ]
-    .map((entry) => String(entry || '').trim())
-    .filter(Boolean)
-    .map((entry) => entry.replace(/\/$/, ''));
-
-  const candidates = [
-    preferredUrl,
-    ...poolBases.map((base) => `${base}${base.includes('?') ? '&' : '?'}${params.toString()}`),
-  ].filter((entry): entry is string => Boolean(entry && entry.trim()));
-
-  const seen = new Set<string>();
-  const unique: string[] = [];
-
-  for (const candidate of candidates) {
-    const canonical = (() => {
-      try {
-        return new URL(candidate, window.location.origin).toString();
-      } catch {
-        return candidate;
-      }
-    })();
-
-    if (seen.has(canonical)) continue;
-    seen.add(canonical);
-    unique.push(candidate);
+  if (!/^https?:/i.test(streamUrl)) {
+    return preferredUrl ? [preferredUrl] : [streamUrl];
   }
 
-  return unique;
+  const candidates: string[] = [];
+  const addCandidate = (value?: string) => {
+    const normalized = String(value || '').trim();
+    if (!normalized) return;
+    if (!candidates.includes(normalized)) candidates.push(normalized);
+  };
+
+  addCandidate(preferredUrl);
+
+  const proxyBases = buildProxyBaseCandidates();
+  const refererCandidates = buildRefererCandidatesForStream(streamUrl, referer);
+  const preservedPassword = preferredUrl ? readProxyQuerySnapshot(preferredUrl).password : '';
+  const resolvedProxyPassword = String(proxyPassword || STREAM_PROXY_PASSWORD || preservedPassword || '').trim();
+
+  for (const proxyBase of proxyBases) {
+    if (refererCandidates.length === 0) {
+      const params = new URLSearchParams({ url: streamUrl, type: 'video' });
+      if (userAgent) params.set('userAgent', userAgent);
+      if (resolvedProxyPassword) params.set('password', resolvedProxyPassword);
+      addCandidate(`${proxyBase}${proxyBase.includes('?') ? '&' : '?'}${params.toString()}`);
+      continue;
+    }
+
+    for (const refererCandidate of refererCandidates) {
+      const params = new URLSearchParams({ url: streamUrl, type: 'video', referer: refererCandidate });
+      if (userAgent) params.set('userAgent', userAgent);
+      if (resolvedProxyPassword) params.set('password', resolvedProxyPassword);
+      addCandidate(`${proxyBase}${proxyBase.includes('?') ? '&' : '?'}${params.toString()}`);
+    }
+
+    const noRefererParams = new URLSearchParams({ url: streamUrl, type: 'video' });
+    if (userAgent) noRefererParams.set('userAgent', userAgent);
+    if (resolvedProxyPassword) noRefererParams.set('password', resolvedProxyPassword);
+    addCandidate(`${proxyBase}${proxyBase.includes('?') ? '&' : '?'}${noRefererParams.toString()}`);
+  }
+
+  return candidates.slice(0, 16);
 }
 
 function getSubtitleSelectionKey(subtitle: { lang: string; url: string; label?: string }, index: number): string {
@@ -155,6 +247,40 @@ function toTrackLanguageCode(lang?: string): string {
   return 'en';
 }
 
+function parseQualityScore(quality?: string): number | null {
+  const normalized = String(quality || '').toLowerCase();
+  const match = normalized.match(/(\d{3,4})\s*p?/);
+  if (!match) return null;
+  const value = Number(match[1]);
+  return Number.isFinite(value) ? value : null;
+}
+
+function selectPreferredSource(
+  sources: Array<{ url: string; isM3U8: boolean; quality?: string }>,
+  preferredQuality: 'auto' | '1080p' | '720p' | '480p' | '360p',
+) {
+  if (!sources.length) return undefined;
+  if (preferredQuality === 'auto') return sources[0];
+
+  const preferredScore = parseQualityScore(preferredQuality);
+  if (!preferredScore) {
+    return sources.find((source) => String(source.quality || '').toLowerCase() === preferredQuality) || sources[0];
+  }
+
+  const candidates = sources
+    .map((source) => ({ source, score: parseQualityScore(source.quality) }))
+    .filter((entry): entry is { source: { url: string; isM3U8: boolean; quality?: string }; score: number } => entry.score != null)
+    .sort((left, right) => {
+      const distanceDiff = Math.abs(left.score - preferredScore) - Math.abs(right.score - preferredScore);
+      if (distanceDiff !== 0) return distanceDiff;
+      return right.score - left.score;
+    });
+
+  if (candidates.length > 0) return candidates[0].source;
+
+  return sources.find((source) => String(source.quality || '').toLowerCase() === preferredQuality) || sources[0];
+}
+
 
 
 interface VideoPlayerProps {
@@ -170,6 +296,8 @@ interface VideoPlayerProps {
   onError?: () => void;
 
   onServerSwitch?: () => void;
+
+  onRetryCurrentServer?: () => void;
 
   isLoading?: boolean;
 
@@ -226,6 +354,8 @@ export function VideoPlayer({
   onError,
 
   onServerSwitch,
+
+  onRetryCurrentServer,
 
   isLoading = false,
 
@@ -319,7 +449,7 @@ export function VideoPlayer({
 
   const hlsRef = useRef<Hls | null>(null);
 
-  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 
 
@@ -446,7 +576,10 @@ export function VideoPlayer({
 
 
 
-  const currentSource = sources[0];
+  const currentSource = useMemo(
+    () => selectPreferredSource(sources, settings.defaultQuality),
+    [sources, settings.defaultQuality],
+  );
 
 
 
@@ -457,6 +590,9 @@ export function VideoPlayer({
   const bufferingTimeoutRef = useRef<number | null>(null);
   const lastProgressAtRef = useRef<number>(Date.now());
   const lastObservedTimeRef = useRef<number>(0);
+  const manualRetryLockUntilRef = useRef(0);
+  const subtitleApplyStateRef = useRef<{ lang: string; selectedIndex: number; trackCount: number } | null>(null);
+  const subtitleTrackSignatureRef = useRef<string>('');
 
   const initialSeekRef = useRef(initialSeekSeconds);
 
@@ -537,8 +673,6 @@ export function VideoPlayer({
 
     const tracks = video.textTracks;
 
-    console.log('[VideoPlayer] Applying subtitle:', lang, 'Tracks:', tracks.length);
-
     const orderedSubtitles = [...subtitles, ...customSubtitles];
     const selectedKey = lang.trim();
     const selectedKeyLower = selectedKey.toLowerCase();
@@ -580,6 +714,27 @@ export function VideoPlayer({
       }
     }
 
+    let currentShowingIndex = -1;
+    for (let i = 0; i < tracks.length; i++) {
+      if (tracks[i].mode === 'showing') {
+        currentShowingIndex = i;
+        break;
+      }
+    }
+
+    const previousApply = subtitleApplyStateRef.current;
+    const alreadyApplied =
+      !!previousApply &&
+      previousApply.lang === lang &&
+      previousApply.selectedIndex === selectedIndex &&
+      previousApply.trackCount === tracks.length &&
+      currentShowingIndex === selectedIndex;
+
+    if (alreadyApplied) {
+      setCurrentSubtitle((prev) => (prev === lang ? prev : lang));
+      return;
+    }
+
 
 
     for (let i = 0; i < tracks.length; i++) {
@@ -590,7 +745,13 @@ export function VideoPlayer({
 
     }
 
-    setCurrentSubtitle(lang);
+    subtitleApplyStateRef.current = {
+      lang,
+      selectedIndex,
+      trackCount: tracks.length,
+    };
+
+    setCurrentSubtitle((prev) => (prev === lang ? prev : lang));
 
   }, [subtitles, customSubtitles]);
 
@@ -776,6 +937,16 @@ export function VideoPlayer({
 
     const timeout = setTimeout(() => {
 
+      const video = videoRef.current;
+      if (!video) return;
+      const tracks = video.textTracks;
+      const signature = Array.from({ length: tracks.length }, (_, index) => {
+        const track = tracks[index];
+        return `${track.language}|${track.label}|${track.kind}`;
+      }).join('||');
+
+      if (!signature || signature === subtitleTrackSignatureRef.current) return;
+      subtitleTrackSignatureRef.current = signature;
       handleSubtitleChange(currentSubtitle);
 
     }, 500);
@@ -854,6 +1025,14 @@ export function VideoPlayer({
 
       if (tracks && tracks.length > 0) {
 
+        const signature = Array.from({ length: tracks.length }, (_, index) => {
+          const track = tracks[index];
+          return `${track.language}|${track.label}|${track.kind}`;
+        }).join('||');
+
+        if (!signature || signature === subtitleTrackSignatureRef.current) return;
+
+        subtitleTrackSignatureRef.current = signature;
         handleSubtitleChange(currentSubtitle);
 
       }
@@ -878,7 +1057,7 @@ export function VideoPlayer({
 
       applyOnceTracksAvailable();
 
-      if (attempts > 10) clearInterval(interval);
+      if (attempts > 6) clearInterval(interval);
 
     }, 300);
 
@@ -935,6 +1114,25 @@ export function VideoPlayer({
 
 
   const sourceKey = currentSource?.url || '';
+  const autoSkippedWindowRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    autoSkippedWindowRef.current = null;
+  }, [sourceKey]);
+
+  useEffect(() => {
+    if (!settings.autoSkipIntro || !activeSkip || !videoRef.current) return;
+    if (activeSkip.skipType !== 'op' && activeSkip.skipType !== 'mixed-op' && activeSkip.skipType !== 'recap') {
+      return;
+    }
+
+    const windowKey = `${activeSkip.skipType}:${activeSkip.interval.startTime}:${activeSkip.interval.endTime}`;
+    if (autoSkippedWindowRef.current === windowKey) return;
+
+    videoRef.current.currentTime = activeSkip.interval.endTime;
+    autoSkippedWindowRef.current = windowKey;
+    setActiveSkip(null);
+  }, [activeSkip, settings.autoSkipIntro]);
 
 
 
@@ -1003,11 +1201,21 @@ export function VideoPlayer({
       const originalStreamUrl = proxySnapshot.streamUrl || sourceSnapshot.streamUrl || videoUrl;
       const effectiveReferer = proxySnapshot.referer || sourceSnapshot.referer || referer;
       const effectiveUserAgent = proxySnapshot.userAgent || sourceSnapshot.userAgent || userAgent;
+      const effectiveProxyPassword = proxySnapshot.password || sourceSnapshot.password || STREAM_PROXY_PASSWORD;
       const proxyCandidates = isM3U8
-        ? buildProxyCandidateUrls(originalStreamUrl, effectiveReferer, effectiveUserAgent, proxiedUrl)
+        ? buildProxyCandidateUrls(
+            originalStreamUrl,
+            effectiveReferer,
+            effectiveUserAgent,
+            proxiedUrl,
+            effectiveProxyPassword,
+          )
         : [proxiedUrl];
       let activeProxyIndex = Math.max(0, proxyCandidates.findIndex((candidate) => candidate === proxiedUrl));
       let activePlaybackUrl = proxyCandidates[activeProxyIndex] || proxiedUrl;
+      const attemptedProxyIndexes = new Set<number>([activeProxyIndex]);
+      let proxySwitchInProgress = false;
+      let proxySwitchCount = 0;
 
       console.log('Loading video:', { original: videoUrl, final: activePlaybackUrl, isLocal, isOffline, proxyCandidates: proxyCandidates.length });
 
@@ -1036,23 +1244,30 @@ export function VideoPlayer({
           nudgeMaxRetry: 5,
           maxFragLookUpTolerance: 0.25,
           appendErrorMaxRetry: 4,
-          fragLoadingMaxRetry: 5,
-          manifestLoadingMaxRetry: 5,
-          levelLoadingMaxRetry: 5,
+          fragLoadingMaxRetry: 1,
+          manifestLoadingMaxRetry: 0,
+          levelLoadingMaxRetry: 1,
           startFragPrefetch: true,          // parallelize fragment loading
         });
 
-        const trySwitchProxyCandidate = async () => {
+        const trySwitchProxyCandidate = async (context?: { statusCode?: number }) => {
           if (proxyCandidates.length <= 1) return false;
 
-          for (let candidateIndex = activeProxyIndex + 1; candidateIndex < proxyCandidates.length; candidateIndex += 1) {
-            const candidateUrl = proxyCandidates[candidateIndex];
-            try {
-              const probeResponse = await fetch(candidateUrl, { redirect: 'follow', cache: 'no-store' });
-              const probeText = await probeResponse.text().catch(() => '');
-              if (!probeResponse.ok || !looksLikeHlsManifest(probeText)) {
-                continue;
-              }
+          if (proxySwitchInProgress) return false;
+
+          const statusCode = Number(context?.statusCode || 0);
+          const maxSwitches = statusCode === 403 ? 1 : 3;
+          if (proxySwitchCount >= maxSwitches) return false;
+
+          proxySwitchInProgress = true;
+
+          try {
+            for (let candidateIndex = activeProxyIndex + 1; candidateIndex < proxyCandidates.length; candidateIndex += 1) {
+              if (attemptedProxyIndexes.has(candidateIndex)) continue;
+
+              const candidateUrl = proxyCandidates[candidateIndex];
+              attemptedProxyIndexes.add(candidateIndex);
+              proxySwitchCount += 1;
 
               activeProxyIndex = candidateIndex;
               activePlaybackUrl = candidateUrl;
@@ -1072,12 +1287,12 @@ export function VideoPlayer({
               hls.startLoad();
               toast.success(`Switched proxy route (${candidateIndex + 1}/${proxyCandidates.length})`, { id: 'proxy-failover' });
               return true;
-            } catch {
-              // Keep scanning candidates until a valid manifest is found.
             }
-          }
 
-          return false;
+            return false;
+          } finally {
+            proxySwitchInProgress = false;
+          }
         };
 
 
@@ -1124,7 +1339,9 @@ export function VideoPlayer({
 
           setIsBuffering(false);
 
-          videoRef.current?.play().catch(() => { });
+          if (settings.autoplay) {
+            videoRef.current?.play().catch(() => { });
+          }
 
 
 
@@ -1177,6 +1394,7 @@ export function VideoPlayer({
         hls.on(Hls.Events.ERROR, async (_, data) => {
 
           console.error('HLS error:', data.type, data.details);
+          const responseCode = Number((data as any)?.response?.code || (data as any)?.response?.status || 0);
 
           if (data.response?.code === 0 || data.details === 'manifestLoadError') {
             toast.error("Playback blocked? Try disabling 'Tracking Prevention' or switching servers.", { duration: 5000, id: 'tracking-prevention' });
@@ -1188,6 +1406,22 @@ export function VideoPlayer({
 
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR && data.details && String(data.details).toLowerCase().includes('manifest') && !manifestFallbackRef.current) {
 
+            if ([403, 502, 503, 504].includes(responseCode)) {
+              const switchedProxy = await trySwitchProxyCandidate({ statusCode: responseCode });
+              if (switchedProxy) {
+                return;
+              }
+
+              if (responseCode === 403) {
+                setVideoError('Stream forbidden (403). Auto-switching server in 3 seconds...');
+              } else {
+                setVideoError('Manifest blocked or invalid. Auto-switching server in 3 seconds...');
+              }
+              if (onError) onError();
+              hls.stopLoad();
+              return;
+            }
+
             manifestFallbackRef.current = true;
 
             try {
@@ -1198,35 +1432,29 @@ export function VideoPlayer({
 
               const text = await res.text().catch(() => '');
 
+              if (res.status === 403) {
+                setVideoError('Stream forbidden (403). Auto-switching server in 3 seconds...');
+                if (onError) onError();
+                hls.stopLoad();
+                return;
+              }
+
 
 
               // Check if we got a valid manifest
 
-              if (!looksLikeHlsManifest(text)) {
+              if (!res.ok || !looksLikeHlsManifest(text)) {
 
                 console.warn('Manifest fallback returned invalid content');
 
-                const switchedProxy = await trySwitchProxyCandidate();
+                const switchedProxy = await trySwitchProxyCandidate({ statusCode: res.status });
                 if (switchedProxy) {
                   return;
                 }
 
-                if (manifestRetryRef.current < 2) {
-                  manifestRetryRef.current += 1;
-                  setVideoError(null);
-                  setIsBuffering(true);
-                  setTimeout(() => {
-                    try {
-                      hls.stopLoad();
-                      hls.startLoad();
-                    } catch {
-                      // noop
-                    }
-                  }, 250);
-                } else {
-                  setVideoError('Manifest blocked or invalid - switching server');
-                  if (onError) onError();
-                }
+                setVideoError('Manifest blocked or invalid. Auto-switching server in 3 seconds...');
+                if (onError) onError();
+                hls.stopLoad();
                 return;
 
               }
@@ -1240,6 +1468,11 @@ export function VideoPlayer({
                 return;
               }
 
+              setVideoError('Manifest fetch failed. Auto-switching server in 3 seconds...');
+              if (onError) onError();
+              hls.stopLoad();
+              return;
+
             }
 
           }
@@ -1247,33 +1480,34 @@ export function VideoPlayer({
 
 
           if (data.fatal) {
+            const isForbiddenResponse = responseCode === 403;
+
+            if (isForbiddenResponse) {
+              const switchedProxy = await trySwitchProxyCandidate({ statusCode: responseCode });
+              if (switchedProxy) {
+                retryCountRef.current = 0;
+                setRetryCount(0);
+                return;
+              }
+
+              setVideoError('Stream forbidden (403). Auto-switching server in 3 seconds...');
+              if (onError) onError();
+              hls.stopLoad();
+              return;
+            }
 
             // Surface manifest parsing problems explicitly so we can switch servers
 
             if (data.details && String(data.details).toLowerCase().includes('manifest')) {
 
-              const switchedProxy = await trySwitchProxyCandidate();
+              const switchedProxy = await trySwitchProxyCandidate({ statusCode: responseCode });
               if (switchedProxy) {
                 return;
               }
 
-              if (manifestRetryRef.current < 2) {
-                manifestRetryRef.current += 1;
-                setVideoError(null);
-                setIsBuffering(true);
-                hls.stopLoad();
-                setTimeout(() => {
-                  try {
-                    hls.startLoad();
-                  } catch {
-                    // noop
-                  }
-                }, 300);
-              } else {
-                setVideoError('Manifest blocked or invalid - switching server');
-                if (onError) onError();
-                hls.stopLoad();
-              }
+              setVideoError('Manifest blocked or invalid. Auto-switching server in 3 seconds...');
+              if (onError) onError();
+              hls.stopLoad();
               return;
 
             }
@@ -1298,14 +1532,14 @@ export function VideoPlayer({
 
                 } else {
 
-                  const switchedProxy = await trySwitchProxyCandidate();
+                  const switchedProxy = await trySwitchProxyCandidate({ statusCode: responseCode });
                   if (switchedProxy) {
                     retryCountRef.current = 0;
                     setRetryCount(0);
                     return;
                   }
 
-                  setVideoError("Network error - try another server");
+                  setVideoError("Network error. Auto-switching server in 3 seconds...");
 
                   if (onError) onError();
 
@@ -1395,7 +1629,9 @@ export function VideoPlayer({
 
 
 
-          videoRef.current?.play().catch(() => { });
+          if (settings.autoplay) {
+            videoRef.current?.play().catch(() => { });
+          }
 
         });
 
@@ -1483,6 +1719,19 @@ export function VideoPlayer({
 
         }
 
+        if (settings.autoplay) {
+          const playDirectSource = () => {
+            videoRef.current?.play().catch(() => { });
+            videoRef.current?.removeEventListener('loadedmetadata', playDirectSource);
+          };
+
+          if (videoRef.current.readyState >= 1) {
+            videoRef.current.play().catch(() => { });
+          } else {
+            videoRef.current.addEventListener('loadedmetadata', playDirectSource);
+          }
+        }
+
 
 
         // Also start periodic saver
@@ -1513,7 +1762,7 @@ export function VideoPlayer({
 
     },
 
-    [sourceKey, isOffline, playbackReferer, playbackUserAgent]
+    [sourceKey, isOffline, playbackReferer, playbackUserAgent, settings.autoplay]
 
   );
 
@@ -1644,7 +1893,7 @@ export function VideoPlayer({
     bufferingTimeoutRef.current = window.setTimeout(() => {
       const stalledMs = Date.now() - lastProgressAtRef.current;
       if (stalledMs >= 15000) {
-        setVideoError("Server timed out - switching server");
+        setVideoError("Server timed out. Auto-switching server in 3 seconds...");
         if (onError) onError();
       }
     }, 16000);
@@ -2270,9 +2519,11 @@ export function VideoPlayer({
             )}
 
             <p className="text-sm text-white/60">
-              {videoError.toLowerCase().includes('retrying')
-                ? 'Retrying automatically...'
-                : 'Try switching to a different server'}
+              {(videoError.toLowerCase().includes('auto-switching') || videoError.toLowerCase().includes('switching server'))
+                ? 'Auto-switching to the next server in 3 seconds...'
+                : videoError.toLowerCase().includes('retrying')
+                  ? 'Retrying automatically...'
+                  : 'Automatic server failover is enabled.'}
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 mt-2">
@@ -2281,6 +2532,13 @@ export function VideoPlayer({
 
                 onClick={() => {
 
+                  const now = Date.now();
+                  if (now < manualRetryLockUntilRef.current) return;
+                  manualRetryLockUntilRef.current = now + 2500;
+
+                  // Manual retry should cancel pending auto-failover and retry current server first.
+                  if (onRetryCurrentServer) onRetryCurrentServer();
+
                   retryCountRef.current = 0;
                   setRetryCount(0);
 
@@ -2288,13 +2546,14 @@ export function VideoPlayer({
 
                 }}
 
-                className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur-sm flex items-center justify-center gap-2 transition-all font-medium video-controls-btn"
+                className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm flex items-center justify-center gap-2 transition-all font-medium video-controls-btn"
+                disabled={isBuffering}
 
               >
 
                 <RefreshCw className="w-4 h-4" />
 
-                Retry
+                Retry Current Server
 
               </button>
 

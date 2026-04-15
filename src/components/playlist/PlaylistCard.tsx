@@ -93,7 +93,7 @@ export function PlaylistCard({
           {playlist.name}
         </h3>
         <p className="text-sm text-muted-foreground">
-          {playlist.items_count} {playlist.items_count === 1 ? 'anime' : 'anime'}
+          {playlist.items_count} {playlist.items_count === 1 ? 'item' : 'items'}
         </p>
       </Link>
 
@@ -144,7 +144,7 @@ export function PlaylistCardCompact({ playlist }: { playlist: Playlist }) {
           {playlist.name}
         </p>
         <p className="text-xs text-muted-foreground">
-          {playlist.items_count} anime
+          {playlist.items_count} {playlist.items_count === 1 ? 'item' : 'items'}
         </p>
       </div>
     </Link>

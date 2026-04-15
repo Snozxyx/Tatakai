@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: m3u8-streaming-proxy
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: ALLOWED_ORIGINS
+        value: http://localhost:3000,https://your-website.com

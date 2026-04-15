@@ -1,33 +1,34 @@
 import { getClientIdSync } from '@/hooks/useClientId';
 import { isApiCryptoEnabled, generateApiSignature } from '@/lib/apiCrypto';
-import { proxyManager } from '@/services/proxyManager.service';
 
-const DEFAULT_HIANIME_API_URL = "https://core.tatakai.me/api/v2/tatakai";
-const CONFIGURED_HIANIME_API_URL = import.meta.env.VITE_HIANIME_API_URL || DEFAULT_HIANIME_API_URL;
+const DEFAULT_API_BASE = "http://localhost:9000/api/v2";
+const BACKEND_ORIGIN = (import.meta.env.VITE_BACKEND_ORIGIN || '').replace(/\/$/, '');
+const CONFIGURED_API_BASE =
+  import.meta.env.VITE_API_BASE_URL ||
+  import.meta.env.VITE_HIANIME_API_URL ||
+  (BACKEND_ORIGIN ? `${BACKEND_ORIGIN}/api/v2` : DEFAULT_API_BASE);
 
-function normalizeTatakaiApiBase(url: string): string {
-  const trimmed = (url || '').trim().replace(/\/+$/, '');
-  if (!trimmed) return 'https://api.tatakai.me/api/v2/anime';
-  if (/^https?:\/\/[^/]+$/i.test(trimmed)) return `${trimmed}/api/v2/anime`;
-  if (/\/api\/v2\/anime$/i.test(trimmed)) return trimmed;
-  if (/\/api\/v1$/i.test(trimmed)) return `${trimmed.replace(/\/api\/v1$/i, '')}/api/v2/anime`;
-  if (/\/api\/v2$/i.test(trimmed)) return `${trimmed}/anime`;
-  if (/\/api$/i.test(trimmed)) return `${trimmed}/v2/anime`;
-  return trimmed;
-}
+// Remove /hianime or /anime from the end if present to get the clean base
+const CLEAN_API_BASE = CONFIGURED_API_BASE.replace(/\/+(hianime|anime|tatakai)$/i, '');
 
 const isMobileNative = typeof window !== 'undefined' &&
   (window as any).Capacitor?.isNativePlatform?.() || false;
 
-export const API_URL = import.meta.env.DEV && !isMobileNative
+// Unified exports derived from the single base
+export const API_URL = (import.meta.env.DEV && !isMobileNative)
   ? '/api/tatakai'
-  : CONFIGURED_HIANIME_API_URL;
+  : `${CLEAN_API_BASE}/hianime`;
 
-const _RAW_TATAKAI_API_URL = import.meta.env.VITE_TATAKAI_API_URL || "https://api.tatakai.me/api/v2/anime";
-const _NORMALIZED_TATAKAI_API_URL = normalizeTatakaiApiBase(_RAW_TATAKAI_API_URL);
 export const TATAKAI_API_URL = (import.meta.env.DEV && !isMobileNative)
   ? '/api/v2/anime'
-  : _NORMALIZED_TATAKAI_API_URL;
+  : `${CLEAN_API_BASE}/anime`;
+
+const CONFIGURED_MANGA_API_URL =
+  import.meta.env.VITE_MANGA_API_URL || `${CLEAN_API_BASE}/manga`;
+
+export const MANGA_API_URL = (import.meta.env.DEV && !isMobileNative)
+  ? '/api/v2/manga'
+  : CONFIGURED_MANGA_API_URL;
 
 const API_TIMEOUT = isMobileNative ? 15000 : 30000;
 
@@ -53,26 +54,52 @@ export function unwrapApiData<T>(payload: AnyEnvelope<T> | T): T {
   }
 
   if ((payload as ApiEnvelope<T>).success === true) {
-    return (payload as ApiEnvelope<T>).data;
+    if (!Object.prototype.hasOwnProperty.call(payload as any, 'data')) {
+      // Some endpoints return { success: true, ...payload } without wrapping in data.
+      return payload as T;
+    }
+
+    const data = (payload as ApiEnvelope<T>).data;
+    if (data && typeof data === 'object') {
+      const p = payload as any;
+      const ids: any = {};
+      if (p.anilistID) ids.anilistID = p.anilistID;
+      if (p.malID) ids.malID = p.malID;
+      if (p.anilist_id) ids.anilist_id = p.anilist_id;
+      if (p.mal_id) ids.mal_id = p.mal_id;
+      return { ...data, ...ids } as T;
+    }
+    return data;
   }
 
   if (typeof (payload as ProxyEnvelope<T>).status === "number") {
     const { status, data } = payload as ProxyEnvelope<T>;
-    if (status >= 200 && status < 300) return data;
+    if (status >= 200 && status < 300) {
+      if (data && typeof data === 'object') {
+        const p = payload as any;
+        const ids: any = {};
+        if (p.anilistID) ids.anilistID = p.anilistID;
+        if (p.malID) ids.malID = p.malID;
+        if (p.anilist_id) ids.anilist_id = p.anilist_id;
+        if (p.mal_id) ids.mal_id = p.mal_id;
+        return { ...data, ...ids } as T;
+      }
+      return data;
+    }
   }
 
   return payload as T;
 }
 
-export async function apiGet<T>(path: string, retries?: number): Promise<T> {
+export async function baseApiGet<T>(baseUrl: string, path: string, retries?: number): Promise<T> {
   const maxRetries = retries ?? (isMobileNative ? 2 : 3);
-  const url = `${API_URL}${path}`;
+  const url = `${baseUrl}${path}`;
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const isUsingLocalDevProxy = import.meta.env.DEV && API_URL.startsWith('/');
+  const isUsingLocalDevProxy = import.meta.env.DEV && baseUrl.startsWith('/');
 
-  const resolvedApiUrl = API_URL.startsWith('http')
-    ? API_URL
-    : (typeof window !== 'undefined' ? new URL(API_URL, window.location.origin).toString() : CONFIGURED_HIANIME_API_URL);
+  const resolvedApiUrl = baseUrl.startsWith('http')
+    ? baseUrl
+    : (typeof window !== 'undefined' ? new URL(baseUrl, window.location.origin).toString() : `${CLEAN_API_BASE}/hianime`);
 
   const apiOrigin = new URL(resolvedApiUrl).origin;
   const isLocalApiTarget = /^(localhost|127\.0\.0\.1)$/i.test(new URL(resolvedApiUrl).hostname);
@@ -171,27 +198,170 @@ export async function externalApiGet<T>(baseUrl: string, path: string, retries =
   throw lastError || new Error(`Failed to fetch from ${url}`);
 }
 
-export function getProxiedVideoUrl(videoUrl: string, referer?: string, userAgent?: string): string {
-  if (videoUrl.includes('/functions/v1/rapid-service')) return videoUrl;
-  if (videoUrl.includes('/hindiapi/proxy')) return videoUrl;
-  
-  const proxy = proxyManager.getOptimalProxy();
-  if (!proxy) {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    if (!supabaseUrl) return videoUrl;
-    const params = new URLSearchParams({ url: videoUrl, type: 'video' });
-    if (referer) params.set('referer', referer);
-    if (userAgent) params.set('userAgent', userAgent);
-    const apikey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    if (apikey) params.set('apikey', apikey);
-    return `${supabaseUrl}/functions/v1/rapid-service?${params.toString()}`;
+type VideoProxyOptions = {
+  preferProxyManager?: boolean;
+};
+
+const REMOTE_NODE_STREAM_PROXY = 'https://hoko.tatakai.me/api/v1/streamingProxy';
+const REMOTE_CF_STREAM_PROXY = 'https://moko.tatakai.me/api/v1/streamingProxy';
+const DEFAULT_STREAM_PROXY_PATH = '/api/v1/streamingProxy';
+const STREAM_PROXY_PASSWORD = String(
+  import.meta.env.VITE_STREAM_PROXY_PASSWORD || import.meta.env.VITE_PROXY_PASSWORD || ''
+).trim();
+const PROXY_CURSOR_STORAGE_KEY = 'tatakai.streamProxy.cursor';
+let proxyBaseRoundRobinIndex = -1;
+
+function isLoopbackProxyUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+  } catch {
+    return false;
+  }
+}
+
+function normalizeStreamProxyBase(value: string): string {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) return '';
+
+  try {
+    const parsed = new URL(trimmed);
+    const pathname = parsed.pathname.replace(/\/$/, '');
+    const isStreamingPath = /\/api\/(v1\/streamingproxy|v2\/hianime\/proxy\/m3u8-streaming-proxy|proxy\/m3u8-streaming-proxy)$/i.test(pathname);
+    if (isStreamingPath) {
+      parsed.pathname = pathname;
+      parsed.search = '';
+      return parsed.toString().replace(/\/$/, '');
+    }
+
+    if (!pathname || pathname === '/') {
+      parsed.pathname = DEFAULT_STREAM_PROXY_PATH;
+      parsed.search = '';
+      return parsed.toString().replace(/\/$/, '');
+    }
+
+    parsed.pathname = pathname;
+    parsed.search = '';
+    return parsed.toString().replace(/\/$/, '');
+  } catch {
+    return trimmed.replace(/\/$/, '');
+  }
+}
+
+function resolveStreamProxyBaseCandidates(): string[] {
+  const candidates: string[] = [];
+
+  const add = (value?: string) => {
+    const normalized = normalizeStreamProxyBase(String(value || ''));
+    if (!normalized || isLoopbackProxyUrl(normalized)) return;
+    if (!candidates.includes(normalized)) candidates.push(normalized);
+  };
+
+  const pool = String(import.meta.env.VITE_PROXY_POOL_URLS || '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  pool.forEach(add);
+  add(import.meta.env.VITE_PROXY_NODE_URL);
+  add(import.meta.env.VITE_PROXY_CF_URL);
+  add(import.meta.env.VITE_SINGLE_STREAM_PROXY_URL);
+  add(import.meta.env.VITE_STREAM_PROXY_URL);
+
+  add(REMOTE_NODE_STREAM_PROXY);
+  add(REMOTE_CF_STREAM_PROXY);
+
+  return candidates;
+}
+
+function resolveInitialProxyCursor(candidatesLength: number): number {
+  if (proxyBaseRoundRobinIndex >= 0) {
+    return proxyBaseRoundRobinIndex % Math.max(1, candidatesLength);
   }
 
-  const params = new URLSearchParams({ url: videoUrl });
+  if (typeof window !== 'undefined') {
+    const savedCursorRaw = window.sessionStorage.getItem(PROXY_CURSOR_STORAGE_KEY);
+    const savedCursor = Number(savedCursorRaw);
+    if (Number.isInteger(savedCursor) && savedCursor >= 0) {
+      proxyBaseRoundRobinIndex = savedCursor % Math.max(1, candidatesLength);
+      return proxyBaseRoundRobinIndex;
+    }
+  }
+
+  proxyBaseRoundRobinIndex = Math.floor(Math.random() * Math.max(1, candidatesLength));
+  return proxyBaseRoundRobinIndex;
+}
+
+function persistNextProxyCursor(value: number) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.setItem(PROXY_CURSOR_STORAGE_KEY, String(value));
+  } catch {
+    // Ignore storage issues (private mode, quota, etc.).
+  }
+}
+
+function resolveSingleStreamProxyBase(): string {
+  const candidates = resolveStreamProxyBaseCandidates();
+  if (candidates.length === 0) {
+    return REMOTE_NODE_STREAM_PROXY || DEFAULT_STREAM_PROXY_PATH;
+  }
+
+  const currentCursor = resolveInitialProxyCursor(candidates.length);
+  const selected = candidates[currentCursor % candidates.length];
+  proxyBaseRoundRobinIndex = (currentCursor + 1) % candidates.length;
+  persistNextProxyCursor(proxyBaseRoundRobinIndex);
+  return selected;
+}
+
+function buildSingleProxyUrl(
+  upstreamUrl: string,
+  type: 'video' | 'subtitle',
+  referer?: string,
+  userAgent?: string
+): string {
+  const proxyBaseUrl = resolveSingleStreamProxyBase();
+  const params = new URLSearchParams({ url: upstreamUrl, type });
   if (referer) params.set('referer', referer);
   if (userAgent) params.set('userAgent', userAgent);
-  
-  return `${proxy.url}${proxy.url.includes('?') ? '&' : '?'}${params.toString()}`;
+  if (STREAM_PROXY_PASSWORD) params.set('password', STREAM_PROXY_PASSWORD);
+  return `${proxyBaseUrl}${proxyBaseUrl.includes('?') ? '&' : '?'}${params.toString()}`;
+}
+
+function extractUpstreamFromProxyUrl(maybeProxyUrl: string): string | null {
+  if (!maybeProxyUrl) return null;
+  if (!/\/api\/(v1\/streamingproxy|v2\/hianime\/proxy\/m3u8-streaming-proxy|proxy\/m3u8-streaming-proxy)/i.test(maybeProxyUrl)) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(
+      maybeProxyUrl,
+      typeof window !== 'undefined' ? window.location.origin : 'http://localhost'
+    );
+    return parsed.searchParams.get('url');
+  } catch {
+    return null;
+  }
+}
+
+export function getProxiedVideoUrl(
+  videoUrl: string,
+  referer?: string,
+  userAgent?: string,
+  _options: VideoProxyOptions = {}
+): string {
+  if (videoUrl.includes('/functions/v1/rapid-service')) return videoUrl;
+  if (videoUrl.includes('/hindiapi/proxy')) return videoUrl;
+
+  const upstreamFromExistingProxy = extractUpstreamFromProxyUrl(videoUrl);
+  if (upstreamFromExistingProxy) {
+    return buildSingleProxyUrl(upstreamFromExistingProxy, 'video', referer, userAgent);
+  }
+
+  if (!videoUrl.startsWith('http')) return videoUrl;
+
+  return buildSingleProxyUrl(videoUrl, 'video', referer, userAgent);
 }
 
 export function getProxiedImageUrl(imageUrl: string): string {
@@ -199,6 +369,21 @@ export function getProxiedImageUrl(imageUrl: string): string {
   let trimmed = imageUrl.trim();
   if (!trimmed.startsWith('http')) return trimmed;
   if (trimmed.includes('/functions/v1/rapid-service')) return trimmed;
+
+  // Manga provider image endpoints are already backend-proxied.
+  // Re-wrapping them via rapid-service breaks URLs (especially localhost sources).
+  try {
+    const parsed = new URL(trimmed);
+    const pathname = parsed.pathname.toLowerCase();
+    const isMangaProviderImageProxy =
+      /^\/api\/v\d+\/manga\/(?:adult\/)?[^/]+\/image\//.test(pathname) ||
+      /^\/manga\/(?:adult\/)?[^/]+\/image\//.test(pathname);
+
+    if (isMangaProviderImageProxy) return trimmed;
+  } catch {
+    // Ignore URL parse failures and fall back to default behavior.
+  }
+
   if (trimmed.includes('s4.anilist.co') || trimmed.includes('anilist.co/file/anilistcdn')) {
     trimmed = trimmed.replace('/cover/medium/', '/cover/large/').replace(/\/banner\/(small|medium)\//, '/banner/large/');
   }
@@ -213,20 +398,18 @@ export function getProxiedImageUrl(imageUrl: string): string {
 export function getProxiedSubtitleUrl(subtitleUrl: string | undefined, referer?: string): string {
   if (!subtitleUrl || typeof subtitleUrl !== 'string') return '';
   if (subtitleUrl.includes('/functions/v1/rapid-service')) return subtitleUrl;
-  if (subtitleUrl.includes('/api/proxy/m3u8-streaming-proxy')) return subtitleUrl;
-  if (!subtitleUrl.startsWith('http')) return subtitleUrl;
-
-  const params = new URLSearchParams({ url: subtitleUrl, type: 'subtitle' });
-  if (referer) params.set('referer', referer);
-
-  const proxy = proxyManager.getOptimalProxy();
-  if (proxy?.url) {
-    return `${proxy.url}${proxy.url.includes('?') ? '&' : '?'}${params.toString()}`;
+  const upstreamFromExistingProxy = extractUpstreamFromProxyUrl(subtitleUrl);
+  if (upstreamFromExistingProxy) {
+    return buildSingleProxyUrl(upstreamFromExistingProxy, 'subtitle', referer);
   }
+  if (!subtitleUrl.startsWith('http')) return subtitleUrl;
+  return buildSingleProxyUrl(subtitleUrl, 'subtitle', referer);
+}
 
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  if (!supabaseUrl) return subtitleUrl;
-  const apikey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  if (apikey) params.set('apikey', apikey);
-  return `${supabaseUrl}/functions/v1/rapid-service?${params.toString()}`;
+export function apiGet<T>(path: string, retries?: number): Promise<T> {
+  return baseApiGet<T>(API_URL, path, retries);
+}
+
+export function mangaGet<T>(path: string, retries?: number): Promise<T> {
+  return baseApiGet<T>(MANGA_API_URL, path, retries);
 }

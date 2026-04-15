@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { ALL_GENRES } from "@/lib/externalIntegrations";
 
 interface GenreCloudProps {
   genres: string[];
@@ -6,9 +7,10 @@ interface GenreCloudProps {
 
 export function GenreCloud({ genres }: GenreCloudProps) {
   const navigate = useNavigate();
+  const mergedGenres = Array.from(new Set([...(genres || []), ...ALL_GENRES])).slice(0, 24);
 
   const handleGenreClick = (genre: string) => {
-    navigate(`/genre/${genre.toLowerCase()}`);
+    navigate(`/genre/${genre.toLowerCase().replace(/\s+/g, '-')}`);
   };
 
   return (
@@ -17,7 +19,7 @@ export function GenreCloud({ genres }: GenreCloudProps) {
         Explore Genres
       </h3>
       <div className="flex flex-wrap gap-4">
-        {genres.slice(0, 12).map((genre) => (
+        {mergedGenres.map((genre) => (
           <button
             key={genre}
             onClick={() => handleGenreClick(genre)}

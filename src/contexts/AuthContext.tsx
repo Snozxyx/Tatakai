@@ -29,6 +29,8 @@ export interface Profile {
   is_premium?: boolean;
   role?: string;
   preferred_title_language?: 'romaji' | 'english' | 'native';
+  preferred_manga_language?: 'auto' | 'jp' | 'en' | 'kr' | 'zh';
+  app_settings?: Record<string, any> | null;
 }
 
 interface AuthContextType {

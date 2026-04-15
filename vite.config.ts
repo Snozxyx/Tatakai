@@ -1,20 +1,26 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import packageJson from "./package.json";
 
-// Force development environment for esbuild to properly bundle JSX dev runtime
-if (process.env.NODE_ENV !== 'production') {
-  process.env.NODE_ENV = 'development';
-}
-
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+
+  // Keep React dev JSX runtime consistent; production env strips jsxDEV.
+  if (mode !== "production") {
+    process.env.NODE_ENV = "development";
+  }
+
   const isWebMode = mode === 'web';
-  const isElectronBuild = process.env.ELECTRON_BUILD === 'true';
-  const hmrClientPort = process.env.VITE_HMR_CLIENT_PORT
-    ? Number(process.env.VITE_HMR_CLIENT_PORT)
+  const isElectronBuild = (process.env.ELECTRON_BUILD || env.ELECTRON_BUILD) === 'true';
+  const hmrClientPort = env.VITE_HMR_CLIENT_PORT
+    ? Number(env.VITE_HMR_CLIENT_PORT)
     : undefined;
+  const backendOrigin =
+    env.VITE_BACKEND_ORIGIN ||
+    env.VITE_LOCAL_HIANIME_ORIGIN ||
+    'https://api.tatakai.me';
 
   return {
     plugins: [react()],
@@ -26,7 +32,7 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       // Only generate sourcemaps if explicitly enabled (for debugging)
-      sourcemap: mode === 'production' && process.env.ENABLE_SOURCEMAPS === 'true',
+      sourcemap: mode === 'production' && ((process.env.ENABLE_SOURCEMAPS || env.ENABLE_SOURCEMAPS) === 'true'),
       minify: 'terser',
       terserOptions: {
         compress: {
@@ -59,38 +65,58 @@ export default defineConfig(({ mode }) => {
         ...(hmrClientPort ? { clientPort: hmrClientPort } : {}),
       },
       proxy: {
+        '/api/v2/anime/hianime': {
+          target: backendOrigin,
+          changeOrigin: true,
+          secure: false,
+        },
+        '/api/v2/hianime': {
+          target: backendOrigin,
+          changeOrigin: true,
+          secure: false,
+        },
         // Preferred dev proxy for provider calls
         '/api/v2/anime': {
-          target: process.env.VITE_LOCAL_HIANIME_ORIGIN || 'https://api.tatakai.me',
+          target: backendOrigin,
+          changeOrigin: true,
+          secure: false,
+        },
+        '/api/v2/manga': {
+          target: backendOrigin,
           changeOrigin: true,
           secure: false,
         },
         // Dev proxy for all provider calls → local TatakaiCore (localhost:9000)
         '/api/providers': {
-          target: process.env.VITE_LOCAL_HIANIME_ORIGIN || 'https://api.tatakai.me',
+          target: backendOrigin,
           changeOrigin: true,
           secure: false,
           rewrite: (p) => p.replace(/^\/api\/providers/, ''),
         },
         // Same-origin dev proxy to local HiAnime API (prevents browser CORS errors)
         '/api/tatakai': {
-          target: process.env.VITE_LOCAL_HIANIME_ORIGIN || 'https://api.tatakai.me',
+          target: backendOrigin,
           changeOrigin: true,
           secure: false,
           rewrite: (p) => p.replace(/^\/api\/tatakai/, '/api/v2/hianime'),
         },
         '/api/stream': {
-          target: process.env.VITE_LOCAL_HIANIME_ORIGIN || 'https://api.tatakai.me',
+          target: backendOrigin,
           changeOrigin: true,
           secure: false,
         },
         '/api/servers': {
-          target: process.env.VITE_LOCAL_HIANIME_ORIGIN || 'https://api.tatakai.me',
+          target: backendOrigin,
           changeOrigin: true,
           secure: false,
         },
         '/api/proxy': {
-          target: process.env.VITE_LOCAL_HIANIME_ORIGIN || 'https://api.tatakai.me',
+          target: backendOrigin,
+          changeOrigin: true,
+          secure: false,
+        },
+        '/api/v1/streamingProxy': {
+          target: backendOrigin,
           changeOrigin: true,
           secure: false,
         },

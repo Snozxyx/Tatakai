@@ -1,14 +1,57 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
 import { AnimeCard, getProxiedImageUrl, getHighQualityPoster } from '@/lib/api';
 import { useInfiniteHomeSections, type HomeSection, type SectionLayout } from '@/hooks/useInfiniteHomeSections';
+import { useHomeData } from '@/hooks/useAnimeData';
 import { Play, Star, Loader2, ChevronRight, Sparkles, LayoutGrid, Heart, Flame, Zap, ArrowRight, ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AnimeCardWithPreview } from './AnimeCardWithPreview';
 import { useIsMobile } from '@/hooks/use-mobile';
+
+const shouldEnablePreview = (anime: AnimeCard): boolean => {
+  return !/^(mal|anilist)-/i.test(String(anime?.id || '').trim());
+};
+
+function MobileAnimeCard({ anime }: { anime: AnimeCard }) {
+  return (
+    <div className="group overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-lg">
+      <div className="relative aspect-[3/4]">
+        <img
+          src={getHighQualityPoster(anime.poster, anime.anilistId)}
+          alt={anime.name}
+          loading="eager"
+          className="h-full w-full object-cover"
+          onError={(event) => {
+            const image = event.currentTarget;
+            if (image.dataset.fallbackStage === 'placeholder') return;
+            if (image.dataset.fallbackStage !== 'direct' && anime.poster) {
+              image.dataset.fallbackStage = 'direct';
+              image.src = anime.poster;
+              return;
+            }
+            image.dataset.fallbackStage = 'placeholder';
+            image.src = '/placeholder.svg';
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/30 to-transparent" />
+        <div className="absolute bottom-0 left-0 right-0 p-3">
+          <h4 className="text-sm font-bold leading-tight text-white line-clamp-2">
+            {anime.name}
+          </h4>
+          <div className="mt-1 flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+            <span className="rounded-md bg-background/60 px-2 py-0.5">SUB {anime.episodes?.sub || 0}</span>
+            {(anime.episodes?.dub || 0) > 0 && (
+              <span className="rounded-md bg-background/60 px-2 py-0.5">DUB {anime.episodes?.dub || 0}</span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function SectionSkeleton({ layout }: { layout: SectionLayout }) {
   return (
@@ -61,7 +104,7 @@ function GridLayout({ animes, isMobile }: { animes: AnimeCard[]; isMobile: boole
           animate={isMobile ? {} : { opacity: 1, scale: 1 }}
           transition={{ delay: i * delayStep, duration }}
         >
-          <AnimeCardWithPreview anime={anime} />
+          {isMobile ? <MobileAnimeCard anime={anime} /> : <AnimeCardWithPreview anime={anime} showPreview={shouldEnablePreview(anime)} />}
         </motion.div>
       ))}
     </div>
@@ -83,7 +126,7 @@ function CarouselLayout({ animes, isMobile }: { animes: AnimeCard[]; isMobile: b
           transition={{ delay: i * delayStep, duration }}
           className="flex-shrink-0 w-40 md:w-56 snap-start"
         >
-          <AnimeCardWithPreview anime={anime} />
+          {isMobile ? <MobileAnimeCard anime={anime} /> : <AnimeCardWithPreview anime={anime} showPreview={shouldEnablePreview(anime)} />}
         </motion.div>
       ))}
     </div>
@@ -154,7 +197,7 @@ function FeaturedLayout({ animes, isMobile }: { animes: AnimeCard[]; isMobile: b
             animate={isMobile ? {} : { opacity: 1, y: 0 }}
             transition={{ delay: 0.1 + i * (isMobile ? 0.03 : 0.05), duration }}
           >
-            <AnimeCardWithPreview anime={anime} />
+            {isMobile ? <MobileAnimeCard anime={anime} /> : <AnimeCardWithPreview anime={anime} showPreview={shouldEnablePreview(anime)} />}
           </motion.div>
         ))}
       </div>
@@ -176,7 +219,7 @@ function CompactLayout({ animes, isMobile }: { animes: AnimeCard[]; isMobile: bo
           animate={isMobile ? {} : { opacity: 1, y: 0 }}
           transition={{ delay: i * delayStep, duration }}
         >
-          <AnimeCardWithPreview anime={anime} />
+          {isMobile ? <MobileAnimeCard anime={anime} /> : <AnimeCardWithPreview anime={anime} showPreview={shouldEnablePreview(anime)} />}
         </motion.div>
       ))}
     </div>
@@ -204,7 +247,7 @@ function MasonryLayout({ animes, isMobile }: { animes: AnimeCard[]; isMobile: bo
               isLarge && 'row-span-2 col-span-1 md:col-span-2'
             )}
           >
-            <AnimeCardWithPreview anime={anime} />
+            {isMobile ? <MobileAnimeCard anime={anime} /> : <AnimeCardWithPreview anime={anime} showPreview={shouldEnablePreview(anime)} />}
           </motion.div>
         );
       })}
@@ -234,6 +277,7 @@ function HomeSection({ section }: { section: HomeSection }) {
   const navigate = useNavigate();
   const LayoutComponent = getLayoutComponent(section.layout);
   const IconComponent = section.icon;
+  const hasGenreRoute = String(section.genre || '').trim().length > 0;
 
   if (section.animes.length === 0) return null;
 
@@ -257,7 +301,12 @@ function HomeSection({ section }: { section: HomeSection }) {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate(`/genre/${section.genre}`)}
+          onClick={() => {
+            if (hasGenreRoute) {
+              navigate(`/genre/${section.genre}`);
+            }
+          }}
+          disabled={!hasGenreRoute}
           className="gap-2 px-5 py-5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 text-muted-foreground hover:text-white transition-all font-bold"
         >
           View All
@@ -274,6 +323,7 @@ function HomeSection({ section }: { section: HomeSection }) {
 export function InfiniteHomeSections() {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
+  const { data: homeFallbackData } = useHomeData();
   const {
     data,
     fetchNextPage,
@@ -284,6 +334,8 @@ export function InfiniteHomeSections() {
   } = useInfiniteHomeSections();
 
   const loadMoreRef = useRef<HTMLDivElement>(null);
+  const bootstrapAttemptRef = useRef(0);
+  const hasQueryError = !!error;
 
   // Intersection Observer for infinite scroll
   const handleObserver = useCallback((entries: IntersectionObserverEntry[]) => {
@@ -294,6 +346,8 @@ export function InfiniteHomeSections() {
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') return;
+
     const observer = new IntersectionObserver(handleObserver, {
       root: null,
       rootMargin: isMobile ? '400px' : '800px', // Preload sooner for smoother experience
@@ -305,13 +359,50 @@ export function InfiniteHomeSections() {
     }
 
     return () => observer.disconnect();
-  }, [handleObserver]);
-
-  if (error) {
-    return null;
-  }
+  }, [handleObserver, isMobile]);
 
   const allSections = data?.pages.flatMap(page => page.sections) || [];
+  const mobileFallbackSections = useMemo<HomeSection[]>(() => {
+    if (!isMobile || !homeFallbackData) return [];
+
+    const sections: HomeSection[] = [];
+
+    if (Array.isArray(homeFallbackData.mostPopularAnimes) && homeFallbackData.mostPopularAnimes.length > 0) {
+      sections.push({
+        id: 'mobile-fallback-popular',
+        title: 'Popular Picks',
+        genre: '',
+        layout: 'grid',
+        animes: homeFallbackData.mostPopularAnimes.slice(0, 8),
+      });
+    }
+
+    if (Array.isArray(homeFallbackData.latestEpisodeAnimes) && homeFallbackData.latestEpisodeAnimes.length > 0) {
+      sections.push({
+        id: 'mobile-fallback-latest',
+        title: 'Latest Episodes',
+        genre: '',
+        layout: 'compact',
+        animes: homeFallbackData.latestEpisodeAnimes.slice(0, 9),
+      });
+    }
+
+    return sections;
+  }, [homeFallbackData, isMobile]);
+  const visibleSections = allSections.length > 0 ? allSections : mobileFallbackSections;
+
+  useEffect(() => {
+    if (hasQueryError) return;
+    if (isLoading || isFetchingNextPage) return;
+    if (!hasNextPage) return;
+    if (allSections.length > 0) return;
+
+    const maxBootstrapAttempts = isMobile ? 4 : 2;
+    if (bootstrapAttemptRef.current >= maxBootstrapAttempts) return;
+    bootstrapAttemptRef.current += 1;
+
+    void fetchNextPage();
+  }, [allSections.length, fetchNextPage, hasNextPage, hasQueryError, isFetchingNextPage, isLoading, isMobile]);
 
   return (
     <div className="mt-24">
@@ -346,8 +437,29 @@ export function InfiniteHomeSections() {
         </div>
       )}
 
+      {hasQueryError && (
+        <div className="mb-16 px-2">
+          <GlassPanel className="p-8 text-center border-red-500/30 bg-red-500/10">
+            <p className="text-lg font-bold text-foreground mb-2">Unable to load discover sections</p>
+            <p className="text-sm text-muted-foreground mb-5">
+              The request failed on this network. Tap retry to fetch a fresh batch.
+            </p>
+            <Button
+              onClick={() => {
+                bootstrapAttemptRef.current = 0;
+                void fetchNextPage();
+              }}
+              variant="outline"
+              className="rounded-2xl border-red-400/40 bg-red-500/10 px-6 py-2 text-xs font-black uppercase tracking-widest hover:bg-red-500/20"
+            >
+              Retry Discover Feed
+            </Button>
+          </GlassPanel>
+        </div>
+      )}
+
       {/* Rendered sections */}
-      {allSections.map((section, index) => (
+      {visibleSections.map((section, index) => (
         <div key={section.id}>
           <HomeSection section={section} />
           {/* Insert dynamic banner every 3 sections */}
@@ -382,6 +494,28 @@ export function InfiniteHomeSections() {
         </div>
       ))}
 
+      {!hasQueryError && !isLoading && !isFetchingNextPage && visibleSections.length === 0 && (
+        <div className="mb-16 px-2">
+          <GlassPanel className="p-8 text-center border-white/10 bg-white/5">
+            <p className="text-lg font-bold text-foreground mb-2">Discover feed is still loading</p>
+            <p className="text-sm text-muted-foreground mb-5">
+              Your connection or upstream providers delayed this batch. Tap retry to load more sections.
+            </p>
+            <Button
+              onClick={() => {
+                if (!isFetchingNextPage && hasNextPage) {
+                  void fetchNextPage();
+                }
+              }}
+              variant="outline"
+              className="rounded-2xl border-white/15 bg-white/5 px-6 py-2 text-xs font-black uppercase tracking-widest hover:bg-white/10"
+            >
+              Retry Discover Feed
+            </Button>
+          </GlassPanel>
+        </div>
+      )}
+
       {/* Load more trigger */}
       <div ref={loadMoreRef} className="py-20 flex flex-col items-center justify-center gap-6">
         {isFetchingNextPage ? (
@@ -396,12 +530,18 @@ export function InfiniteHomeSections() {
             </span>
           </>
         ) : hasNextPage ? (
-          <div className="w-1.5 h-1.5 rounded-full bg-white/10 animate-bounce" />
+          <Button
+            onClick={() => fetchNextPage()}
+            variant="outline"
+            className="rounded-2xl border-white/15 bg-white/5 px-6 py-2 text-xs font-black uppercase tracking-widest hover:bg-white/10"
+          >
+            Load More Sections
+          </Button>
         ) : null}
       </div>
 
       {/* End message */}
-      {!hasNextPage && allSections.length > 0 && (
+      {!hasNextPage && visibleSections.length > 0 && (
         <div className="relative py-24 text-center group">
           <div className="absolute top-1/2 left-0 right-0 h-px bg-white/5" />
           <div className="relative inline-block px-12 py-3 bg-card/40 backdrop-blur-xl border border-white/5 rounded-full overflow-hidden">

@@ -9,6 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 
 import { fetchEpisodes, fetchStreamingSources } from "@/lib/api";
+import { buildPreferredAnimeRouteId } from "@/lib/animeIdMapping";
 
 import Hls from "hls.js";
 
@@ -46,11 +47,22 @@ export function AnimeCardWithPreview({ anime, showPreview = true, disableClick =
 
   const [posterIndex, setPosterIndex] = useState(0);
 
+  const routeAnimeId = buildPreferredAnimeRouteId({
+    id: anime.id,
+    name: anime.name,
+    malId: anime.malId,
+    malID: (anime as any)?.malID,
+    mal_id: (anime as any)?.mal_id,
+    anilistId: anime.anilistId,
+    anilistID: (anime as any)?.anilistID,
+    anilist_id: (anime as any)?.anilist_id,
+  });
+
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const hlsRef = useRef<Hls | null>(null);
 
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 
 
@@ -75,12 +87,11 @@ export function AnimeCardWithPreview({ anime, showPreview = true, disableClick =
 
 
     return [
-
-      getHighQualityPoster(directPoster, anime.anilistId),
-
       directLargeAniList,
 
       directPoster,
+
+      getHighQualityPoster(directPoster, anime.anilistId),
 
       '/placeholder.svg',
 
@@ -154,25 +165,58 @@ export function AnimeCardWithPreview({ anime, showPreview = true, disableClick =
 
     if (previewUrl || previewError) return;
 
+    if (!routeAnimeId) {
+      setPreviewError(true);
+      return;
+    }
+
 
 
     setIsLoadingPreview(true);
 
     try {
-
-      const episodes = await fetchEpisodes(anime.id);
+      const episodes = await fetchEpisodes(routeAnimeId, {
+        preferDirect: true,
+        timeoutMs: 4200,
+        skipProxyFallback: true,
+      });
 
       if (episodes?.episodes?.length > 0) {
 
         const firstEpisode = episodes.episodes[0];
+        const previewEpisodeId = String(firstEpisode?.episodeId || "").includes("?ep=")
+          ? String(firstEpisode?.episodeId || "")
+          : `${firstEpisode?.episodeId}?ep=${firstEpisode?.number || 1}`;
 
-        const sources = await fetchStreamingSources(firstEpisode.episodeId, "hd-2", "sub");
+        let sources: Awaited<ReturnType<typeof fetchStreamingSources>> | null = null;
+        const previewServers = ["justanime", "hd-1", "hd-2", "hd-3"];
+
+        for (const server of previewServers) {
+          try {
+            const candidate = await fetchStreamingSources(previewEpisodeId, server, "sub", {
+              timeoutMs: 4500,
+              animeName: anime.name,
+              anilistId: anime.anilistId,
+            });
+            if (candidate?.sources?.length) {
+              sources = candidate;
+              break;
+            }
+          } catch {
+            // Try next preview server.
+          }
+        }
 
         if (sources?.sources?.length > 0) {
 
           const source = sources.sources[0];
 
-          const proxiedUrl = getProxiedVideoUrl(source.url, sources.headers?.Referer);
+          const proxiedUrl = getProxiedVideoUrl(
+            source.url,
+            sources.headers?.Referer,
+            sources.headers?.['User-Agent'],
+            { preferProxyManager: true }
+          );
 
           setPreviewUrl(proxiedUrl);
 
@@ -282,7 +326,7 @@ export function AnimeCardWithPreview({ anime, showPreview = true, disableClick =
 
     } catch (error) {
 
-      console.log("Preview not available for:", anime.id);
+      console.log("Preview not available for:", routeAnimeId);
 
       setPreviewError(true);
 
@@ -292,7 +336,7 @@ export function AnimeCardWithPreview({ anime, showPreview = true, disableClick =
 
     }
 
-  }, [anime.id, previewUrl, previewError]);
+  }, [routeAnimeId, previewUrl, previewError]);
 
 
 
@@ -322,7 +366,7 @@ export function AnimeCardWithPreview({ anime, showPreview = true, disableClick =
 
 
 
-    hoverTimeoutRef.current = setTimeout(loadPreview, 800);
+    hoverTimeoutRef.current = setTimeout(loadPreview, 220);
 
 
 
@@ -379,7 +423,12 @@ export function AnimeCardWithPreview({ anime, showPreview = true, disableClick =
       className="group cursor-pointer overflow-hidden rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500"
 
       onClick={() => {
-        if (!disableClick) navigate(`/anime/${anime.id}`);
+        if (disableClick) return;
+        if (routeAnimeId) {
+          navigate(`/anime/${routeAnimeId}`);
+          return;
+        }
+        navigate(`/search?q=${encodeURIComponent(anime.name)}`);
       }}
 
       onMouseEnter={() => setIsHovering(true)}

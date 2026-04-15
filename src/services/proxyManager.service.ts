@@ -21,6 +21,27 @@ function normalizeUrl(url: string | undefined | null): string | null {
   return trimmed.replace(/\/$/, '');
 }
 
+function isLoopbackProxyUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+  } catch {
+    return false;
+  }
+}
+
+const DEFAULT_STREAM_PROXY_PATH = '/api/v1/streamingProxy';
+const DEFAULT_NODE_PROXY_LOADER = 'https://hoko.tatakai.me/api/v1/streamingProxy';
+const DEFAULT_CF_PROXY_LOADER = 'https://moko.tatakai.me/api/v1/streamingProxy';
+const LEGACY_STREAM_PROXY_PATHS = [
+  '/api/v2/hianime/proxy/m3u8-streaming-proxy',
+  '/api/proxy/m3u8-streaming-proxy',
+];
+
+const STREAM_PROXY_PASSWORD = String(
+  import.meta.env.VITE_STREAM_PROXY_PASSWORD || import.meta.env.VITE_PROXY_PASSWORD || ''
+).trim();
+
 function createNode(id: string, url: string, type: ProxyNode['type'], weight: number): ProxyNode {
   return {
     id,
@@ -36,13 +57,18 @@ function createNode(id: string, url: string, type: ProxyNode['type'], weight: nu
 
 function buildProxyPool(): ProxyNode[] {
   const fromTypedEnv: ProxyNode[] = [];
-  const cfUrl = normalizeUrl(import.meta.env.VITE_PROXY_CF_URL);
-  const nodeUrl = normalizeUrl(import.meta.env.VITE_PROXY_NODE_URL);
+  const cfUrl = normalizeUrl(import.meta.env.VITE_PROXY_CF_URL) || DEFAULT_CF_PROXY_LOADER;
+  const nodeUrl = normalizeUrl(import.meta.env.VITE_PROXY_NODE_URL) || DEFAULT_NODE_PROXY_LOADER;
   const bunUrl = normalizeUrl(import.meta.env.VITE_PROXY_BUN_URL);
+  const configuredDevProxyUrl = String(import.meta.env.VITE_PROXY_DEV_URL || '').trim();
+  const devUrl = isLoopbackProxyUrl(configuredDevProxyUrl)
+    ? null
+    : normalizeUrl(configuredDevProxyUrl);
 
   if (cfUrl) fromTypedEnv.push(createNode('proxy-cf-1', cfUrl, 'cf', 10));
   if (nodeUrl) fromTypedEnv.push(createNode('proxy-node-1', nodeUrl, 'nodejs', 6));
   if (bunUrl) fromTypedEnv.push(createNode('proxy-bun-1', bunUrl, 'bun', 6));
+  if (devUrl) fromTypedEnv.push(createNode('proxy-dev-1', devUrl, 'nodejs', 9));
 
   const fromPoolEnvRaw = (import.meta.env.VITE_PROXY_POOL_URLS || '')
     .split(',')
@@ -52,7 +78,7 @@ function buildProxyPool(): ProxyNode[] {
   const dynamicPool = fromPoolEnvRaw.map((url, index) => {
     const lower = url.toLowerCase();
     const inferredType: ProxyNode['type'] =
-      lower.includes('worker') || lower.includes('cloudflare') || lower.includes('kira')
+      lower.includes('worker') || lower.includes('cloudflare') || lower.includes('kira') || lower.includes('moko')
         ? 'cf'
         : lower.includes('bun')
           ? 'bun'
@@ -70,8 +96,12 @@ function buildProxyPool(): ProxyNode[] {
 
   // Final fallback to local proxy endpoint so the balancer still works in local/dev setups.
   if (deduped.size === 0 && typeof window !== 'undefined') {
-    const localProxy = `${window.location.origin}/api/proxy/m3u8-streaming-proxy`;
-    deduped.set(localProxy, createNode('proxy-local-1', localProxy, 'nodejs', 10));
+    const localProxyPrimary = `${window.location.origin}${DEFAULT_STREAM_PROXY_PATH}`;
+    const localProxyLegacy = `${window.location.origin}${LEGACY_STREAM_PROXY_PATHS[0]}`;
+    const localProxyLegacyFallback = `${window.location.origin}${LEGACY_STREAM_PROXY_PATHS[1]}`;
+    deduped.set(localProxyPrimary, createNode('proxy-local-1', localProxyPrimary, 'nodejs', 10));
+    deduped.set(localProxyLegacy, createNode('proxy-local-2', localProxyLegacy, 'nodejs', 8));
+    deduped.set(localProxyLegacyFallback, createNode('proxy-local-3', localProxyLegacyFallback, 'nodejs', 7));
   }
 
   return Array.from(deduped.values());
@@ -177,6 +207,7 @@ class ProxyManager {
         // E.g., https://cf-proxy.com/?url=xyz&referer=abc
         const proxyParams = new URLSearchParams({ url: targetUrl, type: proxyType });
         if (referer) proxyParams.set('referer', referer);
+        if (STREAM_PROXY_PASSWORD) proxyParams.set('password', STREAM_PROXY_PASSWORD);
         fetchUrl = `${proxy.url}?${proxyParams.toString()}`;
 
         const controller = new AbortController();

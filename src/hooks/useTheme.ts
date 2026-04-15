@@ -1,4 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  readGuestSettingsFromCookie,
+  readProfileAppSettings,
+  saveAccountSettingsPatch,
+  writeGuestSettingsCookie,
+} from '@/lib/appSettingsPersistence';
 
 export type Theme =
   | 'midnight'
@@ -24,6 +31,7 @@ export type Theme =
   | 'vampire'
   | 'matcha-light'
   | 'ocean-breeze'
+  | 'brutalist-concrete'
   | 'ultra-lite'
   | 'lite'
   | 'amoled';
@@ -506,6 +514,30 @@ export const THEME_COLORS: Record<Theme, ThemeColors> = {
     sidebarBorder: '200 20% 90%',
     isLight: true,
   },
+  'brutalist-concrete': {
+    primary: '0 0% 5%',
+    primaryForeground: '0 0% 98%',
+    secondary: '0 0% 95%',
+    secondaryForeground: '0 0% 8%',
+    accent: '0 100% 47%',
+    background: '0 0% 94%',
+    foreground: '0 0% 4%',
+    card: '0 0% 100%',
+    cardForeground: '0 0% 4%',
+    muted: '0 0% 88%',
+    mutedForeground: '0 0% 18%',
+    border: '0 0% 4%',
+    glass: '0 0% 100%',
+    glowPrimary: '0 0% 4%',
+    glowSecondary: '0 100% 47%',
+    surface: '0 0% 92%',
+    surfaceHover: '0 0% 86%',
+    sidebarBackground: '0 0% 96%',
+    sidebarBorder: '0 0% 4%',
+    isLight: true,
+    isBrutalism: true,
+    highContrast: true,
+  },
   'ultra-lite': {
     primary: '0 0% 0%',
     primaryForeground: '0 0% 100%',
@@ -735,6 +767,13 @@ export const THEME_INFO: Record<Theme, { name: string; gradient: string; descrip
     icon: '🌬️',
     category: 'light',
   },
+  'brutalist-concrete': {
+    name: 'Brutalist Concrete',
+    gradient: 'from-zinc-900 via-zinc-100 to-red-600',
+    description: 'Raw geometric blocks, hard borders, and stark contrast',
+    icon: '🧱',
+    category: 'light',
+  },
   'ultra-lite': {
     name: 'Ultra Lite',
     gradient: 'from-gray-900 via-gray-800 to-black',
@@ -759,6 +798,9 @@ export const THEME_INFO: Record<Theme, { name: string; gradient: string; descrip
 };
 const THEME_KEY = 'anime-theme';
 export function useTheme() {
+  const { user, profile } = useAuth();
+  const seededAccountRef = useRef<string | null>(null);
+
   const isLowEndDevice = useCallback(() => {
     if (typeof window === 'undefined') return false;
 
@@ -775,6 +817,11 @@ export function useTheme() {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem(THEME_KEY) as Theme | null;
       if (stored && THEME_COLORS[stored]) return stored;
+
+      const cookieTheme = readGuestSettingsFromCookie().theme?.theme;
+      if (cookieTheme && THEME_COLORS[cookieTheme as Theme]) {
+        return cookieTheme as Theme;
+      }
     }
     return 'cherry-blossom';
   });
@@ -783,6 +830,9 @@ export function useTheme() {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('tatakai_reduce_motion');
       if (stored !== null) return stored === 'true';
+
+      const cookieValue = readGuestSettingsFromCookie().theme?.reduceMotion;
+      if (typeof cookieValue === 'boolean') return cookieValue;
       return false;
     }
     return false;
@@ -790,10 +840,87 @@ export function useTheme() {
 
   const [highContrast, setHighContrastState] = useState(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('tatakai_high_contrast') === 'true';
+      const stored = localStorage.getItem('tatakai_high_contrast');
+      if (stored !== null) return stored === 'true';
+
+      const cookieValue = readGuestSettingsFromCookie().theme?.highContrast;
+      if (typeof cookieValue === 'boolean') return cookieValue;
+
+      return false;
     }
     return false;
   });
+
+  const accountThemeSettings = useMemo(
+    () => readProfileAppSettings(profile).theme,
+    [profile?.app_settings],
+  );
+
+  useEffect(() => {
+    if (!user?.id) return;
+    if (!accountThemeSettings || typeof accountThemeSettings !== 'object') return;
+
+    const nextTheme = String(accountThemeSettings.theme || '').trim();
+    if (nextTheme && THEME_COLORS[nextTheme as Theme] && nextTheme !== theme) {
+      setThemeState(nextTheme as Theme);
+      localStorage.setItem(THEME_KEY, nextTheme);
+    }
+
+    if (
+      typeof accountThemeSettings.reduceMotion === 'boolean' &&
+      accountThemeSettings.reduceMotion !== reduceMotion
+    ) {
+      setReduceMotionState(accountThemeSettings.reduceMotion);
+      localStorage.setItem('tatakai_reduce_motion', String(accountThemeSettings.reduceMotion));
+    }
+
+    if (
+      typeof accountThemeSettings.highContrast === 'boolean' &&
+      accountThemeSettings.highContrast !== highContrast
+    ) {
+      setHighContrastState(accountThemeSettings.highContrast);
+      localStorage.setItem('tatakai_high_contrast', String(accountThemeSettings.highContrast));
+    }
+
+    writeGuestSettingsCookie({
+      theme: {
+        theme: nextTheme && THEME_COLORS[nextTheme as Theme] ? nextTheme : theme,
+        reduceMotion:
+          typeof accountThemeSettings.reduceMotion === 'boolean'
+            ? accountThemeSettings.reduceMotion
+            : reduceMotion,
+        highContrast:
+          typeof accountThemeSettings.highContrast === 'boolean'
+            ? accountThemeSettings.highContrast
+            : highContrast,
+      },
+    });
+  }, [user?.id, accountThemeSettings, theme, reduceMotion, highContrast]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      seededAccountRef.current = null;
+      return;
+    }
+
+    if (accountThemeSettings && typeof accountThemeSettings === 'object') {
+      seededAccountRef.current = user.id;
+      return;
+    }
+
+    if (seededAccountRef.current === user.id) return;
+    seededAccountRef.current = user.id;
+
+    void saveAccountSettingsPatch(user.id, {
+      theme: {
+        theme,
+        reduceMotion,
+        highContrast,
+      },
+    }).catch(() => {
+      seededAccountRef.current = null;
+    });
+  }, [user?.id, accountThemeSettings, theme, reduceMotion, highContrast]);
 
   const applyTheme = useCallback(
     (themeName: Theme) => {
@@ -811,6 +938,7 @@ export function useTheme() {
       document.body.classList.toggle('light-theme', colors.isLight);
       document.body.classList.toggle('dark-theme', !colors.isLight);
       document.body.classList.toggle('ultra-lite-theme', !!colors.isUltraLite);
+      document.body.classList.toggle('brutalism-theme', !!colors.isBrutalism);
       document.body.classList.toggle('reduce-motion', reduceMotion);
       document.body.classList.toggle('high-contrast', highContrast);
 
@@ -826,17 +954,68 @@ export function useTheme() {
   const setTheme = useCallback((newTheme: Theme) => {
     setThemeState(newTheme);
     localStorage.setItem(THEME_KEY, newTheme);
-  }, []);
+    writeGuestSettingsCookie({
+      theme: {
+        theme: newTheme,
+        reduceMotion,
+        highContrast,
+      },
+    });
+
+    if (user?.id) {
+      void saveAccountSettingsPatch(user.id, {
+        theme: {
+          theme: newTheme,
+          reduceMotion,
+          highContrast,
+        },
+      }).catch(() => undefined);
+    }
+  }, [user?.id, reduceMotion, highContrast]);
 
   const setReduceMotion = useCallback((value: boolean) => {
     setReduceMotionState(value);
     localStorage.setItem('tatakai_reduce_motion', String(value));
-  }, []);
+    writeGuestSettingsCookie({
+      theme: {
+        theme,
+        reduceMotion: value,
+        highContrast,
+      },
+    });
+
+    if (user?.id) {
+      void saveAccountSettingsPatch(user.id, {
+        theme: {
+          theme,
+          reduceMotion: value,
+          highContrast,
+        },
+      }).catch(() => undefined);
+    }
+  }, [user?.id, theme, highContrast]);
 
   const setHighContrast = useCallback((value: boolean) => {
     setHighContrastState(value);
     localStorage.setItem('tatakai_high_contrast', String(value));
-  }, []);
+    writeGuestSettingsCookie({
+      theme: {
+        theme,
+        reduceMotion,
+        highContrast: value,
+      },
+    });
+
+    if (user?.id) {
+      void saveAccountSettingsPatch(user.id, {
+        theme: {
+          theme,
+          reduceMotion,
+          highContrast: value,
+        },
+      }).catch(() => undefined);
+    }
+  }, [user?.id, theme, reduceMotion]);
 
   const isLightTheme = THEME_COLORS[theme]?.isLight ?? false;
 

@@ -3,5 +3,8 @@ project_id = "sqeohsijpbfacjoodhsq"
 [functions.external-auth]
 verify_jwt = false
 
+[functions.mal-auth]
+verify_jwt = false
+
 [functions.embed-proxy]
 verify_jwt = false

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
 import { fetchEpisodes, fetchStreamingSources } from "@/lib/api";
 import Hls from "hls.js";
+import { buildPreferredAnimeRouteId } from "@/lib/animeIdMapping";
 
 interface TrendingGridProps {
   animes: TrendingAnime[];
@@ -34,6 +35,12 @@ const getTrendingPoster = (poster: string) => {
 
 function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: string }) {
   const navigate = useNavigate();
+  const routeAnimeId = buildPreferredAnimeRouteId({
+    id: anime.id,
+    name: anime.name,
+    malId: (anime as any)?.malId ?? (anime as any)?.malID ?? (anime as any)?.mal_id,
+    anilistId: (anime as any)?.anilistId ?? (anime as any)?.anilistID ?? (anime as any)?.anilist_id,
+  });
   const [isHovering, setIsHovering] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isPreviewM3U8, setIsPreviewM3U8] = useState(false);
@@ -41,20 +48,22 @@ function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: s
   const [previewError, setPreviewError] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const cached = trendingPreviewCache.get(anime.id);
+    if (!routeAnimeId) return;
+
+    const cached = trendingPreviewCache.get(routeAnimeId);
     if (!cached) return;
 
     if (Date.now() - cached.cachedAt > TRENDING_PREVIEW_CACHE_TTL) {
-      trendingPreviewCache.delete(anime.id);
+      trendingPreviewCache.delete(routeAnimeId);
       return;
     }
 
     setPreviewUrl(cached.url);
     setIsPreviewM3U8(cached.isM3U8);
-  }, [anime.id]);
+  }, [routeAnimeId]);
 
   // Cleanup HLS on unmount
   useEffect(() => {
@@ -67,20 +76,41 @@ function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: s
   }, []);
 
   useEffect(() => {
+    if (!routeAnimeId) {
+      setPreviewError(true);
+      return;
+    }
+
     if (!isHovering || previewUrl || previewError) return;
 
     hoverTimeoutRef.current = setTimeout(async () => {
       setIsLoading(true);
       try {
-        const episodes = await fetchEpisodes(anime.id);
+        const episodes = await fetchEpisodes(routeAnimeId, {
+          preferDirect: true,
+          timeoutMs: 3800,
+          skipProxyFallback: true,
+        });
         if (episodes.episodes.length > 0) {
           // Pick a random episode for preview
           const randomEpisode = episodes.episodes[Math.floor(Math.random() * episodes.episodes.length)];
+          const previewEpisodeId = String(randomEpisode?.episodeId || "").includes("?ep=")
+            ? String(randomEpisode?.episodeId || "")
+            : `${randomEpisode?.episodeId}?ep=${randomEpisode?.number || 1}`;
+          const previewAniListId =
+            (anime as any)?.anilistId ??
+            (anime as any)?.anilistID ??
+            (anime as any)?.anilist_id ??
+            null;
           let sources: Awaited<ReturnType<typeof fetchStreamingSources>> | null = null;
-          const preferredServers = ["hd-2", "hd-1", "hd-3"];
+          const preferredServers = ["justanime", "hd-1", "hd-2", "hd-3"];
           for (const server of preferredServers) {
             try {
-              const candidate = await fetchStreamingSources(randomEpisode.episodeId, server, "sub");
+              const candidate = await fetchStreamingSources(previewEpisodeId, server, "sub", {
+                timeoutMs: 4500,
+                animeName: anime.name,
+                anilistId: previewAniListId,
+              });
               if (candidate?.sources?.length) {
                 sources = candidate;
                 break;
@@ -92,10 +122,15 @@ function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: s
 
           if (sources?.sources?.length) {
             const source = sources.sources[0];
-            const proxiedUrl = getProxiedVideoUrl(source.url, sources.headers?.Referer);
+            const proxiedUrl = getProxiedVideoUrl(
+              source.url,
+              sources.headers?.Referer,
+              sources.headers?.['User-Agent'],
+              { preferProxyManager: true }
+            );
             setPreviewUrl(proxiedUrl);
             setIsPreviewM3U8(Boolean(source.isM3U8));
-            trendingPreviewCache.set(anime.id, {
+            trendingPreviewCache.set(routeAnimeId, {
               url: proxiedUrl,
               isM3U8: Boolean(source.isM3U8),
               cachedAt: Date.now(),
@@ -109,12 +144,12 @@ function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: s
       } finally {
         setIsLoading(false);
       }
-    }, 220);
+    }, 140);
 
     return () => {
       if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     };
-  }, [isHovering, anime.id, previewUrl, previewError]);
+  }, [isHovering, routeAnimeId, previewUrl, previewError]);
 
   useEffect(() => {
     if (!previewUrl || !videoRef.current) return;
@@ -177,7 +212,13 @@ function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: s
 
   return (
     <div 
-      onClick={() => navigate(`/anime/${anime.id}`)}
+      onClick={() => {
+        if (routeAnimeId) {
+          navigate(`/anime/${routeAnimeId}`);
+          return;
+        }
+        navigate(`/search?q=${encodeURIComponent(anime.name)}`);
+      }}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
       className={`relative group rounded-3xl overflow-hidden cursor-pointer ${spanClass} border border-border/30 min-h-[200px] md:min-h-0`}

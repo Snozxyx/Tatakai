@@ -68,7 +68,7 @@ function PlaylistMiniCard({ playlist }: { playlist: Playlist }) {
         {playlist.name}
       </h3>
       <p className="text-xs text-muted-foreground">
-        {playlist.items_count} anime
+        {playlist.items_count} {playlist.items_count === 1 ? 'item' : 'items'}
       </p>
     </motion.div>
   );

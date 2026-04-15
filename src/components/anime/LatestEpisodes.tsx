@@ -15,7 +15,7 @@ function LatestEpisodeCard({ anime }: { anime: AnimeCard }) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!isHovering || previewUrl) return;
@@ -23,11 +23,44 @@ function LatestEpisodeCard({ anime }: { anime: AnimeCard }) {
     hoverTimeoutRef.current = setTimeout(async () => {
       setIsLoading(true);
       try {
-        const episodes = await fetchEpisodes(anime.id);
+        const episodes = await fetchEpisodes(anime.id, {
+          preferDirect: true,
+          timeoutMs: 3800,
+          skipProxyFallback: true,
+        });
         if (episodes.episodes.length > 0) {
-          const sources = await fetchStreamingSources(episodes.episodes[0].episodeId, "hd-2", "sub");
-          if (sources.sources.length > 0) {
-            setPreviewUrl(sources.sources[0].url);
+          const firstEpisode = episodes.episodes[0];
+          const previewEpisodeId = String(firstEpisode?.episodeId || "").includes("?ep=")
+            ? String(firstEpisode?.episodeId || "")
+            : `${firstEpisode?.episodeId}?ep=${firstEpisode?.number || 1}`;
+          const previewServers = ["justanime", "hd-1", "hd-2", "hd-3"];
+          let sources: Awaited<ReturnType<typeof fetchStreamingSources>> | null = null;
+
+          for (const server of previewServers) {
+            try {
+              const candidate = await fetchStreamingSources(previewEpisodeId, server, "sub", {
+                timeoutMs: 4500,
+                animeName: anime.name,
+                anilistId: anime.anilistId,
+              });
+              if (candidate?.sources?.length) {
+                sources = candidate;
+                break;
+              }
+            } catch {
+              // Try next preview server.
+            }
+          }
+
+          if (sources?.sources?.length > 0) {
+            const source = sources.sources[0];
+            const proxiedUrl = getProxiedVideoUrl(
+              source.url,
+              sources.headers?.Referer,
+              sources.headers?.['User-Agent'],
+              { preferProxyManager: true }
+            );
+            setPreviewUrl(proxiedUrl);
           }
         }
       } catch (error) {
@@ -35,7 +68,7 @@ function LatestEpisodeCard({ anime }: { anime: AnimeCard }) {
       } finally {
         setIsLoading(false);
       }
-    }, 600);
+    }, 180);
 
     return () => {
       if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
@@ -63,7 +96,12 @@ function LatestEpisodeCard({ anime }: { anime: AnimeCard }) {
       <div className="flex items-center gap-4">
         <div className="relative w-20 h-28 flex-shrink-0 rounded-xl overflow-hidden">
               <img
-                src={getHighQualityPoster(anime.poster, anime.anilistId)} 
+                src={
+                  (anime.poster || '')
+                    .replace('/cover/medium/', '/cover/large/')
+                    .replace(/\/banner\/(small|medium)\//, '/banner/large/') ||
+                  getHighQualityPoster(anime.poster, anime.anilistId)
+                }
                 alt={anime.name}
                 loading="lazy"
                 className="w-full h-full object-cover transition-all duration-500 group-hover:scale-110"
@@ -73,7 +111,7 @@ function LatestEpisodeCard({ anime }: { anime: AnimeCard }) {
           {previewUrl && (
             <video
               ref={videoRef}
-              src={getProxiedVideoUrl(previewUrl)}
+              src={previewUrl}
               className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
                 isHovering ? 'opacity-100' : 'opacity-0'
               }`}

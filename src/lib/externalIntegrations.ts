@@ -1,6 +1,12 @@
 import { supabase } from '@/integrations/supabase/client';
 import { disconnectMal, exchangeMalCode, getMalAuthUrl } from '@/lib/mal';
 
+export const ALL_GENRES = [
+  "Action", "Adventure", "Comedy", "Drama", "Ecchi", "Fantasy", "Horror", "Mahou Shoujo", 
+  "Mecha", "Music", "Mystery", "Psychological", "Romance", "Sci-Fi", "Slice of Life", 
+  "Sports", "Supernatural", "Thriller"
+];
+
 // ===========================================
 // MyAnimeList Integration
 // ===========================================
@@ -227,8 +233,60 @@ export async function fetchAniListUserList(accessToken: string, userId: number):
   return allEntries;
 }
 
+// Fetch AniList manga list
+export async function fetchAniListMangaList(accessToken: string, userId: number): Promise<any[]> {
+  const query = `
+    query ($userId: Int) {
+      MediaListCollection(userId: $userId, type: MANGA) {
+        lists {
+          name
+          status
+          entries {
+            id
+            mediaId
+            status
+            progress
+            score
+            media {
+              id
+              idMal
+              title { romaji english native }
+              coverImage { medium large }
+              chapters
+              volumes
+            }
+          }
+        }
+      }
+    }
+  `;
+  const data = await anilistQuery(query, { userId }, accessToken);
+  const allEntries = data.MediaListCollection?.lists?.flatMap((list: any) => list.entries) || [];
+  return allEntries;
+}
+
 // Update AniList anime status
 export async function updateAniListAnimeStatus(
+  accessToken: string,
+  mediaId: number,
+  status: 'CURRENT' | 'COMPLETED' | 'PAUSED' | 'DROPPED' | 'PLANNING',
+  progress?: number
+): Promise<boolean> {
+  const query = `
+    mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int) {
+      SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress) {
+        id
+        status
+        progress
+      }
+    }
+  `;
+  await anilistQuery(query, { mediaId, status, progress }, accessToken);
+  return true;
+}
+
+// Update AniList manga status
+export async function updateAniListMangaStatus(
   accessToken: string,
   mediaId: number,
   status: 'CURRENT' | 'COMPLETED' | 'PAUSED' | 'DROPPED' | 'PLANNING',
@@ -255,6 +313,7 @@ export type AniListSort =
   | 'FAVOURITES_DESC';
 
 export type AniListSearchFilters = {
+  page?: number;
   perPage?: number;
   format?: 'TV' | 'TV_SHORT' | 'MOVIE' | 'SPECIAL' | 'OVA' | 'ONA' | 'MUSIC';
   status?: 'FINISHED' | 'RELEASING' | 'NOT_YET_RELEASED' | 'CANCELLED' | 'HIATUS';
@@ -268,6 +327,7 @@ export type AniListSearchFilters = {
 export interface AniListMedia {
   id: number;
   idMal?: number | null;
+  bannerImage?: string | null;
   format?: string | null;
   title?: {
     romaji?: string | null;
@@ -279,6 +339,8 @@ export interface AniListMedia {
     large?: string | null;
   };
   episodes?: number | null;
+  chapters?: number | null;
+  volumes?: number | null;
   status?: string | null;
   seasonYear?: number | null;
   season?: string | null;
@@ -295,6 +357,7 @@ export interface AniListMedia {
 export async function searchAniListAnime(title: string, filters: AniListSearchFilters = {}): Promise<AniListMedia[]> {
   const query = `
     query (
+      $page: Int,
       $search: String,
       $perPage: Int,
       $format: MediaFormat,
@@ -305,7 +368,7 @@ export async function searchAniListAnime(title: string, filters: AniListSearchFi
       $genreIn: [String],
       $sort: [MediaSort]
     ) {
-      Page(perPage: $perPage) {
+      Page(page: $page, perPage: $perPage) {
         media(
           search: $search,
           type: ANIME,
@@ -319,6 +382,7 @@ export async function searchAniListAnime(title: string, filters: AniListSearchFi
         ) {
           id
           idMal
+          bannerImage
           format
           title { romaji english native }
           coverImage { medium large }
@@ -338,6 +402,7 @@ export async function searchAniListAnime(title: string, filters: AniListSearchFi
     }
   `;
   const variables = {
+    page: filters.page || 1,
     search: title,
     perPage: filters.perPage || 10,
     format: filters.format,
@@ -353,9 +418,46 @@ export async function searchAniListAnime(title: string, filters: AniListSearchFi
   return data.Page?.media || [];
 }
 
+export async function searchAniListManga(title: string): Promise<AniListMedia[]> {
+  const query = `
+    query ($search: String, $page: Int, $perPage: Int) {
+      Page(page: $page, perPage: $perPage) {
+        media(search: $search, type: MANGA, sort: [POPULARITY_DESC]) {
+          id
+          idMal
+          bannerImage
+          format
+          title { romaji english native }
+          coverImage { medium large }
+          chapters
+          volumes
+          status
+          seasonYear
+          genres
+          averageScore
+          popularity
+          favourites
+          trending
+          countryOfOrigin
+          startDate { year }
+        }
+      }
+    }
+  `;
+
+  const data = await anilistQuery(query, {
+    search: title,
+    page: 1,
+    perPage: 10,
+  });
+
+  return data.Page?.media || [];
+}
+
 export async function fetchAniListDiscover(filters: AniListSearchFilters = {}): Promise<AniListMedia[]> {
   const query = `
     query (
+      $page: Int,
       $perPage: Int,
       $format: MediaFormat,
       $status: MediaStatus,
@@ -365,7 +467,7 @@ export async function fetchAniListDiscover(filters: AniListSearchFilters = {}): 
       $genreIn: [String],
       $sort: [MediaSort]
     ) {
-      Page(perPage: $perPage) {
+      Page(page: $page, perPage: $perPage) {
         media(
           type: ANIME,
           format: $format,
@@ -378,6 +480,7 @@ export async function fetchAniListDiscover(filters: AniListSearchFilters = {}): 
         ) {
           id
           idMal
+          bannerImage
           format
           title { romaji english native }
           coverImage { medium large }
@@ -398,6 +501,7 @@ export async function fetchAniListDiscover(filters: AniListSearchFilters = {}): 
   `;
 
   const variables = {
+    page: filters.page || 1,
     perPage: filters.perPage || 20,
     format: filters.format,
     status: filters.status,
@@ -410,6 +514,50 @@ export async function fetchAniListDiscover(filters: AniListSearchFilters = {}): 
 
   const data = await anilistQuery(query, variables);
   return data.Page?.media || [];
+}
+
+export async function fetchAniListMediaById(ids: {
+  anilistId?: number | null;
+  malId?: number | null;
+}): Promise<AniListMedia | null> {
+  const anilistId = Number(ids?.anilistId);
+  const malId = Number(ids?.malId);
+
+  const hasAniListId = Number.isFinite(anilistId) && anilistId > 0;
+  const hasMalId = Number.isFinite(malId) && malId > 0;
+  if (!hasAniListId && !hasMalId) return null;
+
+  const query = `
+    query ($id: Int, $idMal: Int) {
+      Media(id: $id, idMal: $idMal, type: ANIME) {
+        id
+        idMal
+        bannerImage
+        format
+        title { romaji english native }
+        coverImage { medium large }
+        episodes
+        status
+        seasonYear
+        season
+        genres
+        averageScore
+        popularity
+        favourites
+        trending
+        countryOfOrigin
+        startDate { year }
+      }
+    }
+  `;
+
+  const variables = {
+    id: hasAniListId ? anilistId : undefined,
+    idMal: !hasAniListId && hasMalId ? malId : undefined,
+  };
+
+  const data = await anilistQuery(query, variables);
+  return data?.Media || null;
 }
 
 // Disconnect integrations
@@ -439,4 +587,27 @@ export function mapTatakaiStatusToAniList(status: string) {
     'on_hold': 'PAUSED'
   };
   return map[status] || 'PLANNING';
+}
+
+export function mapAniListMangaStatusToTatakai(status: string) {
+  const map: Record<string, string> = {
+    'CURRENT': 'reading',
+    'COMPLETED': 'completed',
+    'PLANNING': 'plan_to_read',
+    'DROPPED': 'dropped',
+    'PAUSED': 'on_hold',
+    'REPEATING': 'reading'
+  };
+  return map[String(status || '').toUpperCase()] || 'plan_to_read';
+}
+
+export function mapTatakaiMangaStatusToAniList(status: string) {
+  const map: Record<string, any> = {
+    'reading': 'CURRENT',
+    'completed': 'COMPLETED',
+    'plan_to_read': 'PLANNING',
+    'dropped': 'DROPPED',
+    'on_hold': 'PAUSED'
+  };
+  return map[String(status || '').toLowerCase()] || 'PLANNING';
 }

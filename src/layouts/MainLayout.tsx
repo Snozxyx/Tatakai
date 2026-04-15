@@ -57,7 +57,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
   const isMobile = useIsMobile();
   const isMobileApp = Capacitor.isNativePlatform();
 
-  const hideSidebarPages = ['/auth', '/onboarding', '/setup', '/maintenance', '/banned', '/error', '/smarttv'];
+  const hideSidebarPages = ['/auth', '/onboarding', '/setup', '/maintenance', '/banned', '/error', '/smarttv', '/manga/read'];
   const isHiddenPage = hideSidebarPages.some(page => location.pathname.startsWith(page));
   const showSidebar = !isMobile && !isMobileApp && !isHiddenPage;
 
@@ -110,7 +110,7 @@ function ConditionalFooter() {
   const location = useLocation();
   const isNative = useIsNativeApp();
   if (isNative) return null;
-  const hideFooter = ['/watch/', '/isshoni/', '/search', '/image-search', '/status', '/banned', '/maintenance', '/service-unavailable', '/503', '/error', '/auth', '/reset-password', '/update-password', '/onboarding', '/setup', '/mal-redirect', '/anilist-redirect', '/favorites', '/trending', '/settings' , '/recommendations' , '/admin'].some(path => location.pathname.startsWith(path));
+  const hideFooter = ['/watch/', '/genre/', '/manga/', '/manga', '/isshoni/', '/search', '/image-search', '/status', '/banned', '/maintenance', '/service-unavailable', '/503', '/error', '/auth', '/reset-password', '/update-password', '/onboarding', '/setup', '/mal-redirect', '/anilist-redirect', '/favorites', '/trending', '/settings' , '/recommendations' , '/admin', '/mobile-app'].some(path => location.pathname.startsWith(path));
   if (hideFooter) return null;
   return <Footer />;
 }

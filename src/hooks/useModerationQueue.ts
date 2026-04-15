@@ -89,8 +89,8 @@ export function useModerationQueue(filters?: {
           : { data: [] },
       ]);
 
-      const flaggerMap = new Map(flaggers.data?.map((p) => [p.user_id, p]) || []);
-      const reviewerMap = new Map(reviewers.data?.map((p) => [p.user_id, p]) || []);
+      const flaggerMap = new Map((flaggers.data ?? []).map((p) => [p.user_id, p] as const));
+      const reviewerMap = new Map((reviewers.data ?? []).map((p) => [p.user_id, p] as const));
 
       return (data || []).map((item) => ({
         ...item,

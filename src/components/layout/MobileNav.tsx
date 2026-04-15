@@ -1,4 +1,4 @@
-import { LayoutGrid, Search, User, LogIn, Users, Heart, TrendingUp, Settings, Shield, Bell } from "lucide-react";
+import { LayoutGrid, Search, User, LogIn, Users, Heart, TrendingUp, Settings, Shield, Bell, BookOpen } from "lucide-react";
 import { NavIcon } from "@/components/ui/NavIcon";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,7 +8,7 @@ import { useHaptics } from "@/hooks/useHaptics";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { NotificationModal } from "@/components/profile/NotificationModal";
 import { cn } from "@/lib/utils";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 import {
   DropdownMenu,
@@ -16,6 +16,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
+const POPUP_VISIBILITY_EVENT = 'tatakai-v5-popup-visibility';
+const POPUP_ACTIVE_CLASS = 'v5-popup-active';
 
 export function MobileNav() {
   const location = useLocation();
@@ -25,8 +28,45 @@ export function MobileNav() {
   const isMobileNative = useIsMobileApp(); // Only Capacitor Android/iOS
   const { impact } = useHaptics();
   const [showNotifications, setShowNotifications] = useState(false);
+  const [isAnnouncementPopupActive, setIsAnnouncementPopupActive] = useState(() => {
+    if (typeof document === 'undefined') return false;
+    return (
+      document.documentElement.classList.contains(POPUP_ACTIVE_CLASS) ||
+      document.body.classList.contains(POPUP_ACTIVE_CLASS)
+    );
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+
+    const syncFromClasses = () => {
+      const isActive =
+        document.documentElement.classList.contains(POPUP_ACTIVE_CLASS) ||
+        document.body.classList.contains(POPUP_ACTIVE_CLASS);
+      setIsAnnouncementPopupActive(isActive);
+    };
+
+    const handlePopupVisibility = (event: Event) => {
+      const customEvent = event as CustomEvent<{ open?: boolean }>;
+      if (typeof customEvent.detail?.open === 'boolean') {
+        setIsAnnouncementPopupActive(customEvent.detail.open);
+        return;
+      }
+      syncFromClasses();
+    };
+
+    syncFromClasses();
+    window.addEventListener(POPUP_VISIBILITY_EVENT, handlePopupVisibility as EventListener);
+    document.addEventListener('visibilitychange', syncFromClasses);
+
+    return () => {
+      window.removeEventListener(POPUP_VISIBILITY_EVENT, handlePopupVisibility as EventListener);
+      document.removeEventListener('visibilitychange', syncFromClasses);
+    };
+  }, []);
 
   const isActive = (path: string) => location.pathname === path;
+  const isMangaActive = location.pathname.startsWith('/manga');
 
   // Haptic navigation handler
   const handleNavigate = useCallback((path: string) => {
@@ -51,6 +91,10 @@ export function MobileNav() {
     }
     navigate(path);
   }, [navigate, impact]);
+
+  if (isAnnouncementPopupActive) {
+    return null;
+  }
 
   const navContent = (
     <div 
@@ -94,6 +138,13 @@ export function MobileNav() {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <NavIcon
+        icon={BookOpen}
+        active={isMangaActive}
+        onClick={() => hapticNavigate('/manga')}
+        aria-label="Manga"
+      />
 
       {/* Downloads removed from mobile nav - use desktop/electron only */}
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,6 +18,7 @@ import { WatchStreaks } from '@/components/profile/WatchStreaks';
 import { useWatchlist } from '@/hooks/useWatchlist';
 import { useWatchHistory } from '@/hooks/useWatchHistory';
 import { usePublicProfile, usePublicWatchlist, usePublicWatchHistory } from '@/hooks/useProfileFeatures';
+import { useMangaReadlist, usePublicMangaReadlist, type MangaReadlistStatus } from '@/hooks/useMangaReadlist';
 import { useUserForumPosts } from '@/hooks/useForum';
 import { useFollow } from '@/hooks/useFollow';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,7 +31,7 @@ import { cn } from '@/lib/utils';
 import {
   User, Settings, List, History, LogOut, Edit2, Save, X,
   Play, Trash2, Clock, CheckCircle, Eye, Pause, XCircle, ArrowLeft, Camera, Shield, Sparkles, Globe, Lock, Share2, MessageSquare, AlertCircle, UserPlus, UserMinus, Bell, Check,
-  ShieldCheck, Loader2, Flame
+  ShieldCheck, Loader2, Flame, BookOpen
 } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { motion } from 'framer-motion';
@@ -45,6 +46,16 @@ const STATUS_LABELS: Record<string, { label: string; icon: React.ReactNode; colo
   on_hold: { label: 'On Hold', icon: <Pause className="w-3 h-3" />, color: 'text-orange-400', bg: 'bg-orange-400/10' },
   dropped: { label: 'Dropped', icon: <XCircle className="w-3 h-3" />, color: 'text-red-400', bg: 'bg-red-400/10' },
 };
+
+const MANGA_STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  reading: { label: 'Reading', color: 'text-blue-300', bg: 'bg-blue-500/15' },
+  completed: { label: 'Completed', color: 'text-green-300', bg: 'bg-green-500/15' },
+  plan_to_read: { label: 'Plan to Read', color: 'text-amber-300', bg: 'bg-amber-500/15' },
+  on_hold: { label: 'On Hold', color: 'text-orange-300', bg: 'bg-orange-500/15' },
+  dropped: { label: 'Dropped', color: 'text-red-300', bg: 'bg-red-500/15' },
+};
+
+const MANGA_READING_ONLY_STATUSES: MangaReadlistStatus[] = ['reading'];
 
 export default function ProfilePage() {
   const navigate = useNavigate();
@@ -71,18 +82,35 @@ export default function ProfilePage() {
   // Use the appropriate profile data
   const profile = isViewingOther ? publicProfile : ownProfile;
 
-  // Fetch watchlist and history - own data or public data
+  // Fetch watchlist/history/readlist - own data or public data
   const { data: ownWatchlist, isLoading: loadingOwnWatchlist } = useWatchlist();
   const { data: ownHistory, isLoading: loadingOwnHistory } = useWatchHistory();
+  const { data: ownMangaReadlist = [], isLoading: loadingOwnMangaReadlist } = useMangaReadlist();
+  const { data: ownMangaReadingHistory = [], isLoading: loadingOwnMangaReadingHistory } = useMangaReadlist(MANGA_READING_ONLY_STATUSES);
+
   const { data: publicWatchlist = [], isLoading: loadingPublicWatchlist } = usePublicWatchlist(
     publicProfile?.user_id,
     publicProfile?.is_public ?? false,
-    publicProfile?.show_watchlist ?? true
+    publicProfile?.show_watchlist ?? true,
   );
+
   const { data: publicHistory = [], isLoading: loadingPublicHistory } = usePublicWatchHistory(
     publicProfile?.user_id,
     publicProfile?.is_public ?? false,
-    publicProfile?.show_history ?? true
+    publicProfile?.show_history ?? true,
+  );
+
+  const { data: publicMangaReadlist = [], isLoading: loadingPublicMangaReadlist } = usePublicMangaReadlist(
+    publicProfile?.user_id,
+    publicProfile?.is_public ?? false,
+    publicProfile?.show_watchlist ?? true,
+  );
+
+  const { data: publicMangaReadingHistory = [], isLoading: loadingPublicMangaReadingHistory } = usePublicMangaReadlist(
+    publicProfile?.user_id,
+    publicProfile?.is_public ?? false,
+    publicProfile?.show_history ?? true,
+    MANGA_READING_ONLY_STATUSES,
   );
 
   // Fetch forum posts for the profile
@@ -93,8 +121,53 @@ export default function ProfilePage() {
 
   const watchlist = isViewingOther ? publicWatchlist : ownWatchlist;
   const history = isViewingOther ? publicHistory : ownHistory;
+  const mangaReadlist = isViewingOther ? publicMangaReadlist : ownMangaReadlist;
+  const mangaHistorySource = isViewingOther ? publicMangaReadingHistory : ownMangaReadingHistory;
   const loadingWatchlist = isViewingOther ? loadingPublicWatchlist : loadingOwnWatchlist;
   const loadingHistory = isViewingOther ? loadingPublicHistory : loadingOwnHistory;
+  const loadingMangaReadlist = isViewingOther ? loadingPublicMangaReadlist : loadingOwnMangaReadlist;
+  const loadingMangaHistory = isViewingOther ? loadingPublicMangaReadingHistory : loadingOwnMangaReadingHistory;
+  const loadingCombinedHistory = loadingHistory || loadingMangaHistory;
+
+  const computedWatchTimeSeconds = useMemo(() => {
+    if (!history || history.length === 0) return 0;
+
+    return history.reduce((total: number, item: any) => {
+      const progressSeconds = Number(item?.progress_seconds);
+      if (Number.isFinite(progressSeconds) && progressSeconds > 0) {
+        return total + progressSeconds;
+      }
+
+      const durationSeconds = Number(item?.duration_seconds);
+      if (Number.isFinite(durationSeconds) && durationSeconds > 0) {
+        return total + durationSeconds;
+      }
+
+      return total;
+    }, 0);
+  }, [history]);
+
+  const mangaHistoryEntries = useMemo(() => {
+    return [...(mangaHistorySource || [])]
+      .filter((entry: any) => {
+        if (!entry) return false;
+        const status = String(entry.status || '').trim().toLowerCase();
+        if (status !== 'reading') return false;
+
+        return Boolean(
+          entry.last_chapter_key ||
+            entry.last_chapter_number != null ||
+            (entry.last_chapter_title && String(entry.last_chapter_title).trim().length > 0),
+        );
+      })
+      .sort(
+        (left: any, right: any) =>
+          new Date(right?.updated_at || 0).getTime() - new Date(left?.updated_at || 0).getTime(),
+      );
+  }, [mangaHistorySource]);
+
+  const hasAnimeHistory = Boolean(history && history.length > 0);
+  const hasMangaHistory = mangaHistoryEntries.length > 0;
 
   // Fetch manual achievement grants for rank display
   const { data: manualGrants = [] } = useQuery({
@@ -244,7 +317,7 @@ export default function ProfilePage() {
     watching: watchlist?.filter(i => i.status === 'watching').length || 0,
     completed: watchlist?.filter(i => i.status === 'completed').length || 0,
     plan_to_watch: watchlist?.filter(i => i.status === 'plan_to_watch').length || 0,
-    watchTimeSeconds: profile?.total_watch_time_seconds || 0,
+    watchTimeSeconds: computedWatchTimeSeconds,
   };
 
   // Format watch time to hours and minutes
@@ -579,6 +652,12 @@ export default function ProfilePage() {
                     Watchlist
                   </TabsTrigger>
                 )}
+                {showWatchlistTab && (
+                  <TabsTrigger value="manga-readlist" className="flex-1 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg px-6">
+                    <BookOpen className="w-4 h-4" />
+                    Manga Readlist
+                  </TabsTrigger>
+                )}
                 {showHistoryTab && (
                   <TabsTrigger value="history" className="flex-1 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg px-6">
                     <History className="w-4 h-4" />
@@ -673,99 +752,265 @@ export default function ProfilePage() {
                 </TabsContent>
               )}
 
+              {showWatchlistTab && (
+                <TabsContent value="manga-readlist" className="mt-6">
+                  <GlassPanel className="p-6 md:p-8">
+                    <div className="flex items-center justify-between mb-8">
+                      <h2 className="text-2xl font-bold flex items-center gap-2">
+                        <BookOpen className="w-6 h-6 text-primary" />
+                        {isViewingOther ? 'Manga Readlist' : 'My Manga Readlist'}
+                      </h2>
+                      <span className="text-sm text-muted-foreground">
+                        {mangaReadlist?.length || 0} items
+                      </span>
+                    </div>
+
+                    {loadingMangaReadlist ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {[...Array(6)].map((_, i) => (
+                          <div key={i} className="h-28 bg-muted/50 rounded-xl animate-pulse" />
+                        ))}
+                      </div>
+                    ) : mangaReadlist && mangaReadlist.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {mangaReadlist.map((item: any) => {
+                          const status = MANGA_STATUS_LABELS[item.status || 'plan_to_read'] || MANGA_STATUS_LABELS.plan_to_read;
+                          const chapterLabel =
+                            item.last_chapter_number != null
+                              ? `Ch. ${item.last_chapter_number}`
+                              : item.last_chapter_title || 'Not started';
+
+                          return (
+                            <motion.button
+                              initial={{ opacity: 0, y: 12 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              whileHover={{ y: -2 }}
+                              key={item.id}
+                              onClick={() => navigate(`/manga/${item.manga_id}`)}
+                              className="text-left rounded-2xl border border-white/10 bg-background/20 hover:bg-background/40 transition-all overflow-hidden group"
+                            >
+                              <div className="p-4 flex gap-3 items-start">
+                                <div className="w-14 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-muted/30">
+                                  <img
+                                    src={getProxiedImageUrl(item.manga_poster || '/placeholder.svg')}
+                                    alt={item.manga_title}
+                                    className="w-full h-full object-cover"
+                                    loading="lazy"
+                                  />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="font-bold line-clamp-1 group-hover:text-primary transition-colors">
+                                    {item.manga_title}
+                                  </h3>
+                                  <div className={`mt-1 inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${status.bg} ${status.color}`}>
+                                    {status.label}
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-2 line-clamp-1">
+                                    {chapterLabel}
+                                  </p>
+                                  <p className="text-[11px] text-muted-foreground mt-1">
+                                    Page {(Number(item.last_page_index) || 0) + 1}
+                                  </p>
+                                </div>
+                              </div>
+                            </motion.button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center py-20 border-2 border-dashed border-white/5 rounded-2xl">
+                        <BookOpen className="w-16 h-16 mx-auto text-muted-foreground/30 mb-4" />
+                        <h3 className="text-xl font-bold mb-2">{isViewingOther ? 'Readlist is empty' : 'Your manga readlist is empty'}</h3>
+                        <p className="text-muted-foreground mb-6">
+                          {isViewingOther ? 'This user has not saved any manga yet.' : 'Save manga to your readlist from any manga details page.'}
+                        </p>
+                        {!isViewingOther && (
+                          <Button onClick={() => navigate('/search')}>
+                            Browse Manga
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </GlassPanel>
+                </TabsContent>
+              )}
+
               {showHistoryTab && (
                 <TabsContent value="history" className="mt-6">
                   <GlassPanel className="p-6 md:p-8">
                     <h2 className="text-2xl font-bold mb-8 flex items-center gap-2">
                       <History className="w-6 h-6 text-primary" />
-                      Watch History
+                      Activity History
                     </h2>
 
-                    {loadingHistory ? (
+                    {loadingCombinedHistory ? (
                       <div className="space-y-4">
                         {[...Array(3)].map((_, i) => (
                           <div key={i} className="h-24 bg-muted/50 rounded-xl animate-pulse" />
                         ))}
                       </div>
-                    ) : history && history.length > 0 ? (
-                      <div className="space-y-3">
-                        {(() => {
-                          const groupedHistory: Record<string, any[]> = {};
-                          history.forEach(item => {
-                            if (!groupedHistory[item.anime_id]) groupedHistory[item.anime_id] = [];
-                            groupedHistory[item.anime_id].push(item);
-                          });
-                          
-                          return Object.entries(groupedHistory)
-                            .sort(([, a], [, b]) => new Date(b[0].watched_at).getTime() - new Date(a[0].watched_at).getTime())
-                            .map(([animeId, episodes], index) => (
-                              <motion.div
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: index * 0.05 }}
-                                key={animeId}
-                                className="bg-background/20 rounded-2xl border border-white/5 overflow-hidden"
-                              >
-                                <div className="flex gap-4 p-4 items-center border-b border-white/5 bg-white/5">
-                                  <div className="w-12 h-16 rounded overflow-hidden flex-shrink-0">
-                                    <img
-                                      src={getProxiedImageUrl(episodes[0].anime_poster || '/placeholder.svg')}
-                                      alt={episodes[0].anime_name}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <h3 className="font-bold text-lg line-clamp-1">
-                                      {episodes[0].anime_name}
-                                    </h3>
-                                    <p className="text-xs text-muted-foreground">
-                                      {episodes.length} episodes watched
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="divide-y divide-white/5">
-                                  {episodes
-                                    .sort((a,b) => new Date(b.watched_at).getTime() - new Date(a.watched_at).getTime())
-                                    .map((item) => (
-                                      <div
-                                        key={item.id}
-                                        className="flex items-center gap-4 p-3 hover:bg-white/5 transition-colors cursor-pointer group"
-                                        onClick={() => navigate(`/watch/${encodeURIComponent(item.episode_id)}`)}
-                                      >
-                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
-                                          {item.episode_number}
+                    ) : hasAnimeHistory || hasMangaHistory ? (
+                      <div className="space-y-6">
+                        {hasAnimeHistory && (
+                          <section>
+                            <div className="mb-3 flex items-center gap-2 px-1">
+                              <Play className="w-4 h-4 text-primary" />
+                              <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                                Anime Watching
+                              </h3>
+                            </div>
+
+                            <div className="space-y-3">
+                              {(() => {
+                                const groupedHistory: Record<string, any[]> = {};
+                                history?.forEach((item: any) => {
+                                  if (!groupedHistory[item.anime_id]) groupedHistory[item.anime_id] = [];
+                                  groupedHistory[item.anime_id].push(item);
+                                });
+
+                                return Object.entries(groupedHistory)
+                                  .sort(([, a], [, b]) => new Date(b[0].watched_at).getTime() - new Date(a[0].watched_at).getTime())
+                                  .map(([animeId, episodes], index) => (
+                                    <motion.div
+                                      initial={{ opacity: 0, y: 20 }}
+                                      animate={{ opacity: 1, y: 0 }}
+                                      transition={{ delay: index * 0.05 }}
+                                      key={animeId}
+                                      className="bg-background/20 rounded-2xl border border-white/5 overflow-hidden"
+                                    >
+                                      <div className="flex gap-4 p-4 items-center border-b border-white/5 bg-white/5">
+                                        <div className="w-12 h-16 rounded overflow-hidden flex-shrink-0">
+                                          <img
+                                            src={getProxiedImageUrl(episodes[0].anime_poster || '/placeholder.svg')}
+                                            alt={episodes[0].anime_name}
+                                            className="w-full h-full object-cover"
+                                          />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                          <div className="flex items-center gap-2">
-                                            <span className="text-sm font-medium">Episode {item.episode_number}</span>
-                                            <span className="text-xs text-muted-foreground">•</span>
-                                            <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                              <Clock className="w-3 h-3" />
-                                              {formatDate(item.watched_at)}
-                                            </span>
-                                          </div>
-                                          {item.duration_seconds && (
-                                            <div className="w-32 h-1 bg-white/5 rounded-full mt-1.5 overflow-hidden">
-                                              <div 
-                                                className="h-full bg-primary"
-                                                style={{ width: `${Math.min(100, ((item.progress_seconds || 0) / item.duration_seconds) * 100)}%` }}
-                                              />
-                                            </div>
-                                          )}
+                                          <h3 className="font-bold text-lg line-clamp-1">
+                                            {episodes[0].anime_name}
+                                          </h3>
+                                          <p className="text-xs text-muted-foreground">
+                                            {episodes.length} episodes watched
+                                          </p>
                                         </div>
-                                        <Play className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
                                       </div>
-                                    ))}
-                                </div>
-                              </motion.div>
-                            ));
-                        })()}
+                                      <div className="divide-y divide-white/5">
+                                        {episodes
+                                          .sort((a, b) => new Date(b.watched_at).getTime() - new Date(a.watched_at).getTime())
+                                          .map((item) => (
+                                            <div
+                                              key={item.id}
+                                              className="flex items-center gap-4 p-3 hover:bg-white/5 transition-colors cursor-pointer group"
+                                              onClick={() => navigate(`/watch/${encodeURIComponent(item.episode_id)}`)}
+                                            >
+                                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                                                {item.episode_number}
+                                              </div>
+                                              <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                  <span className="text-sm font-medium">Episode {item.episode_number}</span>
+                                                  <span className="text-xs text-muted-foreground">•</span>
+                                                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                                    <Clock className="w-3 h-3" />
+                                                    {formatDate(item.watched_at)}
+                                                  </span>
+                                                </div>
+                                                {item.duration_seconds && (
+                                                  <div className="w-32 h-1 bg-white/5 rounded-full mt-1.5 overflow-hidden">
+                                                    <div
+                                                      className="h-full bg-primary"
+                                                      style={{ width: `${Math.min(100, ((item.progress_seconds || 0) / item.duration_seconds) * 100)}%` }}
+                                                    />
+                                                  </div>
+                                                )}
+                                              </div>
+                                              <Play className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                                            </div>
+                                          ))}
+                                      </div>
+                                    </motion.div>
+                                  ));
+                              })()}
+                            </div>
+                          </section>
+                        )}
+
+                        {hasMangaHistory && (
+                          <section>
+                            <div className="mb-3 flex items-center gap-2 px-1">
+                              <BookOpen className="w-4 h-4 text-primary" />
+                              <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                                Manga Reading
+                              </h3>
+                            </div>
+
+                            <div className="space-y-2">
+                              {mangaHistoryEntries.map((item: any, index: number) => {
+                                const status =
+                                  MANGA_STATUS_LABELS[item.status || 'plan_to_read'] ||
+                                  MANGA_STATUS_LABELS.plan_to_read;
+                                const chapterLabel =
+                                  item.last_chapter_number != null
+                                    ? `Chapter ${item.last_chapter_number}`
+                                    : item.last_chapter_title || 'Reading progress updated';
+                                const chapterKey = String(item.last_chapter_key || '').trim();
+                                const nextPage = Math.max(0, Number(item.last_page_index || 0));
+
+                                return (
+                                  <motion.button
+                                    key={`manga-history-${item.id}`}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: index * 0.03 }}
+                                    className="w-full text-left rounded-xl border border-white/10 bg-white/5 p-3 hover:bg-white/10 transition-colors"
+                                    onClick={() => {
+                                      if (chapterKey) {
+                                        navigate(`/manga/read/${item.manga_id}?chapterKey=${encodeURIComponent(chapterKey)}&page=${nextPage}`);
+                                        return;
+                                      }
+                                      navigate(`/manga/${item.manga_id}`);
+                                    }}
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-10 h-14 rounded-md overflow-hidden bg-muted/30 flex-shrink-0">
+                                        <img
+                                          src={getProxiedImageUrl(item.manga_poster || '/placeholder.svg')}
+                                          alt={item.manga_title}
+                                          className="w-full h-full object-cover"
+                                          loading="lazy"
+                                        />
+                                      </div>
+
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                          <p className="font-semibold line-clamp-1">{item.manga_title}</p>
+                                          <span className={`rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${status.bg} ${status.color}`}>
+                                            {status.label}
+                                          </span>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                                          {chapterLabel}
+                                        </p>
+                                        <p className="text-[11px] text-muted-foreground mt-1">
+                                          {formatDistanceToNow(new Date(item.updated_at), { addSuffix: true })}
+                                        </p>
+                                      </div>
+
+                                      <BookOpen className="w-4 h-4 text-muted-foreground" />
+                                    </div>
+                                  </motion.button>
+                                );
+                              })}
+                            </div>
+                          </section>
+                        )}
                       </div>
                     ) : (
                       <div className="text-center py-20 border-2 border-dashed border-white/5 rounded-2xl">
                         <History className="w-16 h-16 mx-auto text-muted-foreground/30 mb-4" />
-                        <h3 className="text-xl font-bold mb-2">No watch history</h3>
-                        <p className="text-muted-foreground mb-6">{isViewingOther ? 'This user hasn\'t watched any episodes yet.' : 'Episodes you watch will appear here.'}</p>
+                        <h3 className="text-xl font-bold mb-2">No activity history</h3>
+                        <p className="text-muted-foreground mb-6">{isViewingOther ? 'This user has no watch or manga activity yet.' : 'Your anime and manga activity will appear here.'}</p>
                         {!isViewingOther && (
                           <Button onClick={() => navigate('/')}>
                             Start Watching

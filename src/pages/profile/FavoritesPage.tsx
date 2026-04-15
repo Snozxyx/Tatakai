@@ -17,7 +17,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useIsNativeApp } from "@/hooks/useIsNativeApp";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
-import { fetchAniListDiscover, AniListMedia } from "@/lib/externalIntegrations";
+import { fetchAniListDiscover, fetchAniListMediaById, AniListMedia } from "@/lib/externalIntegrations";
+import { parseExternalAnimeId, toPositiveInt } from "@/lib/animeIdMapping";
 
 type TabType = 'for-you' | 'ai-recs' | 'all' | 'watching' | 'completed' | 'plan' | 'on-hold' | 'dropped';
 
@@ -53,7 +54,7 @@ function FavoritesHero({ anime }: { anime: any }) {
     >
       <div className="absolute inset-0">
         <img
-          src={getProxiedImageUrl(anime.anime_poster || anime.poster || '')}
+          src={getProxiedImageUrl(anime.anime_banner || anime.bannerImage || anime.anime_poster || anime.poster || '')}
           className="w-full h-full object-cover scale-105 group-hover:scale-100 transition-transform duration-1000 brightness-75 contrast-110"
           alt={anime.anime_name || anime.name}
         />
@@ -137,6 +138,48 @@ export default function FavoritesPage() {
     const watching = watchlist.filter(item => item.status === 'watching');
     return watching.length > 0 ? watching[0] : watchlist[0];
   }, [watchlist]);
+
+  const heroExternalIds = useMemo(() => {
+    if (!heroAnime) return { anilistId: null as number | null, malId: null as number | null };
+
+    const rawAnimeId = String((heroAnime as any)?.anime_id || (heroAnime as any)?.id || '').trim();
+    const parsed = parseExternalAnimeId(rawAnimeId);
+
+    let anilistId =
+      toPositiveInt((heroAnime as any)?.anilist_id) ||
+      toPositiveInt((heroAnime as any)?.anilistId) ||
+      null;
+    let malId =
+      toPositiveInt((heroAnime as any)?.mal_id) ||
+      toPositiveInt((heroAnime as any)?.malId) ||
+      null;
+
+    if (parsed?.provider === 'anilist') anilistId = parsed.id;
+    if (parsed?.provider === 'mal') malId = parsed.id;
+
+    return { anilistId, malId };
+  }, [heroAnime]);
+
+  const { data: heroAniListMedia } = useQuery({
+    queryKey: ['favorites-hero-banner', heroExternalIds.anilistId, heroExternalIds.malId],
+    queryFn: () =>
+      fetchAniListMediaById({
+        anilistId: heroExternalIds.anilistId,
+        malId: heroExternalIds.malId,
+      }),
+    enabled: Boolean(heroAnime && (heroExternalIds.anilistId || heroExternalIds.malId)),
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const heroDisplayAnime = useMemo(() => {
+    if (!heroAnime) return null;
+    const banner = heroAniListMedia?.bannerImage || '';
+    if (!banner) return heroAnime;
+    return {
+      ...heroAnime,
+      anime_banner: banner,
+    };
+  }, [heroAnime, heroAniListMedia]);
 
   // Filter watchlist by status
   const filteredWatchlist = useMemo(() => {
@@ -321,8 +364,8 @@ export default function FavoritesPage() {
             ) : (
               <>
                 {/* Hero Section for primary tab */}
-                {activeTab === 'for-you' && heroAnime && (
-                  <FavoritesHero anime={heroAnime} />
+                {activeTab === 'for-you' && heroDisplayAnime && (
+                  <FavoritesHero anime={heroDisplayAnime} />
                 )}
 
                 {/* Smart Favorites Section */}

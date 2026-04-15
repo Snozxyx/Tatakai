@@ -1,7 +1,14 @@
-import { apiGet, externalApiGet, TATAKAI_API_URL, getProxiedImageUrl } from "@/lib/api/api-client";
-import { AnimeInfo, AnimeCard, EpisodeData, EpisodeServer, StreamingData, NextEpisodeSchedule } from "@/types/anime";
+import { apiGet, externalApiGet, TATAKAI_API_URL, API_URL, getProxiedImageUrl, unwrapApiData } from "@/lib/api/api-client";
+import type {
+  AnimeInfo,
+  AnimeCard,
+  EpisodeData,
+  EpisodeServer,
+  StreamingData,
+  NextEpisodeSchedule,
+} from "@/types/anime";
 
-const STREAM_API_BASE = (import.meta.env.VITE_STREAM_API_URL || '/api').replace(/\/$/, '');
+const JUSTANIME_PROXY_BASE = String(import.meta.env.VITE_JUSTANIME_PROXY_BASE || `${TATAKAI_API_URL}/justanime`).replace(/\/+$/, "");
 
 export async function fetchAnimeInfo(
   animeId: string
@@ -15,8 +22,15 @@ export async function fetchAnimeInfo(
   return apiGet(`/anime/${animeId}`);
 }
 
+type FetchEpisodesOptions = {
+  preferDirect?: boolean;
+  timeoutMs?: number;
+  skipProxyFallback?: boolean;
+};
+
 export async function fetchEpisodes(
-  animeId: string
+  animeId: string,
+  options: FetchEpisodesOptions = {}
 ): Promise<{ totalEpisodes: number; episodes: EpisodeData[] }> {
   if (/^\d+$/.test(animeId)) {
     let allEpisodes: any[] = [];
@@ -53,6 +67,35 @@ export async function fetchEpisodes(
       }))
     };
   }
+  if (options.preferDirect) {
+    try {
+      const directUrl = `${API_URL}/anime/${encodeURIComponent(animeId)}/episodes`;
+      const response = await fetch(directUrl, {
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(Math.max(1200, Number(options.timeoutMs || 12000))),
+      });
+
+      if (response.ok) {
+        const json = await response.json();
+        return unwrapApiData<{ totalEpisodes: number; episodes: EpisodeData[] }>(json);
+      }
+
+      if (options.skipProxyFallback) {
+        throw new Error(`Direct episode fetch failed with status ${response.status}`);
+      }
+    } catch {
+      if (options.skipProxyFallback) {
+        throw new Error('Direct episode fetch timed out');
+      }
+
+      // Fall back to the existing apiGet proxy chain.
+    }
+  }
+
+  if (options.skipProxyFallback) {
+    throw new Error('Episode fetch failed in fast mode');
+  }
+
   return apiGet(`/anime/${animeId}/episodes`);
 }
 
@@ -125,7 +168,7 @@ export async function fetchEpisodeServers(
   };
 
   try {
-    const response = await fetch(`${STREAM_API_BASE}/servers/${encodeURIComponent(episodeId)}`);
+    const response = await fetch(`${API_URL}/servers/${encodeURIComponent(episodeId)}`);
     if (!response.ok) throw new Error("Failed to fetch servers");
     
     const json = await response.json();
@@ -136,7 +179,7 @@ export async function fetchEpisodeServers(
 
     if (sub.length === 0 && dub.length === 0 && raw.length === 0) {
       const streamRes = await fetch(
-        `${STREAM_API_BASE}/stream?id=${encodeURIComponent(episodeId)}&server=hd-1&type=sub`
+        `${API_URL}/stream?id=${encodeURIComponent(episodeId)}&server=hd-1&type=sub`
       );
       if (streamRes.ok) {
         const streamJson = await streamRes.json();
@@ -155,6 +198,34 @@ export async function fetchEpisodeServers(
     // If the episodeId contains the sequential number in the slug (e.g. frieren-episode-1), we could extract it.
     // For now, let's keep it as is but ensure the WatchPage handles it gracefully by prioritizing its own currentEpisode state.
     if (epMatch) episodeNo = parseInt(epMatch[1]);
+
+    const shouldShowJustAnime = String(import.meta.env.VITE_ENABLE_JUSTANIME_FAST_FIRST ?? "true").toLowerCase() !== "false";
+    if (shouldShowJustAnime) {
+      const hasJustAnimeSub = sub.some((server) => String(server.serverName || "").toLowerCase() === "justanime");
+      const hasJustAnimeDub = dub.some((server) => String(server.serverName || "").toLowerCase() === "justanime");
+
+      if (!hasJustAnimeSub) {
+        sub.push({
+          serverId: 9001,
+          serverName: "justanime",
+          providerKey: "justanime",
+          providerName: "Koro",
+          displayName: "Koro",
+          isProviderServer: true,
+        });
+      }
+
+      if (!hasJustAnimeDub) {
+        dub.push({
+          serverId: 9002,
+          serverName: "justanime",
+          providerKey: "justanime",
+          providerName: "Koro",
+          displayName: "Koro",
+          isProviderServer: true,
+        });
+      }
+    }
 
     return {
       episodeId,
@@ -178,14 +249,164 @@ export async function fetchEpisodeServers(
 export async function fetchStreamingSources(
   episodeId: string,
   server: string = "hd-1",
-  category: string = "sub"
+  category: string = "sub",
+  options: { timeoutMs?: number; animeName?: string; anilistId?: number | string | null } = {}
 ): Promise<StreamingData> {
-  const targetUrl = `${STREAM_API_BASE}/stream?id=${encodeURIComponent(episodeId)}&server=${encodeURIComponent(server)}&type=${encodeURIComponent(category)}`;
+  const toPositiveNumber = (value?: number | string | null): number | null => {
+    if (value === undefined || value === null || value === "") return null;
+    const parsed = typeof value === "number" ? value : Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : null;
+  };
+
+  const slugifySimple = (value?: string): string => {
+    return String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/["'`]/g, "")
+      .replace(/&/g, " and ")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "");
+  };
+
+  const extractEpisodeToken = (value: string): string | null => {
+    const source = String(value || "").trim();
+    if (!source) return null;
+    const epMatch = source.match(/[?&]ep=([^&]+)/i);
+    if (epMatch?.[1]) {
+      try {
+        return decodeURIComponent(epMatch[1]);
+      } catch {
+        return epMatch[1];
+      }
+    }
+    if (/^\d+$/.test(source)) return source;
+    return null;
+  };
+
+  const buildJustAnimeBaseId = (inputEpisodeId: string, animeName?: string, anilistId?: number | string | null): string | null => {
+    const rawBase = String(inputEpisodeId || "").split("?")[0].trim();
+    if (!rawBase) return null;
+
+    let decodedBase = rawBase;
+    try {
+      decodedBase = decodeURIComponent(rawBase);
+    } catch {
+      decodedBase = rawBase;
+    }
+
+    if (/^[a-z0-9]+(?:-[a-z0-9]+)+-\d{5,9}$/i.test(decodedBase)) {
+      return decodedBase;
+    }
+
+    const explicitAniListId = toPositiveNumber(anilistId);
+    if (explicitAniListId) {
+      if (new RegExp(`-${explicitAniListId}$`).test(decodedBase.toLowerCase())) {
+        return decodedBase;
+      }
+      const simple = slugifySimple(animeName || inputEpisodeId.split("?")[0]);
+      if (simple) return `${simple}-${explicitAniListId}`;
+    }
+
+    return decodedBase;
+  };
+
+  const parseStreamResponse = (results: any, fallbackServer: string): StreamingData | null => {
+    const streamingLinks = results?.streamingLink || [];
+    if (!Array.isArray(streamingLinks) || streamingLinks.length === 0) return null;
+
+    const parsedSources = streamingLinks
+      .map((sLink: any) => ({
+        url: sLink.link || sLink.file,
+        type: sLink.type,
+        isM3U8: sLink.type === "hls" || sLink.link?.includes(".m3u8"),
+        quality: "auto",
+        server: sLink.server || fallbackServer,
+        providerName: sLink.server || fallbackServer,
+        isDub: category === "dub",
+        language: category === "dub" ? "Dub" : "Sub",
+      }))
+      .filter((item: any) => !!item.url);
+
+    if (parsedSources.length === 0) return null;
+
+    const subtitles = (results.tracks || []).map((track: any) => ({
+      lang: track.lang || track.label || "Unknown",
+      url: track.url || track.src || track.file,
+      label: track.lang || track.label,
+    }));
+
+    return {
+      headers: { Referer: "https://justanime.fun/", "User-Agent": "Mozilla/5.0" },
+      sources: parsedSources,
+      subtitles,
+      tracks: results.tracks,
+      anilistID: results.anilistID || null,
+      malID: results.malID || null,
+      intro: results.intro,
+      outro: results.outro,
+    };
+  };
+
+  const tryJustAnimeFastFirst = async (): Promise<StreamingData | null> => {
+    const enabled = String(import.meta.env.VITE_ENABLE_JUSTANIME_FAST_FIRST ?? "true").toLowerCase() !== "false";
+    if (!enabled) return null;
+
+    const requestedServer = String(server || "").trim().toLowerCase();
+    if (requestedServer && requestedServer !== "hd-1" && requestedServer !== "justanime") {
+      return null;
+    }
+
+    const epToken = extractEpisodeToken(episodeId);
+    const baseId = buildJustAnimeBaseId(episodeId, options.animeName, options.anilistId);
+    if (!epToken || !baseId) return null;
+
+    const justAnimeEpisodeId = `${baseId}?ep=${epToken}`;
+    const justAnimeUrl = `${JUSTANIME_PROXY_BASE}/stream?id=${encodeURIComponent(justAnimeEpisodeId)}&server=hd-1&type=${encodeURIComponent(category)}`;
+
+    try {
+      const response = await fetch(justAnimeUrl, {
+        headers: {
+          Accept: "application/json",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+        signal: AbortSignal.timeout(Math.max(1000, Math.min(Number(options.timeoutMs || 4500), 7000))),
+      });
+
+      if (!response.ok) return null;
+      const payload = await response.json();
+      if (!payload?.success || !payload?.results) return null;
+      const parsed = parseStreamResponse(payload.results, "hd-1");
+      if (!parsed) return null;
+
+      return {
+        ...parsed,
+        sources: (parsed.sources || []).map((source, index) => ({
+          ...source,
+          server: source.server || "hd-1",
+          providerKey: "justanime",
+          providerName: source.providerName && String(source.providerName).toLowerCase().includes("hd")
+            ? `Koro ${source.providerName}`
+            : "Koro",
+          langCode: source.langCode || `justanime-${index}`,
+        })),
+      };
+    } catch {
+      return null;
+    }
+  };
+
+  const justAnimeFast = await tryJustAnimeFastFirst();
+  if (justAnimeFast) {
+    return justAnimeFast;
+  }
+
+  const targetUrl = `${API_URL}/stream?id=${encodeURIComponent(episodeId)}&server=${encodeURIComponent(server)}&type=${encodeURIComponent(category)}`;
   
   try {
     const response = await fetch(targetUrl, {
       headers: { 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(20000),
+      signal: AbortSignal.timeout(Math.max(1200, Number(options.timeoutMs || 20000))),
     });
 
     if (!response.ok) throw new Error(`HiAnime Stream API returned status ${response.status}`);
@@ -193,35 +414,13 @@ export async function fetchStreamingSources(
     const json = await response.json();
     if (json.success && json.results) {
       const results = json.results;
-      const streamingLinks = results.streamingLink || [];
-      
-      const subtitles = (results.tracks || []).map((track: any) => ({
-        lang: track.lang || track.label || 'Unknown',
-        url: track.url || track.src || track.file,
-        label: track.lang || track.label
-      }));
-
-      const parsedSources = streamingLinks.map((sLink: any) => ({
-        url: sLink.link || sLink.file,
-        type: sLink.type,
-        isM3U8: sLink.type === 'hls' || sLink.link?.includes('.m3u8'),
-        quality: 'auto',
-        server: sLink.server || server,
-        providerName: sLink.server || server,
-        isDub: category === 'dub',
-        language: category === 'dub' ? 'Dub' : 'Sub',
-      }));
-
-      return {
-        headers: { Referer: 'https://megacloud.blog/', 'User-Agent': 'Mozilla/5.0' },
-        sources: parsedSources,
-        subtitles,
-        tracks: results.tracks,
-        anilistID: results.anilistID || null,
-        malID: results.malID || null,
-        intro: results.intro,
-        outro: results.outro
-      };
+      const parsed = parseStreamResponse(results, server);
+      if (parsed) {
+        return {
+          ...parsed,
+          headers: { Referer: 'https://megacloud.blog/', 'User-Agent': 'Mozilla/5.0' },
+        };
+      }
     }
     throw new Error('HiAnime API returned invalid response');
   } catch (error) {

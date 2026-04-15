@@ -39,6 +39,11 @@ const AnimePage = lazy(() => import("../pages/watch/AnimePage"));
 const WatchRoomPage = lazy(() => import("../pages/watch/WatchRoomPage"));
 const IsshoNiPage = lazy(() => import("../pages/watch/IsshoNiPage"));
 
+// Manga & Reading
+const MangaHomePage = lazy(() => import("../pages/manga/MangaHomePage"));
+const MangaPage = lazy(() => import("../pages/manga/MangaPage"));
+const MangaReaderPage = lazy(() => import("../pages/manga/MangaReaderPage"));
+
 // Profile & Personal
 const ProfilePage = lazy(() => import("../pages/profile/ProfilePage"));
 const PublicProfilePage = lazy(() => import("../pages/profile/PublicProfilePage"));
@@ -227,6 +232,9 @@ const AppRoutes = () => {
         <Route path="/mal/:id" element={<ExternalIdRedirect type="mal" />} />
         <Route path="/anilist/:id" element={<ExternalIdRedirect type="anilist" />} />
         <Route path="/anime/:animeId" element={<ProtectedRoute><AnimePage /></ProtectedRoute>} />
+        <Route path="/manga" element={<ProtectedRoute><MangaHomePage /></ProtectedRoute>} />
+        <Route path="/manga/:mangaId" element={<ProtectedRoute><MangaPage /></ProtectedRoute>} />
+        <Route path="/manga/read/:mangaId" element={<ProtectedRoute><MangaReaderPage /></ProtectedRoute>} />
         <Route path="/watch/:episodeId" element={<ProtectedRoute><WatchPage /></ProtectedRoute>} />
         <Route path="/downloads" element={<ProtectedRoute>{isMobileApp ? <MobileOfflinePage /> : <OfflineLibraryPage />}</ProtectedRoute>} />
         <Route path="/offline-library" element={<ProtectedRoute><OfflineLibraryPage /></ProtectedRoute>} />

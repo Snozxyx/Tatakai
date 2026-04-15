@@ -345,6 +345,16 @@ export function clearCachedCombinedSourcesByEpisodeAndCategory(episodeId: string
 }
 
 export async function preflightSourceUrl(url: string, timeoutMs = 4500): Promise<{ ok: boolean; latencyMs: number }> {
+  const normalizedUrl = String(url || "").toLowerCase();
+  if (
+    normalizedUrl.includes("/api/v1/streamingproxy") ||
+    normalizedUrl.includes("/api/v2/hianime/proxy/m3u8-streaming-proxy") ||
+    normalizedUrl.includes("/api/proxy/m3u8-streaming-proxy")
+  ) {
+    // Proxy endpoints can reject ranged probes but still succeed for full playback.
+    return { ok: true, latencyMs: 0 };
+  }
+
   const started = Date.now();
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);

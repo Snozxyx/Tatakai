@@ -27,6 +27,7 @@ interface AddToPlaylistButtonProps {
   animeId: string;
   animeName: string;
   animePoster?: string;
+  mediaType?: 'anime' | 'manga';
   variant?: 'default' | 'icon' | 'mini';
   className?: string;
 }
@@ -35,6 +36,7 @@ export function AddToPlaylistButton({
   animeId, 
   animeName, 
   animePoster,
+  mediaType = 'anime',
   variant = 'default',
   className 
 }: AddToPlaylistButtonProps) {
@@ -50,6 +52,7 @@ export function AddToPlaylistButton({
   const { data: inPlaylists = [] } = useAnimeInPlaylists(animeId);
   const createPlaylist = useCreatePlaylist();
   const addToPlaylist = useAddToPlaylist();
+  const mediaLabel = mediaType === 'manga' ? 'Manga' : 'Anime';
 
   // Show a visual indication if this anime is already in any of the user's playlists
   const isInAnyPlaylist = (inPlaylists || []).length > 0;
@@ -151,7 +154,7 @@ export function AddToPlaylistButton({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          {/* Anime preview */}
+          {/* Media preview */}
           <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-white/5">
             {animePoster && (
               <img 
@@ -161,6 +164,7 @@ export function AddToPlaylistButton({
               />
             )}
             <div className="flex-1 min-w-0">
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">{mediaLabel}</p>
               <p className="font-medium line-clamp-2">{animeName}</p>
             </div>
           </div>
@@ -282,7 +286,7 @@ export function AddToPlaylistButton({
                             <div className="flex-1 min-w-0">
                               <p className="font-medium line-clamp-1">{playlist.name}</p>
                               <p className="text-xs text-muted-foreground">
-                                {playlist.items_count} {playlist.items_count === 1 ? 'anime' : 'anime'}
+                                {playlist.items_count} {playlist.items_count === 1 ? 'item' : 'items'}
                                 {playlist.is_public && (
                                   <span className="ml-2 inline-flex items-center gap-1">
                                     <Globe className="w-3 h-3" /> Public

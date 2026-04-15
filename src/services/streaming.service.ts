@@ -93,9 +93,17 @@ export async function fetchCombinedSources(
   episodeNumber: number | undefined,
   server: string = "hd-1",
   category: string = "sub",
-  currentUserId?: string
+  currentUserId?: string,
+  knownAnilistId?: number | string | null,
+  knownMalId?: number | string | null
 ): Promise<StreamingData & { hasTatakaiAPI: boolean }> {
   if (!episodeId) throw new Error("Episode ID required");
+
+  const toPositiveNumber = (value?: number | string | null): number | undefined => {
+    if (value === undefined || value === null || value === "") return undefined;
+    const parsed = typeof value === "number" ? value : Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+  };
 
   let primaryData: StreamingData = {
     headers: { Referer: "", "User-Agent": "" },
@@ -107,7 +115,10 @@ export async function fetchCombinedSources(
   let directHiAnimeSuccess = false;
 
   try {
-    primaryData = await fetchStreamingSources(episodeId, server, category);
+    primaryData = await fetchStreamingSources(episodeId, server, category, {
+      animeName,
+      anilistId: knownAnilistId,
+    });
     directHiAnimeSuccess = true;
   } catch (error) {
     console.warn('Direct HiAnime API failed, trying TatakaiAPI fallback');
@@ -119,9 +130,11 @@ export async function fetchCombinedSources(
     }
   }
 
-  let malID = primaryData.malID || undefined;
-  let anilistID = primaryData.anilistID || undefined;
+  let malID = toPositiveNumber(primaryData.malID) ?? toPositiveNumber(knownMalId);
+  let anilistID = toPositiveNumber(primaryData.anilistID) ?? toPositiveNumber(knownAnilistId);
   const hasTatakaiAPI = directHiAnimeSuccess;
+  const EXTERNAL_PROVIDERS_ENABLED = String(import.meta.env.VITE_ENABLE_EXTERNAL_PROVIDERS ?? 'true').toLowerCase() !== 'false';
+  const hasValidEpisodeNumber = Number.isFinite(episodeNumber) && Number(episodeNumber) > 0;
 
   let providerData: StreamingData & { providerServers?: Array<any> } = {
     headers: { Referer: "", "User-Agent": "" },
@@ -132,27 +145,37 @@ export async function fetchCombinedSources(
     providerServers: [],
   };
 
-  try {
-    const inferredSeason = inferSeasonFromContext(animeName, episodeId);
-    providerData = await fetchTatakaiProviderSources({
-      animeId: episodeId?.split("?")[0],
-      animeName,
-      episodeNumber,
-      season: inferredSeason,
-      category: category as "sub" | "dub",
-      anilistId: anilistID,
-      malId: malID,
-    });
-  } catch (error) {
-    console.warn("Tatakai provider aggregation failed:", error);
+  if (EXTERNAL_PROVIDERS_ENABLED && hasValidEpisodeNumber) {
+    try {
+      const inferredSeason = inferSeasonFromContext(animeName, episodeId);
+      providerData = await fetchTatakaiProviderSources({
+        animeId: episodeId?.split("?")[0],
+        animeName,
+        episodeNumber: Number(episodeNumber),
+        season: inferredSeason,
+        category: category as "sub" | "dub",
+        anilistId: anilistID,
+        malId: malID,
+      });
+
+      // Preserve IDs from provider payload when primary stream payload omitted them.
+      anilistID = anilistID ?? toPositiveNumber(providerData.anilistID);
+      malID = malID ?? toPositiveNumber(providerData.malID);
+    } catch (error) {
+      console.warn("Tatakai provider aggregation failed:", error);
+    }
+  } else if (EXTERNAL_PROVIDERS_ENABLED && import.meta.env.DEV) {
+    console.log("[Tatakai] Provider fanout skipped: episode number not ready yet");
   }
 
   // Always include custom/marketplace sources in returned payload.
   let customSources: any[] = [];
-  try {
-    customSources = await fetchCustomSupabaseSources(episodeId.split('?')[0], episodeId, episodeNumber, currentUserId);
-  } catch {
-    customSources = [];
+  if (EXTERNAL_PROVIDERS_ENABLED) {
+    try {
+      customSources = await fetchCustomSupabaseSources(episodeId.split('?')[0], episodeId, episodeNumber, currentUserId);
+    } catch {
+      customSources = [];
+    }
   }
 
   // Fetch Marketplace Subtitles
@@ -187,21 +210,27 @@ export async function fetchCombinedSources(
 
   const allSources = [
     ...(primaryData.sources || []),
-    ...(providerData.sources || []),
-    ...(Array.isArray(customSources) ? customSources : [])
+    ...(EXTERNAL_PROVIDERS_ENABLED ? (providerData.sources || []) : []),
+    ...(EXTERNAL_PROVIDERS_ENABLED && Array.isArray(customSources) ? customSources : [])
   ];
 
-  const mergedProviderServers = [
-    ...((providerData.providerServers || []) as any[]),
-  ];
+  const mergedProviderServers = EXTERNAL_PROVIDERS_ENABLED
+    ? [...((providerData.providerServers || []) as any[])]
+    : [];
 
   return {
     sources: allSources,
-    subtitles: mergeSubtitleLikeLists(primaryData.subtitles as any[], providerData.subtitles as any[]),
-    tracks: mergeSubtitleLikeLists(primaryData.tracks as any[], providerData.tracks as any[]),
+    subtitles: mergeSubtitleLikeLists(
+      primaryData.subtitles as any[],
+      EXTERNAL_PROVIDERS_ENABLED ? (providerData.subtitles as any[]) : []
+    ),
+    tracks: mergeSubtitleLikeLists(
+      primaryData.tracks as any[],
+      EXTERNAL_PROVIDERS_ENABLED ? (providerData.tracks as any[]) : []
+    ),
     providerServers: mergedProviderServers,
-    anilistID: typeof anilistID === 'string' ? parseInt(anilistID) : (anilistID || null),
-    malID: typeof malID === 'string' ? parseInt(malID) : (malID || null),
+    anilistID: anilistID || null,
+    malID: malID || null,
     intro: primaryData.intro,
     outro: primaryData.outro,
     headers: primaryData.headers,

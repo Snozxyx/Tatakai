@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import {
   fetchHome,
   fetchAnimeInfo,
@@ -9,6 +9,7 @@ import {
   fetchGenreAnimes,
   fetchNextEpisodeSchedule,
 } from "@/lib/api";
+import type { AnimeSearchFilters } from "@/services/home.service";
 
 // Detect mobile for longer cache times
 const isMobileNative = typeof window !== 'undefined' && 
@@ -72,11 +73,29 @@ export function useStreamingSources(
   });
 }
 
-export function useSearch(query: string, page: number = 1) {
+export function useSearch(query: string, page: number = 1, filters: AnimeSearchFilters = {}) {
   return useQuery({
-    queryKey: ["search", query, page],
-    queryFn: () => searchAnime(query, page),
+    queryKey: ["search", query, page, filters],
+    queryFn: () => searchAnime(query, page, filters),
     enabled: query.length > 0,
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function useInfiniteSearch(
+  query: string,
+  filters: AnimeSearchFilters = {},
+  enabled: boolean = true
+) {
+  return useInfiniteQuery({
+    queryKey: ["search-infinite", query, filters],
+    queryFn: ({ pageParam = 1 }) => searchAnime(query, pageParam, filters),
+    getNextPageParam: (lastPage: any) => {
+      if (!lastPage || !lastPage.hasNextPage) return undefined;
+      return lastPage.currentPage + 1;
+    },
+    initialPageParam: 1,
+    enabled: enabled && query.length > 0,
     staleTime: 2 * 60 * 1000,
   });
 }
@@ -85,6 +104,20 @@ export function useGenreAnimes(genre: string | undefined, page: number = 1) {
   return useQuery({
     queryKey: ["genre", genre, page],
     queryFn: () => fetchGenreAnimes(genre!, page),
+    enabled: !!genre,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useInfiniteGenreAnimes(genre: string | undefined) {
+  return useInfiniteQuery({
+    queryKey: ["genre-infinite", genre],
+    queryFn: ({ pageParam = 1 }) => fetchGenreAnimes(genre!, pageParam),
+    getNextPageParam: (lastPage: any) => {
+      if (!lastPage || !lastPage.hasNextPage) return undefined;
+      return lastPage.currentPage + 1;
+    },
+    initialPageParam: 1,
     enabled: !!genre,
     staleTime: 5 * 60 * 1000,
   });

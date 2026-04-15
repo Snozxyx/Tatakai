@@ -4,6 +4,7 @@ import { AnimeCard, getProxiedImageUrl, getHighQualityPoster } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 import { AnimeCardWithPreview } from "./AnimeCardWithPreview";
 import { useTheme } from "@/hooks/useTheme";
+import { buildPreferredAnimeRouteId } from "@/lib/animeIdMapping";
 
 interface AnimeGridProps {
   animes: AnimeCard[];
@@ -28,15 +29,33 @@ export function AnimeGrid({ animes, title, icon, enablePreview = false }: AnimeG
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        {animes.map((anime) => (
-          enablePreview ? (
+        {animes.map((anime) => {
+          const routeAnimeId =
+            buildPreferredAnimeRouteId({
+              id: anime.id,
+              name: anime.name,
+              malId: anime.malId,
+              malID: (anime as any)?.malID,
+              mal_id: (anime as any)?.mal_id,
+              anilistId: anime.anilistId,
+              anilistID: (anime as any)?.anilistID,
+              anilist_id: (anime as any)?.anilist_id,
+            });
+
+          return enablePreview ? (
             <AnimeCardWithPreview key={anime.id} anime={anime} showPreview={true} />
           ) : (
             <GlassPanel
               key={anime.id}
               hoverEffect={!isUltraLite}
               className="group cursor-pointer overflow-hidden"
-              onClick={() => navigate(`/anime/${anime.id}`)}
+              onClick={() => {
+                if (routeAnimeId) {
+                  navigate(`/anime/${routeAnimeId}`);
+                  return;
+                }
+                navigate(`/search?q=${encodeURIComponent(anime.name)}`);
+              }}
             >
               <div className="relative aspect-[3/4]">
                 <img
@@ -81,8 +100,8 @@ export function AnimeGrid({ animes, title, icon, enablePreview = false }: AnimeG
                 </div>
               </div>
             </GlassPanel>
-          )
-        ))}
+          );
+        })}
       </div>
     </section>
   );

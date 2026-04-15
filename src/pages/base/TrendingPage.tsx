@@ -5,46 +5,55 @@ import { AnimeCardWithPreview } from "@/components/anime/AnimeCardWithPreview";
 import { Skeleton } from "@/components/ui/skeleton-custom";
 import { useTrendingAnime, formatViewCount } from "@/hooks/useViews";
 import { fetchHome, TrendingAnime as ApiTrendingAnime, AnimeCard } from "@/lib/api";
-import { fetchAniListDiscover, AniListMedia } from "@/lib/externalIntegrations";
+import { fetchAniListDiscover, fetchAniListMediaById, AniListMedia } from "@/lib/externalIntegrations";
 import { Flame, TrendingUp, Clock, Sparkles, Heart } from "lucide-react";
 import { Sparkline } from '@/components/ui/Sparkline';
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { useIsNativeApp } from "@/hooks/useIsNativeApp";
 import { cn } from "@/lib/utils";
+import {
+  buildExternalAnimeRouteId,
+  buildPreferredAnimeRouteId,
+  collectAnimeCandidatesFromHome,
+  createAnimeIdMappingIndex,
+  parseExternalAnimeId,
+  registerAnimeIdMappings,
+  toPositiveInt,
+} from "@/lib/animeIdMapping";
 
 type TimeFrame = 'today' | 'week' | 'month' | 'all';
 
+const normalizeAnimeName = (value?: string | null) =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/[\W_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
 // Convert API trending anime to AnimeCard format for our component
-function trendingToCard(trending: ApiTrendingAnime): AnimeCard {
+function trendingToCard(trending: ApiTrendingAnime, routeIdOverride?: string): AnimeCard {
+  const malId = toPositiveInt((trending as any)?.malId ?? (trending as any)?.malID ?? (trending as any)?.mal_id);
+  const anilistId = toPositiveInt((trending as any)?.anilistId ?? (trending as any)?.anilistID ?? (trending as any)?.anilist_id);
   return {
-    id: trending.id,
+    id: routeIdOverride || trending.id,
     name: trending.name,
     poster: trending.poster,
     type: 'TV',
     episodes: { sub: 0, dub: 0 },
     rating: undefined,
-  };
-}
-
-function aniListToCard(media: AniListMedia): AnimeCard {
-  const title = media?.title?.english || media?.title?.romaji || media?.title?.native || `AniList #${media.id}`;
-  const id = media?.idMal ? `mal-${media.idMal}` : `anilist-${media.id}`;
-  return {
-    id,
-    name: title,
-    poster: media?.coverImage?.large || media?.coverImage?.medium || '',
-    type: media?.format || 'TV',
-    episodes: { sub: Number(media?.episodes || 0), dub: 0 },
-    rating: media?.averageScore ? (media.averageScore / 10).toFixed(1) : undefined,
-    malId: media?.idMal || undefined,
-    anilistId: media?.id,
+    malId: malId || undefined,
+    anilistId: anilistId || undefined,
   };
 }
 
 function TrendingHero({ anime, rank, views }: { anime: AnimeCard; rank: number; views?: number }) {
+  const animeLink = anime.id
+    ? `/anime/${anime.id}`
+    : `/search?q=${encodeURIComponent(anime.name)}`;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -94,13 +103,13 @@ function TrendingHero({ anime, rank, views }: { anime: AnimeCard; rank: number; 
           className="flex items-center gap-4"
         >
           <Link
-            to={`/anime/${anime.id}`}
+            to={animeLink}
             className="px-4 md:px-8 py-2 md:py-3 bg-white text-black rounded-xl md:rounded-2xl text-sm md:text-base font-bold hover:scale-105 transition-transform"
           >
             Watch Now
           </Link>
           <Link
-            to={`/anime/${anime.id}`}
+            to={animeLink}
             className="px-4 md:px-8 py-2 md:py-3 bg-white/10 backdrop-blur-md text-white rounded-xl md:rounded-2xl text-sm md:text-base font-bold hover:bg-white/20 transition-all border border-white/10"
           >
             Details
@@ -146,27 +155,162 @@ export default function TrendingPage() {
 
   // Get anime cards from API homepage data
   const apiTrending = homepageData?.trendingAnimes || [];
+  const homeIdMappingIndex = useMemo(() => {
+    const index = createAnimeIdMappingIndex();
+    registerAnimeIdMappings(index, collectAnimeCandidatesFromHome(homepageData));
+    return index;
+  }, [homepageData]);
+
   const apiTrendingById = useMemo(() => {
     const map = new Map<string, ApiTrendingAnime>();
-    apiTrending.forEach((item) => map.set(item.id, item));
+
+    apiTrending.forEach((item) => {
+      const routeKeys = new Set<string>();
+      const preferredId = buildPreferredAnimeRouteId(item as any, homeIdMappingIndex);
+      const fallbackExternalId = buildExternalAnimeRouteId(
+        (item as any)?.malId ?? (item as any)?.malID ?? (item as any)?.mal_id,
+        (item as any)?.anilistId ?? (item as any)?.anilistID ?? (item as any)?.anilist_id
+      );
+
+      if (preferredId) routeKeys.add(preferredId);
+      if (typeof item?.id === 'string' && item.id.trim()) routeKeys.add(item.id.trim());
+      if (fallbackExternalId) routeKeys.add(fallbackExternalId);
+
+      for (const key of routeKeys) {
+        map.set(key, item);
+      }
+    });
+
+    return map;
+  }, [apiTrending, homeIdMappingIndex]);
+
+  const apiTrendingByName = useMemo(() => {
+    const map = new Map<string, ApiTrendingAnime>();
+    apiTrending.forEach((item) => {
+      const key = normalizeAnimeName(item?.name);
+      if (key) map.set(key, item);
+    });
     return map;
   }, [apiTrending]);
+
+  const resolveInternalTrendingCard = useCallback((entry: any): AnimeCard => {
+    const rawEntryId = String(entry?.anime_id || '').trim();
+    const safeRawEntryId = /^(mal|anilist)-/i.test(rawEntryId) ? '' : rawEntryId;
+
+    const preferredRouteId = buildPreferredAnimeRouteId(
+      {
+        id: entry?.anime_id,
+        name: entry?.anime_name,
+        malId: entry?.malId,
+        malID: entry?.malID,
+        anilistId: entry?.anilistId,
+        anilistID: entry?.anilistID,
+      },
+      homeIdMappingIndex
+    );
+
+    const directResolved =
+      (preferredRouteId && apiTrendingById.get(preferredRouteId)) ||
+      apiTrendingById.get(String(entry?.anime_id || '').trim()) ||
+      apiTrendingByName.get(normalizeAnimeName(entry?.anime_name));
+
+    if (directResolved) {
+      const resolvedRouteId =
+        buildPreferredAnimeRouteId(directResolved as any, homeIdMappingIndex) ||
+        directResolved.id;
+      return trendingToCard(directResolved, resolvedRouteId);
+    }
+
+    return {
+      id: preferredRouteId || safeRawEntryId || '',
+      name: entry?.anime_name || safeRawEntryId || 'Unknown Anime',
+      poster: entry?.poster || '',
+      type: 'TV',
+      episodes: { sub: 0, dub: 0 },
+      rating: undefined,
+    };
+  }, [homeIdMappingIndex, apiTrendingById, apiTrendingByName]);
+
+  const aniListToCard = (media: AniListMedia): AnimeCard => {
+    const title = media?.title?.english || media?.title?.romaji || media?.title?.native || `AniList #${media.id}`;
+    const malId = toPositiveInt(media?.idMal);
+    const anilistId = toPositiveInt(media?.id);
+    const fallbackExternalId = buildExternalAnimeRouteId(malId, anilistId);
+    const routeId =
+      buildPreferredAnimeRouteId(
+        {
+          id: fallbackExternalId || undefined,
+          name: title,
+          malId,
+          anilistId,
+        },
+        homeIdMappingIndex
+      ) ||
+      fallbackExternalId ||
+      `anilist-${media.id}`;
+
+    return {
+      id: routeId,
+      name: title,
+      poster: media?.coverImage?.large || media?.coverImage?.medium || '',
+      type: media?.format || 'TV',
+      episodes: { sub: Number(media?.episodes || 0), dub: 0 },
+      rating: media?.averageScore ? (media.averageScore / 10).toFixed(1) : undefined,
+      malId: malId || undefined,
+      anilistId: anilistId || undefined,
+    };
+  };
 
   const heroInternalAnime = useMemo(() => {
     if (!hasInternalData) return null;
     const first = internalTrending[0] as any;
-    const resolved = apiTrendingById.get(first.anime_id);
-    if (resolved) return trendingToCard(resolved);
+    return resolveInternalTrendingCard(first);
+  }, [hasInternalData, internalTrending, resolveInternalTrendingCard]);
 
+  const heroBaseAnime = useMemo(() => {
+    if (hasInternalData) return heroInternalAnime;
+    if (!apiTrending[0]) return null;
+    return trendingToCard(
+      apiTrending[0],
+      buildPreferredAnimeRouteId(apiTrending[0] as any, homeIdMappingIndex) || apiTrending[0].id
+    );
+  }, [hasInternalData, heroInternalAnime, apiTrending, homeIdMappingIndex]);
+
+  const heroExternalIds = useMemo(() => {
+    if (!heroBaseAnime) return { anilistId: null as number | null, malId: null as number | null };
+
+    let anilistId = toPositiveInt(heroBaseAnime.anilistId) || null;
+    let malId = toPositiveInt(heroBaseAnime.malId) || null;
+
+    if ((!anilistId && !malId) && heroBaseAnime.id) {
+      const parsed = parseExternalAnimeId(heroBaseAnime.id);
+      if (parsed?.provider === 'anilist') anilistId = parsed.id;
+      if (parsed?.provider === 'mal') malId = parsed.id;
+    }
+
+    return { anilistId, malId };
+  }, [heroBaseAnime]);
+
+  const { data: heroAniListMedia } = useQuery({
+    queryKey: ['anilist-trending-hero-banner', heroExternalIds.anilistId, heroExternalIds.malId],
+    queryFn: () =>
+      fetchAniListMediaById({
+        anilistId: heroExternalIds.anilistId,
+        malId: heroExternalIds.malId,
+      }),
+    enabled: Boolean(heroBaseAnime && (heroExternalIds.anilistId || heroExternalIds.malId)),
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const heroDisplayAnime = useMemo(() => {
+    if (!heroBaseAnime) return null;
+    const banner = heroAniListMedia?.bannerImage || '';
+    if (!banner) return heroBaseAnime;
     return {
-      id: first.anime_id,
-      name: first.anime_name || first.anime_id,
-      poster: first.poster || '',
-      type: 'TV',
-      episodes: { sub: 0, dub: 0 },
-      rating: undefined,
-    } as AnimeCard;
-  }, [hasInternalData, internalTrending, apiTrendingById]);
+      ...heroBaseAnime,
+      poster: banner,
+    };
+  }, [heroBaseAnime, heroAniListMedia]);
 
   const timeFrameButtons: { id: TimeFrame; label: string; icon: React.ReactNode }[] = [
     { id: 'today', label: 'Today', icon: <Clock className="w-4 h-4" /> },
@@ -268,39 +412,27 @@ export default function TrendingPage() {
               className="space-y-12"
             >
               {/* Hero for #1 */}
-              {hasInternalData ? (
+              {heroDisplayAnime ? (
                 <TrendingHero
-                  anime={heroInternalAnime!}
+                  anime={heroDisplayAnime}
                   rank={1}
-                  views={internalTrending[0]?.views_week}
+                  views={hasInternalData ? internalTrending[0]?.views_week : undefined}
                 />
-              ) : apiTrending[0] && (
-                <TrendingHero
-                  anime={trendingToCard(apiTrending[0])}
-                  rank={1}
-                />
-              )}
+              ) : null}
 
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-4 gap-y-10 md:gap-x-6 md:gap-y-12">
                 {(hasInternalData ? internalTrending.slice(1) : apiTrending.slice(1)).map((t: any, index: number) => {
-                  const resolvedApi = hasInternalData ? apiTrendingById.get(t.anime_id) : null;
                   const anime = hasInternalData
-                    ? (resolvedApi
-                      ? trendingToCard(resolvedApi)
-                      : {
-                        id: t.anime_id,
-                        name: t.anime_name || t.anime_id,
-                        poster: t.poster || '',
-                        type: 'TV',
-                        episodes: { sub: 0, dub: 0 },
-                        rating: undefined,
-                      })
-                    : trendingToCard(t);
+                    ? resolveInternalTrendingCard(t)
+                    : trendingToCard(
+                      t,
+                      buildPreferredAnimeRouteId(t as any, homeIdMappingIndex) || t.id
+                    );
                   const rank = index + 2;
 
                   return (
                     <motion.div
-                      key={anime.id}
+                      key={`${anime.id || 'anime'}-${index}`}
                       layout
                       initial={{ opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}

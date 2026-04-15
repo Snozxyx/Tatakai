@@ -573,7 +573,7 @@ export default function OnboardingPage() {
       <div className="relative z-10 min-h-screen flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-6 md:p-10 relative z-20">
-          <motion.div
+          {/* <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             className="flex items-center gap-3"
@@ -581,8 +581,7 @@ export default function OnboardingPage() {
             <div className="w-10 h-10 bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-500 rounded-xl flex items-center justify-center shadow-lg shadow-pink-500/20 rotate-3">
               <PlayCircle className="w-6 h-6 text-white" />
             </div>
-            <span className="font-black text-2xl tracking-tighter bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent italic">TATAKAI</span>
-          </motion.div>
+            {/* <span className="font-black text-2xl tracking-tighter bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent italic">TATAKAI</span> */}
           <Button variant="ghost" onClick={handleSkip} className="text-muted-foreground/60 hover:text-white hover:bg-white/5 rounded-full px-6">
             Skip Intro
           </Button>
