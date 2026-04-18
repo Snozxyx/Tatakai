@@ -106,6 +106,18 @@ const normalizePreferredMangaLanguage = (value: unknown): PreferredMangaLanguage
 
 const FALLBACK_CHANGELOG = [
   {
+    version: '5.0.1',
+    date: '2026-04-18',
+    changes: [
+      'Producer Search Routing: Producer chips now open the dedicated producer search route and the search page loads producer results directly',
+      'Tierlist Character Links: Tierlist character cards now prefer MAL numeric IDs for stable character page navigation',
+      'Curated Discovery Lanes: Added manual homepage curation tools plus new manga/anime discovery lanes and quick filters',
+      'Admin Surface Expansion: Added API health, canonical snapshot, and source validation tools to the admin dashboard',
+      'Playback and Proxy Resilience: Improved codec recovery, source blocking, and provider refresh behavior during stream failures',
+      'Version Sync: Bumped the package version and aligned the settings changelog with the new release entry',
+    ],
+  },
+  {
     version: '5.0.0',
     date: '2026-04-08',
     changes: [
