@@ -13,7 +13,7 @@ import {
     searchJikanCharacters,
     JikanCharacterFullResponse
 } from '@/lib/api';
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 
 export default function CharacterPage() {
@@ -34,10 +34,69 @@ export default function CharacterPage() {
         return charname ? /^\d+$/.test(charname) : false;
     }, [charname]);
 
+    const isExternalCharacterId = useMemo(() => {
+        return charname ? /^ext-\d+$/i.test(charname) : false;
+    }, [charname]);
+
     // Determine if it's a MongoDB ObjectID
     const isMongoId = useMemo(() => {
         return charname ? /^[0-9a-fA-F]{24}$/.test(charname) : false;
     }, [charname]);
+
+    const normalizeNameForMatch = (value: string) =>
+        value
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, ' ')
+            .trim();
+
+    const namesLikelyMatch = (left?: string | null, right?: string | null) => {
+        const normalizedLeft = normalizeNameForMatch(String(left || ''));
+        const normalizedRight = normalizeNameForMatch(String(right || ''));
+
+        if (!normalizedLeft || !normalizedRight) return false;
+        if (normalizedLeft === normalizedRight) return true;
+        if (normalizedLeft.includes(normalizedRight) || normalizedRight.includes(normalizedLeft)) return true;
+
+        const leftTokens = new Set(normalizedLeft.split(' ').filter((token) => token.length > 2));
+        const rightTokens = normalizedRight.split(' ').filter((token) => token.length > 2);
+        const overlapCount = rightTokens.filter((token) => leftTokens.has(token)).length;
+
+        return overlapCount >= Math.min(2, rightTokens.length);
+    };
+
+    const enrichInternalCharacterWithJikan = async (character: CharacterDetail): Promise<CharacterDetail> => {
+        const image = String(character?.image || '').trim();
+        const description = String(character?.description || '').trim();
+        const hasSyntheticDescription = /is known as .*occupation:/i.test(description);
+
+        const needsImage = !image || image === '/placeholder.svg';
+        const needsDescription = !description || description.length < 120 || hasSyntheticDescription;
+
+        if (!needsImage && !needsDescription) return character;
+
+        const nameQuery = String(character?.name || fallbackName || charname || '').trim();
+        if (!nameQuery) return character;
+
+        try {
+            const response = await searchJikanCharacters(nameQuery, 1);
+            const candidate = Array.isArray(response?.data) ? response.data[0] : undefined;
+            if (!candidate) return character;
+
+            const candidateImage =
+                candidate.images?.jpg?.image_url ||
+                candidate.images?.webp?.image_url ||
+                '';
+            const candidateAbout = String(candidate.about || '').trim();
+
+            return {
+                ...character,
+                image: needsImage && candidateImage ? candidateImage : character.image,
+                description: needsDescription && candidateAbout ? candidateAbout : character.description,
+            };
+        } catch {
+            return character;
+        }
+    };
 
     // Fetch from Jikan API for numeric IDs
     const { data: jikanCharacter, isLoading: jikanLoading, error: jikanError } = useQuery({
@@ -46,9 +105,14 @@ export default function CharacterPage() {
             if (!charname || !isNumericId) return null;
             const malId = parseInt(charname, 10);
             const response = await fetchJikanCharacter(malId);
+
+            if (fallbackName && !namesLikelyMatch(response?.data?.name, fallbackName)) {
+                return null;
+            }
+
             return response;
         },
-        enabled: isNumericId,
+        enabled: isNumericId && !isExternalCharacterId,
         retry: 1
     });
 
@@ -58,14 +122,38 @@ export default function CharacterPage() {
         queryFn: async () => {
             if (!charname) throw new Error('Character name/ID required');
 
-            // If it's a numeric ID, skip internal API (handled by Jikan)
-            if (isNumericId) return null;
+            if (isExternalCharacterId) {
+                const response = await fetchCharacterById(charname);
+                if (response.success) return enrichInternalCharacterWithJikan(response.data);
+            }
+
+            if (isNumericId) {
+                const numericNameHint = String(fallbackName || '').trim();
+                if (!numericNameHint) return null;
+
+                try {
+                    const directLookup = await fetchCharacterById(charname);
+                    if (directLookup.success && namesLikelyMatch(directLookup.data?.name, numericNameHint)) {
+                        return enrichInternalCharacterWithJikan(directLookup.data);
+                    }
+                } catch {
+                    // Fall through to name-based search.
+                }
+
+                const numericSearch = await searchCharacters(numericNameHint);
+                if (numericSearch.success && numericSearch.data.length > 0) {
+                    const detailedResp = await fetchCharacterById(numericSearch.data[0]._id);
+                    if (detailedResp.success) return enrichInternalCharacterWithJikan(detailedResp.data);
+                }
+
+                return null;
+            }
 
             // Try as MongoDB ID first
             if (isMongoId) {
                 try {
                     const response = await fetchCharacterById(charname);
-                    if (response.success) return response.data;
+                    if (response.success) return enrichInternalCharacterWithJikan(response.data);
                 } catch (e) {
                     console.warn('ID lookup failed, falling back to name search');
                 }
@@ -78,7 +166,7 @@ export default function CharacterPage() {
             if (searchResponse.success && searchResponse.data.length > 0) {
                 const firstResultId = searchResponse.data[0]._id;
                 const detailedResp = await fetchCharacterById(firstResultId);
-                if (detailedResp.success) return detailedResp.data;
+                if (detailedResp.success) return enrichInternalCharacterWithJikan(detailedResp.data);
             }
 
             // Final attempt with raw charname
@@ -86,17 +174,25 @@ export default function CharacterPage() {
                 const retrySearch = await searchCharacters(charname);
                 if (retrySearch.success && retrySearch.data.length > 0) {
                     const detailedResp = await fetchCharacterById(retrySearch.data[0]._id);
-                    if (detailedResp.success) return detailedResp.data;
+                    if (detailedResp.success) return enrichInternalCharacterWithJikan(detailedResp.data);
                 }
             }
             throw new Error('Character not found');
         },
-        enabled: !isNumericId,
+        enabled:
+            !isNumericId ||
+            isExternalCharacterId ||
+            Boolean(fallbackName && !jikanLoading && !jikanCharacter),
         retry: 1
     });
 
-    const isLoading = jikanLoading || internalLoading;
-    const error = isNumericId ? jikanError : internalError;
+    const hasCharacterData = Boolean((isNumericId && jikanCharacter) || internalCharacter);
+    const isLoading = hasCharacterData ? false : (jikanLoading || internalLoading);
+    const error = hasCharacterData
+        ? null
+        : isNumericId
+            ? (jikanError || internalError)
+            : internalError;
 
     // Render Jikan character data
     const renderJikanCharacter = (data: JikanCharacterFullResponse) => {

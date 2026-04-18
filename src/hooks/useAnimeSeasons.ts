@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { API_URL, TATAKAI_API_URL, unwrapApiData } from '@/lib/api/api-client';
 
 interface Season {
   id: string;
@@ -15,26 +16,28 @@ export function useAnimeSeasons(animeId: string | undefined) {
       if (!animeId) return [];
 
       try {
-        // Use TatakaiAPI for numeric IDs (Anilist)
+        let resolvedAnimeId = animeId;
+
+        // New model: numeric AniList IDs are mapped via /api/v2/anime/mapper.
         if (/^\d+$/.test(animeId)) {
-          const res = await fetch(`https://api.tatakai.me/api/v1/animelok/anime/${animeId}/seasons`);
-          if (res.ok) {
-            const json = await res.json();
-            if (json.status === 200 && json.data?.seasons) {
-              return json.data.seasons.map((s: any) => ({
-                id: s.id,
-                name: s.title,
-                title: s.title,
-                poster: s.poster,
-                isCurrent: s.id === animeId
-              }));
+          const mapperRes = await fetch(`${TATAKAI_API_URL}/mapper/map/hianime/${animeId}`, {
+            headers: { Accept: 'application/json' },
+            signal: AbortSignal.timeout(6000),
+          });
+
+          if (mapperRes.ok) {
+            const mapperJson = await mapperRes.json();
+            const mapped = unwrapApiData<{ id?: string | number }>(mapperJson as any);
+            const mappedId = String(mapped?.id || '').trim();
+            if (mappedId) {
+              resolvedAnimeId = mappedId;
             }
           }
         }
 
         // Try the local proxy endpoint first (avoids CORS issues in browser)
-        const proxyUrl = `/api/proxy/aniwatch/anime/${animeId}`;
-        const directUrl = `https://api.tatakai.me/api/v2/hianime/anime/${animeId}`;
+        const proxyUrl = `/api/proxy/aniwatch/anime/${resolvedAnimeId}`;
+        const directUrl = `${API_URL}/anime/${resolvedAnimeId}`;
 
         let res: Response | null = null;
         let attemptedUrl = proxyUrl;
@@ -55,8 +58,10 @@ export function useAnimeSeasons(animeId: string | undefined) {
           return [];
         }
 
-        const data = await res.json();
-        const relatedAnimes = data.data?.relatedAnimes || [];
+        const raw = await res.json();
+        const data = unwrapApiData<any>(raw as any);
+        const relatedAnimes = Array.isArray(data?.relatedAnimes) ? data.relatedAnimes : [];
+        const currentAnimeInfo = data?.anime?.info || {};
         const seasonRelations = ['Sequel', 'Prequel', 'Parent story', 'Side story', 'Alternative version'];
 
         const seasons = relatedAnimes
@@ -66,27 +71,27 @@ export function useAnimeSeasons(animeId: string | undefined) {
               anime.name?.toLowerCase().includes('season') ||
               anime.name?.toLowerCase().includes('part')
             ) ||
-            isSameSeries(data.data?.anime?.info?.name, anime.name)
+            isSameSeries(currentAnimeInfo?.name, anime.name)
           )
           .map((anime: any) => ({
             id: anime.id,
             name: anime.name,
             title: anime.name,
             poster: anime.poster,
-            isCurrent: anime.id === animeId,
+            isCurrent: anime.id === resolvedAnimeId,
           }));
 
         // Add current anime to seasons list
-        const currentAnime = {
-          id: animeId,
-          name: data.data?.anime?.info?.name || '',
-          title: data.data?.anime?.info?.name || '',
-          poster: data.data?.anime?.info?.poster || '',
+        const currentSeasonEntry = {
+          id: resolvedAnimeId,
+          name: currentAnimeInfo?.name || '',
+          title: currentAnimeInfo?.name || '',
+          poster: currentAnimeInfo?.poster || '',
           isCurrent: true,
         };
 
-        if (!seasons.some((s: Season) => s.id === animeId)) {
-          seasons.push(currentAnime);
+        if (!seasons.some((s: Season) => s.id === resolvedAnimeId)) {
+          seasons.push(currentSeasonEntry);
         }
 
         // Sort by name

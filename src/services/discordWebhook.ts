@@ -1,3 +1,5 @@
+import { TATAKAI_API_URL } from '@/lib/api/api-client';
+
 /**
  * Discord Webhook Service
  *
@@ -12,12 +14,11 @@
  *  3. Comments      — fires when a new comment is posted
  */
 
-const RAW_TATAKAI_API_URL =
-  import.meta.env.VITE_TATAKAI_API_URL || 'https://api.tatakai.me/api/v2/anime';
+const RAW_TATAKAI_API_URL = TATAKAI_API_URL;
 
 function normalizeWebhookBase(url: string): string {
   const trimmed = (url || '').replace(/\/+$/, '');
-  if (!trimmed) return 'https://api.tatakai.me/api/v2/anime';
+  if (!trimmed) return '/api/v2/anime';
   if (/^https?:\/\/[^/]+$/i.test(trimmed)) return `${trimmed}/api/v2/anime`;
   if (/\/api\/v2\/anime$/i.test(trimmed)) return trimmed;
   if (/\/api\/v1$/i.test(trimmed)) return `${trimmed.replace(/\/api\/v1$/i, '')}/api/v2/anime`;

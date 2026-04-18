@@ -34,6 +34,7 @@ import { Heart, Sparkles } from "lucide-react";
 import { DiscordSection } from "@/components/home/DiscordSection";
 import { useEffect } from "react";
 import { BecauseYouWatched } from "@/components/anime/BecauseYouWatched";
+import { CuratedAnimeSections } from "@/components/home/CuratedAnimeSections";
 
 const Index = () => {
   const { data, isLoading, error } = useHomeData();
@@ -136,6 +137,7 @@ const Index = () => {
 
             {/* Trending Grid */}
             <TrendingGrid animes={data.trendingAnimes} />
+
             <TierlistSection />
 
             {/* Upcoming Anime - From Jikan API */}
@@ -148,11 +150,15 @@ const Index = () => {
               month={data.top10Animes.month}
             />
 
+            
+
 
             {/* Join Discord */}
             <div className="mb-24">
               <DiscordSection />
             </div>
+
+            <CuratedAnimeSections homeData={data} />
 
             {/* Most Popular */}
             <AnimeGrid

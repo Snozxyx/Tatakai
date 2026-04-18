@@ -32,15 +32,18 @@ export async function logClientError(err: unknown, context: Record<string, any> 
       context,
     };
 
-    // Insert into admin_logs as a client_error. This relies on a DB policy
-    // that allows public inserts where action = 'client_error' and entity_type = 'frontend'.
-    await supabase.from('admin_logs').insert({
-      user_id: userId,
-      action: 'client_error',
-      entity_type: 'frontend',
-      entity_id: null,
-      details,
-    });
+    // Frontend errors are intentionally NOT persisted to admin_logs/staff logs by default.
+    // Keep an explicit opt-in switch for exceptional debugging sessions.
+    const shouldPersistToAdminLogs = import.meta.env.VITE_LOG_FRONTEND_ERRORS_TO_DB === 'true';
+    if (shouldPersistToAdminLogs) {
+      await supabase.from('admin_logs').insert({
+        user_id: userId,
+        action: 'client_error',
+        entity_type: 'frontend',
+        entity_id: null,
+        details,
+      });
+    }
 
     const isLocalhost = typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
     const enableDiscordLogging = (import.meta.env.PROD && !isLocalhost) || import.meta.env.VITE_ENABLE_DISCORD_WEBHOOKS === 'true';

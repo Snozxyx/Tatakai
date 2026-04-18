@@ -1,7 +1,7 @@
 import { getClientIdSync } from '@/hooks/useClientId';
 import { isApiCryptoEnabled, generateApiSignature } from '@/lib/apiCrypto';
 
-const DEFAULT_API_BASE = "https://api.tatakai.me/api/v2";
+const DEFAULT_API_BASE = "http://localhost:9000/api/v2";
 const BACKEND_ORIGIN = (import.meta.env.VITE_BACKEND_ORIGIN || '').replace(/\/$/, '');
 
 function isAbsoluteHttpUrl(value: string): boolean {
@@ -51,6 +51,7 @@ export const MANGA_API_URL = (import.meta.env.DEV && !isMobileNative)
   : CONFIGURED_MANGA_API_URL;
 
 const API_TIMEOUT = isMobileNative ? 15000 : 30000;
+const ADMIN_API_SECRET = String(import.meta.env.VITE_ADMIN_API_SECRET || '').trim();
 
 export class ApiError extends Error {
   constructor(
@@ -145,7 +146,7 @@ export async function baseApiGet<T>(baseUrl: string, path: string, retries?: num
   for (const proxy of proxies) {
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
-        const headers: Record<string, string> = { 'Accept': 'application/json' };
+        const headers = withClientHeaders({ 'Accept': 'application/json' });
         if (proxy.url.includes('/rapid-service')) {
           headers['apikey'] = import.meta.env.VITE_SUPABASE_ANON_KEY;
           const bearer = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -181,6 +182,7 @@ export function withClientHeaders(extra: Record<string, string> = {}): Record<st
   const headers: Record<string, string> = { ...extra };
   const cid = getClientIdSync();
   if (cid) headers['X-Client-Id'] = cid;
+  if (ADMIN_API_SECRET) headers['X-Admin-Secret'] = ADMIN_API_SECRET;
   return headers;
 }
 
@@ -203,7 +205,7 @@ export async function externalApiGet<T>(baseUrl: string, path: string, retries =
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-      const headers = isTatakaiApi ? await withSignedHeaders(path) : withClientHeaders();
+      const headers = isTatakaiApi ? await withSignedHeaders(path) : { Accept: 'application/json' };
       const response = await fetch(url, { headers, signal: controller.signal });
       clearTimeout(timeoutId);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -224,10 +226,16 @@ type VideoProxyOptions = {
 
 const REMOTE_NODE_STREAM_PROXY = 'https://hoko.tatakai.me/api/v1/streamingProxy';
 const REMOTE_CF_STREAM_PROXY = 'https://moko.tatakai.me/api/v1/streamingProxy';
+const REMOTE_FOGTWIST_PROXY = 'https://mega.zanora.lol/m3u8-proxy';
+const REMOTE_ANIMEPAHE_PROXY = 'https://proxy.1anime.app/m3u8-proxy';
 const DEFAULT_STREAM_PROXY_PATH = '/api/v1/streamingProxy';
 const STREAM_PROXY_PASSWORD = String(
   import.meta.env.VITE_STREAM_PROXY_PASSWORD || import.meta.env.VITE_PROXY_PASSWORD || ''
 ).trim();
+const FOGTWIST_PROXY_BASE = String(import.meta.env.VITE_FOGTWIST_PROXY_URL || REMOTE_FOGTWIST_PROXY).trim();
+const ANIMEPAHE_PROXY_BASE = String(import.meta.env.VITE_ANIMEPAHE_PROXY_URL || REMOTE_ANIMEPAHE_PROXY).trim();
+const ENABLE_ANIMEPAHE_PROXY =
+  String(import.meta.env.VITE_ENABLE_ANIMEPAHE_PROXY ?? 'false').toLowerCase() === 'true';
 const PROXY_CURSOR_STORAGE_KEY = 'tatakai.streamProxy.cursor';
 let proxyBaseRoundRobinIndex = -1;
 
@@ -294,6 +302,15 @@ function resolveStreamProxyBaseCandidates(): string[] {
   return candidates;
 }
 
+function isHokoProxyCandidate(proxyBaseUrl: string): boolean {
+  try {
+    const parsed = new URL(proxyBaseUrl);
+    return /(^|\.)hoko\.tatakai\.me$/i.test(parsed.hostname);
+  } catch {
+    return /(^|\.)hoko\.tatakai\.me/i.test(proxyBaseUrl);
+  }
+}
+
 function resolveInitialProxyCursor(candidatesLength: number): number {
   if (proxyBaseRoundRobinIndex >= 0) {
     return proxyBaseRoundRobinIndex % Math.max(1, candidatesLength);
@@ -327,6 +344,12 @@ function resolveSingleStreamProxyBase(): string {
     return REMOTE_NODE_STREAM_PROXY || DEFAULT_STREAM_PROXY_PATH;
   }
 
+  // Always prefer Hoko for stream URL generation (anime info/card preview/video playback).
+  const preferredHoko = candidates.find(isHokoProxyCandidate);
+  if (preferredHoko) {
+    return preferredHoko;
+  }
+
   const currentCursor = resolveInitialProxyCursor(candidates.length);
   const selected = candidates[currentCursor % candidates.length];
   proxyBaseRoundRobinIndex = (currentCursor + 1) % candidates.length;
@@ -348,9 +371,81 @@ function buildSingleProxyUrl(
   return `${proxyBaseUrl}${proxyBaseUrl.includes('?') ? '&' : '?'}${params.toString()}`;
 }
 
+function buildFogtwistProxyUrl(upstreamUrl: string): string {
+  const proxyBase = FOGTWIST_PROXY_BASE || REMOTE_FOGTWIST_PROXY;
+  const params = new URLSearchParams({ url: upstreamUrl });
+  return `${proxyBase}${proxyBase.includes('?') ? '&' : '?'}${params.toString()}`;
+}
+
+function resolveAnimepaheReferer(upstreamUrl: string, referer?: string): string {
+  const explicitReferer = String(referer || '').trim();
+  if (explicitReferer) return explicitReferer;
+
+  try {
+    const host = new URL(upstreamUrl).hostname.toLowerCase();
+    if (host.includes('kwik') || host.includes('kiwi') || host.includes('owocdn')) {
+      return 'https://kwik.cx';
+    }
+  } catch {
+    // Ignore parse failures and fall back.
+  }
+
+  return 'https://kwik.cx';
+}
+
+function buildAnimepaheProxyUrl(upstreamUrl: string, referer?: string): string {
+  const proxyBase = ANIMEPAHE_PROXY_BASE || REMOTE_ANIMEPAHE_PROXY;
+  const params = new URLSearchParams({ url: upstreamUrl });
+  const resolvedReferer = resolveAnimepaheReferer(upstreamUrl, referer);
+  if (resolvedReferer) {
+    params.set('headers', JSON.stringify({ Referer: resolvedReferer }));
+  }
+  return `${proxyBase}${proxyBase.includes('?') ? '&' : '?'}${params.toString()}`;
+}
+
+function shouldUseFogtwistProxy(upstreamUrl: string): boolean {
+  try {
+    const parsed = new URL(upstreamUrl);
+    return /(^|\.)fogtwist21\.xyz$/i.test(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function shouldUseAnimepaheProxy(upstreamUrl: string, referer?: string): boolean {
+  // This third-party proxy is CORS-sensitive in browsers; keep opt-in only.
+  if (!ENABLE_ANIMEPAHE_PROXY) return false;
+
+  if (typeof window !== 'undefined' && !isMobileNative) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(upstreamUrl);
+    const host = parsed.hostname.toLowerCase();
+    if (host.includes('owocdn') || host.includes('kwik') || host.includes('kiwi')) {
+      return true;
+    }
+  } catch {
+    // Ignore URL parse failures.
+  }
+
+  const ref = String(referer || '').toLowerCase();
+  return ref.includes('kwik') || ref.includes('kiwi') || ref.includes('animepahe');
+}
+
+function isAlreadyGenericM3u8ProxyUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
+    return /\/m3u8-proxy$/i.test(parsed.pathname) && parsed.searchParams.has('url');
+  } catch {
+    return false;
+  }
+}
+
 function extractUpstreamFromProxyUrl(maybeProxyUrl: string): string | null {
   if (!maybeProxyUrl) return null;
-  if (!/\/api\/(v1\/streamingproxy|v2\/hianime\/proxy\/m3u8-streaming-proxy|proxy\/m3u8-streaming-proxy)/i.test(maybeProxyUrl)) {
+  if (!/\/(api\/(v1\/streamingproxy|v2\/hianime\/proxy\/m3u8-streaming-proxy|proxy\/m3u8-streaming-proxy)|m3u8-proxy)/i.test(maybeProxyUrl)) {
     return null;
   }
 
@@ -373,8 +468,19 @@ export function getProxiedVideoUrl(
 ): string {
   if (videoUrl.includes('/functions/v1/rapid-service')) return videoUrl;
   if (videoUrl.includes('/hindiapi/proxy')) return videoUrl;
+  if (isAlreadyGenericM3u8ProxyUrl(videoUrl)) return videoUrl;
 
   const upstreamFromExistingProxy = extractUpstreamFromProxyUrl(videoUrl);
+  const upstreamUrl = upstreamFromExistingProxy || videoUrl;
+
+  if (upstreamUrl.startsWith('http') && shouldUseFogtwistProxy(upstreamUrl)) {
+    return buildFogtwistProxyUrl(upstreamUrl);
+  }
+
+  if (upstreamUrl.startsWith('http') && shouldUseAnimepaheProxy(upstreamUrl, referer)) {
+    return buildAnimepaheProxyUrl(upstreamUrl, referer);
+  }
+
   if (upstreamFromExistingProxy) {
     return buildSingleProxyUrl(upstreamFromExistingProxy, 'video', referer, userAgent);
   }

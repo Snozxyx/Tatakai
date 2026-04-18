@@ -258,6 +258,86 @@ export function AnalyticsDashboard() {
     },
   });
 
+  // Session quality metrics
+  const { data: sessionQuality } = useQuery({
+    queryKey: ['analytics_session_quality', timeRange],
+    queryFn: async () => {
+      const startDate = subDays(new Date(), days).toISOString();
+      const [visitsResult, watchResult] = await Promise.all([
+        supabase
+          .from('page_visits')
+          .select('session_id')
+          .gte('created_at', startDate),
+        supabase
+          .from('watch_sessions')
+          .select('session_id, watch_duration_seconds')
+          .gte('created_at', startDate),
+      ]);
+
+      const sessionPageCounts = new Map<string, number>();
+      visitsResult.data?.forEach((visit) => {
+        const sessionId = String(visit.session_id || '').trim();
+        if (!sessionId) return;
+        sessionPageCounts.set(sessionId, (sessionPageCounts.get(sessionId) || 0) + 1);
+      });
+
+      const totalSessions = sessionPageCounts.size;
+      const totalPageViews = visitsResult.data?.length || 0;
+      const returningSessions = Array.from(sessionPageCounts.values()).filter((count) => count > 1).length;
+      const returningRate = totalSessions > 0 ? Math.round((returningSessions / totalSessions) * 100) : 0;
+      const avgPagesPerSession = totalSessions > 0
+        ? Number((totalPageViews / totalSessions).toFixed(2))
+        : 0;
+
+      const totalWatchSeconds =
+        watchResult.data?.reduce((acc, session) => acc + (session.watch_duration_seconds || 0), 0) || 0;
+      const watchSessionCount = watchResult.data?.length || 0;
+      const avgWatchMinutes = watchSessionCount > 0
+        ? Math.round((totalWatchSeconds / watchSessionCount) / 60)
+        : 0;
+
+      return {
+        totalSessions,
+        totalPageViews,
+        returningSessions,
+        returningRate,
+        avgPagesPerSession,
+        avgWatchMinutes,
+      };
+    },
+  });
+
+  // Top page paths by unique sessions
+  const { data: topPages } = useQuery({
+    queryKey: ['analytics_top_pages', timeRange],
+    queryFn: async () => {
+      const startDate = subDays(new Date(), days).toISOString();
+      const { data } = await supabase
+        .from('page_visits')
+        .select('page_path, session_id')
+        .gte('created_at', startDate);
+
+      const pathSessions = new Map<string, Set<string>>();
+      data?.forEach((visit) => {
+        const sessionId = String(visit.session_id || '').trim();
+        if (!sessionId) return;
+
+        const rawPath = String(visit.page_path || '/').trim() || '/';
+        const normalizedPath = rawPath.replace(/\?.*$/, '') || '/';
+
+        if (!pathSessions.has(normalizedPath)) {
+          pathSessions.set(normalizedPath, new Set());
+        }
+        pathSessions.get(normalizedPath)!.add(sessionId);
+      });
+
+      return Array.from(pathSessions.entries())
+        .map(([path, sessions]) => ({ path, sessions: sessions.size }))
+        .sort((a, b) => b.sessions - a.sessions)
+        .slice(0, 8);
+    },
+  });
+
 
   const formatWatchTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -302,6 +382,27 @@ export function AnalyticsDashboard() {
       icon: <Globe className="w-5 h-5" />,
       color: 'from-orange-500 to-orange-700',
     },
+    {
+      title: 'Page Depth',
+      value: String(sessionQuality?.avgPagesPerSession || 0),
+      subtitle: 'Avg pages per session',
+      icon: <BarChart3 className="w-5 h-5" />,
+      color: 'from-cyan-500 to-cyan-700',
+    },
+    {
+      title: 'Returning Sessions',
+      value: `${sessionQuality?.returningRate || 0}%`,
+      subtitle: `${sessionQuality?.returningSessions || 0} repeat sessions`,
+      icon: <TrendingUp className="w-5 h-5" />,
+      color: 'from-emerald-500 to-emerald-700',
+    },
+    {
+      title: 'Avg Watch Session',
+      value: `${sessionQuality?.avgWatchMinutes || 0}m`,
+      subtitle: 'Per watch session',
+      icon: <Play className="w-5 h-5" />,
+      color: 'from-violet-500 to-violet-700',
+    },
   ];
 
   return (
@@ -329,7 +430,7 @@ export function AnalyticsDashboard() {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((stat, index) => (
           <motion.div
             key={stat.title}
@@ -515,6 +616,61 @@ export function AnalyticsDashboard() {
               <div className="text-center w-full text-muted-foreground">No acquisition data yet</div>
             )}
           </div>
+        </GlassPanel>
+      </div>
+
+      {/* Traffic Rhythm and Top Paths */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <GlassPanel className="p-6">
+          <h3 className="font-medium mb-4 flex items-center gap-2">
+            <Activity className="w-4 h-4 text-primary" />
+            Hourly Traffic Pattern
+          </h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={hourlyActivity || []}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="hour" stroke="hsl(var(--muted-foreground))" fontSize={11} interval={2} />
+                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px',
+                  }}
+                />
+                <Bar dataKey="visits" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} name="Visits" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </GlassPanel>
+
+        <GlassPanel className="p-6">
+          <h3 className="font-medium mb-4 flex items-center gap-2">
+            <Eye className="w-4 h-4 text-primary" />
+            Most Visited Paths
+          </h3>
+          {topPages && topPages.length > 0 ? (
+            <div className="space-y-3">
+              {topPages.map((entry) => (
+                <div key={entry.path} className="space-y-1">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-medium truncate">{entry.path}</p>
+                    <span className="text-xs text-muted-foreground shrink-0">{entry.sessions} sessions</span>
+                  </div>
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(entry.sessions / (topPages[0]?.sessions || 1)) * 100}%` }}
+                      className="h-full bg-primary rounded-full"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center text-muted-foreground">No page path data yet</div>
+          )}
         </GlassPanel>
       </div>
 

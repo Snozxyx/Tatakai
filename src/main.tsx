@@ -7,6 +7,7 @@ import { WebappWrapper } from '@/components/WebappWrapper';
 import { initConsoleProtection, logger } from '@/lib/logger';
 import { initSentryClient } from '@/lib/sentry';
 import { initDiscordActivity } from '@/lib/discordActivity';
+import { installGlobalAdminSecretFetchPatch } from '@/lib/api/adminSecret';
 import '@/lib/production'; // Suppress console in production
 
 // Initialize Sentry (client) if configured
@@ -16,6 +17,9 @@ try {
 
 // Initialize production console protection early
 initConsoleProtection();
+
+// Inject X-Admin-Secret into backend-bound fetch calls when configured.
+installGlobalAdminSecretFetchPatch();
 
 // Production mode: suppress console in production (already handled by production.ts import)
 

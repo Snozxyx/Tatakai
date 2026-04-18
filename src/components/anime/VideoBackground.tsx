@@ -26,9 +26,10 @@ export function VideoBackground({ animeId, poster, children }: VideoBackgroundPr
       const randomIndex = Math.floor(Math.random() * Math.min(episodesData.episodes.length, 5)); // Limit to first 5 episodes
       const randomEpisode = episodesData.episodes[randomIndex];
 
-      // Fetch streaming sources with retry logic - hd-2 (HD Pro) is default
+      // Fetch streaming sources with retry logic.
+      // Always prioritize JustAnime (mx1.tatakai.me proxy path) first.
       let sources = null;
-      const servers = ['hd-2', 'megacloud'];
+      const servers = ['justanime', 'hd-1', 'hd-2', 'megacloud'];
       
       for (const server of servers) {
         try {

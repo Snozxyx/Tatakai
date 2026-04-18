@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { TATAKAI_API_URL } from '@/lib/api/api-client';
+import { withAdminSecretHeader } from '@/lib/api/adminSecret';
 
 // ============================================
 // STATUS INCIDENTS
@@ -51,7 +52,7 @@ async function sendStatusIncidentWebhook(payload: {
 
     await fetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: withAdminSecretHeader({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         channel: 'status',
         username: 'Tatakai Status Bot',

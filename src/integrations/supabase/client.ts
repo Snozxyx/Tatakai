@@ -2,14 +2,14 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const VITE_SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const DEFAULT_LOCAL_SUPABASE_URL = 'http://127.0.0.1:54321';
+const VITE_SUPABASE_URL = String(import.meta.env.VITE_SUPABASE_URL || '').trim();
+const SUPABASE_PUBLISHABLE_KEY = String(import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
+const SUPABASE_URL = VITE_SUPABASE_URL || DEFAULT_LOCAL_SUPABASE_URL;
 
-// Standardize URL to avoid framing/CORS blocks on custom domains
-// Project Ref: xkbzamfyupjafugqeaby
-const SUPABASE_URL = (VITE_SUPABASE_URL?.includes("jiobase.com") || !VITE_SUPABASE_URL)
-  ? "https://xkbzamfyupjafugqeaby.supabase.co"
-  : VITE_SUPABASE_URL;
+if (!SUPABASE_PUBLISHABLE_KEY) {
+  throw new Error('Missing VITE_SUPABASE_ANON_KEY for Supabase client initialization.');
+}
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";

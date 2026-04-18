@@ -18,6 +18,9 @@ const STALE_TIME = {
   read: isMobileNative ? 60 * 60 * 1000 : 30 * 60 * 1000 // Pages read shouldn't update often
 };
 
+const FORCE_FRESH_MANGA_READS =
+  String(import.meta.env.VITE_ALWAYS_FRESH_MANGA_READS ?? "true").toLowerCase() !== "false";
+
 export function useMangaSearch(
   query: string,
   page: number = 1,
@@ -103,7 +106,10 @@ export function useMangaDetail(id: string | undefined) {
     queryKey: ["manga-detail", id],
     queryFn: () => getMangaDetail(id!),
     enabled: !!id,
-    staleTime: STALE_TIME.manga,
+    staleTime: FORCE_FRESH_MANGA_READS ? 0 : STALE_TIME.manga,
+    refetchOnMount: FORCE_FRESH_MANGA_READS ? "always" : true,
+    refetchOnWindowFocus: FORCE_FRESH_MANGA_READS,
+    refetchOnReconnect: FORCE_FRESH_MANGA_READS,
   });
 }
 
@@ -112,7 +118,10 @@ export function useMangaChapters(id: string | undefined, providers?: string, lan
     queryKey: ["manga-chapters", id, providers, language],
     queryFn: () => getMangaChapters(id!, providers, language),
     enabled: !!id,
-    staleTime: STALE_TIME.chapters,
+    staleTime: FORCE_FRESH_MANGA_READS ? 0 : STALE_TIME.chapters,
+    refetchOnMount: FORCE_FRESH_MANGA_READS ? "always" : true,
+    refetchOnWindowFocus: FORCE_FRESH_MANGA_READS,
+    refetchOnReconnect: FORCE_FRESH_MANGA_READS,
   });
 }
 
@@ -121,6 +130,9 @@ export function useMangaRead(id: string | undefined, chapterKey: string | undefi
     queryKey: ["manga-read", id, chapterKey],
     queryFn: () => getMangaReadByKey(id!, chapterKey!),
     enabled: !!id && !!chapterKey,
-    staleTime: STALE_TIME.read,
+    staleTime: FORCE_FRESH_MANGA_READS ? 0 : STALE_TIME.read,
+    refetchOnMount: FORCE_FRESH_MANGA_READS ? "always" : true,
+    refetchOnWindowFocus: FORCE_FRESH_MANGA_READS,
+    refetchOnReconnect: FORCE_FRESH_MANGA_READS,
   });
 }

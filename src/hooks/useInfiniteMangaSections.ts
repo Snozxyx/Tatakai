@@ -87,6 +87,37 @@ const SECTION_CONFIGS: Array<{
 ];
 
 const SECTION_BATCH_SIZE = 8;
+const FIXED_SECTION_ITEMS = 5;
+
+function dedupeItems(items: UnifiedMediaCardProps["item"][]): UnifiedMediaCardProps["item"][] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = String(item.anilistId || item.malId || item.id || '').trim();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function mapSearchRowsToItems(rawItems: any[], canShowAdult: boolean): UnifiedMediaCardProps["item"][] {
+  return rawItems
+    .filter(item => {
+      const isAdult = inferMangaAdultFlag(item);
+      return !isAdult || canShowAdult;
+    })
+    .map(item => ({
+      id: String(item.anilistId || item.malId || item.id),
+      name: item.canonicalTitle || item.title?.english || item.title?.romaji || item.title?.native || "Unknown",
+      poster: item.poster || "",
+      type: item.mediaType || "manga",
+      status: item.status || undefined,
+      rating: typeof item.score === "number" && Number.isFinite(item.score) ? (item.score / 10).toFixed(1) : undefined,
+      chapters: typeof item.chapters === "number" && item.chapters > 0 ? item.chapters : undefined,
+      malId: typeof item.malId === "number" ? item.malId : undefined,
+      anilistId: typeof item.anilistId === "number" ? item.anilistId : undefined,
+      mediaType: "manga" as const,
+    }));
+}
 
 function toDisplayGenre(genre: string): string {
   return genre.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
@@ -107,27 +138,33 @@ const SHUFFLED_SECTION_CONFIGS = shuffleConfigs(SECTION_CONFIGS);
 
 async function fetchMangaSection(config: typeof SECTION_CONFIGS[0], pageSeed: number, canShowAdult: boolean): Promise<MangaSection> {
   const query = config.query || `${config.genre} manga`;
-  const data = await searchManga(query, 1, 24);
-  const rawItems = Array.isArray(data?.results) ? data.results : [];
-  
-  const items = rawItems
-    .filter(item => {
-      const isAdult = inferMangaAdultFlag(item);
-      return !isAdult || canShowAdult;
-    })
-    .map(item => ({
-      id: String(item.anilistId || item.malId || item.id),
-      name: item.canonicalTitle || item.title?.english || item.title?.romaji || item.title?.native || "Unknown",
-      poster: item.poster || "",
-      type: item.mediaType || "manga",
-      status: item.status || undefined,
-      rating: typeof item.score === "number" && Number.isFinite(item.score) ? (item.score / 10).toFixed(1) : undefined,
-      chapters: typeof item.chapters === "number" && item.chapters > 0 ? item.chapters : undefined,
-      malId: typeof item.malId === "number" ? item.malId : undefined,
-      anilistId: typeof item.anilistId === "number" ? item.anilistId : undefined,
-      mediaType: "manga" as const,
-    }))
-    .slice(0, 12);
+  const fallbackStartPage = (Math.abs(pageSeed) % 3) + 2;
+  const candidatePages = Array.from(new Set([1, fallbackStartPage, fallbackStartPage + 1]));
+  const collected: UnifiedMediaCardProps["item"][] = [];
+
+  for (const page of candidatePages) {
+    try {
+      const data = await searchManga(query, page, 24);
+      const rawItems = Array.isArray(data?.results) ? data.results : [];
+      collected.push(...mapSearchRowsToItems(rawItems, canShowAdult));
+
+      const uniqueItems = dedupeItems(collected);
+      if (uniqueItems.length >= FIXED_SECTION_ITEMS) {
+        return {
+          id: `section-${config.genre}-${Date.now()}`,
+          title: toDisplayGenre(config.genre),
+          genre: config.genre,
+          layout: config.layout,
+          items: uniqueItems.slice(0, FIXED_SECTION_ITEMS),
+          icon: config.icon,
+        };
+      }
+    } catch {
+      // Ignore single-page failures and continue fallback page attempts.
+    }
+  }
+
+  const items = dedupeItems(collected).slice(0, FIXED_SECTION_ITEMS);
 
   return {
     id: `section-${config.genre}-${Date.now()}`,
@@ -154,7 +191,7 @@ export function useInfiniteMangaSections({ showAdult }: { showAdult: boolean }) 
         configs.map((config, index) => fetchMangaSection(config, startIndex + index + 1, showAdult))
       );
       
-      const validSections = sections.filter(s => s.items.length > 0);
+      const validSections = sections.filter(s => s.items.length >= FIXED_SECTION_ITEMS);
       
       return {
         sections: validSections,

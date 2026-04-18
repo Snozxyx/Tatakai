@@ -13,7 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useStatusIncidents } from '@/hooks/useAdminFeatures';
 import { formatDistanceToNow } from 'date-fns';
 import { StatusPageBackground } from '@/components/layout/StatusPageBackground';
-import { TATAKAI_API_URL } from '@/lib/api/api-client';
+import { TATAKAI_API_URL, withClientHeaders } from '@/lib/api/api-client';
 
 interface ServiceStatus {
   name: string;
@@ -59,7 +59,7 @@ interface ScraperHealthSummary {
 
 const SERVICE_CHECK_FREQ_SECONDS = 30;
 const PROXY_POLL_FREQ_SECONDS = 4;
-const DEFAULT_BACKEND_HEALTH_URL = 'https://api.tatakai.me/health';
+const DEFAULT_BACKEND_HEALTH_URL = 'http://localhost:9000/health';
 
 type KnownProxyNode = {
   id: string;
@@ -247,7 +247,10 @@ export default function StatusPage() {
   };
 
   const loadScraperHealth = useCallback(async () => {
-    const response = await fetch(`${TATAKAI_API_URL}/health/scrapers`, { signal: AbortSignal.timeout(9000) });
+    const response = await fetch(`${TATAKAI_API_URL}/health/scrapers`, {
+      headers: withClientHeaders({ Accept: 'application/json' }),
+      signal: AbortSignal.timeout(9000),
+    });
     if (!response.ok) throw new Error(`Scraper health failed: ${response.status}`);
 
     const json = await response.json();
@@ -285,7 +288,10 @@ export default function StatusPage() {
     let mappedFromBackend: ProxyDisplayNode[] = [];
 
     try {
-      const response = await fetch(proxyStatusEndpoint, { signal: AbortSignal.timeout(7000) });
+      const response = await fetch(proxyStatusEndpoint, {
+        headers: withClientHeaders({ Accept: 'application/json' }),
+        signal: AbortSignal.timeout(7000),
+      });
       if (response.ok) {
         const json = await response.json();
         const nodes: ProxyStatusNode[] = Array.isArray(json?.nodes) ? json.nodes : [];
@@ -358,7 +364,10 @@ export default function StatusPage() {
       await checkService('Tatakai Backend', async () => {
         const start = Date.now();
         try {
-          const res = await fetch(backendHealthEndpoint, { signal: AbortSignal.timeout(5000) });
+          const res = await fetch(backendHealthEndpoint, {
+            headers: withClientHeaders({ Accept: 'text/plain,application/json,*/*' }),
+            signal: AbortSignal.timeout(5000),
+          });
           const text = await res.text();
           const latency = Date.now() - start;
           return {

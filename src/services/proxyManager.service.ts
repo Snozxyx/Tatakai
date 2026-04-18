@@ -65,8 +65,9 @@ function buildProxyPool(): ProxyNode[] {
     ? null
     : normalizeUrl(configuredDevProxyUrl);
 
-  if (cfUrl) fromTypedEnv.push(createNode('proxy-cf-1', cfUrl, 'cf', 10));
-  if (nodeUrl) fromTypedEnv.push(createNode('proxy-node-1', nodeUrl, 'nodejs', 6));
+  // Hoko should always be the primary proxy when available.
+  if (nodeUrl) fromTypedEnv.push(createNode('proxy-node-1', nodeUrl, 'nodejs', 10));
+  if (cfUrl) fromTypedEnv.push(createNode('proxy-cf-1', cfUrl, 'cf', 6));
   if (bunUrl) fromTypedEnv.push(createNode('proxy-bun-1', bunUrl, 'bun', 6));
   if (devUrl) fromTypedEnv.push(createNode('proxy-dev-1', devUrl, 'nodejs', 9));
 
@@ -111,7 +112,7 @@ const PROXY_POOL: ProxyNode[] = buildProxyPool();
 
 class ProxyManager {
   private pool: ProxyNode[] = [...PROXY_POOL];
-  private currentIndex: number = 0;
+  private currentIndex: number = -1;
 
   public getPoolStats() {
     return this.pool;
@@ -133,6 +134,11 @@ class ProxyManager {
   public getOptimalProxy(): ProxyNode | null {
     const available = this.pool.filter(p => p.status !== 'offline');
     if (available.length === 0) return null;
+
+    const preferredHoko = available.find((proxy) => proxy.url.toLowerCase().includes('hoko.tatakai.me'));
+    if (preferredHoko) {
+      return preferredHoko;
+    }
 
     // Simple round robin skipping offline nodes
     this.currentIndex = (this.currentIndex + 1) % available.length;

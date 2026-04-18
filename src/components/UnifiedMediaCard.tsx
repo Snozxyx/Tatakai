@@ -17,6 +17,7 @@ export interface UnifiedMediaCardProps {
     mediaType: 'anime' | 'manga' | 'character';
     malId?: number;
     anilistId?: number;
+    href?: string;
     isAdult?: boolean;
     blurAdult?: boolean;
   };
@@ -45,6 +46,16 @@ export function UnifiedMediaCard({ item, className = "" }: UnifiedMediaCardProps
   const mediaBadgeLabel = getMangaFormatLabel();
 
   const handleClick = () => {
+    if (item.href) {
+      if (/^https?:\/\//i.test(item.href)) {
+        window.open(item.href, "_blank", "noopener,noreferrer");
+        return;
+      }
+
+      navigate(item.href);
+      return;
+    }
+
     if (isAnime) {
       navigate(`/anime/${encodeURIComponent(item.id)}`);
     } else if (isManga) {

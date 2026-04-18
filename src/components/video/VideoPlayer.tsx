@@ -293,7 +293,7 @@ interface VideoPlayerProps {
 
   poster?: string;
 
-  onError?: () => void;
+  onError?: (context?: { statusCode?: number; reason?: string }) => void;
 
   onServerSwitch?: () => void;
 
@@ -587,6 +587,8 @@ export function VideoPlayer({
 
   const manifestFallbackRef = useRef(false);
   const manifestRetryRef = useRef(0);
+  const audioCodecSwapAttemptedRef = useRef(false);
+  const mediaErrorBurstRef = useRef({ windowStart: 0, count: 0, escalatedAt: 0 });
   const bufferingTimeoutRef = useRef<number | null>(null);
   const lastProgressAtRef = useRef<number>(Date.now());
   const lastObservedTimeRef = useRef<number>(0);
@@ -1256,7 +1258,7 @@ export function VideoPlayer({
           if (proxySwitchInProgress) return false;
 
           const statusCode = Number(context?.statusCode || 0);
-          const maxSwitches = statusCode === 403 ? 1 : 3;
+          const maxSwitches = statusCode === 403 || statusCode === 410 ? 1 : 3;
           if (proxySwitchCount >= maxSwitches) return false;
 
           proxySwitchInProgress = true;
@@ -1273,6 +1275,7 @@ export function VideoPlayer({
               activePlaybackUrl = candidateUrl;
               manifestFallbackRef.current = false;
               manifestRetryRef.current = 0;
+              audioCodecSwapAttemptedRef.current = false;
 
               setVideoError(null);
               setIsBuffering(true);
@@ -1326,6 +1329,7 @@ export function VideoPlayer({
 
 
         hls.loadSource(activePlaybackUrl);
+    audioCodecSwapAttemptedRef.current = false;
 
         hls.attachMedia(videoRef.current);
 
@@ -1336,6 +1340,8 @@ export function VideoPlayer({
           console.log('HLS manifest parsed successfully');
           manifestRetryRef.current = 0;
           manifestFallbackRef.current = false;
+          audioCodecSwapAttemptedRef.current = false;
+          mediaErrorBurstRef.current = { windowStart: 0, count: 0, escalatedAt: 0 };
 
           setIsBuffering(false);
 
@@ -1395,6 +1401,61 @@ export function VideoPlayer({
 
           console.error('HLS error:', data.type, data.details);
           const responseCode = Number((data as any)?.response?.code || (data as any)?.response?.status || 0);
+          const detailText = String(data.details || '').toLowerCase();
+          const isCodecBufferError =
+            data.type === Hls.ErrorTypes.MEDIA_ERROR &&
+            (
+              detailText.includes('bufferappenderror') ||
+              detailText.includes('bufferaddcodecerror') ||
+              detailText.includes('bufferstallederror') ||
+              detailText.includes('fragparsingerror') ||
+              detailText.includes('buffernudgeonstall')
+            );
+
+          if (isCodecBufferError) {
+            if (!audioCodecSwapAttemptedRef.current) {
+              audioCodecSwapAttemptedRef.current = true;
+              try {
+                hls.swapAudioCodec();
+              } catch {
+                // noop
+              }
+
+              hls.recoverMediaError();
+              return;
+            }
+
+            const now = Date.now();
+            const burst = mediaErrorBurstRef.current;
+            const isSevereCodecError =
+              detailText.includes('bufferaddcodecerror') ||
+              detailText.includes('fragparsingerror');
+
+            if (!burst.windowStart || now - burst.windowStart > 7000) {
+              burst.windowStart = now;
+              burst.count = 0;
+            }
+
+            burst.count += 1;
+
+            // Avoid infinite recover loops for broken HLS segment/codec pipelines.
+            const burstThreshold = isSevereCodecError ? 2 : 3;
+            if (burst.count >= burstThreshold && now - burst.escalatedAt > 3500) {
+              burst.escalatedAt = now;
+
+              const switchedProxy = await trySwitchProxyCandidate({ statusCode: responseCode });
+              if (switchedProxy) {
+                burst.windowStart = now;
+                burst.count = 0;
+                return;
+              }
+
+              setVideoError('HLS decode failed repeatedly. Auto-switching source...');
+              if (onError) onError({ statusCode: responseCode || undefined, reason: 'hls-buffer-codec-loop' });
+              hls.stopLoad();
+              return;
+            }
+          }
 
           if (data.response?.code === 0 || data.details === 'manifestLoadError') {
             toast.error("Playback blocked? Try disabling 'Tracking Prevention' or switching servers.", { duration: 5000, id: 'tracking-prevention' });
@@ -1406,7 +1467,7 @@ export function VideoPlayer({
 
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR && data.details && String(data.details).toLowerCase().includes('manifest') && !manifestFallbackRef.current) {
 
-            if ([403, 502, 503, 504].includes(responseCode)) {
+            if ([403, 410, 502, 503, 504].includes(responseCode)) {
               const switchedProxy = await trySwitchProxyCandidate({ statusCode: responseCode });
               if (switchedProxy) {
                 return;
@@ -1414,10 +1475,12 @@ export function VideoPlayer({
 
               if (responseCode === 403) {
                 setVideoError('Stream forbidden (403). Auto-switching server in 3 seconds...');
+              } else if (responseCode === 410) {
+                setVideoError('Stream expired (410). Refreshing source and switching server...');
               } else {
                 setVideoError('Manifest blocked or invalid. Auto-switching server in 3 seconds...');
               }
-              if (onError) onError();
+              if (onError) onError({ statusCode: responseCode, reason: 'manifest-network-error' });
               hls.stopLoad();
               return;
             }
@@ -1434,7 +1497,7 @@ export function VideoPlayer({
 
               if (res.status === 403) {
                 setVideoError('Stream forbidden (403). Auto-switching server in 3 seconds...');
-                if (onError) onError();
+                if (onError) onError({ statusCode: res.status, reason: 'manifest-fetch-forbidden' });
                 hls.stopLoad();
                 return;
               }
@@ -1453,7 +1516,7 @@ export function VideoPlayer({
                 }
 
                 setVideoError('Manifest blocked or invalid. Auto-switching server in 3 seconds...');
-                if (onError) onError();
+                if (onError) onError({ statusCode: res.status, reason: 'manifest-fetch-invalid' });
                 hls.stopLoad();
                 return;
 
@@ -1469,7 +1532,7 @@ export function VideoPlayer({
               }
 
               setVideoError('Manifest fetch failed. Auto-switching server in 3 seconds...');
-              if (onError) onError();
+              if (onError) onError({ statusCode: responseCode || undefined, reason: 'manifest-fetch-error' });
               hls.stopLoad();
               return;
 
@@ -1491,7 +1554,19 @@ export function VideoPlayer({
               }
 
               setVideoError('Stream forbidden (403). Auto-switching server in 3 seconds...');
-              if (onError) onError();
+              if (onError) onError({ statusCode: responseCode, reason: 'fatal-forbidden' });
+              hls.stopLoad();
+              return;
+            }
+
+            if (responseCode === 410) {
+              const switchedProxy = await trySwitchProxyCandidate({ statusCode: responseCode });
+              if (switchedProxy) {
+                return;
+              }
+
+              setVideoError('Stream expired (410). Refreshing source and switching server...');
+              if (onError) onError({ statusCode: responseCode, reason: 'fatal-gone' });
               hls.stopLoad();
               return;
             }
@@ -1506,7 +1581,7 @@ export function VideoPlayer({
               }
 
               setVideoError('Manifest blocked or invalid. Auto-switching server in 3 seconds...');
-              if (onError) onError();
+              if (onError) onError({ statusCode: responseCode || undefined, reason: 'fatal-manifest' });
               hls.stopLoad();
               return;
 
@@ -1541,7 +1616,7 @@ export function VideoPlayer({
 
                   setVideoError("Network error. Auto-switching server in 3 seconds...");
 
-                  if (onError) onError();
+                  if (onError) onError({ statusCode: responseCode || undefined, reason: 'fatal-network' });
 
                 }
 
@@ -1551,6 +1626,20 @@ export function VideoPlayer({
 
                 console.error('Media error - attempting recovery');
 
+                if (isCodecBufferError) {
+                  const switchedProxy = await trySwitchProxyCandidate({ statusCode: responseCode });
+                  if (switchedProxy) {
+                    retryCountRef.current = 0;
+                    setRetryCount(0);
+                    return;
+                  }
+
+                  setVideoError('Media decode failed. Auto-switching source in 3 seconds...');
+                  if (onError) onError({ statusCode: responseCode || undefined, reason: 'fatal-media-buffer' });
+                  hls.stopLoad();
+                  return;
+                }
+
                 hls.recoverMediaError();
 
                 break;
@@ -1559,7 +1648,7 @@ export function VideoPlayer({
 
                 setVideoError("Failed to load video");
 
-                if (onError) onError();
+                if (onError) onError({ statusCode: responseCode || undefined, reason: 'fatal-generic' });
 
                 break;
 
@@ -1849,13 +1938,55 @@ export function VideoPlayer({
     const handleError = (e: any) => {
       console.error('Video Error:', e);
       const err = videoRef.current?.error;
+      let failureReason = 'native-video-error';
+      let friendlyMessage: string | null = null;
+      const eventMessageRaw = String(e?.message || e?.target?.error?.message || '').trim();
+      const eventMessage = eventMessageRaw.toLowerCase();
+
       if (err) {
         console.error('Video Error Code:', err.code, err.message);
-        setVideoError(`Playback Error (${err.code}): ${err.message || 'Unknown error'}`);
+        const code = Number(err.code || 0);
+        const rawMessage = String(err.message || 'Unknown error');
+        const normalizedMessage = rawMessage.toLowerCase();
+        const compositeMessage = `${normalizedMessage} ${eventMessage}`;
+
+        if (
+          code === 4 &&
+          (
+            compositeMessage.includes('decoder_error_not_supported') ||
+            compositeMessage.includes('pipelinestatus::decoder_error_not_supported') ||
+            compositeMessage.includes('unsupportedconfig') ||
+            compositeMessage.includes('unsupported config') ||
+            compositeMessage.includes('kunsupportedconfig') ||
+            compositeMessage.includes('audio decoder initialization failed')
+          )
+        ) {
+          failureReason = 'native-decoder-unsupported-config';
+          friendlyMessage = 'Audio codec is not supported for this source. Auto-switching source...';
+        } else if (code === 4) {
+          failureReason = 'native-playback-not-supported';
+          if (compositeMessage.includes('unsupported') || compositeMessage.includes('not supported')) {
+            friendlyMessage = 'Playback format is not supported for this source. Auto-switching source...';
+          }
+        } else if (code === 3 || compositeMessage.includes('decode')) {
+          failureReason = 'native-decode-error';
+        }
+
+        setVideoError(friendlyMessage || `Playback Error (${code}): ${rawMessage}`);
+        if (onError) onError({ statusCode: code || undefined, reason: failureReason });
       } else {
-        setVideoError('Playback failed');
+        if (
+          eventMessage.includes('decoder_error_not_supported') ||
+          eventMessage.includes('kunsupportedconfig') ||
+          eventMessage.includes('audio decoder initialization failed')
+        ) {
+          failureReason = 'native-decoder-unsupported-config';
+          friendlyMessage = 'Audio codec is not supported for this source. Auto-switching source...';
+        }
+
+        setVideoError(friendlyMessage || 'Playback failed');
+        if (onError) onError({ reason: failureReason });
       }
-      if (onError) onError();
     };
 
     video.addEventListener("timeupdate", handleTimeUpdate);
@@ -1880,7 +2011,7 @@ export function VideoPlayer({
       video.removeEventListener("error", handleError);
     };
 
-  }, [settings.autoNextEpisode, onEpisodeEnd]);
+  }, [settings.autoNextEpisode, onEpisodeEnd, onPlay, onPause, onProgressUpdate, onError]);
 
   useEffect(() => {
     if (bufferingTimeoutRef.current !== null) {
@@ -1894,7 +2025,7 @@ export function VideoPlayer({
       const stalledMs = Date.now() - lastProgressAtRef.current;
       if (stalledMs >= 15000) {
         setVideoError("Server timed out. Auto-switching server in 3 seconds...");
-        if (onError) onError();
+        if (onError) onError({ reason: 'buffer-stall-timeout' });
       }
     }, 16000);
 

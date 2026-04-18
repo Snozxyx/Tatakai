@@ -35,7 +35,7 @@ export const CSP_POLICY = {
     'https://*.tatakai.me',
     'https://*.datadoghq.com',
     'https://www.google-analytics.com',
-    'https://api.tatakai.me',
+    'http://localhost:9000',
     'https://api.jikan.moe',
     'https://api.trace.moe',
     'https://graphql.anilist.co',

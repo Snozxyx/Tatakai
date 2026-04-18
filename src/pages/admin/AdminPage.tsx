@@ -33,6 +33,8 @@ import { MarketplaceManager } from '@/components/admin/MarketplaceManager';
 import { RedirectManager } from '@/components/admin/RedirectManager';
 import { UserActivityLogs } from '@/components/admin/UserActivityLogs';
 import { AchievementManager } from '@/components/admin/AchievementManager';
+import { ApiAdminPanel } from '@/components/admin/ApiAdminPanel';
+import { CuratedHomeManager } from '@/components/admin/CuratedHomeManager';
 import { useAdminMessages } from '@/hooks/useAdminMessages';
 import { formatDistanceToNow } from 'date-fns';
 import { Link } from 'react-router-dom';
@@ -49,6 +51,7 @@ const navItems = [
   { value: 'suggestions', label: 'Suggestions', icon: Lightbulb, roles: ['admin', 'moderator'], badge: 'suggestions' },
   { value: 'pending', label: 'Forum Moderation', icon: MessageSquare, roles: ['admin', 'moderator'], badge: 'posts' },
   { value: 'submissions', label: 'Submissions', icon: Globe, roles: ['admin', 'moderator'], badge: 'posts' },
+  { value: 'curation', label: 'Home Curation', icon: Image, roles: ['admin', 'moderator'] },
   { value: 'languages', label: 'Languages', icon: Globe, roles: ['admin'] },
   { value: 'users', label: 'Users', icon: Users, roles: ['admin', 'moderator'] },
   { value: 'comments', label: 'Comments', icon: MessageSquare, roles: ['admin', 'moderator'] },
@@ -60,6 +63,7 @@ const navItems = [
   { value: 'incidents', label: 'Incidents', icon: AlertCircle, roles: ['admin'] },
   { value: 'changelog', label: 'Changelog', icon: History, roles: ['admin'] },
   { value: 'servers', label: 'Video Servers', icon: Server, roles: ['admin'] },
+  { value: 'api-admin', label: 'API Admin', icon: ExternalLink, roles: ['admin'] },
   { value: 'settings', label: 'System', icon: Settings, roles: ['admin'] },
   { value: 'achievements', label: 'Achievements', icon: Star, roles: ['admin', 'moderator'] },
 ];
@@ -564,6 +568,11 @@ export default function AdminPage() {
               <LanguageManager />
             </TabsContent>
 
+            {/* Home Curation Tab */}
+            <TabsContent value="curation">
+              <CuratedHomeManager />
+            </TabsContent>
+
             {/* Achievements Tab */}
             <TabsContent value="achievements">
               <AchievementManager />
@@ -947,6 +956,11 @@ export default function AdminPage() {
               <GlassPanel className="p-6">
                 <VideoServerManager />
               </GlassPanel>
+            </TabsContent>
+
+            {/* API Admin Tab */}
+            <TabsContent value="api-admin">
+              <ApiAdminPanel />
             </TabsContent>
 
             {/* Incidents Tab */}

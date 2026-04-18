@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchCombinedSources } from "@/lib/api";
 import type { StreamingData, StreamingSource } from "@/lib/api";
 import { getCachedCombinedSources, getCombinedSourceCacheKey, setCachedCombinedSources } from "@/lib/watch/sourceIntelligence";
+import { isProviderSourceRefreshPending } from "@/services/provider.service";
 
 /**
  * Combined hook that fetches TatakaiAPI, HiAnime, WatchAnimeWorld, and AnimeHindiDubbed sources
@@ -57,8 +58,11 @@ export function useCombinedSources(
         s.providerName?.includes('Z-Fighter')
       );
 
+      const ENABLE_COMBINED_SOURCE_CACHE =
+        String(import.meta.env.VITE_ENABLE_COMBINED_SOURCE_CACHE ?? "false").toLowerCase() === "true";
+
       const cacheKey = getCombinedSourceCacheKey(episodeId!, server, category, currentUserId);
-      const cached = getCachedCombinedSources(cacheKey);
+      const cached = ENABLE_COMBINED_SOURCE_CACHE ? getCachedCombinedSources(cacheKey) : null;
 
       let data: StreamingData & { hasTatakaiAPI: boolean };
       try {
@@ -67,7 +71,7 @@ export function useCombinedSources(
           45000
         );
       } catch (error) {
-        if (cached) {
+        if (ENABLE_COMBINED_SOURCE_CACHE && cached && !isProviderSourceRefreshPending()) {
           return {
             ...cached,
             hasTatakaiProviders: (cached.providerServers?.length || 0) > 0,
@@ -92,7 +96,9 @@ export function useCombinedSources(
         }
         throw error;
       }
-      setCachedCombinedSources(cacheKey, data);
+      if (ENABLE_COMBINED_SOURCE_CACHE) {
+        setCachedCombinedSources(cacheKey, data);
+      }
 
       if (import.meta.env.DEV) {
         const hindiApiSources = data.sources.filter(s => s.langCode?.startsWith('hindiapi'));

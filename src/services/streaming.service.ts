@@ -145,6 +145,9 @@ export async function fetchCombinedSources(
     providerServers: [],
   };
 
+  const ALWAYS_FRESH_PROVIDER_SOURCES =
+    String(import.meta.env.VITE_ALWAYS_FRESH_PROVIDER_SOURCES ?? "true").toLowerCase() !== "false";
+
   if (EXTERNAL_PROVIDERS_ENABLED && hasValidEpisodeNumber) {
     try {
       const inferredSeason = inferSeasonFromContext(animeName, episodeId);
@@ -156,6 +159,7 @@ export async function fetchCombinedSources(
         category: category as "sub" | "dub",
         anilistId: anilistID,
         malId: malID,
+        forceFresh: ALWAYS_FRESH_PROVIDER_SOURCES,
       });
 
       // Preserve IDs from provider payload when primary stream payload omitted them.

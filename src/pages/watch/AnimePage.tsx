@@ -17,7 +17,7 @@ import { WatchlistButton } from "@/components/anime/WatchlistButton";
 import { ShareButton } from "@/components/anime/ShareButton";
 import { AddToPlaylistButton } from "@/components/playlist/AddToPlaylistButton";
 import { NextEpisodeSchedule } from "@/components/anime/NextEpisodeSchedule";
-import { getProxiedImageUrl, fetchJikanCover, searchAnime } from "@/lib/api";
+import { getProxiedImageUrl, fetchJikanCover, fetchProducerAnimes } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
@@ -87,6 +87,79 @@ export default function AnimePage() {
     enabled: !!malId,
     staleTime: 1000 * 60 * 60 * 24, // 24h — covers don't change often
   });
+
+  const producerNames = useMemo(() => {
+    const fromPayload = Array.isArray(animeData?.anime?.moreInfo?.producers)
+      ? animeData.anime.moreInfo.producers.map((producer: unknown) => String(producer || '').trim()).filter(Boolean)
+      : [];
+
+    if (fromPayload.length > 0) {
+      return Array.from(new Set(fromPayload));
+    }
+
+    const studioText = String(animeData?.anime?.moreInfo?.studios || '').trim();
+    if (!studioText) return [];
+
+    return Array.from(
+      new Set(
+        studioText
+          .split(',')
+          .map((studio) => studio.trim())
+          .filter(Boolean)
+      )
+    );
+  }, [animeData?.anime?.moreInfo?.producers, animeData?.anime?.moreInfo?.studios]);
+
+  const producerRequestCandidates = useMemo(() => {
+    const slugifyProducer = (value: string) => {
+      return value
+        .toLowerCase()
+        .replace(/&/g, ' and ')
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+    };
+
+    const candidates: string[] = [];
+    for (const producer of producerNames) {
+      const slug = slugifyProducer(producer);
+      if (slug) candidates.push(slug);
+      candidates.push(producer);
+    }
+
+    return Array.from(new Set(candidates.map((value) => value.trim()).filter(Boolean)));
+  }, [producerNames]);
+
+  const { data: producerAnimeData } = useQuery({
+    queryKey: ['producer-anime', producerRequestCandidates],
+    queryFn: async () => {
+      for (const candidate of producerRequestCandidates) {
+        try {
+          const response = await fetchProducerAnimes(candidate, 1);
+          if (Array.isArray(response?.animes) && response.animes.length > 0) {
+            return response;
+          }
+        } catch {
+          // Try the next candidate (slug/raw producer variant).
+        }
+      }
+
+      return null;
+    },
+    enabled: producerRequestCandidates.length > 0,
+    staleTime: 1000 * 60 * 5,
+    retry: 1,
+  });
+
+  const producerAnimes = useMemo(() => {
+    const currentId = String(contentAnimeId || '').trim().toLowerCase();
+    const rows = Array.isArray(producerAnimeData?.animes) ? producerAnimeData.animes : [];
+
+    return rows
+      .filter((anime) => String(anime?.id || '').trim().toLowerCase() !== currentId)
+      .slice(0, 6);
+  }, [producerAnimeData?.animes, contentAnimeId]);
   
   // Debug log for tracking ID extraction
   console.log('[AnimePage] External IDs Debug:', {
@@ -310,6 +383,23 @@ export default function AnimePage() {
                       <p className="font-medium mt-1">{moreInfo.studios}</p>
                     </div>
                   )}
+                  {producerNames.length > 0 && (
+                    <div className="col-span-2 md:col-span-3">
+                      <span className="text-xs text-muted-foreground uppercase tracking-wider">Producers</span>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {producerNames.map((producer) => (
+                          <button
+                            key={producer}
+                            type="button"
+                            onClick={() => navigate(`/search/producer/${encodeURIComponent(producer)}`)}
+                            className="px-3 py-1 rounded-full border border-border text-sm hover:bg-muted transition-colors"
+                          >
+                            {producer}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Action Buttons */}
@@ -513,6 +603,14 @@ export default function AnimePage() {
           <section className="mb-16">
             <EpisodeComments animeId={contentAnimeId!} animeName={info.name} />
           </section>
+
+          {/* Producer Catalog */}
+          {producerAnimes.length > 0 && (
+            <AnimeGrid
+              animes={producerAnimes}
+              title={`More from ${producerAnimeData?.producerName || producerNames[0] || 'this producer'}`}
+            />
+          )}
 
           {/* Related Animes */}
           {relatedAnimes.length > 0 && (

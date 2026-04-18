@@ -43,9 +43,9 @@ function SectionSkeleton({ layout }: { layout: SectionLayout }) {
 }
 
 function SectionContent({ section, isMobile }: { section: MangaSection; isMobile: boolean }) {
-  const items = section.items.slice(0, 10);
+  const items = section.items.slice(0, 5);
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-4 gap-y-8 md:gap-x-6 md:gap-y-10">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-x-4 gap-y-8 md:gap-x-6 md:gap-y-10 w-full">
       {items.map((item, i) => (
         <motion.div
           key={item.id}
@@ -109,7 +109,7 @@ export function InfiniteMangaSections() {
       {data?.pages.map((page, pageIndex) => (
         <div key={pageIndex} className="space-y-16 md:space-y-24">
           {page.sections.map((section) => (
-            <section key={section.id} className="relative">
+            <section key={section.id} className="relative w-full">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 px-2">
                 <div className="flex items-center gap-3">
                   {section.icon && (

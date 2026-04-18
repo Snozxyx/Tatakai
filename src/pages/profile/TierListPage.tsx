@@ -536,7 +536,7 @@ export function TierListViewPage() {
                     const isCharacter = item.anime_id.startsWith('char-');
                     const charId = item.anime_id.replace('char-', '');
                     const linkTo = isCharacter
-                      ? `/char/${charId}?name=${encodeURIComponent(item.anime_title)}`
+                      ? `/char/${encodeURIComponent(charId)}?name=${encodeURIComponent(item.anime_title)}`
                       : `/anime/${item.anime_id}`;
 
                     return (

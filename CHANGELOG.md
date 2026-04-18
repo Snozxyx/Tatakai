@@ -4,6 +4,28 @@ All notable changes to Tatakai are documented here.
 
 ---
 
+## [5.0.1] - 2026-04-18
+
+### Added
+- **Producer Deep Links** — Anime producer chips now open `/search/producer/:producerName`, and producer pages use the dedicated producer API instead of generic text search
+- **Tierlist Character Linking** — Tierlist character entries now prefer MAL numeric IDs so character pages open with stable `/char/{id}?name=...` links
+- **Curated Home System** — Added manual anime/manga homepage curation tools, curated section rendering, and discovery lanes for genre/provider/feed shortcuts
+- **API Admin Panel** — Added a dedicated admin surface for API health, canonical snapshot visibility, source validation, and webhook smoke tests
+- **Manga Discovery Browse** — Added genre/provider/feed-oriented manga browse routes and quick filters for faster catalog exploration
+
+### Changed
+- **Search Behavior** — Search page now hydrates from producer routes, initializes anime mode for producer landing pages, and uses producer-aware pagination/loading state
+- **Playback Resilience** — Strengthened stream failover handling, codec recovery, source blocking, and provider refresh behavior
+- **Content/Proxy Freshness** — Tightened fresh-fetch behavior across provider, manga, and proxy paths to reduce stale fallback reuse
+- **Admin/Analytics Visibility** — Expanded admin dashboards and operational metadata around source health and traffic patterns
+
+### Fixed
+- **Empty Producer Result Pages** — `/search/producer/Funimation` and similar producer pages now return populated anime results
+- **Character Page Routing** — Character detail routes now handle encoded MAL IDs consistently from tierlists and search results
+- **Devtools Guard Routing** — Devtools-blocked pages now bypass the standard shell and restore access only after the guard clears
+
+---
+
 ## [5.0.0] - 2026-04-08
 
 ### Added

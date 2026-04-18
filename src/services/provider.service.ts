@@ -1,10 +1,9 @@
-import { TATAKAI_API_URL, getProxiedImageUrl, externalApiGet } from "@/lib/api/api-client";
+import { TATAKAI_API_URL, getProxiedImageUrl, externalApiGet, withClientHeaders } from "@/lib/api/api-client";
 import { EpisodeServer, StreamingData, StreamingSource, Subtitle } from "@/types/anime";
 
-// ──────────────────────────────────────────────────────────────
-// Shared helper — every provider just uses plain fetch() now.
-// The Vite dev proxy handles CORS (→ https://api.tatakai.me).
-// ──────────────────────────────────────────────────────────────
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// Shared helper G�� every provider just uses plain fetch() now.
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 const TIMEOUT = 12000; // Single-pass provider mode: allow slower upstreams enough time to resolve.
 const RAW_ANIME_MAPPER_API = String(import.meta.env.VITE_ANIME_MAPPER_API || "").trim();
 const DEFAULT_ANIME_MAPPER_API = "/api/v2/anime/mapper";
@@ -17,6 +16,7 @@ const PROVIDER_ENDPOINT_COOLDOWN_TTL = 15 * 60 * 1000;
 const PROVIDER_EXECUTION_TIMEOUT_MS = 12000;
 const PROVIDER_TIMEOUT_COOLDOWN_TTL = 90 * 1000;
 const PROVIDER_LAST_GOOD_CACHE_TTL = 10 * 60 * 1000;
+const PROVIDER_FORCE_REFRESH_TTL_MS = 90 * 1000;
 const PROVIDER_EXECUTION_TIMEOUTS_MS: Record<string, number> = {
   animelok: 14000,
   animeya: 18000,
@@ -48,12 +48,57 @@ const providerLastGoodCache = new Map<
 >();
 const mapperFailureCache = new Map<string, number>();
 let mapperDisabledUntil = 0;
+let providerForceRefreshUntil = 0;
 
-// ─── Background Retry Cache ───
+function clearProviderFallbackCaches(): void {
+  providerLastGoodCache.clear();
+  providerNotFoundPathCache.clear();
+  providerEndpointCooldown.clear();
+  providerTimeoutCooldown.clear();
+  toonstreamNegativePathCache.clear();
+}
+
+function isProviderForceRefreshActive(now = Date.now()): boolean {
+  if (!providerForceRefreshUntil) return false;
+  if (providerForceRefreshUntil <= now) {
+    providerForceRefreshUntil = 0;
+    return false;
+  }
+  return true;
+}
+
+export function isProviderSourceRefreshPending(): boolean {
+  return isProviderForceRefreshActive();
+}
+
+function buildProviderRequestPath(path: string, forceFresh: boolean): string {
+  if (!forceFresh) return path;
+
+  const [pathname, search = ""] = String(path || "").split("?");
+  const params = new URLSearchParams(search);
+  params.set("nocache", "1");
+  params.set("snapshotRefresh", "1");
+  params.set("snapshotUse", "0");
+  params.set("snapshotFallback", "0");
+  params.set("snapshotPurge", "1");
+  return `${pathname}?${params.toString()}`;
+}
+
+export function markProviderSourcesExpired(reason = "expired-stream", ttlMs = PROVIDER_FORCE_REFRESH_TTL_MS): void {
+  const ttl = Number.isFinite(Number(ttlMs)) ? Math.max(5000, Number(ttlMs)) : PROVIDER_FORCE_REFRESH_TTL_MS;
+  providerForceRefreshUntil = Date.now() + ttl;
+  clearProviderFallbackCaches();
+
+  if (import.meta.env.DEV) {
+    console.warn(`[Tatakai] Provider sources marked expired. Forcing fresh fetch for ${ttl}ms (${reason}).`);
+  }
+}
+
+// G��G��G�� Background Retry Cache G��G��G��
 // Stores in-flight and completed provider retries for each episode
 type ProviderRetryState = {
   inProgress: boolean;
-  results: Map<string, StreamingSource[]>; // provider key → sources
+  results: Map<string, StreamingSource[]>; // provider key G�� sources
   lastRetry: number;
   retryCount: number;
 };
@@ -200,6 +245,107 @@ function buildProviderLastGoodCacheKey(params: {
   ].join("|");
 }
 
+function normalizeTechInMindStreams(json: any): any[] {
+  const payload = json?.data || json;
+  if (Array.isArray(payload?.streams)) return payload.streams;
+  if (Array.isArray(json?.streams)) return json.streams;
+  if (Array.isArray(payload?.results?.streams)) return payload.results.streams;
+  return [];
+}
+
+type TechInMindFetchOptions = {
+  episodeNumber: number;
+  season: number;
+  malId?: number | string;
+  anilistId?: number | string;
+  timeoutMs: number;
+};
+
+async function fetchTechInMindStreamsWithFallback(options: TechInMindFetchOptions): Promise<any[]> {
+  const episode = Math.max(1, Number(options.episodeNumber) || 1);
+  const season = Math.max(1, Number(options.season) || 1);
+
+  const idCandidates: Array<{ key: "malId" | "anilistId"; value: string }> = [];
+  const addIdCandidate = (key: "malId" | "anilistId", value?: number | string) => {
+    const normalized = String(value || "").trim();
+    if (!normalized) return;
+    if (!idCandidates.some((candidate) => candidate.key === key && candidate.value === normalized)) {
+      idCandidates.push({ key, value: normalized });
+    }
+  };
+
+  addIdCandidate("malId", options.malId);
+  addIdCandidate("anilistId", options.anilistId);
+
+  if (idCandidates.length === 0) return [];
+
+  const requestVariants: Array<{ season: number; episode: number; type: "series" | "movie" }> = [
+    { season, episode, type: "series" },
+    ...(season !== 1 ? [{ season: 1, episode, type: "series" as const }] : []),
+    ...(episode !== 1 ? [{ season, episode: 1, type: "series" as const }] : []),
+    ...(season !== 1 || episode !== 1 ? [{ season: 1, episode: 1, type: "series" as const }] : []),
+    { season: 1, episode: 1, type: "movie" },
+  ];
+
+  const seenSignatures = new Set<string>();
+
+  for (const idCandidate of idCandidates) {
+    for (const variant of requestVariants) {
+      const params = new URLSearchParams({
+        season: String(variant.season),
+        episode: String(variant.episode),
+        type: variant.type,
+      });
+      params.set(idCandidate.key, idCandidate.value);
+
+      const signature = `${idCandidate.key}:${idCandidate.value}:${params.toString()}`;
+      if (seenSignatures.has(signature)) continue;
+      seenSignatures.add(signature);
+
+      const json = await providerFetch<any>(`/techinmind/episode?${params.toString()}`, options.timeoutMs);
+      const streams = normalizeTechInMindStreams(json);
+      if (streams.length > 0) return streams;
+    }
+  }
+
+  return [];
+}
+
+function mapTechInMindStreamsToSources(
+  streams: any[],
+  langCodePrefix: string,
+  providerLabel: string
+): StreamingSource[] {
+  return streams
+    .filter((stream: any) => stream?.url || stream?.dhls)
+    .map((stream: any, index: number) => {
+      const hasDirect = !!stream.dhls;
+      const providerKey = stream.provider?.toLowerCase().replace(/\s+/g, "") || `server${index}`;
+      let url: string;
+
+      if (hasDirect) {
+        const referer = stream.headers?.Referer || stream.headers?.referer || "";
+        url = `${TATAKAI_API_URL}/techinmind/proxy?url=${encodeURIComponent(stream.dhls)}${
+          referer ? `&referer=${encodeURIComponent(referer)}` : ""
+        }`;
+      } else {
+        url = stream.url;
+      }
+
+      return {
+        url,
+        isM3U8: hasDirect,
+        quality: "HD",
+        language: "Hindi",
+        langCode: `${langCodePrefix}-${index}-${providerKey}`,
+        isDub: true,
+        providerName: `${stream.provider || `Server ${index + 1}`} (${providerLabel})`,
+        isEmbed: !hasDirect,
+        needsHeadless: !hasDirect,
+      };
+    });
+}
+
 function getProviderLastGood(cacheKey: string): (StreamingData & { providerServers: EpisodeServer[] }) | null {
   const cached = providerLastGoodCache.get(cacheKey);
   if (!cached) return null;
@@ -283,7 +429,7 @@ async function fetchMapperMap(alias: string, anilistId: number): Promise<any | n
   for (const base of MAPPER_BASE_CANDIDATES) {
     try {
       const res = await fetch(`${base}/map/${alias}/${anilistId}`, {
-        headers: { Accept: "application/json" },
+        headers: withClientHeaders({ Accept: "application/json" }),
         signal: AbortSignal.timeout(MAPPER_REQUEST_TIMEOUT_MS),
       });
 
@@ -314,18 +460,21 @@ async function fetchMapperMap(alias: string, anilistId: number): Promise<any | n
 }
 
 async function providerFetch<T = any>(path: string, timeout = TIMEOUT): Promise<T | null> {
-  if (shouldSkipNotFoundPath(path)) return null;
-  if (isProviderEndpointCoolingDown(path)) return null;
+  const forceFresh = isProviderForceRefreshActive();
+  const requestPath = buildProviderRequestPath(path, forceFresh);
+
+  if (!forceFresh && shouldSkipNotFoundPath(path)) return null;
+  if (!forceFresh && isProviderEndpointCoolingDown(path)) return null;
   try {
-    const res = await fetch(`${TATAKAI_API_URL}${path}`, {
-      headers: { Accept: "application/json" },
+    const res = await fetch(`${TATAKAI_API_URL}${requestPath}`, {
+      headers: withClientHeaders({ Accept: "application/json" }),
       signal: AbortSignal.timeout(timeout),
     });
     if (!res.ok) {
-      if (res.status === 404) {
+      if (!forceFresh && res.status === 404) {
         markNotFoundPath(path);
       }
-      if (res.status === 405) {
+      if (!forceFresh && res.status === 405) {
         markProviderEndpointCooldown(path);
       }
       return null;
@@ -337,9 +486,11 @@ async function providerFetch<T = any>(path: string, timeout = TIMEOUT): Promise<
 }
 
 async function providerFetchText(path: string, timeout = TIMEOUT): Promise<string | null> {
+  const forceFresh = isProviderForceRefreshActive();
+  const requestPath = buildProviderRequestPath(path, forceFresh);
   try {
-    const res = await fetch(`${TATAKAI_API_URL}${path}`, {
-      headers: { Accept: "application/json,text/plain,*/*" },
+    const res = await fetch(`${TATAKAI_API_URL}${requestPath}`, {
+      headers: withClientHeaders({ Accept: "application/json,text/plain,*/*" }),
       signal: AbortSignal.timeout(timeout),
     });
     if (!res.ok) return null;
@@ -540,9 +691,10 @@ function shouldSkipCachedToonstreamPath(path: string): boolean {
 }
 
 async function providerFetchToonstream<T = any>(path: string, timeout = 4000): Promise<T | null> {
-  if (shouldSkipCachedToonstreamPath(path)) return null;
+  const forceFresh = isProviderForceRefreshActive();
+  if (!forceFresh && shouldSkipCachedToonstreamPath(path)) return null;
   const json = await providerFetch<T>(path, timeout);
-  if (!json) {
+  if (!forceFresh && !json) {
     toonstreamNegativePathCache.set(path, Date.now() + TOONSTREAM_NEGATIVE_CACHE_TTL);
   }
   return json;
@@ -677,9 +829,87 @@ function buildProviderServerGroups(sources: StreamingSource[]) {
     .sort((a, b) => a.displayName.localeCompare(b.displayName));
 }
 
-// ──────────────────────────────────────────────────────────────
+function providerKeyMatchesCandidate(providerKey: string, candidate: string): boolean {
+  const normalizedProvider = normalizeProviderKey(providerKey);
+  const normalizedCandidate = normalizeProviderKey(candidate);
+  if (!normalizedProvider || !normalizedCandidate) return false;
+  return (
+    normalizedCandidate === normalizedProvider ||
+    normalizedCandidate.startsWith(`${normalizedProvider}-`) ||
+    normalizedProvider.startsWith(`${normalizedCandidate}-`)
+  );
+}
+
+function isSourceFromProvider(source: StreamingSource, providerKey: string): boolean {
+  const candidates = [
+    source.providerKey,
+    source.server,
+    source.providerName,
+    source.langCode,
+  ]
+    .filter(Boolean)
+    .map((value) => String(value));
+
+  return candidates.some((candidate) => providerKeyMatchesCandidate(providerKey, candidate));
+}
+
+function isProviderServerFromProvider(server: EpisodeServer, providerKey: string): boolean {
+  const candidates = [
+    server.providerKey,
+    server.serverName,
+    server.providerName,
+    server.displayName,
+  ]
+    .filter(Boolean)
+    .map((value) => String(value));
+
+  return candidates.some((candidate) => providerKeyMatchesCandidate(providerKey, candidate));
+}
+
+function pruneProviderPayloadByKeys(
+  payload: StreamingData & { providerServers: EpisodeServer[] },
+  providerKeys: Set<string>
+): StreamingData & { providerServers: EpisodeServer[] } {
+  if (!providerKeys || providerKeys.size === 0) return payload;
+
+  const normalizedKeys = new Set(
+    Array.from(providerKeys)
+      .map((value) => normalizeProviderKey(String(value)))
+      .filter(Boolean)
+  );
+
+  if (normalizedKeys.size === 0) return payload;
+
+  const filteredSources = (payload.sources || []).filter((source) => {
+    for (const providerKey of normalizedKeys) {
+      if (isSourceFromProvider(source, providerKey)) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  const existingProviderServers = Array.isArray(payload.providerServers) ? payload.providerServers : [];
+  const filteredProviderServers = existingProviderServers
+    .filter((server) => {
+      for (const providerKey of normalizedKeys) {
+        if (isProviderServerFromProvider(server, providerKey)) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+  return {
+    ...payload,
+    sources: filteredSources,
+    providerServers: filteredProviderServers,
+  };
+}
+
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 // Jikan (MAL) cover fetcher
-// ──────────────────────────────────────────────────────────────
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 export async function fetchJikanCover(
   malId: number | null | undefined,
   fallbackPoster: string
@@ -701,9 +931,9 @@ export async function fetchJikanCover(
   return getProxiedImageUrl(fallbackPoster);
 }
 
-// ──────────────────────────────────────────────────────────────
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 // WatchAnimeWorld
-// ──────────────────────────────────────────────────────────────
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 export async function fetchWatchanimeworldSources(
   episodeUrl: string
 ): Promise<StreamingData> {
@@ -842,9 +1072,9 @@ export async function fetchWatchanimeworldFromContext(
   return empty;
 }
 
-// ──────────────────────────────────────────────────────────────
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 // AnimeHindiDubbed
-// ──────────────────────────────────────────────────────────────
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 export async function fetchAnimeHindiDubbedData(
   slug: string,
   _episode?: number
@@ -876,7 +1106,9 @@ export async function fetchHindiDubbedSources(
   slug: string,
   episodeNumber: number,
   anilistId?: number,
-  animeName?: string
+  animeName?: string,
+  malId?: number,
+  season: number = 1
 ): Promise<StreamingSource[]> {
   const targetSlug = slugify(cleanedSearchTitle(slug) || slug);
 
@@ -934,10 +1166,59 @@ export async function fetchHindiDubbedSources(
 
   if (!animeJson) return [];
 
-  // Extract servers for the requested episode number
+  const parseEpisodeNumber = (episode: any): number | null => {
+    const directNumber = Number(episode?.number ?? episode?.episode ?? episode?.ep);
+    if (Number.isFinite(directNumber) && directNumber > 0) return directNumber;
+
+    const title = String(episode?.title || episode?.name || "");
+    const explicitEpisode = title.match(/\b(?:episode|ep|e)\s*(\d{1,4})\b/i);
+    if (explicitEpisode?.[1]) return Number(explicitEpisode[1]);
+
+    const fallbackNumeric = title.match(/(\d{1,4})/);
+    if (fallbackNumeric?.[1]) return Number(fallbackNumeric[1]);
+    return null;
+  };
+
+  const pickBestEpisode = (episodesList: any[]): any | null => {
+    if (!Array.isArray(episodesList) || episodesList.length === 0) return null;
+
+    const withServers = episodesList.filter((ep) => Array.isArray(ep?.servers) && ep.servers.length > 0);
+    const pool = withServers.length > 0 ? withServers : episodesList;
+    const targetNumber = Number(episodeNumber);
+
+    const exact = pool.find((ep) => parseEpisodeNumber(ep) === targetNumber);
+    if (exact) return exact;
+
+    const closest = pool
+      .map((ep) => ({ ep, number: parseEpisodeNumber(ep) }))
+      .filter((entry) => Number.isFinite(entry.number as number))
+      .sort(
+        (a, b) =>
+          Math.abs((a.number as number) - targetNumber) -
+          Math.abs((b.number as number) - targetNumber)
+      )[0];
+
+    if (closest?.ep) return closest.ep;
+    return pool[0] || episodesList[0] || null;
+  };
+
+  // Extract servers for the requested episode number.
   const episodes: any[] = animeJson.episodes || [];
-  const targetEpisode = episodes.find((ep: any) => Number(ep?.number) === Number(episodeNumber)) || episodes[0];
-  const servers: any[] = targetEpisode?.servers || [];
+  const targetEpisode = pickBestEpisode(episodes);
+  const servers: any[] = Array.isArray(targetEpisode?.servers) ? targetEpisode.servers : [];
+
+  if (servers.length === 0) {
+    const mirrorSources = await fetchHindiApiSources(episodeNumber, malId, anilistId, season);
+    if (mirrorSources.length > 0) {
+      return mirrorSources.map((source, index) => ({
+        ...source,
+        langCode: `hindidubbed-mirror-${index}`,
+        providerName: source.providerName
+          ? `HindiDubbed Mirror - ${source.providerName}`
+          : "HindiDubbed Mirror",
+      }));
+    }
+  }
 
   const collected: StreamingSource[] = [];
   for (const [serverIndex, server] of servers.entries()) {
@@ -983,9 +1264,9 @@ export async function fetchHindiDubbedSources(
   return collected;
 }
 
-// ──────────────────────────────────────────────────────────────
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 // Animelok
-// ──────────────────────────────────────────────────────────────
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 export async function fetchAnimelokSources(
   animeSlug: string,
   episodeNumber: number,
@@ -1201,9 +1482,9 @@ export async function fetchAnimelokSources(
   return { sources: [] };
 }
 
-// ──────────────────────────────────────────────────────────────
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 // AnimeKai (Anime-Mapper + Search-First)
-// ──────────────────────────────────────────────────────────────
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 export async function fetchAnimeKaiSources(
   animeSlug: string,
   episodeNumber: number,
@@ -1363,9 +1644,9 @@ export async function fetchAnimeKaiSources(
   return { sources: [] };
 }
 
-// ──────────────────────────────────────────────────────────────
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 // Animepahe (Anime-Mapper + Search-First)
-// ──────────────────────────────────────────────────────────────
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 export async function fetchAnimepaheSources(
   animeSlug: string,
   episodeNumber: number,
@@ -1456,9 +1737,9 @@ export async function fetchAnimepaheSources(
   return [];
 }
 
-// ──────────────────────────────────────────────────────────────
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 // DesiDubAnime
-// ──────────────────────────────────────────────────────────────
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 export async function fetchDesidubanimeSources(
   watchSlug: string,
   episodeNumber: number,
@@ -1574,9 +1855,9 @@ export async function fetchDesidubanimeSources(
   return [];
 }
 
-// ──────────────────────────────────────────────────────────────
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 // Aniworld
-// ──────────────────────────────────────────────────────────────
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 export async function fetchAniworldSources(
   slug: string,
   episodeNumber: number,
@@ -1662,9 +1943,9 @@ export async function fetchAniworldSources(
   return [];
 }
 
-// ──────────────────────────────────────────────────────────────
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 // ToonStream
-// ──────────────────────────────────────────────────────────────
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 export async function fetchToonStreamSources(
   animeName: string,
   season: number,
@@ -1755,97 +2036,51 @@ export async function fetchToonStreamSources(
   return [];
 }
 
-// ──────────────────────────────────────────────────────────────
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 // HindiAPI (TechInMind)
-// ──────────────────────────────────────────────────────────────
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 export async function fetchHindiApiSources(
   episodeNumber: number,
   malId?: number | string,
   anilistId?: number | string,
   season: number = 1
 ): Promise<StreamingSource[]> {
-  const params = new URLSearchParams({ season: String(season), episode: String(episodeNumber), type: "series" });
-  if (malId) params.set("malId", String(malId));
-  else if (anilistId) params.set("anilistId", String(anilistId));
-  else return [];
+  const streams = await fetchTechInMindStreamsWithFallback({
+    episodeNumber,
+    season,
+    malId,
+    anilistId,
+    timeoutMs: 20000,
+  });
+  if (streams.length === 0) return [];
 
-  const json = await providerFetch<any>(`/techinmind/episode?${params}`, 15000);
-  const streams = json?.data?.streams || json?.streams;
-  if (!streams) return [];
-  return streams
-    .filter((s: any) => s.url || s.dhls)
-    .map((s: any, i: number) => {
-      const hasDirect = !!s.dhls;
-      const pKey = s.provider?.toLowerCase().replace(/\s+/g, "") || `server${i}`;
-      let url: string;
-      if (hasDirect) {
-        const ref = s.headers?.Referer || s.headers?.referer || "";
-        url = `${TATAKAI_API_URL}/techinmind/proxy?url=${encodeURIComponent(s.dhls)}${ref ? `&referer=${encodeURIComponent(ref)}` : ""}`;
-      } else {
-        url = s.url;
-      }
-      return {
-        url,
-        isM3U8: hasDirect,
-        quality: "HD",
-        language: "Hindi",
-        langCode: `hindiapi-${i}-${pKey}`,
-        isDub: true,
-        providerName: `${s.provider || `Server ${i + 1}`} (HIN)`,
-        isEmbed: !hasDirect,
-        needsHeadless: !hasDirect,
-      };
-    });
+  return mapTechInMindStreamsToSources(streams, "hindiapi", "HIN");
 }
 
-// ──────────────────────────────────────────────────────────────
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 // AnilistHindi (also TechInMind, different ID route)
-// ──────────────────────────────────────────────────────────────
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 export async function fetchAnilistHindiSources(
   episodeNumber: number,
   anilistId?: number | string,
-  season: number = 1
+  season: number = 1,
+  malId?: number | string
 ): Promise<StreamingSource[]> {
-  if (!anilistId) return [];
-  const params = new URLSearchParams({
-    anilistId: String(anilistId),
-    episode: String(episodeNumber),
-    season: String(season),
-    type: "series",
+  const streams = await fetchTechInMindStreamsWithFallback({
+    episodeNumber,
+    season,
+    malId,
+    anilistId,
+    timeoutMs: 22000,
   });
+  if (streams.length === 0) return [];
 
-  const json = await providerFetch<any>(`/techinmind/episode?${params}`, 20000);
-  const streams = json?.data?.streams || json?.streams;
-  if (!streams) return [];
-  return streams
-    .filter((s: any) => s.url || s.dhls)
-    .map((s: any, i: number) => {
-      const hasDirect = !!s.dhls;
-      const pKey = s.provider?.toLowerCase().replace(/\s+/g, "") || `server${i}`;
-      let url: string;
-      if (hasDirect) {
-        const ref = s.headers?.Referer || s.headers?.referer || "";
-        url = `${TATAKAI_API_URL}/techinmind/proxy?url=${encodeURIComponent(s.dhls)}${ref ? `&referer=${encodeURIComponent(ref)}` : ""}`;
-      } else {
-        url = s.url;
-      }
-      return {
-        url,
-        isM3U8: hasDirect,
-        quality: "HD",
-        language: "Hindi",
-        langCode: `anilisthindi-${i}-${pKey}`,
-        isDub: true,
-        providerName: `${s.provider || `Server ${i + 1}`} (AH)`,
-        isEmbed: !hasDirect,
-        needsHeadless: !hasDirect,
-      };
-    });
+  return mapTechInMindStreamsToSources(streams, "anilisthindi", "AH");
 }
 
-// ──────────────────────────────────────────────────────────────
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 // ToonWorld
-// ──────────────────────────────────────────────────────────────
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 export async function fetchToonWorldSources(
   animeName: string,
   season: number = 1,
@@ -1912,9 +2147,9 @@ export async function fetchToonWorldSources(
   return [];
 }
 
-// ──────────────────────────────────────────────────────────────
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 // Animeya
-// ──────────────────────────────────────────────────────────────
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 export async function fetchAnimeyaSources(
   id: string | number,
   episodeNumber?: number,
@@ -2010,9 +2245,9 @@ function formatAnimeyaSource(s: any, i: number): StreamingSource {
   };
 }
 
-// ──────────────────────────────────────────────────────────────
-// Custom Supabase sources (unchanged — these go to Supabase, not TatakaiCore)
-// ──────────────────────────────────────────────────────────────
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
+// Custom Supabase sources (unchanged G�� these go to Supabase, not TatakaiCore)
+// G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 export async function fetchCustomSupabaseSources(
   animeId?: string,
   episodeId?: string,
@@ -2079,7 +2314,7 @@ export async function fetchCustomSupabaseSources(
   }
 }
 
-// ─── Background Provider Retry Logic ───
+// G��G��G�� Background Provider Retry Logic G��G��G��
 function scheduleProviderBackgroundRetries(
   episodeId: string,
   timedOutProviders: Array<{ key: string; execute?: () => Promise<any> }>,
@@ -2166,7 +2401,7 @@ function scheduleProviderBackgroundRetries(
   }, delayBeforeRetry);
 }
 
-// ─── Get cached results from background retries ───
+// G��G��G�� Get cached results from background retries G��G��G��
 function getCachedProviderResults(episodeId: string): Map<string, StreamingSource[]> {
   const retryState = providerRetryCache.get(episodeId);
   return retryState?.results || new Map();
@@ -2182,6 +2417,7 @@ export type TatakaiProviderSourceQuery = {
   malId?: number | string | null;
   episodeUrl?: string;
   slug?: string;
+  forceFresh?: boolean;
 };
 
 function toPositiveNumber(value?: number | string | null): number | undefined {
@@ -2201,9 +2437,10 @@ function extractTrailingNumericSuffix(value?: string): number | undefined {
 export async function fetchTatakaiProviderSources(
   query: TatakaiProviderSourceQuery
 ): Promise<StreamingData & { providerServers: EpisodeServer[] }> {
+  const forceFresh = Boolean(query.forceFresh) || isProviderForceRefreshActive();
   const animeIdBase = String(query.animeId || "").split("?")[0].trim();
 
-  // Clean animeName by removing trailing anime IDs (e.g., "name-20401" → "name")
+  // Clean animeName by removing trailing anime IDs (e.g., "name-20401" G�� "name")
   let rawAnimeName = query.animeName?.trim() || animeIdBase.replace(/[-_]+/g, " ") || "";
   const animeName = rawAnimeName.replace(/-\d{4,}$/, "").trim();
 
@@ -2247,6 +2484,13 @@ export async function fetchTatakaiProviderSources(
     anilistId: derivedAniListId,
     malId,
   });
+
+  if (forceFresh) {
+    providerLastGoodCache.delete(providerLastGoodKey);
+    providerNotFoundPathCache.clear();
+    providerEndpointCooldown.clear();
+    toonstreamNegativePathCache.clear();
+  }
 
   if (import.meta.env.DEV) {
     console.log(`[Tatakai] Identifier Check:`, {
@@ -2300,7 +2544,7 @@ export async function fetchTatakaiProviderSources(
     {
       key: "anilisthindi",
       enabled: !!derivedAniListId,
-      execute: () => fetchAnilistHindiSources(episodeNumber, derivedAniListId, season),
+      execute: () => fetchAnilistHindiSources(episodeNumber, derivedAniListId, season, malId),
     },
     {
       key: "toonworld",
@@ -2322,7 +2566,7 @@ export async function fetchTatakaiProviderSources(
     {
       key: "hindidubbed",
       enabled: !!slug,
-      execute: () => fetchHindiDubbedSources(slug, episodeNumber, derivedAniListId, animeName),
+      execute: () => fetchHindiDubbedSources(slug, episodeNumber, derivedAniListId, animeName, malId, season),
     },
     {
       key: "animepahe",
@@ -2355,7 +2599,7 @@ export async function fetchTatakaiProviderSources(
   }
 
   const filteredActiveProviderTasks = activeProviderTasks.filter((task) => {
-    const coolingDown = isProviderTimeoutCoolingDown(task.key);
+    const coolingDown = forceFresh ? false : isProviderTimeoutCoolingDown(task.key);
     if (coolingDown) {
       // TEMPORARY: Bypass cooldown for targeted providers during debug
       if (task.key === "animelok" || task.key === "hindiapi") {
@@ -2370,6 +2614,9 @@ export async function fetchTatakaiProviderSources(
     return true;
   });
   if (filteredActiveProviderTasks.length === 0) {
+    if (forceFresh) {
+      return empty;
+    }
     const cached = getProviderLastGood(providerLastGoodKey);
     if (cached) {
       if (import.meta.env.DEV) {
@@ -2557,12 +2804,32 @@ export async function fetchTatakaiProviderSources(
     return finalPayload;
   }
 
+  if (forceFresh) {
+    return finalPayload;
+  }
+
   const cachedFallback = getProviderLastGood(providerLastGoodKey);
   if (cachedFallback) {
+    const staleProviderKeys = new Set(
+      providerDiagnostics
+        .filter((item) => item.status !== "success")
+        .map((item) => item.key)
+    );
+    const prunedFallback = pruneProviderPayloadByKeys(cachedFallback, staleProviderKeys);
+
+    if (prunedFallback.sources.length === 0) {
+      providerLastGoodCache.delete(providerLastGoodKey);
+      return finalPayload;
+    }
+
+    if (prunedFallback.sources.length !== cachedFallback.sources.length) {
+      setProviderLastGood(providerLastGoodKey, prunedFallback);
+    }
+
     if (import.meta.env.DEV) {
       console.log(`[Tatakai] Provider aggregation: returning cached last-good sources after empty live result`);
     }
-    return cachedFallback;
+    return prunedFallback;
   }
 
   return finalPayload;

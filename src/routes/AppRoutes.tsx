@@ -5,6 +5,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useMaintenanceMode } from "@/hooks/useAdminMessages";
 import { useIsNativeApp } from "@/hooks/useIsNativeApp";
 import { useAntiDevTools } from '@/hooks/useAntiDevTools';
+import {
+  clearDevtoolsTrapState,
+  isDevtoolsGuardBypassedHost,
+  isDevtoolsLockActive,
+  isLikelyDevtoolsOpenByViewport,
+  persistDevtoolsTrapState,
+} from '@/lib/devtoolsTrap';
 import { Capacitor } from '@capacitor/core';
 
 // Base Pages
@@ -41,6 +48,7 @@ const IsshoNiPage = lazy(() => import("../pages/watch/IsshoNiPage"));
 
 // Manga & Reading
 const MangaHomePage = lazy(() => import("../pages/manga/MangaHomePage"));
+const MangaGenreBrowsePage = lazy(() => import("../pages/manga/MangaGenreBrowsePage"));
 const MangaPage = lazy(() => import("../pages/manga/MangaPage"));
 const MangaReaderPage = lazy(() => import("../pages/manga/MangaReaderPage"));
 
@@ -174,6 +182,37 @@ export function AntiDevToolsGuard() {
   return null;
 }
 
+function DevtoolsRouteEnforcer() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (location.pathname.startsWith('/devtools-blocked')) return;
+
+    if (isDevtoolsGuardBypassedHost()) {
+      clearDevtoolsTrapState();
+      return;
+    }
+
+    if (isDevtoolsLockActive()) {
+      navigate(`/devtools-blocked?locked=${Date.now()}`, { replace: true });
+      return;
+    }
+
+    // Fast viewport-based probe on route changes for immediate enforcement.
+    if (isLikelyDevtoolsOpenByViewport(180)) {
+      const payload = persistDevtoolsTrapState('route-viewport-detection');
+      navigate(`/devtools-blocked?locked=${Date.now()}`, {
+        replace: true,
+        state: { trapPayload: payload },
+      });
+    }
+  }, [location.pathname, navigate]);
+
+  return null;
+}
+
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isBanned, isAdmin, isLoading } = useAuth();
   const { isMaintenanceMode } = useMaintenanceMode();
@@ -217,6 +256,7 @@ const AppRoutes = () => {
 
   return (
     <Suspense fallback={<PageLoader />}>
+      <DevtoolsRouteEnforcer />
       <Routes>
         <Route path="/maintenance" element={<StatusPageGuard allowedWhen={isMaintenanceMode}><MaintenancePage /></StatusPageGuard>} />
         <Route path="/banned" element={<StatusPageGuard allowedWhen={isBanned}><BannedPage /></StatusPageGuard>} />
@@ -233,6 +273,8 @@ const AppRoutes = () => {
         <Route path="/anilist/:id" element={<ExternalIdRedirect type="anilist" />} />
         <Route path="/anime/:animeId" element={<ProtectedRoute><AnimePage /></ProtectedRoute>} />
         <Route path="/manga" element={<ProtectedRoute><MangaHomePage /></ProtectedRoute>} />
+        <Route path="/manga/discover" element={<ProtectedRoute><MangaGenreBrowsePage /></ProtectedRoute>} />
+        <Route path="/manga/genre/:genre" element={<ProtectedRoute><MangaGenreBrowsePage /></ProtectedRoute>} />
         <Route path="/manga/:mangaId" element={<ProtectedRoute><MangaPage /></ProtectedRoute>} />
         <Route path="/manga/read/:mangaId" element={<ProtectedRoute><MangaReaderPage /></ProtectedRoute>} />
         <Route path="/watch/:episodeId" element={<ProtectedRoute><WatchPage /></ProtectedRoute>} />
@@ -240,6 +282,7 @@ const AppRoutes = () => {
         <Route path="/offline-library" element={<ProtectedRoute><OfflineLibraryPage /></ProtectedRoute>} />
         <Route path="/offline" element={<ProtectedRoute><OfflineLibraryPage /></ProtectedRoute>} />
         <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
+        <Route path="/search/producer/:producerName" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
         <Route path="/download" element={<ProtectedRoute><DownloadPage /></ProtectedRoute>} />
         <Route path="/mobile-app" element={<ProtectedRoute><MobileAppSoonPage /></ProtectedRoute>} />
         <Route path="/image-search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />

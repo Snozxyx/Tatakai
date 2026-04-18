@@ -14,9 +14,14 @@ export async function fetchAnimeInfo(
   animeId: string
 ): Promise<{ anime: AnimeInfo; recommendedAnimes: AnimeCard[]; relatedAnimes: AnimeCard[] }> {
   if (/^\d+$/.test(animeId)) {
-    const res = await externalApiGet<any>(TATAKAI_API_URL, `/animelok/anime/${animeId}`);
-    if (res.status === 200 && res.data) {
-      return mapAnimelokToAnimePage(res.data);
+    try {
+      const res = await externalApiGet<any>(TATAKAI_API_URL, `/animelok/anime/${animeId}`);
+      const payload = unwrapApiData<any>(res as any);
+      if (payload && typeof payload === "object") {
+        return mapAnimelokToAnimePage(payload);
+      }
+    } catch {
+      // Fall through to standard API path.
     }
   }
   return apiGet(`/anime/${animeId}`);
@@ -40,16 +45,14 @@ export async function fetchEpisodes(
     while (hasMore) {
       try {
         const res = await externalApiGet<any>(TATAKAI_API_URL, `/animelok/watch/${animeId}?ep=${page}`);
-        if (res.status === 200 && res.data && res.data.episodes) {
-          const pageEpisodes = res.data.episodes;
-          allEpisodes = [...allEpisodes, ...pageEpisodes];
-          if (pageEpisodes.length === 0) {
-            hasMore = false;
-          } else {
-            page++;
-          }
-        } else {
+        const payload = unwrapApiData<any>(res as any);
+        const pageEpisodes = Array.isArray(payload?.episodes) ? payload.episodes : [];
+        allEpisodes = [...allEpisodes, ...pageEpisodes];
+
+        if (pageEpisodes.length === 0) {
           hasMore = false;
+        } else {
+          page++;
         }
       } catch (error) {
         console.error(`Failed to fetch episodes page ${page}:`, error);
@@ -172,18 +175,46 @@ export async function fetchEpisodeServers(
     if (!response.ok) throw new Error("Failed to fetch servers");
     
     const json = await response.json();
-    const serversArray: any[] = json.success ? json.results : json;
+    const serverPayload = unwrapApiData<any>(json as any);
+    const serversArray: any[] = Array.isArray(serverPayload)
+      ? serverPayload
+      : Array.isArray(serverPayload?.results)
+      ? serverPayload.results
+      : Array.isArray(serverPayload?.servers)
+      ? serverPayload.servers
+      : [];
     let { sub, dub, raw } = Array.isArray(serversArray)
       ? parseServers(serversArray)
       : { sub: [], dub: [], raw: [] };
 
     if (sub.length === 0 && dub.length === 0 && raw.length === 0) {
-      const streamRes = await fetch(
-        `${API_URL}/stream?id=${encodeURIComponent(episodeId)}&server=hd-1&type=sub`
-      );
+      const streamParams = new URLSearchParams({
+        id: episodeId,
+        server: "hd-1",
+        type: "sub",
+      });
+      streamParams.set("nocache", "1");
+      streamParams.set("snapshotRefresh", "1");
+      streamParams.set("snapshotUse", "0");
+      streamParams.set("snapshotFallback", "0");
+      streamParams.set("snapshotPurge", "1");
+
+      const streamRes = await fetch(`${API_URL}/stream?${streamParams.toString()}`, {
+        headers: {
+          Accept: "application/json",
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+        },
+        cache: "no-store",
+      });
       if (streamRes.ok) {
         const streamJson = await streamRes.json();
-        const fallbackServers = streamJson?.results?.servers;
+        const streamPayload = unwrapApiData<any>(streamJson as any);
+        const fallbackServers = Array.isArray(streamPayload?.servers)
+          ? streamPayload.servers
+          : Array.isArray(streamPayload?.results?.servers)
+          ? streamPayload.results.servers
+          : [];
         if (Array.isArray(fallbackServers)) {
           ({ sub, dub, raw } = parseServers(fallbackServers));
         }
@@ -201,30 +232,35 @@ export async function fetchEpisodeServers(
 
     const shouldShowJustAnime = String(import.meta.env.VITE_ENABLE_JUSTANIME_FAST_FIRST ?? "true").toLowerCase() !== "false";
     if (shouldShowJustAnime) {
-      const hasJustAnimeSub = sub.some((server) => String(server.serverName || "").toLowerCase() === "justanime");
-      const hasJustAnimeDub = dub.some((server) => String(server.serverName || "").toLowerCase() === "justanime");
+      const isJustAnimeServer = (server: EpisodeServer): boolean => {
+        const name = String(server.serverName || "").toLowerCase();
+        const key = String(server.providerKey || "").toLowerCase();
+        const providerName = String(server.providerName || "").toLowerCase();
+        const displayName = String(server.displayName || "").toLowerCase();
+        return name === "justanime"
+          || key === "justanime"
+          || providerName === "koro"
+          || displayName === "koro";
+      };
 
-      if (!hasJustAnimeSub) {
-        sub.push({
-          serverId: 9001,
+      const ensureJustAnimeFirst = (servers: EpisodeServer[], fallbackServerId: number): EpisodeServer[] => {
+        const existing = servers.find((server) => isJustAnimeServer(server));
+        const normalized: EpisodeServer = {
+          ...(existing || {}),
+          serverId: Number(existing?.serverId || fallbackServerId),
           serverName: "justanime",
           providerKey: "justanime",
           providerName: "Koro",
           displayName: "Koro",
           isProviderServer: true,
-        });
-      }
+        };
 
-      if (!hasJustAnimeDub) {
-        dub.push({
-          serverId: 9002,
-          serverName: "justanime",
-          providerKey: "justanime",
-          providerName: "Koro",
-          displayName: "Koro",
-          isProviderServer: true,
-        });
-      }
+        const filtered = servers.filter((server) => !isJustAnimeServer(server));
+        return [normalized, ...filtered];
+      };
+
+      sub = ensureJustAnimeFirst(sub, 9001);
+      dub = ensureJustAnimeFirst(dub, 9002);
     }
 
     return {
@@ -311,7 +347,11 @@ export async function fetchStreamingSources(
     return decodedBase;
   };
 
-  const parseStreamResponse = (results: any, fallbackServer: string): StreamingData | null => {
+  const parseStreamResponse = (
+    results: any,
+    fallbackServer: string,
+    providerKey: string = "hianime"
+  ): StreamingData | null => {
     const streamingLinks = results?.streamingLink || [];
     if (!Array.isArray(streamingLinks) || streamingLinks.length === 0) return null;
 
@@ -323,6 +363,7 @@ export async function fetchStreamingSources(
         quality: "auto",
         server: sLink.server || fallbackServer,
         providerName: sLink.server || fallbackServer,
+        providerKey,
         isDub: category === "dub",
         language: category === "dub" ? "Dub" : "Sub",
       }))
@@ -348,6 +389,15 @@ export async function fetchStreamingSources(
     };
   };
 
+  const applyFreshStreamParams = (params: URLSearchParams) => {
+    params.set("nocache", "1");
+    params.set("snapshotRefresh", "1");
+    params.set("snapshotUse", "0");
+    params.set("snapshotFallback", "0");
+    params.set("snapshotPurge", "1");
+    return params;
+  };
+
   const tryJustAnimeFastFirst = async (): Promise<StreamingData | null> => {
     const enabled = String(import.meta.env.VITE_ENABLE_JUSTANIME_FAST_FIRST ?? "true").toLowerCase() !== "false";
     if (!enabled) return null;
@@ -362,21 +412,29 @@ export async function fetchStreamingSources(
     if (!epToken || !baseId) return null;
 
     const justAnimeEpisodeId = `${baseId}?ep=${epToken}`;
-    const justAnimeUrl = `${JUSTANIME_PROXY_BASE}/stream?id=${encodeURIComponent(justAnimeEpisodeId)}&server=hd-1&type=${encodeURIComponent(category)}`;
+    const justAnimeParams = applyFreshStreamParams(new URLSearchParams({
+      id: justAnimeEpisodeId,
+      server: "hd-1",
+      type: category,
+    }));
+    const justAnimeUrl = `${JUSTANIME_PROXY_BASE}/stream?${justAnimeParams.toString()}`;
 
     try {
       const response = await fetch(justAnimeUrl, {
         headers: {
           Accept: "application/json",
           "Accept-Language": "en-US,en;q=0.9",
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
         },
+        cache: "no-store",
         signal: AbortSignal.timeout(Math.max(1000, Math.min(Number(options.timeoutMs || 4500), 7000))),
       });
 
       if (!response.ok) return null;
       const payload = await response.json();
       if (!payload?.success || !payload?.results) return null;
-      const parsed = parseStreamResponse(payload.results, "hd-1");
+      const parsed = parseStreamResponse(payload.results, "hd-1", "justanime");
       if (!parsed) return null;
 
       return {
@@ -401,20 +459,34 @@ export async function fetchStreamingSources(
     return justAnimeFast;
   }
 
-  const targetUrl = `${API_URL}/stream?id=${encodeURIComponent(episodeId)}&server=${encodeURIComponent(server)}&type=${encodeURIComponent(category)}`;
+  const hiAnimeParams = applyFreshStreamParams(new URLSearchParams({
+    id: episodeId,
+    server,
+    type: category,
+  }));
+  const targetUrl = `${API_URL}/stream?${hiAnimeParams.toString()}`;
   
   try {
     const response = await fetch(targetUrl, {
-      headers: { 'Accept': 'application/json' },
+      headers: {
+        Accept: 'application/json',
+        'Cache-Control': 'no-cache',
+        Pragma: 'no-cache',
+      },
+      cache: 'no-store',
       signal: AbortSignal.timeout(Math.max(1200, Number(options.timeoutMs || 20000))),
     });
 
     if (!response.ok) throw new Error(`HiAnime Stream API returned status ${response.status}`);
 
     const json = await response.json();
-    if (json.success && json.results) {
-      const results = json.results;
-      const parsed = parseStreamResponse(results, server);
+    const streamPayload = unwrapApiData<any>(json as any);
+    const results = Array.isArray(streamPayload?.streamingLink)
+      ? streamPayload
+      : streamPayload?.results;
+
+    if (results) {
+      const parsed = parseStreamResponse(results, server, "hianime");
       if (parsed) {
         return {
           ...parsed,

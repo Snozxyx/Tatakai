@@ -54,6 +54,7 @@ import { MarketplaceModal } from "@/components/ui/MarketplaceModal";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchEpisodeServers, fetchStreamingSources, fetchTatakaiEpisodeSources, trackEvent } from "@/lib/api";
+import { markProviderSourcesExpired } from "@/services/provider.service";
 import {
   buildDubSubtitles,
   clearCachedCombinedSourcesByEpisodeAndCategory,
@@ -183,6 +184,7 @@ export default function WatchPage() {
   const [newProviderCount, setNewProviderCount] = useState(0);
   const [providerFeedUpdatedAt, setProviderFeedUpdatedAt] = useState<number | null>(null);
   const [lockedSourceUrl, setLockedSourceUrl] = useState<string | null>(null);
+  const [blockedSourceUrls, setBlockedSourceUrls] = useState<Record<string, number>>({});
   const [committedPlaybackSource, setCommittedPlaybackSource] = useState<any | null>(null);
   const [committedPlaybackHeaders, setCommittedPlaybackHeaders] = useState<Record<string, string> | null>(null);
   const previousProviderCountRef = useRef<number | null>(null);
@@ -587,7 +589,7 @@ export default function WatchPage() {
 
   const { data: fastStartData, isLoading: loadingFastStart } = useQuery({
     queryKey: ["fast-start-source", decodedEpisodeId, currentServer?.serverName, category],
-    enabled: !isOfflineMode && !!decodedEpisodeId && !!currentServer?.serverName && !(sourcesData?.sources?.length),
+    enabled: !isOfflineMode && !!decodedEpisodeId && !!currentServer?.serverName,
     staleTime: 90 * 1000,
     queryFn: async () => {
       const empty = {
@@ -616,16 +618,90 @@ export default function WatchPage() {
   });
 
   const sourceDataForPlayback = useMemo(() => {
-    if (sourcesData?.sources?.length) return sourcesData;
+    const normalizeForBlocked = (value?: string | null) => {
+      const raw = String(value || "").trim();
+      if (!raw) return "";
+
+      try {
+        const parsed = new URL(raw, window.location.origin);
+        const upstream = parsed.searchParams.get("url");
+        return String(upstream || parsed.href || raw).trim();
+      } catch {
+        return raw;
+      }
+    };
+
+    const countUsableSources = (payload: any): number => {
+      const rows = Array.isArray(payload?.sources) ? payload.sources : [];
+      const now = Date.now();
+      return rows.filter((source: any) => {
+        const normalized = normalizeForBlocked(source?.url);
+        if (!normalized) return false;
+        const expiresAt = blockedSourceUrls[normalized];
+        return !(Number.isFinite(expiresAt) && expiresAt > now);
+      }).length;
+    };
+
+    const usableCombinedCount = countUsableSources(sourcesData);
+    const usableFastStartCount = countUsableSources(fastStartData);
+
+    if (usableCombinedCount > 0 && sourcesData?.sources?.length) return sourcesData;
+    if (usableFastStartCount > 0 && fastStartData?.sources?.length) return fastStartData;
     if (fastStartData?.sources?.length) return fastStartData;
+    if (sourcesData?.sources?.length) return sourcesData;
     return sourcesData || fastStartData;
-  }, [sourcesData, fastStartData]);
+  }, [sourcesData, fastStartData, blockedSourceUrls]);
+
+  const normalizePlaybackSourceUrl = useCallback((value?: string | null) => {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+
+    try {
+      const parsed = new URL(raw, window.location.origin);
+      const upstream = parsed.searchParams.get("url");
+      return String(upstream || parsed.href || raw).trim();
+    } catch {
+      return raw;
+    }
+  }, []);
+
+  const isPlaybackSourceBlocked = useCallback(
+    (value?: string | null) => {
+      const normalized = normalizePlaybackSourceUrl(value);
+      if (!normalized) return false;
+
+      const expiresAt = blockedSourceUrls[normalized];
+      return Number.isFinite(expiresAt) && expiresAt > Date.now();
+    },
+    [blockedSourceUrls, normalizePlaybackSourceUrl],
+  );
+
+  const blockPlaybackSourceUrl = useCallback(
+    (value?: string | null, ttlMs = 2 * 60 * 1000) => {
+      const normalized = normalizePlaybackSourceUrl(value);
+      if (!normalized) return;
+
+      const expiresAt = Date.now() + Math.max(15000, ttlMs);
+      setBlockedSourceUrls((previous) => {
+        const next: Record<string, number> = { ...previous, [normalized]: expiresAt };
+        const now = Date.now();
+        for (const [url, expiry] of Object.entries(next)) {
+          if (!Number.isFinite(expiry) || expiry <= now) {
+            delete next[url];
+          }
+        }
+        return next;
+      });
+    },
+    [normalizePlaybackSourceUrl],
+  );
 
   const visibleSources = useMemo(() => {
     const rawSources = sourceDataForPlayback?.sources || [];
+    const unblockedSources = rawSources.filter((source) => !isPlaybackSourceBlocked(source?.url));
     const seen = new Set<string>();
 
-    return rawSources.filter((source) => {
+    return unblockedSources.filter((source) => {
       if (!source?.url) return false;
       const key = [
         String(source.url || '').trim().toLowerCase(),
@@ -640,7 +716,7 @@ export default function WatchPage() {
       seen.add(key);
       return true;
     });
-  }, [sourceDataForPlayback?.sources]);
+  }, [sourceDataForPlayback?.sources, isPlaybackSourceBlocked]);
 
   const hasWatchAnimeWorldAvailable = useMemo(() => {
     return visibleSources.some((s: any) =>
@@ -737,10 +813,27 @@ export default function WatchPage() {
         ...(sourceDataForPlayback?.subtitles || []),
         ...(sourceDataForPlayback?.tracks || [])
       ];
-      const seenUrls = new Set();
+      const seenUrls = new Set<string>();
+      const seenLanguages = new Set<string>();
+      const normalizeLanguage = (track: { lang?: string; label?: string }) => {
+        const raw = `${track.lang || ''} ${track.label || ''}`.toLowerCase();
+        const compact = raw.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
+        if (!compact) return '';
+        if (compact === 'en' || compact.includes('english') || compact.includes('eng')) return 'en';
+        if (compact === 'ja' || compact.includes('japanese') || compact.includes('jpn')) return 'ja';
+        if (compact === 'hi' || compact.includes('hindi')) return 'hi';
+        if (compact === 'es' || compact.includes('spanish') || compact.includes('espanol')) return 'es';
+        return compact;
+      };
+
       subs = allTracks.filter(s => {
-        if (seenUrls.has(s.url)) return false;
-        seenUrls.add(s.url);
+        const urlKey = String(s.url || '').trim();
+        const languageKey = normalizeLanguage(s);
+        if (!urlKey) return false;
+        if (seenUrls.has(urlKey)) return false;
+        if (languageKey && seenLanguages.has(languageKey)) return false;
+        seenUrls.add(urlKey);
+        if (languageKey) seenLanguages.add(languageKey);
         return true;
       });
     }
@@ -784,7 +877,15 @@ export default function WatchPage() {
     // Handle regular servers
     if (selectedServerIndex >= 0 && availableServers[selectedServerIndex]) {
       const serverName = availableServers[selectedServerIndex].serverName;
-      return selectSourceForServer(visibleSources, serverName, category);
+      const isKoroServer = String(serverName || "").trim().toLowerCase() === "justanime";
+      const candidatePool = isKoroServer
+        ? visibleSources
+        : visibleSources.filter((source) => {
+            const providerKey = String(source.providerKey || "").trim().toLowerCase();
+            const providerName = String(source.providerName || "").trim().toLowerCase();
+            return providerKey !== "justanime" && !providerName.includes("koro");
+          });
+      return selectSourceForServer(candidatePool, serverName, category);
     }
 
     return null;
@@ -793,25 +894,33 @@ export default function WatchPage() {
   const selectedSource = useMemo(() => {
     if (!visibleSources.length) return null;
 
-    if (lockedSourceUrl) {
+    if (lockedSourceUrl && !isPlaybackSourceBlocked(lockedSourceUrl)) {
       const locked = visibleSources.find((source) => source.url === lockedSourceUrl);
       if (locked) return locked;
     }
 
     return resolvedSelectedSource;
-  }, [visibleSources, lockedSourceUrl, resolvedSelectedSource]);
+  }, [visibleSources, lockedSourceUrl, resolvedSelectedSource, isPlaybackSourceBlocked]);
 
   useEffect(() => {
     if (!selectedSource?.url) return;
+    if (isPlaybackSourceBlocked(selectedSource.url)) return;
 
     setLockedSourceUrl((current) => {
       if (!current) return selectedSource.url;
       if (current === selectedSource.url) return current;
+      if (isPlaybackSourceBlocked(current)) return selectedSource.url;
 
       const currentStillVisible = visibleSources.some((source) => source.url === current);
       return currentStillVisible ? current : selectedSource.url;
     });
-  }, [selectedSource?.url, visibleSources]);
+  }, [selectedSource?.url, visibleSources, isPlaybackSourceBlocked]);
+
+  useEffect(() => {
+    if (!lockedSourceUrl) return;
+    if (!isPlaybackSourceBlocked(lockedSourceUrl)) return;
+    setLockedSourceUrl(null);
+  }, [lockedSourceUrl, isPlaybackSourceBlocked]);
 
   const playbackHeaders = useMemo(() => {
     const baseHeaders: { Referer?: string; "User-Agent"?: string } = (sourceDataForPlayback?.headers || {}) as { Referer?: string; "User-Agent"?: string };
@@ -830,7 +939,13 @@ export default function WatchPage() {
   }, [resolvedSelectedSource]);
 
   useEffect(() => {
-    if (!playbackCandidateSource) return;
+    if (!playbackCandidateSource) {
+      if (pendingPlaybackCommitRef.current) {
+        setCommittedPlaybackSource(null);
+        setCommittedPlaybackHeaders(null);
+      }
+      return;
+    }
 
     if (!committedPlaybackSource || pendingPlaybackCommitRef.current) {
       setCommittedPlaybackSource(playbackCandidateSource);
@@ -942,6 +1057,7 @@ export default function WatchPage() {
     previousProviderCountRef.current = null;
     setNewProviderCount(0);
     setProviderFeedUpdatedAt(null);
+    setBlockedSourceUrls({});
   }, [decodedEpisodeId, category]);
 
   useEffect(() => {
@@ -1139,7 +1255,72 @@ export default function WatchPage() {
   const forceRefreshLockUntilRef = useRef(0);
   const forceRefreshInFlightRef = useRef(false);
   const attemptedFailoverRef = useRef<Set<string>>(new Set());
-  const handleVideoError = useCallback(() => {
+  const sourceRefreshThrottleRef = useRef(0);
+  const sourceRefreshInFlightRef = useRef(false);
+  const sourceRefreshHandlerRef = useRef<null | (() => Promise<void>)>(null);
+
+  const requestSourceRefresh = useCallback((reason: string, options?: { purgeProviderFallback?: boolean }) => {
+    const handler = sourceRefreshHandlerRef.current;
+    if (!handler) return;
+
+    if (options?.purgeProviderFallback) {
+      markProviderSourcesExpired(reason);
+    }
+
+    const now = Date.now();
+    if (sourceRefreshInFlightRef.current) return;
+    if (now - sourceRefreshThrottleRef.current < 15000) return;
+
+    pendingPlaybackCommitRef.current = true;
+    sourceRefreshThrottleRef.current = now;
+    sourceRefreshInFlightRef.current = true;
+    setSourcePreflightError(`Refreshing stream links (${reason})...`);
+
+    void handler().finally(() => {
+      sourceRefreshInFlightRef.current = false;
+    });
+  }, [setSourcePreflightError]);
+
+  const moveToNextVisibleSource = useCallback((blockedUrl?: string | null): boolean => {
+    if (!Array.isArray(visibleSources) || visibleSources.length === 0) return false;
+
+    const blockedNormalized = normalizePlaybackSourceUrl(blockedUrl || activePlaybackSource?.url || "");
+    const candidates = visibleSources.filter((source) => !isPlaybackSourceBlocked(source?.url));
+    if (candidates.length <= 1) return false;
+
+    const currentIndex = candidates.findIndex((source) => {
+      const normalized = normalizePlaybackSourceUrl(source?.url);
+      return blockedNormalized
+        ? normalized === blockedNormalized
+        : normalized === normalizePlaybackSourceUrl(activePlaybackSource?.url || "");
+    });
+
+    let nextSource: any | null = null;
+    if (currentIndex >= 0) {
+      for (let offset = 1; offset < candidates.length; offset += 1) {
+        const candidate = candidates[(currentIndex + offset) % candidates.length];
+        if (!candidate?.url) continue;
+        if (blockedNormalized && normalizePlaybackSourceUrl(candidate.url) === blockedNormalized) continue;
+        nextSource = candidate;
+        break;
+      }
+    } else {
+      nextSource = candidates[0] || null;
+    }
+
+    if (!nextSource?.langCode) return false;
+
+    pendingPlaybackCommitRef.current = true;
+    setSelectedProviderServerKey(null);
+    selectRegularServer(-4);
+    setSelectedLangCode(nextSource.langCode);
+    setPreferredServerName(nextSource.providerName || null);
+    setLockedSourceUrl(nextSource.url || null);
+    setRefererRetryIndex(0);
+    return true;
+  }, [visibleSources, normalizePlaybackSourceUrl, activePlaybackSource?.url, isPlaybackSourceBlocked, selectRegularServer]);
+
+  const handleVideoError = useCallback((context?: { statusCode?: number; reason?: string }) => {
     // Throttle repeated errors to avoid rapid state updates
     const now = Date.now();
     if (now - errorThrottleRef.current < 2000) return;
@@ -1147,6 +1328,24 @@ export default function WatchPage() {
 
     if (!currentServer) return;
     if (failoverTimeoutRef.current !== null) return;
+
+    const statusCode = Number(context?.statusCode || 0);
+    const reason = String(context?.reason || "").toLowerCase();
+    const isExpiredStream = statusCode === 410;
+    const isForbiddenStream = statusCode === 403;
+    const isMissingStream = statusCode === 404;
+    const isManifestFailure = reason.includes("manifest");
+    const isCodecBufferFailure =
+      reason.includes("codec") ||
+      reason.includes("buffer") ||
+      reason.includes("stalled") ||
+      reason.includes("decoder") ||
+      reason.includes("unsupported") ||
+      reason.includes("native-decode-error") ||
+      reason.includes("native-playback-not-supported") ||
+      reason.includes("native-decoder-unsupported-config") ||
+      reason.includes("fatal-media-buffer") ||
+      reason.includes("hls-buffer-codec-loop");
 
     const comboKey = comboFailureKey(animeId, decodedEpisodeId, currentServer.serverName, category);
     recordSourceFailure(comboKey);
@@ -1164,15 +1363,52 @@ export default function WatchPage() {
       serverName: currentServer.serverName,
       ok: false,
       userId: user?.id,
-      metadata: { refererRetryIndex },
+      metadata: {
+        refererRetryIndex,
+        statusCode: context?.statusCode,
+        reason: context?.reason,
+      },
     });
 
     // Retry the same server with alternate referers for m3u8 before server switch.
     const refererVariants = getRefererVariants(activePlaybackHeaders?.Referer);
-    if ((activePlaybackSource?.isM3U8 || activePlaybackSource?.url?.includes(".m3u8")) && refererRetryIndex < refererVariants.length - 1) {
+    if (!isExpiredStream && !isCodecBufferFailure && (activePlaybackSource?.isM3U8 || activePlaybackSource?.url?.includes(".m3u8")) && refererRetryIndex < refererVariants.length - 1) {
       pendingPlaybackCommitRef.current = true;
       setRefererRetryIndex((v) => v + 1);
       return;
+    }
+
+    if (isExpiredStream || isForbiddenStream || isMissingStream || isManifestFailure || isCodecBufferFailure) {
+      const ttlMs = isExpiredStream
+        ? 2 * 60 * 1000
+        : isCodecBufferFailure
+          ? 3 * 60 * 1000
+          : 90 * 1000;
+      blockPlaybackSourceUrl(activePlaybackSource?.url, ttlMs);
+      setLockedSourceUrl(null);
+      pendingPlaybackCommitRef.current = true;
+      setCommittedPlaybackSource(null);
+      setCommittedPlaybackHeaders(null);
+      setRefererRetryIndex(0);
+
+      const movedToNextSource = moveToNextVisibleSource(activePlaybackSource?.url);
+      if (movedToNextSource) {
+        if (isCodecBufferFailure || isManifestFailure) {
+          requestSourceRefresh("codec/manifest failure", { purgeProviderFallback: false });
+        }
+        return;
+      }
+
+      requestSourceRefresh(
+        isExpiredStream
+          ? "expired stream (410)"
+          : isCodecBufferFailure
+            ? "codec decode error"
+            : isManifestFailure
+              ? "manifest error"
+              : `stream error (${statusCode})`,
+        { purgeProviderFallback: isExpiredStream }
+      );
     }
 
     if (shouldAutoSkipSource(comboKey)) {
@@ -1204,6 +1440,7 @@ export default function WatchPage() {
     }
 
     if (nextIndex === -1) {
+      requestSourceRefresh("all servers failed", { purgeProviderFallback: true });
       attemptedFailoverRef.current.clear();
       nextIndex = availableServers.findIndex((server) => server.serverName !== currentServer.serverName);
     }
@@ -1216,7 +1453,7 @@ export default function WatchPage() {
         failoverTimeoutRef.current = null;
       }, 3000);
     }
-  }, [currentServer, availableServers, selectedServerIndex, failedServers, animeId, decodedEpisodeId, category, user?.id, refererRetryIndex, activePlaybackHeaders?.Referer, activePlaybackSource?.isM3U8, activePlaybackSource?.url, activePlaybackSource?.providerName, activePlaybackSource?.server, activePlaybackSource?.quality, selectRegularServer]);
+  }, [currentServer, availableServers, selectedServerIndex, failedServers, animeId, decodedEpisodeId, category, user?.id, refererRetryIndex, activePlaybackHeaders?.Referer, activePlaybackSource?.isM3U8, activePlaybackSource?.url, activePlaybackSource?.providerName, activePlaybackSource?.server, activePlaybackSource?.quality, selectRegularServer, requestSourceRefresh, blockPlaybackSourceUrl, moveToNextVisibleSource]);
 
   useEffect(() => {
     attemptedFailoverRef.current.clear();
@@ -1224,7 +1461,7 @@ export default function WatchPage() {
       window.clearTimeout(failoverTimeoutRef.current);
       failoverTimeoutRef.current = null;
     }
-  }, [selectedServerIndex, activePlaybackSource?.url]);
+  }, [selectedServerIndex]);
 
   useEffect(() => {
     return () => {
@@ -1288,7 +1525,7 @@ export default function WatchPage() {
       await queryClient.invalidateQueries({
         predicate: (query) => {
           const key = query.queryKey as any[];
-          return key?.[0] === "combined-sources" && key?.[1] === decodedEpisodeId && key?.[4] === category;
+          return key?.[0] === "combined-sources" && key?.[1] === decodedEpisodeId && key?.[5] === category;
         },
       });
       await refetchSources();
@@ -1296,6 +1533,10 @@ export default function WatchPage() {
       forceRefreshInFlightRef.current = false;
     }
   }, [decodedEpisodeId, category, queryClient, refetchSources, fetchingSources]);
+
+  useEffect(() => {
+    sourceRefreshHandlerRef.current = handleForceRefreshSources;
+  }, [handleForceRefreshSources]);
 
   const handleCategoryChange = useCallback((nextCategory: "sub" | "dub") => {
     if (nextCategory === category) return;

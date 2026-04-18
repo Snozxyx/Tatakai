@@ -19,6 +19,9 @@ import { MangaTrendingGrid } from "@/components/manga/MangaTrendingGrid";
 import { InfiniteMangaSections } from "@/components/manga/InfiniteMangaSections";
 import { IndexMangaShowcase } from "@/components/manga/IndexMangaShowcase";
 import { LastReadMangaSection } from "@/components/manga/LastReadMangaSection";
+import { MangaGenreSlider } from "@/components/manga/MangaGenreSlider";
+import { MangaDiscoveryQuickFilters } from "@/components/manga/MangaDiscoveryQuickFilters";
+import { CuratedMangaSections } from "@/components/manga/CuratedMangaSections";
 
 const TRENDING_QUERIES = ["Solo Leveling", "Jujutsu Kaisen", "Blue Lock", "Oshi no Ko", "Lookism"];
 const RECOMMENDED_QUERIES = ["Frieren", "Blue Box", "Dandadan", "Sakamoto Days", "Kaiju No. 8"];
@@ -186,6 +189,12 @@ export default function MangaHomePage() {
             <LastReadMangaSection />
 
             <IndexMangaShowcase />
+
+            <MangaGenreSlider />
+
+            <MangaDiscoveryQuickFilters />
+
+            <CuratedMangaSections />
 
             <section className="mb-12 md:mb-16">
               <div className="relative overflow-hidden rounded-3xl border border-rose-500/30">

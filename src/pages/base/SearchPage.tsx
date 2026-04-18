@@ -1,4 +1,4 @@
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate, useParams } from "react-router-dom";
 import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
@@ -13,9 +13,10 @@ import { searchAniListAnime, ALL_GENRES } from "@/lib/externalIntegrations";
 import { useInfiniteSearch as useInfSearch } from "@/hooks/useAnimeData";
 import { useInfiniteMangaSearch } from "@/hooks/useMangaData";
 import { useRef, useCallback, useState, useEffect, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import { searchCharacters } from "@/services/character.service";
-import { getAtsuFilters, type MangaSearchOptions } from "@/services/manga.service";
+import { fetchProducerAnimes } from "@/services/home.service";
+import { getAtsuFilters, parseMangaSearchProvider, type MangaSearchOptions } from "@/services/manga.service";
 import { getProxiedImageUrl } from "@/lib/api";
 import { UnifiedMediaCard } from "@/components/UnifiedMediaCard";
 import { useContentSafetySettings } from "@/hooks/useContentSafetySettings";
@@ -23,9 +24,35 @@ import { inferMangaAdultFlag, isExplicitMangaSearchQuery } from "@/lib/contentSa
 
 export default function SearchPage() {
   const [searchParams] = useSearchParams();
+  const { producerName } = useParams<{ producerName?: string }>();
   const navigate = useNavigate();
   const isNative = useIsNativeApp();
-  const queryParam = searchParams.get("q") || "";
+  const decodedProducerName = useMemo(() => {
+    if (!producerName) return "";
+
+    try {
+      return decodeURIComponent(producerName).trim();
+    } catch {
+      return producerName.trim();
+    }
+  }, [producerName]);
+  const isProducerRoute = decodedProducerName.length > 0;
+
+  const producerRequestCandidates = useMemo(() => {
+    if (!decodedProducerName) return [];
+
+    const slug = decodedProducerName
+      .toLowerCase()
+      .replace(/&/g, ' and ')
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+
+    return Array.from(new Set([decodedProducerName, slug].map((value) => value.trim()).filter(Boolean)));
+  }, [decodedProducerName]);
+
+  const queryParam = searchParams.get("q") || decodedProducerName || "";
   const [query, setQuery] = useState(queryParam);
   const [searchInput, setSearchInput] = useState(queryParam);
   const [page, setPage] = useState(1);
@@ -34,10 +61,19 @@ export default function SearchPage() {
   const [animeStatusFilter, setAnimeStatusFilter] = useState<string>('all');
   const [animeGenreFilter, setAnimeGenreFilter] = useState<string>('all');
   const [animeLanguageFilter, setAnimeLanguageFilter] = useState<string>('all');
+  const [animeRatedFilter, setAnimeRatedFilter] = useState<string>('all');
+  const [animeScoreFilter, setAnimeScoreFilter] = useState<string>('all');
+  const [animeSeasonFilter, setAnimeSeasonFilter] = useState<string>('all');
+  const [animeStartDateFilter, setAnimeStartDateFilter] = useState<string>('');
+  const [animeEndDateFilter, setAnimeEndDateFilter] = useState<string>('');
   const [animeSortFilter, setAnimeSortFilter] = useState<string>('default');
   const [mangaTypeFilter, setMangaTypeFilter] = useState<string>('all');
   const [mangaStatusFilter, setMangaStatusFilter] = useState<string>('all');
-  const [mangaFeedMode, setMangaFeedMode] = useState<'search' | 'latest' | 'added' | 'new-chap'>('search');
+  const [mangaFeedMode, setMangaFeedMode] = useState<
+    'search' | 'latest' | 'added' | 'new-chap' | 'recent' | 'popular' | 'foryou' | 'recommendation' | 'origin' | 'random'
+  >('search');
+  const [mangaFeedWindow, setMangaFeedWindow] = useState<'day' | 'week' | 'month' | 'all'>('day');
+  const [mangaOriginFilter, setMangaOriginFilter] = useState<'all' | 'jp' | 'kr' | 'zh'>('all');
   const [mangaCategoryFilter, setMangaCategoryFilter] = useState<string>('all');
   const [mangaGenreFilter, setMangaGenreFilter] = useState<string>('all');
   const [mangaLanguageFilter, setMangaLanguageFilter] = useState<string>('all');
@@ -66,6 +102,67 @@ export default function SearchPage() {
   const { settings: contentSafetySettings } = useContentSafetySettings();
   const explicitMangaQuery = useMemo(() => isExplicitMangaSearchQuery(query), [query]);
 
+  const animeGenreOptions = useMemo(() => {
+    const normalizeGenreValue = (value: string) => {
+      const normalized = String(value || '').toLowerCase().trim();
+      if (!normalized) return '';
+      if (normalized === 'mahou shoujo') return 'magic';
+
+      return normalized
+        .replace(/&/g, '-and-')
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-');
+    };
+
+    return ALL_GENRES.map((genre) => ({
+      label: genre,
+      value: normalizeGenreValue(genre),
+    })).filter((option, index, rows) => {
+      if (!option.value) return false;
+      return rows.findIndex((row) => row.value === option.value) === index;
+    });
+  }, []);
+
+  const normalizeAnimeStatus = useCallback((value: string | undefined) => {
+    const normalized = String(value || '').toLowerCase().replace(/[_\s]+/g, '-');
+
+    if (normalized.includes('finished') || normalized.includes('completed')) return 'finished-airing';
+    if (normalized.includes('currently') || normalized === 'airing' || normalized.includes('releasing')) return 'currently-airing';
+    if (normalized.includes('not-yet') || normalized.includes('upcoming')) return 'not-yet-aired';
+
+    return normalized;
+  }, []);
+
+  const normalizeAnimeGenre = useCallback((value: string | undefined) => {
+    const normalized = String(value || '').toLowerCase().trim();
+    if (!normalized) return '';
+    if (normalized === 'mahou shoujo') return 'magic';
+
+    return normalized
+      .replace(/&/g, '-and-')
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-');
+  }, []);
+
+  const normalizeAnimeSearchDate = useCallback((value: string): string | undefined => {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+
+    const match = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (!match) return undefined;
+
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return undefined;
+    if (month < 1 || month > 12 || day < 1 || day > 31) return undefined;
+
+    // HiAnime's date parser expects non-zero-padded month/day values.
+    return `${year}-${month}-${day}`;
+  }, []);
+
   const normalizedMangaTypeFilter = useMemo(() => {
     const normalized = String(mangaTypeFilter || '').toLowerCase();
     if (normalized === 'manwha' || normalized === 'manwah') return 'manhwa';
@@ -79,20 +176,33 @@ export default function SearchPage() {
   }, [mangaCategoryFilter]);
 
   const remoteProviderFilter = useMemo(() => {
-    const normalized = String(mangaProviderFilter || '').toLowerCase();
-    if (['all', 'mapped', 'atsu', 'mangafire', 'mangaball'].includes(normalized)) {
-      return normalized as 'all' | 'mapped' | 'atsu' | 'mangafire' | 'mangaball';
-    }
-    return 'mapped';
+    return parseMangaSearchProvider(mangaProviderFilter, 'mapped');
   }, [mangaProviderFilter]);
 
   const localProviderFacetFilter = useMemo(() => {
     const normalized = String(mangaProviderFilter || '').toLowerCase();
-    if (['all', 'mapped', 'atsu', 'mangafire', 'mangaball'].includes(normalized)) {
+    if (['all', 'mapped', 'atsu', 'mangafire', 'mangaball', 'allmanga'].includes(normalized)) {
       return 'all';
     }
     return normalized;
   }, [mangaProviderFilter]);
+
+  const mangaFeedModeLabel = useMemo(() => {
+    const labels: Record<string, string> = {
+      search: 'query search',
+      latest: 'latest updates',
+      added: 'recently added',
+      'new-chap': 'new chapters',
+      recent: 'recently read',
+      popular: 'popular',
+      foryou: 'for you',
+      recommendation: 'recommendation',
+      origin: 'origin',
+      random: 'random picks',
+    };
+
+    return labels[mangaFeedMode] || mangaFeedMode;
+  }, [mangaFeedMode]);
 
   const mangaSearchMode = useMemo<MangaSearchOptions['mode']>(() => {
     if (mangaAuthorFilter.trim()) return 'author';
@@ -123,9 +233,28 @@ export default function SearchPage() {
     if (animeStatusFilter !== 'all') filters.status = animeStatusFilter;
     if (animeGenreFilter !== 'all') filters.genres = animeGenreFilter;
     if (animeLanguageFilter !== 'all') filters.language = animeLanguageFilter;
+    if (animeRatedFilter !== 'all') filters.rated = animeRatedFilter;
+    if (animeScoreFilter !== 'all') filters.score = animeScoreFilter;
+    if (animeSeasonFilter !== 'all') filters.season = animeSeasonFilter;
+    const startDate = normalizeAnimeSearchDate(animeStartDateFilter);
+    const endDate = normalizeAnimeSearchDate(animeEndDateFilter);
+    if (startDate) filters.start_date = startDate;
+    if (endDate) filters.end_date = endDate;
     if (animeSortFilter !== 'default') filters.sort = animeSortFilter;
     return filters;
-  }, [animeTypeFilter, animeStatusFilter, animeGenreFilter, animeLanguageFilter, animeSortFilter]);
+  }, [
+    animeTypeFilter,
+    animeStatusFilter,
+    animeGenreFilter,
+    animeLanguageFilter,
+    animeRatedFilter,
+    animeScoreFilter,
+    animeSeasonFilter,
+    animeStartDateFilter,
+    animeEndDateFilter,
+    animeSortFilter,
+    normalizeAnimeSearchDate,
+  ]);
 
   const mangaSearchOptions = useMemo<MangaSearchOptions>(() => {
     const types: string[] = [];
@@ -145,9 +274,14 @@ export default function SearchPage() {
       provider: remoteProviderFilter,
       category: normalizedMangaCategory !== 'all' ? normalizedMangaCategory : undefined,
       genre: mangaGenreFilter !== 'all' ? mangaGenreFilter : undefined,
+      origin: mangaFeedMode === 'origin' && mangaOriginFilter !== 'all' ? mangaOriginFilter : undefined,
       language: mangaLanguageFilter !== 'all' ? mangaLanguageFilter : undefined,
       author: mangaAuthorFilter.trim() || undefined,
       adult: mangaAdultFilter,
+      timeWindow:
+        mangaFeedMode === 'foryou' || mangaFeedMode === 'recent' || mangaFeedMode === 'popular'
+          ? mangaFeedWindow
+          : undefined,
       types: types.length > 0 ? Array.from(new Set(types)) : undefined,
       statuses: mangaAtsuStatusFilter !== 'all' ? [mangaAtsuStatusFilter] : undefined,
       mangaType: normalizedMangaTypeFilter !== 'all' ? (normalizedMangaTypeFilter as any) : undefined,
@@ -158,6 +292,9 @@ export default function SearchPage() {
     remoteProviderFilter,
     normalizedMangaCategory,
     mangaGenreFilter,
+    mangaFeedMode,
+    mangaFeedWindow,
+    mangaOriginFilter,
     mangaLanguageFilter,
     mangaAuthorFilter,
     mangaAdultFilter,
@@ -198,11 +335,54 @@ export default function SearchPage() {
 
   const { 
     data: infiniteData, 
-    fetchNextPage, 
-    hasNextPage, 
-    isFetchingNextPage, 
-    isLoading 
-  } = useInfSearch(query, animeBackendFilters, shouldSearchAnime);
+    fetchNextPage: fetchNextSearchPage,
+    hasNextPage: hasNextSearchPage,
+    isFetchingNextPage: isFetchingNextSearchPage,
+    isLoading: isLoadingSearch,
+  } = useInfSearch(query, animeBackendFilters, shouldSearchAnime && !isProducerRoute);
+
+  const {
+    data: producerInfiniteData,
+    fetchNextPage: fetchNextProducerPage,
+    hasNextPage: hasNextProducerPage,
+    isFetchingNextPage: isFetchingNextProducerPage,
+    isLoading: isLoadingProducer,
+  } = useInfiniteQuery({
+    queryKey: ['producer-search-infinite', producerRequestCandidates],
+    queryFn: async ({ pageParam = 1 }) => {
+      for (const candidate of producerRequestCandidates) {
+        try {
+          const response = await fetchProducerAnimes(candidate, Number(pageParam));
+          if (Array.isArray(response?.animes) && response.animes.length > 0) {
+            return response;
+          }
+        } catch {
+          // Try next producer variant.
+        }
+      }
+
+      return {
+        producerName: decodedProducerName,
+        animes: [],
+        top10Animes: { today: [], week: [], month: [] },
+        topAiringAnimes: [],
+        currentPage: Number(pageParam),
+        totalPages: Number(pageParam),
+        hasNextPage: false,
+      };
+    },
+    getNextPageParam: (lastPage) => {
+      if (!lastPage || !lastPage.hasNextPage) return undefined;
+      return lastPage.currentPage + 1;
+    },
+    initialPageParam: 1,
+    enabled: shouldSearchAnime && isProducerRoute && producerRequestCandidates.length > 0,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  const hasNextAnimePage = isProducerRoute ? hasNextProducerPage : hasNextSearchPage;
+  const isFetchingNextAnimePage = isProducerRoute ? isFetchingNextProducerPage : isFetchingNextSearchPage;
+  const isLoadingAnime = isProducerRoute ? isLoadingProducer : isLoadingSearch;
 
   const {
     data: infiniteMangaData,
@@ -215,7 +395,7 @@ export default function SearchPage() {
   const observer = useRef<IntersectionObserver>();
   const loadMoreLockRef = useRef(false);
   const scrollRef = useCallback((node: HTMLDivElement) => {
-    if (isLoading || isLoadingManga) return;
+    if (isLoadingAnime || isLoadingManga) return;
     if (observer.current) observer.current.disconnect();
     observer.current = new IntersectionObserver(entries => {
       const entry = entries[0];
@@ -233,8 +413,12 @@ export default function SearchPage() {
       let didRequestNextPage = false;
 
       if (resultType === 'anime') {
-        if (hasNextPage && !isFetchingNextPage) {
-          fetchNextPage();
+        if (hasNextAnimePage && !isFetchingNextAnimePage) {
+          if (isProducerRoute) {
+            fetchNextProducerPage();
+          } else {
+            fetchNextSearchPage();
+          }
           didRequestNextPage = true;
         }
       } else if (resultType === 'manga') {
@@ -243,8 +427,12 @@ export default function SearchPage() {
           didRequestNextPage = true;
         }
       } else {
-        if (hasNextPage && !isFetchingNextPage) {
-          fetchNextPage();
+        if (hasNextAnimePage && !isFetchingNextAnimePage) {
+          if (isProducerRoute) {
+            fetchNextProducerPage();
+          } else {
+            fetchNextSearchPage();
+          }
           didRequestNextPage = true;
         } else if (hasNextMangaPage && !isFetchingNextMangaPage) {
           fetchNextMangaPage();
@@ -257,11 +445,15 @@ export default function SearchPage() {
       }
     }, { rootMargin: '120px 0px' });
     if (node) observer.current.observe(node);
-  }, [isLoading, hasNextPage, isFetchingNextPage, fetchNextPage, isLoadingManga, hasNextMangaPage, isFetchingNextMangaPage, fetchNextMangaPage, resultType]);
+  }, [isLoadingAnime, hasNextAnimePage, isFetchingNextAnimePage, isProducerRoute, fetchNextProducerPage, fetchNextSearchPage, isLoadingManga, hasNextMangaPage, isFetchingNextMangaPage, fetchNextMangaPage, resultType]);
 
   const allAnimeResults = useMemo(() => {
+    if (isProducerRoute) {
+      return producerInfiniteData?.pages.flatMap(page => page.animes) || [];
+    }
+
     return infiniteData?.pages.flatMap(page => page.animes) || [];
-  }, [infiniteData]);
+  }, [infiniteData, isProducerRoute, producerInfiniteData]);
 
   const allMangaResults = useMemo(() => {
     return (infiniteMangaData?.pages || []).flatMap((page: any) => {
@@ -367,14 +559,14 @@ export default function SearchPage() {
   const filteredAnimeResults = (allAnimeResults || []).filter((anime) => {
     const animeType = (anime.type || '').toLowerCase();
     const animeRating = Number.parseFloat(anime.rating || '0');
-    const animeStatus = String((anime as any).status || '').toLowerCase();
+    const animeStatus = normalizeAnimeStatus((anime as any).status);
     const animeGenres = Array.isArray((anime as any).genres)
-      ? (anime as any).genres.map((genre: string) => String(genre || '').toLowerCase())
+      ? (anime as any).genres.map((genre: string) => normalizeAnimeGenre(genre)).filter(Boolean)
       : [];
 
     if (animeTypeFilter !== 'all' && animeType !== animeTypeFilter) return false;
-    if (animeStatusFilter !== 'all' && animeStatus && !animeStatus.includes(animeStatusFilter)) return false;
-    if (animeGenreFilter !== 'all' && animeGenres.length > 0 && !animeGenres.includes(animeGenreFilter.toLowerCase())) {
+    if (animeStatusFilter !== 'all' && animeStatus && animeStatus !== animeStatusFilter) return false;
+    if (animeGenreFilter !== 'all' && animeGenres.length > 0 && !animeGenres.includes(animeGenreFilter)) {
       return false;
     }
     if (animeRating > 0 && animeRating < minRating) return false;
@@ -383,7 +575,7 @@ export default function SearchPage() {
   });
 
   const mangaProviderOptions = useMemo(() => {
-    const providers = new Set<string>(['mapped', 'atsu', 'mangafire', 'mangaball']);
+    const providers = new Set<string>(['mapped', 'atsu', 'mangafire', 'mangaball', 'allmanga']);
     (allMangaResults || []).forEach((manga: any) => {
       (manga.providersAvailable || []).forEach((provider: string) => {
         if (provider) providers.add(provider.toLowerCase());
@@ -534,10 +726,17 @@ export default function SearchPage() {
       animeStatusFilter !== 'all',
       animeGenreFilter !== 'all',
       animeLanguageFilter !== 'all',
+      animeRatedFilter !== 'all',
+      animeScoreFilter !== 'all',
+      animeSeasonFilter !== 'all',
+      animeStartDateFilter.trim().length > 0,
+      animeEndDateFilter.trim().length > 0,
       animeSortFilter !== 'default',
       mangaTypeFilter !== 'all',
       mangaStatusFilter !== 'all',
       mangaFeedMode !== 'search',
+      (mangaFeedMode === 'foryou' || mangaFeedMode === 'recent' || mangaFeedMode === 'popular') && mangaFeedWindow !== 'day',
+      mangaFeedMode === 'origin' && mangaOriginFilter !== 'all',
       mangaCategoryFilter !== 'all',
       mangaGenreFilter !== 'all',
       mangaLanguageFilter !== 'all',
@@ -558,10 +757,17 @@ export default function SearchPage() {
     animeStatusFilter,
     animeGenreFilter,
     animeLanguageFilter,
+    animeRatedFilter,
+    animeScoreFilter,
+    animeSeasonFilter,
+    animeStartDateFilter,
+    animeEndDateFilter,
     animeSortFilter,
     mangaTypeFilter,
     mangaStatusFilter,
     mangaFeedMode,
+    mangaFeedWindow,
+    mangaOriginFilter,
     mangaCategoryFilter,
     mangaGenreFilter,
     mangaLanguageFilter,
@@ -636,6 +842,12 @@ export default function SearchPage() {
   }, [queryParam]);
 
   useEffect(() => {
+    if (decodedProducerName) {
+      setResultType('anime');
+    }
+  }, [decodedProducerName]);
+
+  useEffect(() => {
     setPage(1);
   }, [query]);
 
@@ -686,17 +898,17 @@ export default function SearchPage() {
   const isQuerylessMangaMode = showMangaResults && mangaSearchMode !== 'search';
   const hasSearchContext = query.length > 0 || isQuerylessMangaMode;
   const hasMoreResults =
-    (showAnimeResults && !!hasNextPage) ||
+    (showAnimeResults && !!hasNextAnimePage) ||
     (showMangaResults && !!hasNextMangaPage);
   const isFetchingMoreResults =
-    (showAnimeResults && !!isFetchingNextPage) ||
+    (showAnimeResults && !!isFetchingNextAnimePage) ||
     (showMangaResults && !!isFetchingNextMangaPage);
   const hasMixedResults = unifiedResults.length > 0;
   const hasCharacterResults = characterResults.length > 0;
   const hasAnyResult = hasMixedResults || (showCharacterResults && hasCharacterResults);
 
   // Keep search responsive even if one provider is slow/unavailable.
-  const isAnimeInitialLoading = showAnimeResults && isLoading && allAnimeResults.length === 0;
+  const isAnimeInitialLoading = showAnimeResults && isLoadingAnime && allAnimeResults.length === 0;
   const isMangaInitialLoading = showMangaResults && isLoadingManga && allMangaResults.length === 0;
   const isCharacterInitialLoading = showCharacterResults && loadingCharacters && characterResults.length === 0;
   const hybridLoading = isAnimeInitialLoading || isMangaInitialLoading || isCharacterInitialLoading;
@@ -769,7 +981,19 @@ export default function SearchPage() {
                     </>
                   ) : (
                     <>
-                      Showing <span className="text-foreground font-medium">{mangaFeedMode.replace('-', ' ')}</span> manga feed results
+                      Showing <span className="text-foreground font-medium">{mangaFeedModeLabel}</span> manga feed results
+                      {(mangaFeedMode === 'foryou' || mangaFeedMode === 'recent' || mangaFeedMode === 'popular') && (
+                        <>
+                          {' '}
+                          <span className="text-foreground/80">({mangaFeedWindow})</span>
+                        </>
+                      )}
+                      {mangaFeedMode === 'origin' && mangaOriginFilter !== 'all' && (
+                        <>
+                          {' '}
+                          <span className="text-foreground/80">({mangaOriginFilter.toUpperCase()})</span>
+                        </>
+                      )}
                     </>
                   )}
                   {` • ${filteredAnimeResults.length} anime`}
@@ -877,10 +1101,17 @@ export default function SearchPage() {
                   setAnimeStatusFilter('all');
                   setAnimeGenreFilter('all');
                   setAnimeLanguageFilter('all');
+                  setAnimeRatedFilter('all');
+                  setAnimeScoreFilter('all');
+                  setAnimeSeasonFilter('all');
+                  setAnimeStartDateFilter('');
+                  setAnimeEndDateFilter('');
                   setAnimeSortFilter('default');
                   setMangaTypeFilter('all');
                   setMangaStatusFilter('all');
                   setMangaFeedMode('search');
+                  setMangaFeedWindow('day');
+                  setMangaOriginFilter('all');
                   setMangaCategoryFilter('all');
                   setMangaGenreFilter('all');
                   setMangaLanguageFilter('all');
@@ -928,9 +1159,9 @@ export default function SearchPage() {
                     className="w-full h-9 rounded-lg bg-background/80 border border-white/10 px-3 text-sm"
                   >
                     <option value="all">Any status</option>
-                    <option value="airing">Airing</option>
-                    <option value="finished">Finished</option>
-                    <option value="upcoming">Upcoming</option>
+                    <option value="currently-airing">Currently Airing</option>
+                    <option value="finished-airing">Finished Airing</option>
+                    <option value="not-yet-aired">Not Yet Aired</option>
                   </select>
                 </div>
 
@@ -942,9 +1173,9 @@ export default function SearchPage() {
                     className="w-full h-9 rounded-lg bg-background/80 border border-white/10 px-3 text-sm"
                   >
                     <option value="all">Any genre</option>
-                    {ALL_GENRES.map((genre) => (
-                      <option key={genre} value={genre.toLowerCase()}>
-                        {genre}
+                    {animeGenreOptions.map((genre) => (
+                      <option key={genre.value} value={genre.value}>
+                        {genre.label}
                       </option>
                     ))}
                   </select>
@@ -960,6 +1191,60 @@ export default function SearchPage() {
                     <option value="all">Sub + Dub</option>
                     <option value="sub">Sub</option>
                     <option value="dub">Dub</option>
+                    <option value="sub-&-dub">Sub & Dub</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Anime Rated</p>
+                  <select
+                    value={animeRatedFilter}
+                    onChange={(e) => setAnimeRatedFilter(e.target.value)}
+                    className="w-full h-9 rounded-lg bg-background/80 border border-white/10 px-3 text-sm"
+                  >
+                    <option value="all">Any rating</option>
+                    <option value="g">G</option>
+                    <option value="pg">PG</option>
+                    <option value="pg-13">PG-13</option>
+                    <option value="r">R</option>
+                    <option value="r+">R+</option>
+                    <option value="rx">Rx</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Anime Score Band</p>
+                  <select
+                    value={animeScoreFilter}
+                    onChange={(e) => setAnimeScoreFilter(e.target.value)}
+                    className="w-full h-9 rounded-lg bg-background/80 border border-white/10 px-3 text-sm"
+                  >
+                    <option value="all">Any score</option>
+                    <option value="appalling">Appalling</option>
+                    <option value="horrible">Horrible</option>
+                    <option value="very-bad">Very Bad</option>
+                    <option value="bad">Bad</option>
+                    <option value="average">Average</option>
+                    <option value="fine">Fine</option>
+                    <option value="good">Good</option>
+                    <option value="very-good">Very Good</option>
+                    <option value="great">Great</option>
+                    <option value="masterpiece">Masterpiece</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Anime Season</p>
+                  <select
+                    value={animeSeasonFilter}
+                    onChange={(e) => setAnimeSeasonFilter(e.target.value)}
+                    className="w-full h-9 rounded-lg bg-background/80 border border-white/10 px-3 text-sm"
+                  >
+                    <option value="all">Any season</option>
+                    <option value="spring">Spring</option>
+                    <option value="summer">Summer</option>
+                    <option value="fall">Fall</option>
+                    <option value="winter">Winter</option>
                   </select>
                 </div>
 
@@ -971,10 +1256,33 @@ export default function SearchPage() {
                     className="w-full h-9 rounded-lg bg-background/80 border border-white/10 px-3 text-sm"
                   >
                     <option value="default">Best match</option>
-                    <option value="recently_added">Recently Added</option>
-                    <option value="recently_updated">Recently Updated</option>
-                    <option value="score_desc">Highest Score</option>
+                    <option value="recently-added">Recently Added</option>
+                    <option value="recently-updated">Recently Updated</option>
+                    <option value="score">Score</option>
+                    <option value="name-a-z">Name A-Z</option>
+                    <option value="released-date">Released Date</option>
+                    <option value="most-watched">Most Watched</option>
                   </select>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Anime Start Date</p>
+                  <input
+                    type="date"
+                    value={animeStartDateFilter}
+                    onChange={(e) => setAnimeStartDateFilter(e.target.value)}
+                    className="w-full h-9 rounded-lg bg-background/80 border border-white/10 px-3 text-sm"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Anime End Date</p>
+                  <input
+                    type="date"
+                    value={animeEndDateFilter}
+                    onChange={(e) => setAnimeEndDateFilter(e.target.value)}
+                    className="w-full h-9 rounded-lg bg-background/80 border border-white/10 px-3 text-sm"
+                  />
                 </div>
 
                 <div className="space-y-1">
@@ -988,8 +1296,46 @@ export default function SearchPage() {
                     <option value="latest">Latest</option>
                     <option value="added">Recently Added</option>
                     <option value="new-chap">New Chapters</option>
+                    <option value="recent">Recently Read</option>
+                    <option value="foryou">For You</option>
+                    <option value="popular">Popular</option>
+                    <option value="recommendation">Recommendation</option>
+                    <option value="origin">By Origin</option>
+                    <option value="random">Random Picks</option>
                   </select>
                 </div>
+
+                {(mangaFeedMode === 'foryou' || mangaFeedMode === 'recent' || mangaFeedMode === 'popular') && (
+                  <div className="space-y-1">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Feed Window</p>
+                    <select
+                      value={mangaFeedWindow}
+                      onChange={(e) => setMangaFeedWindow(e.target.value as any)}
+                      className="w-full h-9 rounded-lg bg-background/80 border border-white/10 px-3 text-sm"
+                    >
+                      <option value="day">Daily</option>
+                      <option value="week">Weekly</option>
+                      <option value="month">Monthly</option>
+                      <option value="all">All Time</option>
+                    </select>
+                  </div>
+                )}
+
+                {mangaFeedMode === 'origin' && (
+                  <div className="space-y-1">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Manga Origin</p>
+                    <select
+                      value={mangaOriginFilter}
+                      onChange={(e) => setMangaOriginFilter(e.target.value as any)}
+                      className="w-full h-9 rounded-lg bg-background/80 border border-white/10 px-3 text-sm"
+                    >
+                      <option value="all">All origins</option>
+                      <option value="jp">Japan (Manga)</option>
+                      <option value="kr">Korea (Manhwa)</option>
+                      <option value="zh">China (Manhua)</option>
+                    </select>
+                  </div>
+                )}
 
                 <div className="space-y-1">
                   <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Manga Format</p>
@@ -1471,6 +1817,22 @@ export default function SearchPage() {
                         alt={character.name}
                         className="w-16 h-16 rounded-lg object-cover"
                         loading="lazy"
+                        onError={(event) => {
+                          const image = event.currentTarget;
+                          const directImage = String(character?.image || '').trim();
+                          const stage = image.dataset.fallbackStage || 'proxy';
+
+                          if (stage === 'proxy' && directImage && image.currentSrc !== directImage) {
+                            image.dataset.fallbackStage = 'direct';
+                            image.src = directImage;
+                            return;
+                          }
+
+                          if (stage !== 'placeholder') {
+                            image.dataset.fallbackStage = 'placeholder';
+                            image.src = '/placeholder.svg';
+                          }
+                        }}
                       />
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-sm truncate">{character.name}</p>
@@ -1483,7 +1845,14 @@ export default function SearchPage() {
                             Find Anime
                           </button>
                           <button
-                            onClick={() => navigate(`/char/${encodeURIComponent(character._id || character.name)}`)}
+                            onClick={() => {
+                              const routeId =
+                                character?.malId != null && Number.isFinite(Number(character.malId))
+                                  ? String(character.malId)
+                                  : String(character?._id || character?.name || '');
+
+                              navigate(`/char/${encodeURIComponent(routeId)}?name=${encodeURIComponent(character.name || '')}`);
+                            }}
                             className="text-[10px] font-bold uppercase px-2 py-1 rounded bg-white/10 text-muted-foreground hover:text-foreground"
                           >
                             Open

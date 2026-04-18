@@ -389,11 +389,38 @@ export function buildDubSubtitles(
   subTracks: Subtitle[]
 ): Array<Subtitle & { sourceOrigin?: string }> {
   const out: Array<Subtitle & { sourceOrigin?: string }> = [];
-  const seen = new Set<string>();
+  const seenUrls = new Set<string>();
+  const seenLanguages = new Set<string>();
+
+  const normalizeLanguage = (track: Subtitle): string => {
+    const raw = `${track.lang || ""} ${track.label || ""}`.toLowerCase();
+    const compact = raw.replace(/\([^)]*\)/g, " ").replace(/\s+/g, " ").trim();
+    if (!compact) return "";
+
+    if (compact === "en" || compact.includes("english") || compact.includes("eng")) return "en";
+    if (compact === "ja" || compact.includes("japanese") || compact.includes("jpn")) return "ja";
+    if (compact === "hi" || compact.includes("hindi")) return "hi";
+    if (compact === "ta" || compact.includes("tamil")) return "ta";
+    if (compact === "te" || compact.includes("telugu")) return "te";
+    if (compact === "ml" || compact.includes("malayalam")) return "ml";
+    if (compact === "es" || compact.includes("spanish") || compact.includes("espanol")) return "es";
+    if (compact === "fr" || compact.includes("french")) return "fr";
+    if (compact === "de" || compact.includes("german")) return "de";
+
+    return compact;
+  };
 
   const pushTrack = (track: Subtitle, sourceOrigin: string) => {
-    if (!track?.url || seen.has(track.url)) return;
-    seen.add(track.url);
+    if (!track?.url) return;
+
+    const urlKey = String(track.url).trim();
+    const languageKey = normalizeLanguage(track);
+    if (seenUrls.has(urlKey)) return;
+    if (languageKey && seenLanguages.has(languageKey)) return;
+
+    seenUrls.add(urlKey);
+    if (languageKey) seenLanguages.add(languageKey);
+
     out.push({
       ...track,
       label: track.label ? `${track.label} (${sourceOrigin})` : `${track.lang} (${sourceOrigin})`,

@@ -56,8 +56,9 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
   const isDesktopApp = useIsDesktopApp();
   const isMobile = useIsMobile();
   const isMobileApp = Capacitor.isNativePlatform();
+  const isDevtoolsBlockedPage = location.pathname.startsWith('/devtools-blocked');
 
-  const hideSidebarPages = ['/auth', '/onboarding', '/setup', '/maintenance', '/banned', '/error', '/smarttv', '/manga/read'];
+  const hideSidebarPages = ['/auth', '/onboarding', '/setup', '/maintenance', '/banned', '/error', '/devtools-blocked', '/smarttv', '/manga/read'];
   const isHiddenPage = hideSidebarPages.some(page => location.pathname.startsWith(page));
   const showSidebar = !isMobile && !isMobileApp && !isHiddenPage;
 
@@ -83,24 +84,32 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
       <Sonner />
       <OfflineBanner />
       <OfflineGate>
-        {getDevModeEnabled() && <DevConsole />}
-        {showSidebar && <Background />}
-        {isDesktopApp && <TitleBar />}
-        {showSidebar && <Sidebar />}
-        <V5AnnouncementPopup />
-        <GlobalListeners />
-        <PopupDisplay />
-        <ReduceMotionPrompt />
-        <DownloadIndicator />
-        <LogViewer />
-        <DeepLinkHandler />
-        <AntiDevToolsGuard />
+        {isDevtoolsBlockedPage ? (
+          <main className="flex-1 w-full relative z-[1000]">
+            {children}
+          </main>
+        ) : (
+          <>
+            {getDevModeEnabled() && <DevConsole />}
+            {showSidebar && <Background />}
+            {isDesktopApp && <TitleBar />}
+            {showSidebar && <Sidebar />}
+            <V5AnnouncementPopup />
+            <GlobalListeners />
+            <PopupDisplay />
+            <ReduceMotionPrompt />
+            <DownloadIndicator />
+            <LogViewer />
+            <DeepLinkHandler />
+            <AntiDevToolsGuard />
 
-        <main className="flex-1 w-full relative z-10">
-          {children}
-        </main>
+            <main className="flex-1 w-full relative z-10">
+              {children}
+            </main>
 
-        <ConditionalFooter />
+            <ConditionalFooter />
+          </>
+        )}
       </OfflineGate>
     </div>
   );
@@ -110,7 +119,7 @@ function ConditionalFooter() {
   const location = useLocation();
   const isNative = useIsNativeApp();
   if (isNative) return null;
-  const hideFooter = ['/watch/', '/genre/', '/manga/', '/manga', '/isshoni/', '/search', '/image-search', '/status', '/banned', '/maintenance', '/service-unavailable', '/503', '/error', '/auth', '/reset-password', '/update-password', '/onboarding', '/setup', '/mal-redirect', '/anilist-redirect', '/favorites', '/trending', '/settings' , '/recommendations' , '/admin', '/mobile-app'].some(path => location.pathname.startsWith(path));
+  const hideFooter = ['/watch/', '/char/', '/genre/', '/manga/', '/manga', '/isshoni/', '/search', '/image-search', '/status', '/banned', '/maintenance', '/service-unavailable', '/503', '/error', '/devtools-blocked', '/auth', '/reset-password', '/update-password', '/onboarding', '/setup', '/mal-redirect', '/anilist-redirect', '/favorites', '/trending', '/settings' , '/recommendations' , '/admin', '/mobile-app'].some(path => location.pathname.startsWith(path));
   if (hideFooter) return null;
   return <Footer />;
 }

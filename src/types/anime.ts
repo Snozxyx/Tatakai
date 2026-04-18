@@ -184,11 +184,26 @@ export interface SearchResult {
   searchQuery: string;
 }
 
+export interface ProducerAnimeResult {
+  producerName: string;
+  animes: AnimeCard[];
+  top10Animes: {
+    today: TopAnime[];
+    week: TopAnime[];
+    month: TopAnime[];
+  };
+  topAiringAnimes: AnimeCard[];
+  currentPage: number;
+  totalPages: number;
+  hasNextPage: boolean;
+}
+
 export interface CharacterBase {
   _id: string;
   name: string;
   anime: string;
   image: string;
+  malId?: number;
   gender?: string;
   status?: string;
 }

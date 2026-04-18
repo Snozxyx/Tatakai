@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-
-const TATAKAI_API_URL = import.meta.env.VITE_TATAKAI_API_URL || "https://api.tatakai.me/api/v1";
+import { TATAKAI_API_URL, unwrapApiData } from "@/lib/api/api-client";
 
 async function fetchAnimelok<T>(endpoint: string): Promise<T> {
   const response = await fetch(`${TATAKAI_API_URL}/animelok${endpoint}`, {
     headers: {
       "Accept": "application/json",
     },
+    signal: AbortSignal.timeout(12000),
   });
 
   if (!response.ok) {
@@ -14,7 +14,7 @@ async function fetchAnimelok<T>(endpoint: string): Promise<T> {
   }
 
   const json = await response.json();
-  return json.data;
+  return unwrapApiData<T>(json as any);
 }
 
 export interface ScheduleItem {

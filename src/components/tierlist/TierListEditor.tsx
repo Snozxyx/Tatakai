@@ -170,7 +170,7 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
 
         if (response.success) {
           const newResults = response.data.map((char) => ({
-            id: `char-${char._id}`,
+            id: `char-${char.malId != null && Number.isFinite(Number(char.malId)) ? String(char.malId) : String(char._id)}`,
             title: char.name,
             image: char.image,
             type: 'character' as const,

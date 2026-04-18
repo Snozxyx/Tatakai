@@ -10,23 +10,42 @@ import {
 export type MangaSearchMode =
   | "search"
   | "latest"
+  | "recent"
   | "added"
   | "new-chap"
   | "category"
   | "genre"
   | "author"
-  | "explore";
+  | "explore"
+  | "popular"
+  | "recommendation"
+  | "foryou"
+  | "origin"
+  | "random";
 
-export type MangaSearchProvider = "mapped" | "atsu" | "mangafire" | "mangaball" | "all";
+export type MangaFeedTimeWindow = "day" | "week" | "month" | "all";
+
+export const MANGA_SEARCH_PROVIDERS = ["mapped", "atsu", "mangafire", "mangaball", "allmanga", "all"] as const;
+
+export type MangaSearchProvider = (typeof MANGA_SEARCH_PROVIDERS)[number];
 
 export interface MangaSearchOptions {
   mode?: MangaSearchMode;
   provider?: MangaSearchProvider;
   category?: string;
   genre?: string;
+  origin?: string;
   language?: string;
   author?: string;
   adult?: boolean;
+  timeWindow?: MangaFeedTimeWindow;
+  sort?: MangaSortOption;
+  minYear?: number;
+  maxYear?: number;
+  minScore?: number;
+  maxScore?: number;
+  minChapters?: number;
+  maxChapters?: number;
   types?: string[];
   statuses?: string[];
   mangaType?: "all" | "manga" | "manhwa" | "manhua" | "comics";
@@ -44,11 +63,105 @@ export interface AtsuFilterSchema {
   statuses: AtsuFilterOption[];
 }
 
+export type MangaSortOption =
+  | "relevance"
+  | "trending"
+  | "latestUpdate"
+  | "rating"
+  | "popularity"
+  | "chapterCount";
+
+export interface MangaFilterFacetOption {
+  value: string;
+  label: string;
+  providers: string[];
+}
+
+export interface MangaFilterFacet {
+  key: string;
+  type: "enum" | "range" | "boolean";
+  options?: MangaFilterFacetOption[];
+  range?: {
+    min: number;
+    max: number;
+    step: number;
+  };
+  unsupportedProviders: string[];
+}
+
+export interface MangaFilterSchema {
+  facets: MangaFilterFacet[];
+  sorts: MangaSortOption[];
+}
+
+export interface MangaFilterCountValue {
+  value: string;
+  count: number;
+  providers: string[];
+}
+
+export interface MangaFilterCountGroup {
+  key: string;
+  counts: MangaFilterCountValue[];
+  coverageRatio: number;
+  partial: boolean;
+}
+
+export interface MangaFilterCounts {
+  query: string;
+  groups: MangaFilterCountGroup[];
+}
+
 type ConcreteProvider = Exclude<MangaSearchProvider, "all">;
 
-const KNOWN_MANGA_PROVIDERS: ConcreteProvider[] = ["mapped", "atsu", "mangafire", "mangaball"];
+type MangaRequestControlOptions = {
+  forceFresh?: boolean;
+};
+
+const KNOWN_MANGA_PROVIDERS: ConcreteProvider[] = MANGA_SEARCH_PROVIDERS.filter(
+  (provider): provider is ConcreteProvider => provider !== "all"
+);
+
+const applyMangaFreshParams = (params: URLSearchParams) => {
+  params.set("nocache", "1");
+  params.set("refresh", "1");
+  params.set("snapshotRefresh", "1");
+  params.set("snapshotUse", "0");
+  params.set("snapshotFallback", "0");
+  params.set("snapshotPurge", "1");
+  return params;
+};
+
+const buildMangaPath = (
+  basePath: string,
+  params?: URLSearchParams,
+  options: MangaRequestControlOptions = {}
+) => {
+  const query = new URLSearchParams(params ? params.toString() : "");
+  const forceFresh = options.forceFresh ?? true;
+  if (forceFresh) {
+    applyMangaFreshParams(query);
+  }
+
+  const suffix = query.toString();
+  return suffix ? `${basePath}?${suffix}` : basePath;
+};
 
 const toSafeString = (value: unknown) => String(value ?? "").trim();
+
+const isMangaSearchProvider = (value: string): value is MangaSearchProvider =>
+  (MANGA_SEARCH_PROVIDERS as readonly string[]).includes(value);
+
+export const parseMangaSearchProvider = (
+  value: unknown,
+  fallback: MangaSearchProvider = "all"
+): MangaSearchProvider => {
+  const normalized = toSafeString(value).toLowerCase();
+  if (isMangaSearchProvider(normalized)) {
+    return normalized;
+  }
+  return fallback;
+};
 
 const toNumberOrNull = (value: unknown): number | null => {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -113,6 +226,61 @@ const normalizeLanguageTag = (value: unknown) => {
   if (normalized.startsWith("zh") || normalized === "cn" || normalized.includes("chinese")) return "zh";
   if (normalized.startsWith("en") || normalized.includes("english")) return "en";
   return normalized;
+};
+
+const normalizePosterUrl = (value: unknown): string => {
+  const trimmed = toSafeString(value).replace(/\\/g, "/");
+  if (!trimmed) return "";
+  if (trimmed.startsWith("//")) return `https:${trimmed}`;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (/^(api|manga)\//i.test(trimmed)) return `/${trimmed}`;
+  if (/^[a-z0-9.-]+\.[a-z]{2,}\//i.test(trimmed)) return `https://${trimmed}`;
+  return trimmed;
+};
+
+const extractImageUrlCandidate = (value: unknown, depth = 0): string => {
+  if (depth > 2) return "";
+  if (typeof value === "string") return normalizePosterUrl(value);
+  if (!value || typeof value !== "object") return "";
+
+  const record = value as Record<string, unknown>;
+  const fields = [
+    "url",
+    "src",
+    "proxiedUrl",
+    "image",
+    "thumbnail",
+    "poster",
+    "cover",
+    "large",
+    "medium",
+    "small",
+    "original",
+  ];
+
+  for (const field of fields) {
+    const nested = record[field];
+    if (!nested) continue;
+
+    if (typeof nested === "string") {
+      const normalized = normalizePosterUrl(nested);
+      if (normalized) return normalized;
+      continue;
+    }
+
+    const nestedCandidate = extractImageUrlCandidate(nested, depth + 1);
+    if (nestedCandidate) return nestedCandidate;
+  }
+
+  return "";
+};
+
+const resolvePosterUrl = (...candidates: unknown[]): string | null => {
+  for (const candidate of candidates) {
+    const extracted = extractImageUrlCandidate(candidate);
+    if (extracted) return extracted;
+  }
+  return null;
 };
 
 const inferItemLanguage = (item: MangaSearchItem) => {
@@ -252,7 +420,16 @@ const mapMangaBallItem = (item: any): MangaSearchItem => {
     mediaType,
     canonicalTitle,
     title: { english: canonicalTitle },
-    poster: item?.thumbnail || null,
+    poster: resolvePosterUrl(
+      item?.thumbnail,
+      item?.poster,
+      item?.cover,
+      item?.image,
+      item?.images,
+      item?.images?.large,
+      item?.images?.medium,
+      item?.images?.small
+    ),
     status: normalizeStatus(item?.status),
     year: null,
     score: null,
@@ -265,6 +442,41 @@ const mapMangaBallItem = (item: any): MangaSearchItem => {
     originLanguage: guessOriginLanguage(mediaType),
     readingDirection: "unknown",
     providerSource: "mangaball",
+  };
+};
+
+const mapAllMangaItem = (item: any): MangaSearchItem => {
+  const canonicalTitle =
+    toSafeString(item?.englishTitle) ||
+    toSafeString(item?.title) ||
+    toSafeString(item?.nativeTitle) ||
+    "Unknown title";
+
+  const subChapters = toNumberOrNull(item?.availableChapters?.sub);
+  const rawChapters = toNumberOrNull(item?.availableChapters?.raw);
+
+  return {
+    id: deriveRouteId("allmanga", item?.id, canonicalTitle),
+    mediaType: "manga",
+    canonicalTitle,
+    title: {
+      english: toSafeString(item?.englishTitle) || canonicalTitle,
+      romaji: toSafeString(item?.title) || undefined,
+      native: toSafeString(item?.nativeTitle) || undefined,
+    },
+    poster: item?.cover || null,
+    status: "unknown",
+    year: null,
+    score: toNumberOrNull(item?.score),
+    popularity: null,
+    providersAvailable: ["allmanga"],
+    matchConfidence: 0.64,
+    adult: false,
+    chapters: Math.max(subChapters || 0, rawChapters || 0) || null,
+    volumes: null,
+    originLanguage: "jp",
+    readingDirection: "unknown",
+    providerSource: "allmanga",
   };
 };
 
@@ -315,6 +527,7 @@ const getPayloadRows = (provider: ConcreteProvider, payload: any): any[] => {
   if (provider === "mapped") return Array.isArray(payload?.results) ? payload.results : [];
   if (provider === "atsu") return Array.isArray(payload?.items) ? payload.items : [];
   if (provider === "mangafire") return Array.isArray(payload?.results) ? payload.results : [];
+  if (provider === "allmanga") return Array.isArray(payload?.results) ? payload.results : [];
   if (provider === "mangaball") return Array.isArray(payload?.data) ? payload.data : [];
   return [];
 };
@@ -323,6 +536,7 @@ const mapProviderRows = (provider: ConcreteProvider, rows: any[]): MangaSearchIt
   if (provider === "mapped") return rows.map(mapUnifiedSearchItem);
   if (provider === "atsu") return rows.map(mapAtsuItem);
   if (provider === "mangafire") return rows.map(mapMangaFireItem);
+  if (provider === "allmanga") return rows.map(mapAllMangaItem);
   return rows.map(mapMangaBallItem);
 };
 
@@ -351,16 +565,50 @@ const inferHasNext = (
     return rowCount >= limit;
   }
 
+  const total = toPositiveInt(payload?.total);
+  if (total) {
+    const effectivePageSize = rowCount > 0 ? rowCount : limit;
+    return page * effectivePageSize < total;
+  }
+
   return rowCount >= limit;
 };
 
 const isRemoteProvider = (value: string): value is MangaSearchProvider =>
-  ["mapped", "atsu", "mangafire", "mangaball", "all"].includes(value);
+  isMangaSearchProvider(value);
 
 const normalizeCategory = (value: unknown) => {
   const normalized = toSafeString(value).toLowerCase();
   if (normalized === "manwha" || normalized === "manwah") return "manhwa";
   return normalized;
+};
+
+const normalizeFeedWindow = (value: unknown): MangaFeedTimeWindow => {
+  const normalized = toSafeString(value).toLowerCase();
+  if (normalized === "week") return "week";
+  if (normalized === "month") return "month";
+  if (normalized === "all") return "all";
+  return "day";
+};
+
+const toMangaballFeedWindow = (window: MangaFeedTimeWindow) => {
+  if (window === "week" || window === "month") return window;
+  return "day";
+};
+
+const toAllMangaPeriod = (window: MangaFeedTimeWindow) => {
+  if (window === "week") return "weekly";
+  if (window === "month") return "monthly";
+  if (window === "all") return "all";
+  return "daily";
+};
+
+const normalizeOrigin = (value: unknown) => {
+  const normalized = toSafeString(value).toLowerCase();
+  if (!normalized || normalized === "all") return "all";
+  if (normalized === "cn") return "zh";
+  if (["jp", "kr", "zh"].includes(normalized)) return normalized;
+  return "all";
 };
 
 const toAtsuTypeValue = (value: string) => {
@@ -418,6 +666,10 @@ const buildProviderPath = (
       const params = new URLSearchParams({ page: String(Math.max(page - 1, 0)) });
       return `${base}/recently-added?${params.toString()}`;
     }
+    if (mode === "popular") {
+      const params = new URLSearchParams({ page: String(Math.max(page - 1, 0)) });
+      return `${base}/popular?${params.toString()}`;
+    }
     if (mode === "author") {
       const author = toSafeString(options.author);
       if (!author) return null;
@@ -453,11 +705,60 @@ const buildProviderPath = (
     return null;
   }
 
+  if (provider === "allmanga") {
+    if (mode === "search") {
+      if (!query.trim()) return null;
+      return `/allmanga/search?q=${encodeURIComponent(query)}&page=${page}`;
+    }
+    if (mode === "popular") {
+      const period = toAllMangaPeriod(normalizeFeedWindow(options.timeWindow));
+      return `/allmanga/popular?page=${page}&size=${limit}&period=${encodeURIComponent(period)}`;
+    }
+    if (mode === "random") {
+      return `/allmanga/random`;
+    }
+    if (mode === "latest" || mode === "added" || mode === "new-chap") {
+      return `/allmanga/latest?page=${page}`;
+    }
+    if (mode === "genre") {
+      const genre = toSafeString(options.genre);
+      if (!genre) return null;
+      return `/allmanga/genre/${encodeURIComponent(genre)}?page=${page}`;
+    }
+    if (mode === "author") {
+      const author = toSafeString(options.author);
+      if (!author) return null;
+      return `/allmanga/author/${encodeURIComponent(author)}?page=${page}`;
+    }
+    if (mode === "category" || mode === "explore") {
+      const genre = toSafeString(options.genre);
+      if (genre) {
+        return `/allmanga/genre/${encodeURIComponent(genre)}?page=${page}`;
+      }
+      return `/allmanga/latest?page=${page}`;
+    }
+    return null;
+  }
+
   if (mode === "search") {
     if (!query.trim()) return null;
     return `/mangaball/search?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`;
   }
   if (mode === "latest") return `/mangaball/latest?page=${page}&limit=${limit}`;
+  if (mode === "recent") {
+    const feedWindow = toMangaballFeedWindow(normalizeFeedWindow(options.timeWindow));
+    return `/mangaball/recent?time=${encodeURIComponent(feedWindow)}&limit=${limit}`;
+  }
+  if (mode === "foryou") {
+    const feedWindow = toMangaballFeedWindow(normalizeFeedWindow(options.timeWindow));
+    return `/mangaball/foryou?time=${encodeURIComponent(feedWindow)}&limit=${limit}`;
+  }
+  if (mode === "recommendation") return `/mangaball/recommendation?limit=${limit}`;
+  if (mode === "popular") return `/mangaball/popular?limit=${limit}`;
+  if (mode === "origin") {
+    const origin = normalizeOrigin(options.origin || options.category);
+    return `/mangaball/origin?origin=${encodeURIComponent(origin)}`;
+  }
   if (mode === "added") return `/mangaball/added?page=${page}&limit=${limit}`;
   if (mode === "new-chap") return `/mangaball/new-chap?page=${page}&limit=${limit}`;
   if (mode === "category" || mode === "explore") {
@@ -470,22 +771,39 @@ const buildProviderPath = (
   return null;
 };
 
+const MODE_SUPPORTED_PROVIDERS: Record<MangaSearchMode, ConcreteProvider[]> = {
+  search: ["mapped", "atsu", "mangafire", "mangaball", "allmanga"],
+  latest: ["mangafire", "mangaball", "atsu", "allmanga"],
+  recent: ["mangaball"],
+  added: ["mangaball"],
+  "new-chap": ["mangaball"],
+  category: ["atsu", "mangaball", "mangafire", "allmanga"],
+  genre: ["atsu", "mangafire", "allmanga"],
+  author: ["atsu", "allmanga"],
+  explore: ["atsu", "mangaball", "mangafire", "allmanga"],
+  popular: ["atsu", "mangaball", "allmanga"],
+  recommendation: ["mangaball"],
+  foryou: ["mangaball"],
+  origin: ["mangaball"],
+  random: ["allmanga"],
+};
+
 const resolveProviders = (mode: MangaSearchMode, provider: MangaSearchProvider): ConcreteProvider[] => {
+  const supportedProviders = MODE_SUPPORTED_PROVIDERS[mode] || ["mapped"];
+
   if (provider !== "all") {
     const normalizedProvider = toSafeString(provider).toLowerCase();
     if (KNOWN_MANGA_PROVIDERS.includes(normalizedProvider as ConcreteProvider)) {
-      return [normalizedProvider as ConcreteProvider];
+      const providerValue = normalizedProvider as ConcreteProvider;
+      if (supportedProviders.includes(providerValue)) {
+        return [providerValue];
+      }
+      return [supportedProviders[0]];
     }
-    return ["mapped"];
+    return [supportedProviders[0]];
   }
 
-  if (mode === "latest") return ["mangafire", "mangaball", "atsu"];
-  if (mode === "added" || mode === "new-chap") return ["mangaball"];
-  if (mode === "author") return ["atsu"];
-  if (mode === "genre") return ["atsu", "mangafire"];
-  if (mode === "category" || mode === "explore") return ["atsu", "mangaball", "mangafire"];
-  if (mode === "search") return ["mapped", "atsu", "mangafire", "mangaball"];
-  return ["mapped"];
+  return supportedProviders;
 };
 
 export async function searchManga(
@@ -657,35 +975,83 @@ export async function getAtsuFilters(): Promise<AtsuFilterSchema> {
   };
 }
 
+const EMPTY_MANGA_FILTER_SCHEMA: MangaFilterSchema = {
+  facets: [],
+  sorts: [],
+};
+
+const EMPTY_MANGA_FILTER_COUNTS = (query: string): MangaFilterCounts => ({
+  query,
+  groups: [],
+});
+
+export async function getMangaFilterSchema(): Promise<MangaFilterSchema> {
+  const payload = await mangaGet<any>("/filters/schema");
+
+  if (payload && typeof payload === "object" && Array.isArray(payload?.facets) && Array.isArray(payload?.sorts)) {
+    return payload as MangaFilterSchema;
+  }
+
+  if (payload && typeof payload === "object" && payload?.schema) {
+    const schema = payload.schema;
+    if (Array.isArray(schema?.facets) && Array.isArray(schema?.sorts)) {
+      return schema as MangaFilterSchema;
+    }
+  }
+
+  return EMPTY_MANGA_FILTER_SCHEMA;
+}
+
+export async function getMangaFilterCounts(rawQuery: string): Promise<MangaFilterCounts> {
+  const query = toSafeString(rawQuery);
+  const params = new URLSearchParams();
+  if (query) {
+    params.set("q", query);
+  }
+
+  const suffix = params.toString();
+  const payload = await mangaGet<any>(suffix ? `/filters/counts?${suffix}` : "/filters/counts");
+
+  if (payload && typeof payload === "object" && Array.isArray(payload?.groups)) {
+    return payload as MangaFilterCounts;
+  }
+
+  if (payload && typeof payload === "object" && payload?.counts && Array.isArray(payload.counts?.groups)) {
+    return payload.counts as MangaFilterCounts;
+  }
+
+  return EMPTY_MANGA_FILTER_COUNTS(query);
+}
+
 export async function getMangaDetail(
-  id: string
+  id: string,
+  options: MangaRequestControlOptions = {}
 ): Promise<MangaDetailResponse> {
-  return mangaGet(`/${encodeURIComponent(id)}`);
+  return mangaGet(buildMangaPath(`/${encodeURIComponent(id)}`, undefined, options));
 }
 
 export async function getMangaChapters(
   id: string,
   providers?: string,
-  language?: string
+  language?: string,
+  options: MangaRequestControlOptions = {}
 ): Promise<MangaChapterResponse> {
   const params = new URLSearchParams();
   if (providers) params.set('providers', providers);
   if (language) params.set('language', language);
-  
-  const queryString = params.toString();
-  const suffix = queryString ? `?${queryString}` : '';
-  
-  return mangaGet(`/${encodeURIComponent(id)}/chapters${suffix}`);
+
+  return mangaGet(buildMangaPath(`/${encodeURIComponent(id)}/chapters`, params, options));
 }
 
 export async function getMangaReadByKey(
   id: string,
-  chapterKey: string
+  chapterKey: string,
+  options: MangaRequestControlOptions = {}
 ): Promise<MangaReadResponse> {
   // The shared API client can unwrap { success, data } envelopes.
   // Normalize both wrapped and unwrapped shapes for the reader page.
   const payload = await mangaGet<MangaReadResponse | NonNullable<MangaReadResponse["data"]>>(
-    `/${encodeURIComponent(id)}/read/${encodeURIComponent(chapterKey)}`
+    buildMangaPath(`/${encodeURIComponent(id)}/read/${encodeURIComponent(chapterKey)}`, undefined, options)
   );
 
   if (
@@ -704,6 +1070,13 @@ export async function getMangaReadByKey(
   return payload as MangaReadResponse;
 }
 
-export async function getMangaProviders(): Promise<{ success: boolean; data: string[] }> {
-  return mangaGet(`/providers`);
+export async function getMangaProviders(): Promise<{
+  success?: boolean;
+  providers?: {
+    mapper?: string[];
+    passthrough?: string[];
+  };
+  rewriteBase?: string;
+}> {
+  return mangaGet(buildMangaPath(`/providers`, undefined, { forceFresh: true }));
 }

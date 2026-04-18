@@ -5,57 +5,69 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Max-Age': '86400',
+  'Cross-Origin-Resource-Policy': 'cross-origin',
 };
 
-serve(async (req) => {
+async function fetchWithRetry(url: string, options: RequestInit, retries = 2): Promise<Response> {
+  let lastError: Error | null = null;
+  for (let i = 0; i < retries; i++) {
+    try {
+      const response = await fetch(url, { ...options, signal: AbortSignal.timeout(15000) });
+      if (response.ok) return response;
+      if (response.status === 403 || response.status === 404) return response; // Don't retry these
+      lastError = new Error(`HTTP ${response.status}`);
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+    }
+    if (i < retries - 1) await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+  }
+  throw lastError;
+}
+
+serve(async (req: Request) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const url = new URL(req.url);
-    const targetUrl = url.searchParams.get('url');
+    const urlArr = new URL(req.url);
+    const targetUrl = urlArr.searchParams.get('url');
+    const refererParam = urlArr.searchParams.get('referer');
+    const userAgentParam = urlArr.searchParams.get('userAgent');
 
     if (!targetUrl) {
-      return new Response(
-        JSON.stringify({ error: 'Missing url parameter' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+      return new Response(JSON.stringify({ error: 'Missing url parameter' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     let parsedTarget: URL;
     try {
       parsedTarget = new URL(targetUrl);
-      if (parsedTarget.protocol !== 'http:' && parsedTarget.protocol !== 'https:') {
-        throw new Error('Invalid protocol');
-      }
     } catch {
-      return new Response(
-        JSON.stringify({ error: 'Invalid target url' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+      return new Response(JSON.stringify({ error: 'Invalid target url' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // Fetch the embed page
-    const response = await fetch(targetUrl, {
+    const response = await fetchWithRetry(targetUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Referer': parsedTarget.origin,
+        'User-Agent': userAgentParam || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': refererParam || (parsedTarget.origin + '/'),
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
       },
     });
 
     if (!response.ok) {
       return new Response(
-        JSON.stringify({ error: `Failed to fetch embed: ${response.status}` }),
+        JSON.stringify({ error: `Failed to fetch: ${response.status}`, url: targetUrl }),
         {
           status: response.status,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -63,31 +75,45 @@ serve(async (req) => {
       );
     }
 
-    // Get the content
     const contentType = response.headers.get('content-type') || 'text/html';
+    const finalUrl = new URL(response.url);
+
     let body: string | ArrayBuffer;
-    
-    if (contentType.includes('text') || contentType.includes('html') || contentType.includes('javascript') || contentType.includes('json')) {
-      body = await response.text();
+
+    if (contentType.includes('text') || contentType.includes('html') || contentType.includes('javascript')) {
+      let text = await response.text();
+
+      // Inject <base> tag for HTML content to fix relative paths
+      if (contentType.includes('html')) {
+        const baseHref = finalUrl.origin + finalUrl.pathname;
+        const baseTag = `<base href="${baseHref}">`;
+
+        if (text.includes('<head>')) {
+          text = text.replace('<head>', `<head>\n    ${baseTag}`);
+        } else if (text.includes('<HEAD>')) {
+          text = text.replace('<HEAD>', `<HEAD>\n    ${baseTag}`);
+        } else if (text.includes('<html>')) {
+          text = text.replace('<html>', `<html>\n<head>${baseTag}</head>`);
+        } else if (text.includes('<HTML>')) {
+          text = text.replace('<HTML>', `<HTML>\n<HEAD>${baseTag}</HEAD>`);
+        } else {
+          text = `<head>${baseTag}</head>\n${text}`;
+        }
+      }
+      body = text;
     } else {
       body = await response.arrayBuffer();
     }
 
-    // Strip problematic headers and add CORS
+    // Explicitly remove X-Frame-Options to allow framing from any origin
+    // Supabase might inject its own, so we set a permissive CSP as well
     const newHeaders = new Headers({
       ...corsHeaders,
-      'Content-Type': 'text/html; charset=utf-8',
+      'Content-Type': contentType,
       'Cache-Control': 'public, max-age=3600',
-      'X-Frame-Options': 'ALLOWALL',
-      'Content-Security-Policy': "frame-ancestors *; default-src * data: blob: 'unsafe-inline' 'unsafe-eval'",
-      'Cross-Origin-Resource-Policy': 'cross-origin',
-      'Cross-Origin-Embedder-Policy': 'unsafe-none',
+      'Content-Security-Policy': "frame-ancestors *",
+      'Referrer-Policy': 'no-referrer',
     });
-
-    // Explicitly DO NOT copy these headers from the target:
-    // - X-Frame-Options (allows embedding)
-    // - Content-Security-Policy with frame-ancestors (allows embedding)
-    // - X-Content-Type-Options (can interfere)
 
     return new Response(body, {
       status: response.status,
@@ -95,13 +121,9 @@ serve(async (req) => {
     });
   } catch (error: unknown) {
     console.error('Embed proxy error:', error);
-    const message = error instanceof Error ? error.message : 'Unknown proxy error';
-    return new Response(
-      JSON.stringify({ error: message }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+    return new Response(JSON.stringify({ error: String(error) }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });
