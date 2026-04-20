@@ -4,7 +4,7 @@ import type { StreamingSource } from '@/types/anime';
 export async function fetchAnimeyaSources(
     episodeId: string
 ): Promise<StreamingSource[]> {
-    const apiUrl = `http://localhost:9000/api/v1/animeya/watch/${episodeId}`;
+    const apiUrl = `http://api.tatakai.me/api/v1/animeya/watch/${episodeId}`;
 
     // Use Supabase proxy to avoid CORS issues
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -17,7 +17,7 @@ export async function fetchAnimeyaSources(
     const proxyParams = new URLSearchParams({
         url: apiUrl,
         type: 'api',
-        referer: 'http://localhost:9000'
+        referer: 'http://api.tatakai.me'
     });
     if (apikey) proxyParams.set('apikey', apikey);
 

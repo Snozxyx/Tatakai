@@ -59,7 +59,7 @@ interface ScraperHealthSummary {
 
 const SERVICE_CHECK_FREQ_SECONDS = 30;
 const PROXY_POLL_FREQ_SECONDS = 4;
-const DEFAULT_BACKEND_HEALTH_URL = 'http://localhost:9000/health';
+const DEFAULT_BACKEND_HEALTH_URL = 'http://api.tatakai.me/health';
 
 type KnownProxyNode = {
   id: string;

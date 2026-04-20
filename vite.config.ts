@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => {
   const backendOrigin =
     env.VITE_BACKEND_ORIGIN ||
     env.VITE_LOCAL_HIANIME_ORIGIN ||
-    'http://localhost:9000';
+    'http://api.tatakai.me';
 
   return {
     plugins: [react()],
@@ -86,7 +86,7 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           secure: false,
         },
-        // Dev proxy for all provider calls → local TatakaiCore (http://localhost:9000)
+        // Dev proxy for all provider calls → local TatakaiCore (http://api.tatakai.me)
         '/api/providers': {
           target: backendOrigin,
           changeOrigin: true,

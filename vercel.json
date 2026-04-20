@@ -24,7 +24,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://*.tatakai.me http://localhost:9000 https://api.jikan.moe https://api.trace.moe https://graphql.anilist.co https://api.myanimelist.net https://www.google-analytics.com https://*.datadoghq.com; media-src 'self' blob: https:; frame-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://*.tatakai.me http://api.tatakai.me https://api.jikan.moe https://api.trace.moe https://graphql.anilist.co https://api.myanimelist.net https://www.google-analytics.com https://*.datadoghq.com; media-src 'self' blob: https:; frame-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         }
       ]
     },
