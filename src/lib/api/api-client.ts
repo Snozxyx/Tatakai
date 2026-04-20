@@ -1,7 +1,7 @@
 import { getClientIdSync } from '@/hooks/useClientId';
 import { isApiCryptoEnabled, generateApiSignature } from '@/lib/apiCrypto';
 
-const DEFAULT_API_BASE = "http://api.tatakai.me/api/v2";
+const DEFAULT_API_BASE = "https://api.tatakai.me/api/v2";
 const BACKEND_ORIGIN = (import.meta.env.VITE_BACKEND_ORIGIN || '').replace(/\/$/, '');
 
 function isAbsoluteHttpUrl(value: string): boolean {
