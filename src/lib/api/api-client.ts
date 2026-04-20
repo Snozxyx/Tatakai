@@ -478,7 +478,7 @@ function shouldUseAnimepaheProxy(upstreamUrl: string, referer?: string): boolean
 
 function isAlreadyGenericM3u8ProxyUrl(url: string): boolean {
   try {
-    const parsed = new URL(url, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
+    const parsed = new URL(url, typeof window !== 'undefined' ? window.location.origin : 'https://api.tatakai.me');
     return /\/m3u8-proxy$/i.test(parsed.pathname) && parsed.searchParams.has('url');
   } catch {
     return false;
@@ -494,7 +494,7 @@ function extractUpstreamFromProxyUrl(maybeProxyUrl: string): string | null {
   try {
     const parsed = new URL(
       maybeProxyUrl,
-      typeof window !== 'undefined' ? window.location.origin : 'http://localhost'
+      typeof window !== 'undefined' ? window.location.origin : 'https://api.tatakai.me'
     );
     return parsed.searchParams.get('url');
   } catch {

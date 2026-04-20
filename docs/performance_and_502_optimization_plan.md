@@ -2,7 +2,7 @@
 
 Date: 2026-04-18
 Scope: Frontend startup latency, homepage perceived load time, provider/proxy 502 timeout resilience
-Environment reviewed: http://localhost:8088/
+Environment reviewed: https://api.tatakai.me:8088/
 
 ## 1. Browser Findings (Live Review)
 

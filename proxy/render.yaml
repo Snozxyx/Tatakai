@@ -8,4 +8,4 @@ services:
       - key: PORT
         value: 3000
       - key: ALLOWED_ORIGINS
-        value: http://localhost:3000,https://your-website.com
+        value: https://api.tatakai.me:3000,https://your-website.com

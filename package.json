@@ -21,7 +21,7 @@
     "test:watch": "bun test --watch tests",
     "preview": "vite preview --host 0.0.0.0",
     "start": "node scripts/ptero-start.mjs",
-    "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:8088 && electron desktop/main.cjs\"",
+    "electron:dev": "concurrently \"vite\" \"wait-on https://api.tatakai.me:8088 && electron desktop/main.cjs\"",
     "electron:build": "cross-env ELECTRON_BUILD=true vite build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder",
     "assets:generate": "node scripts/generate-assets.cjs",
     "mobile:dev": "npm run build && npx cap open android",

@@ -68,7 +68,7 @@ export async function extractEmbedVideo(
   }>;
   error?: string;
 }> {
-  const extractorUrl = import.meta.env.VITE_EXTRACTOR_SERVICE_URL || 'http://localhost:3001';
+  const extractorUrl = import.meta.env.VITE_EXTRACTOR_SERVICE_URL || 'https://api.tatakai.me:3001';
   try {
     const response = await fetch(`${extractorUrl}/extract`, {
       method: 'POST',

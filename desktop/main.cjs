@@ -142,7 +142,7 @@ function createWindow() {
     });
 
     const startUrl = isDev
-        ? 'http://localhost:8088'
+        ? 'https://api.tatakai.me:8088'
         : path.join(__dirname, '../dist/index.html');
 
     console.log('Loading URL:', startUrl);
@@ -176,9 +176,9 @@ function createWindow() {
             if (isDev && url.includes('localhost:8088')) {
                 console.log('[Loading] dev-server probably not ready, retrying in 2s...');
                 setTimeout(() => loadURL(url), 2000);
-            } else if (isDev && url === 'http://localhost:8088') {
+            } else if (isDev && url === 'https://api.tatakai.me:8088') {
                 console.log('[Loading] Trying fallback port 8089...');
-                await loadURL('http://localhost:8089');
+                await loadURL('https://api.tatakai.me:8089');
             } else {
                 console.log('[Loading] Falling back to offline page');
                 mainWindow.loadFile(path.join(__dirname, 'offline.html'));
@@ -333,12 +333,12 @@ function createWindow() {
         const currentURL = mainWindow.webContents.getURL();
 
         // Allow navigation within the app (localhost or file://)
-        if (url.startsWith('http://localhost') || url.startsWith('file://')) {
+        if (url.startsWith('https://api.tatakai.me') || url.startsWith('file://')) {
             return;
         }
 
         // Block any navigation attempts from within the app (click hijacking)
-        if (!currentURL.startsWith('http://localhost') && !currentURL.startsWith('file://')) {
+        if (!currentURL.startsWith('https://api.tatakai.me') && !currentURL.startsWith('file://')) {
             return;
         }
 

@@ -115,7 +115,7 @@
     npm start #or yarn start or pnpm start
     ```
 
-    Now the server should be running on [http://localhost:4000](http://localhost:4000)
+    Now the server should be running on [https://api.tatakai.me:4000](https://api.tatakai.me:4000)
 
 ### Docker
 
@@ -127,7 +127,7 @@ Run the following commands to pull and run the docker image.
 docker run -d --name aniwatch-api -p 4000:4000 ghcr.io/ghoshritesh12/aniwatch
 ```
 
-The above command will start the server on port 4000. You can access the server at [http://localhost:4000](http://localhost:4000), and you can also change the port by changing the `-p` option to `-p <port>:4000`.
+The above command will start the server on port 4000. You can access the server at [https://api.tatakai.me:4000](https://api.tatakai.me:4000), and you can also change the port by changing the `-p` option to `-p <port>:4000`.
 
 The `-d` flag runs the container in detached mode, and the `--name` flag is used to name the container that's about to run.
 
