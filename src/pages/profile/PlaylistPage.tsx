@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
@@ -86,6 +86,26 @@ function getPlaylistItemHref(animeId: string): string {
     return `/manga/${encodeURIComponent(media.id)}`;
   }
   return `/anime/${encodeURIComponent(media.id)}`;
+}
+
+const PLAYLIST_COLLAB_SEARCH_DEBOUNCE_MS = 300;
+const PLAYLIST_EDIT_DRAFT_SAVE_DEBOUNCE_MS = 500;
+const PLAYLIST_EDIT_DRAFT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const PLAYLIST_EDIT_DRAFT_STORAGE_PREFIX = 'tatakai_playlist_edit_draft_v1';
+
+interface PlaylistEditDraft {
+  name: string;
+  description: string;
+  isPublic: boolean;
+  shareSlug?: string;
+  shareDescription?: string;
+  embedAllowed: boolean;
+  savedAt: number;
+}
+
+function getPlaylistEditDraftStorageKey(playlistId?: string): string | null {
+  if (!playlistId) return null;
+  return `${PLAYLIST_EDIT_DRAFT_STORAGE_PREFIX}:${playlistId}`;
 }
 
 // Playlists list page
@@ -345,10 +365,16 @@ export function PlaylistViewPage() {
   const [editEmbedAllowed, setEditEmbedAllowed] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [collaboratorSearch, setCollaboratorSearch] = useState('');
+  const [debouncedCollaboratorSearch, setDebouncedCollaboratorSearch] = useState('');
   const [newCollaboratorRole, setNewCollaboratorRole] = useState<CollaboratorRole>('editor');
   const [newComment, setNewComment] = useState('');
   const [openReplyFor, setOpenReplyFor] = useState<string | null>(null);
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
+
+  const playlistEditDraftStorageKey = useMemo(
+    () => getPlaylistEditDraftStorageKey(playlist?.id),
+    [playlist?.id]
+  );
 
   const isOwner = !!user && !!playlist && user.id === playlist.user_id;
   const myCollaboratorRole = collaborators.find((collaborator) => collaborator.user_id === user?.id)?.role;
@@ -370,11 +396,56 @@ export function PlaylistViewPage() {
     }, {});
   }, [comments]);
 
-  const { data: collaboratorSearchResults = [] } = useQuery({
-    queryKey: ['playlist-collaborator-search', playlistId, collaboratorSearch, collaborators.length],
-    enabled: !!playlist && canManageCollaborators && collaboratorSearch.trim().length >= 2,
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedCollaboratorSearch(collaboratorSearch);
+    }, PLAYLIST_COLLAB_SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [collaboratorSearch]);
+
+  useEffect(() => {
+    if (!showEdit || !playlistEditDraftStorageKey || typeof window === 'undefined') return;
+
+    const timer = window.setTimeout(() => {
+      const payload: PlaylistEditDraft = {
+        name: editName,
+        description: editDesc,
+        isPublic: editPublic,
+        shareSlug: editShareSlug,
+        shareDescription: editShareDesc,
+        embedAllowed: editEmbedAllowed,
+        savedAt: Date.now(),
+      };
+
+      try {
+        window.localStorage.setItem(playlistEditDraftStorageKey, JSON.stringify(payload));
+      } catch {
+        // Ignore storage write failures.
+      }
+    }, PLAYLIST_EDIT_DRAFT_SAVE_DEBOUNCE_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [
+    editDesc,
+    editEmbedAllowed,
+    editName,
+    editPublic,
+    editShareDesc,
+    editShareSlug,
+    playlistEditDraftStorageKey,
+    showEdit,
+  ]);
+
+  const { data: collaboratorSearchResults = [], isFetching: isSearchingCollaborators } = useQuery({
+    queryKey: ['playlist-collaborator-search', playlistId, debouncedCollaboratorSearch, collaborators.length],
+    enabled: !!playlist && canManageCollaborators && debouncedCollaboratorSearch.trim().length >= 2,
     queryFn: async () => {
-      const searchTerm = collaboratorSearch.trim();
+      const searchTerm = debouncedCollaboratorSearch.trim();
       if (!searchTerm || !playlist) return [] as Array<{
         user_id: string;
         username: string | null;
@@ -404,12 +475,49 @@ export function PlaylistViewPage() {
       return;
     }
 
-    setEditName(playlist.name);
-    setEditDesc(playlist.description || '');
-    setEditPublic(playlist.is_public);
-    setEditShareSlug(playlist.share_slug ?? undefined);
-    setEditShareDesc(playlist.share_description ?? undefined);
-    setEditEmbedAllowed(!!playlist.embed_allowed);
+    const fallbackDraft: PlaylistEditDraft = {
+      name: playlist.name,
+      description: playlist.description || '',
+      isPublic: playlist.is_public,
+      shareSlug: playlist.share_slug ?? undefined,
+      shareDescription: playlist.share_description ?? undefined,
+      embedAllowed: !!playlist.embed_allowed,
+      savedAt: Date.now(),
+    };
+
+    let resolvedDraft = fallbackDraft;
+
+    if (playlistEditDraftStorageKey && typeof window !== 'undefined') {
+      try {
+        const raw = window.localStorage.getItem(playlistEditDraftStorageKey);
+        if (raw) {
+          const parsed = JSON.parse(raw) as Partial<PlaylistEditDraft>;
+          const savedAt = Number(parsed?.savedAt || 0);
+          if (savedAt && Date.now() - savedAt <= PLAYLIST_EDIT_DRAFT_MAX_AGE_MS) {
+            resolvedDraft = {
+              name: typeof parsed.name === 'string' ? parsed.name : fallbackDraft.name,
+              description: typeof parsed.description === 'string' ? parsed.description : fallbackDraft.description,
+              isPublic: typeof parsed.isPublic === 'boolean' ? parsed.isPublic : fallbackDraft.isPublic,
+              shareSlug: typeof parsed.shareSlug === 'string' ? parsed.shareSlug : fallbackDraft.shareSlug,
+              shareDescription: typeof parsed.shareDescription === 'string' ? parsed.shareDescription : fallbackDraft.shareDescription,
+              embedAllowed: typeof parsed.embedAllowed === 'boolean' ? parsed.embedAllowed : fallbackDraft.embedAllowed,
+              savedAt,
+            };
+          } else {
+            window.localStorage.removeItem(playlistEditDraftStorageKey);
+          }
+        }
+      } catch {
+        // Ignore malformed drafts and fall back to server values.
+      }
+    }
+
+    setEditName(resolvedDraft.name);
+    setEditDesc(resolvedDraft.description);
+    setEditPublic(resolvedDraft.isPublic);
+    setEditShareSlug(resolvedDraft.shareSlug ?? undefined);
+    setEditShareDesc(resolvedDraft.shareDescription ?? undefined);
+    setEditEmbedAllowed(resolvedDraft.embedAllowed);
     setShowEdit(true);
   };
 
@@ -454,6 +562,14 @@ export function PlaylistViewPage() {
       shareDescription: editShareDesc ?? undefined,
       embedAllowed: editEmbedAllowed,
     });
+
+    if (playlistEditDraftStorageKey && typeof window !== 'undefined') {
+      try {
+        window.localStorage.removeItem(playlistEditDraftStorageKey);
+      } catch {
+        // Ignore storage remove failures.
+      }
+    }
 
     setShowEdit(false);
   };
@@ -506,6 +622,7 @@ export function PlaylistViewPage() {
     });
 
     setCollaboratorSearch('');
+    setDebouncedCollaboratorSearch('');
   };
 
   const handleUpdateCollaboratorRole = async (collaboratorId: string, role: CollaboratorRole) => {
@@ -927,7 +1044,9 @@ export function PlaylistViewPage() {
 
                   {collaboratorSearch.trim().length >= 2 && (
                     <div className="max-h-44 overflow-y-auto rounded-lg border border-border/60 bg-muted/30 divide-y divide-border/50">
-                      {collaboratorSearchResults.length === 0 ? (
+                      {isSearchingCollaborators ? (
+                        <p className="text-sm text-muted-foreground p-3">Searching users...</p>
+                      ) : collaboratorSearchResults.length === 0 ? (
                         <p className="text-sm text-muted-foreground p-3">No matching users found.</p>
                       ) : (
                         collaboratorSearchResults.map((profile) => {

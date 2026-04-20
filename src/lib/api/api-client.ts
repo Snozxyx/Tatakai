@@ -68,6 +68,11 @@ export class ApiError extends Error {
 type ApiEnvelope<T> = { success: true; data: T };
 type ProxyEnvelope<T> = { status: number; data: T };
 type AnyEnvelope<T> = ApiEnvelope<T> | ProxyEnvelope<T>;
+type ApiRequestOptions = {
+  retries?: number;
+  timeoutMs?: number;
+  retryDelayBaseMs?: number;
+};
 
 export function unwrapApiData<T>(payload: AnyEnvelope<T> | T): T {
   if (payload && typeof payload === 'object' && !('success' in payload) && !('status' in payload)) {
@@ -112,8 +117,41 @@ export function unwrapApiData<T>(payload: AnyEnvelope<T> | T): T {
   return payload as T;
 }
 
-export async function baseApiGet<T>(baseUrl: string, path: string, retries?: number): Promise<T> {
-  const maxRetries = retries ?? (isMobileNative ? 2 : 3);
+function normalizeApiRequestOptions(
+  retriesOrOptions?: number | ApiRequestOptions
+): Required<ApiRequestOptions> {
+  if (typeof retriesOrOptions === 'number') {
+    return {
+      retries: retriesOrOptions,
+      timeoutMs: API_TIMEOUT,
+      retryDelayBaseMs: isMobileNative ? 300 : 500,
+    };
+  }
+
+  const configuredRetries = retriesOrOptions?.retries;
+  const configuredTimeout = retriesOrOptions?.timeoutMs;
+  const configuredRetryDelay = retriesOrOptions?.retryDelayBaseMs;
+
+  return {
+    retries: Number.isFinite(configuredRetries as number)
+      ? Math.max(0, Number(configuredRetries))
+      : (isMobileNative ? 2 : 3),
+    timeoutMs: Number.isFinite(configuredTimeout as number)
+      ? Math.max(1500, Number(configuredTimeout))
+      : API_TIMEOUT,
+    retryDelayBaseMs: Number.isFinite(configuredRetryDelay as number)
+      ? Math.max(100, Number(configuredRetryDelay))
+      : (isMobileNative ? 300 : 500),
+  };
+}
+
+export async function baseApiGet<T>(
+  baseUrl: string,
+  path: string,
+  retriesOrOptions?: number | ApiRequestOptions
+): Promise<T> {
+  const options = normalizeApiRequestOptions(retriesOrOptions);
+  const maxRetries = options.retries;
   const url = `${baseUrl}${path}`;
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const isUsingLocalDevProxy = import.meta.env.DEV && baseUrl.startsWith('/');
@@ -129,17 +167,15 @@ export async function baseApiGet<T>(baseUrl: string, path: string, retries?: num
 
   const proxies = (() => {
     const ordered: Array<{ url: string; type: 'direct' | 'supabase' }> = [];
-    if (isMobileNative || isLocalApiTarget) {
-      ordered.push({ url, type: 'direct' });
-    }
-    if (supabaseUrl && !isUsingLocalDevProxy) {
+    // Prefer direct API first to avoid extra proxy hop latency.
+    ordered.push({ url, type: 'direct' });
+
+    if (supabaseUrl && !isUsingLocalDevProxy && !isLocalApiTarget) {
       const apikey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       const rapidUrl = `${supabaseUrl}/functions/v1/rapid-service?url=${encodeURIComponent(url)}&type=api&referer=${encodeURIComponent(apiOrigin)}` + (apikey ? `&apikey=${encodeURIComponent(apikey)}` : '');
       ordered.push({ url: rapidUrl, type: 'supabase' });
     }
-    if (!ordered.some((entry) => entry.type === 'direct')) {
-      ordered.push({ url, type: 'direct' });
-    }
+
     return ordered;
   })();
 
@@ -154,7 +190,7 @@ export async function baseApiGet<T>(baseUrl: string, path: string, retries?: num
         }
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+        const timeoutId = setTimeout(() => controller.abort(), options.timeoutMs);
 
         const response = await fetch(proxy.url, { headers, signal: controller.signal });
         clearTimeout(timeoutId);
@@ -169,8 +205,7 @@ export async function baseApiGet<T>(baseUrl: string, path: string, retries?: num
         lastError = error as Error;
         if (proxy.type === 'supabase' && error instanceof ApiError && (error.status === 401 || error.status === 403)) break;
         if (attempt < maxRetries - 1) {
-          const baseDelay = isMobileNative ? 300 : 500;
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * baseDelay));
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * options.retryDelayBaseMs));
         }
       }
     }
@@ -225,7 +260,6 @@ type VideoProxyOptions = {
 };
 
 const REMOTE_NODE_STREAM_PROXY = 'https://hoko.tatakai.me/api/v1/streamingProxy';
-const REMOTE_CF_STREAM_PROXY = 'https://moko.tatakai.me/api/v1/streamingProxy';
 const REMOTE_FOGTWIST_PROXY = 'https://mega.zanora.lol/m3u8-proxy';
 const REMOTE_ANIMEPAHE_PROXY = 'https://proxy.1anime.app/m3u8-proxy';
 const DEFAULT_STREAM_PROXY_PATH = '/api/v1/streamingProxy';
@@ -245,6 +279,15 @@ function isLoopbackProxyUrl(value: string): boolean {
     return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
   } catch {
     return false;
+  }
+}
+
+function isMokoProxyUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return /(^|\.)moko\.tatakai\.me$/i.test(parsed.hostname);
+  } catch {
+    return /(^|\.)moko\.tatakai\.me/i.test(value);
   }
 }
 
@@ -282,6 +325,7 @@ function resolveStreamProxyBaseCandidates(): string[] {
   const add = (value?: string) => {
     const normalized = normalizeStreamProxyBase(String(value || ''));
     if (!normalized || isLoopbackProxyUrl(normalized)) return;
+    if (isMokoProxyUrl(normalized)) return;
     if (!candidates.includes(normalized)) candidates.push(normalized);
   };
 
@@ -292,12 +336,10 @@ function resolveStreamProxyBaseCandidates(): string[] {
 
   pool.forEach(add);
   add(import.meta.env.VITE_PROXY_NODE_URL);
-  add(import.meta.env.VITE_PROXY_CF_URL);
   add(import.meta.env.VITE_SINGLE_STREAM_PROXY_URL);
   add(import.meta.env.VITE_STREAM_PROXY_URL);
 
   add(REMOTE_NODE_STREAM_PROXY);
-  add(REMOTE_CF_STREAM_PROXY);
 
   return candidates;
 }
@@ -460,6 +502,36 @@ function extractUpstreamFromProxyUrl(maybeProxyUrl: string): string | null {
   }
 }
 
+function shouldProxySubtitleUrl(subtitleUrl: string, referer?: string): boolean {
+  const ref = String(referer || '').toLowerCase();
+  if (
+    ref.includes('watching.onl') ||
+    ref.includes('rabbitstream') ||
+    ref.includes('dokicloud') ||
+    ref.includes('megacloud') ||
+    ref.includes('kwik') ||
+    ref.includes('kiwi') ||
+    ref.includes('owocdn')
+  ) {
+    return true;
+  }
+
+  try {
+    const host = new URL(subtitleUrl).hostname.toLowerCase();
+    return (
+      host.includes('watching.onl') ||
+      host.includes('rabbitstream') ||
+      host.includes('dokicloud') ||
+      host.includes('megacloud') ||
+      host.includes('kwik') ||
+      host.includes('kiwi') ||
+      host.includes('owocdn')
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function getProxiedVideoUrl(
   videoUrl: string,
   referer?: string,
@@ -529,13 +601,16 @@ export function getProxiedSubtitleUrl(subtitleUrl: string | undefined, referer?:
     return buildSingleProxyUrl(upstreamFromExistingProxy, 'subtitle', referer);
   }
   if (!subtitleUrl.startsWith('http')) return subtitleUrl;
+  if (!shouldProxySubtitleUrl(subtitleUrl, referer)) {
+    return subtitleUrl;
+  }
   return buildSingleProxyUrl(subtitleUrl, 'subtitle', referer);
 }
 
-export function apiGet<T>(path: string, retries?: number): Promise<T> {
-  return baseApiGet<T>(API_URL, path, retries);
+export function apiGet<T>(path: string, retriesOrOptions?: number | ApiRequestOptions): Promise<T> {
+  return baseApiGet<T>(API_URL, path, retriesOrOptions);
 }
 
-export function mangaGet<T>(path: string, retries?: number): Promise<T> {
-  return baseApiGet<T>(MANGA_API_URL, path, retries);
+export function mangaGet<T>(path: string, retriesOrOptions?: number | ApiRequestOptions): Promise<T> {
+  return baseApiGet<T>(MANGA_API_URL, path, retriesOrOptions);
 }

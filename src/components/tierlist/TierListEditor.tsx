@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, useSortable, rectSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -13,7 +13,6 @@ import { Search, Trash2, Save, Share2, Lock, Globe, GripVertical, X, Film, Users
 import { useCreateTierList, useUpdateTierList, DEFAULT_TIERS, type TierListItem } from '@/hooks/useTierLists';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { searchCharacters } from '@/lib/api';
 
 interface SearchResult {
   id: string;
@@ -33,6 +32,24 @@ interface TierListEditorProps {
   };
   onSave?: (data: { name: string; description?: string; items: TierListItem[]; is_public: boolean }) => void;
   onClose?: () => void;
+}
+
+const SEARCH_DEBOUNCE_MS = 450;
+const TIERLIST_DRAFT_SAVE_DEBOUNCE_MS = 500;
+const TIERLIST_DRAFT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const TIERLIST_DRAFT_STORAGE_PREFIX = 'tatakai_tierlist_editor_draft_v1';
+
+interface TierListEditorDraft {
+  name: string;
+  description: string;
+  isPublic: boolean;
+  searchType: 'anime' | 'character';
+  items: TierListItem[];
+  savedAt: number;
+}
+
+function getTierListDraftStorageKey(tierListId?: string): string {
+  return `${TIERLIST_DRAFT_STORAGE_PREFIX}:${tierListId ? `edit:${tierListId}` : 'new'}`;
 }
 
 function SortableAnimeCard({ item, onRemove }: { item: TierListItem; onRemove?: () => void }) {
@@ -128,9 +145,16 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
   const [page, setPage] = useState(1);
   const [hasNextPage, setHasNextPage] = useState(false);
 
-  // Refs for debouncing
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastSearchTimeRef = useRef<number>(0);
+  const draftStorageKey = useMemo(
+    () => getTierListDraftStorageKey(initialData?.id),
+    [initialData?.id]
+  );
+
+  // Refs for debouncing and stale-request guards
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const draftSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestSearchRequestRef = useRef(0);
+  const isRestoringDraftRef = useRef(false);
 
   const createTierList = useCreateTierList();
   const updateTierList = useUpdateTierList();
@@ -143,11 +167,86 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
     })
   );
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const raw = window.localStorage.getItem(draftStorageKey);
+      if (!raw) return;
+
+      const parsed = JSON.parse(raw) as Partial<TierListEditorDraft>;
+      const savedAt = Number(parsed?.savedAt || 0);
+      if (!savedAt || Date.now() - savedAt > TIERLIST_DRAFT_MAX_AGE_MS) {
+        window.localStorage.removeItem(draftStorageKey);
+        return;
+      }
+
+      isRestoringDraftRef.current = true;
+      if (typeof parsed.name === 'string') setName(parsed.name);
+      if (typeof parsed.description === 'string') setDescription(parsed.description);
+      if (typeof parsed.isPublic === 'boolean') setIsPublic(parsed.isPublic);
+      if (parsed.searchType === 'anime' || parsed.searchType === 'character') {
+        setSearchType(parsed.searchType);
+      }
+      if (Array.isArray(parsed.items)) {
+        setItems(parsed.items as TierListItem[]);
+      }
+    } catch {
+      // Ignore corrupted drafts.
+    } finally {
+      isRestoringDraftRef.current = false;
+    }
+  }, [draftStorageKey]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || isRestoringDraftRef.current) return;
+
+    if (draftSaveTimeoutRef.current) {
+      clearTimeout(draftSaveTimeoutRef.current);
+    }
+
+    draftSaveTimeoutRef.current = setTimeout(() => {
+      const payload: TierListEditorDraft = {
+        name,
+        description,
+        isPublic,
+        searchType,
+        items,
+        savedAt: Date.now(),
+      };
+
+      try {
+        window.localStorage.setItem(draftStorageKey, JSON.stringify(payload));
+      } catch {
+        // Ignore storage write failures.
+      }
+    }, TIERLIST_DRAFT_SAVE_DEBOUNCE_MS);
+
+    return () => {
+      if (draftSaveTimeoutRef.current) {
+        clearTimeout(draftSaveTimeoutRef.current);
+      }
+    };
+  }, [description, draftStorageKey, isPublic, items, name, searchType]);
+
+  const clearSavedDraft = useCallback(() => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      window.localStorage.removeItem(draftStorageKey);
+    } catch {
+      // Ignore storage remove failures.
+    }
+  }, [draftStorageKey]);
+
   // Search anime or characters using Tatakai API
   const performSearch = useCallback(async (query: string, type: 'anime' | 'character', pageNum: number) => {
+    const requestId = ++latestSearchRequestRef.current;
+
     if (!query.trim() || query.length < 3) {
       setSearchResults([]);
       setHasNextPage(false);
+      setIsSearching(false);
       return;
     }
 
@@ -163,11 +262,13 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
           type: 'anime' as const,
         }));
 
+        if (requestId !== latestSearchRequestRef.current) return;
         setSearchResults(prev => pageNum === 1 ? newResults : [...prev, ...newResults]);
         setHasNextPage(data.hasNextPage);
       } else {
         const response = await import('@/lib/api').then(mod => mod.searchCharacters(query, pageNum));
 
+        if (requestId !== latestSearchRequestRef.current) return;
         if (response.success) {
           const newResults = response.data.map((char) => ({
             id: `char-${char.malId != null && Number.isFinite(Number(char.malId)) ? String(char.malId) : String(char._id)}`,
@@ -183,11 +284,14 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
         }
       }
     } catch (error) {
+      if (requestId !== latestSearchRequestRef.current) return;
       console.error('Search failed:', error);
       if (pageNum === 1) setSearchResults([]);
       toast.error('Failed to search. Please try again.');
     } finally {
-      setIsSearching(false);
+      if (requestId === latestSearchRequestRef.current) {
+        setIsSearching(false);
+      }
     }
   }, []);
 
@@ -205,7 +309,7 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
     if (value.trim().length >= 3) {
       searchTimeoutRef.current = setTimeout(() => {
         performSearch(value, searchType, 1);
-      }, 800);
+      }, SEARCH_DEBOUNCE_MS);
     } else {
       setSearchResults([]);
       setHasNextPage(false);
@@ -224,6 +328,9 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
       }
+      if (draftSaveTimeoutRef.current) {
+        clearTimeout(draftSaveTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -237,7 +344,7 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
       }
       searchTimeoutRef.current = setTimeout(() => {
         performSearch(searchQuery, type, 1);
-      }, 800);
+      }, SEARCH_DEBOUNCE_MS);
     }
   };
 
@@ -289,7 +396,7 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (!name.trim()) {
       toast.error('Please enter a name for your tier list');
       return;
@@ -314,13 +421,25 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
         });
         toast.success('Tier list created!');
       }
+      clearSavedDraft();
       onSave?.({ name, description, items, is_public: isPublic });
       onClose?.();
     } catch (error: any) {
       const message = error?.message || error?.details || 'Failed to save tier list';
       toast.error(message);
     }
-  };
+  }, [
+    clearSavedDraft,
+    createTierList,
+    description,
+    initialData?.id,
+    isPublic,
+    items,
+    name,
+    onClose,
+    onSave,
+    updateTierList,
+  ]);
 
   const activeItem = activeId ? items.find(i => i.anime_id === activeId) : null;
 

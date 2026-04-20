@@ -55,6 +55,27 @@ function isOnline(): boolean {
   return typeof navigator !== 'undefined' ? navigator.onLine : true;
 }
 
+const AUTH_BOOTSTRAP_TIMEOUT_MS = 2500;
+const PROFILE_FETCH_TIMEOUT_MS = 3500;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error(timeoutMessage));
+    }, timeoutMs);
+
+    promise
+      .then((value) => {
+        clearTimeout(timeoutId);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timeoutId);
+        reject(error);
+      });
+  });
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -69,43 +90,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchProfile = async (userId: string) => {
     // Skip fetching profile when offline
     if (!isOnline()) {
-      setIsLoading(false);
       return;
     }
 
-    // Use maybeSingle() to avoid 406 when a profile doesn't exist yet
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
+    try {
+      const profileQueryPromise = new Promise<{ data: Profile | null; error: { code?: string; message?: string } | null }>((resolve, reject) => {
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .maybeSingle()
+          .then(
+            (result: any) => resolve(result),
+            (queryError: any) => reject(queryError)
+          );
+      });
 
-    if (profileError && profileError.code !== 'PGRST116') {
-      console.warn('Error fetching profile:', profileError.message || profileError);
-    }
+      // Use maybeSingle() to avoid 406 when a profile doesn't exist yet
+      const { data: profileData, error: profileError } = await withTimeout(
+        profileQueryPromise,
+        PROFILE_FETCH_TIMEOUT_MS,
+        'Profile lookup timed out'
+      );
 
-    if (profileData) {
-      setProfile(profileData);
+      if (profileError && profileError.code !== 'PGRST116') {
+        console.warn('Error fetching profile:', profileError.message || profileError);
+      }
 
-      // Role detection
-      const role = profileData.role || 'user';
-      setIsAdmin(role === 'admin');
-      setIsModerator(role === 'moderator' || role === 'admin');
+      if (profileData) {
+        setProfile(profileData);
 
-      // Check if user is banned
-      if (profileData.is_banned) {
-        setIsBanned(true);
-        setBanReason(profileData.ban_reason || null);
+        // Role detection
+        const role = profileData.role || 'user';
+        setIsAdmin(role === 'admin');
+        setIsModerator(role === 'moderator' || role === 'admin');
+
+        // Check if user is banned
+        if (profileData.is_banned) {
+          setIsBanned(true);
+          setBanReason(profileData.ban_reason || null);
+        } else {
+          setIsBanned(false);
+          setBanReason(null);
+        }
       } else {
+        setProfile(null);
+        setIsAdmin(false);
+        setIsModerator(false);
         setIsBanned(false);
         setBanReason(null);
       }
-    } else {
-      setProfile(null);
-      setIsAdmin(false);
-      setIsModerator(false);
-      setIsBanned(false);
-      setBanReason(null);
+    } catch (error) {
+      console.warn('Profile bootstrap failed:', error);
     }
   };
 
@@ -188,19 +224,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    (async () => {
+      try {
+        const { data: { session } } = await withTimeout(
+          supabase.auth.getSession(),
+          AUTH_BOOTSTRAP_TIMEOUT_MS,
+          'Auth session bootstrap timed out'
+        );
 
-      if (session?.user) {
-        fetchProfile(session.user.id);
+        setSession(session);
+        setUser(session?.user ?? null);
+
+        if (session?.user) {
+          void fetchProfile(session.user.id);
+        }
+      } catch (err) {
+        console.error('[Auth] Initial session fetch failed:', err);
+      } finally {
+        setIsLoading(false);
       }
-
-      setIsLoading(false);
-    }).catch(err => {
-      console.error('[Auth] Initial session fetch failed:', err);
-      setIsLoading(false);
-    });
+    })();
 
     return () => subscription.unsubscribe();
   }, []);

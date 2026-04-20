@@ -32,7 +32,7 @@ import { IndexMangaShowcase } from "@/components/manga/IndexMangaShowcase";
 import { LastReadMangaSection } from "@/components/manga/LastReadMangaSection";
 import { Heart, Sparkles } from "lucide-react";
 import { DiscordSection } from "@/components/home/DiscordSection";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { BecauseYouWatched } from "@/components/anime/BecauseYouWatched";
 import { CuratedAnimeSections } from "@/components/home/CuratedAnimeSections";
 
@@ -43,6 +43,7 @@ const Index = () => {
   const isMobile = useIsMobile();
   const isMobileApp = Capacitor.isNativePlatform();
   const showInfiniteEarly = isMobile || isMobileApp;
+  const [showDeferredSections, setShowDeferredSections] = useState(false);
   
   // Show sidebar on desktop (web or app), but not on mobile (web or app)
   const showSidebar = !isMobile && !isMobileApp;
@@ -55,6 +56,21 @@ const Index = () => {
       });
     }
   }, []);
+
+  useEffect(() => {
+    if (isLoading || !data) {
+      setShowDeferredSections(false);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setShowDeferredSections(true);
+    }, 450);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [isLoading, data]);
 
   if (error) {
     return (
@@ -115,86 +131,87 @@ const Index = () => {
             <LocalContinueWatching />
             <LastReadMangaSection />
 
-            {/* Because You Watched — Personalised recommendations */}
-            <BecauseYouWatched className="mb-12" />
-
-            {/* Last manga/manhwa/comics progress */}
-
-                        <IndexMangaShowcase />
-
-
             {/* My Playlists */}
             <PlaylistSection />
 
             {/* Latest Episodes */}
             <LatestEpisodes animes={data.latestEpisodeAnimes} />
-            <AIRecommendationBanner />
-
-
-
-            {/* Languages Section */}
-            <LanguagesSection />
-
             {/* Trending Grid */}
             <TrendingGrid animes={data.trendingAnimes} />
 
-            <TierlistSection />
+            {showDeferredSections ? (
+              <>
+                {/* Because You Watched — Personalised recommendations */}
+                <BecauseYouWatched className="mb-12" />
 
-            {/* Upcoming Anime - From Jikan API */}
-            <UpcomingAnimeSection />
+                {/* Last manga/manhwa/comics progress */}
+                <IndexMangaShowcase />
 
-            {/* Top 10 Anime */}
-            <TopAnimeSection
-              today={data.top10Animes.today}
-              week={data.top10Animes.week}
-              month={data.top10Animes.month}
-            />
+                <AIRecommendationBanner />
 
-            
+                {/* Languages Section */}
+                <LanguagesSection />
 
+                <TierlistSection />
 
-            {/* Join Discord */}
-            <div className="mb-24">
-              <DiscordSection />
-            </div>
+                {/* Upcoming Anime - From Jikan API */}
+                <UpcomingAnimeSection />
 
-            <CuratedAnimeSections homeData={data} />
+                {/* Top 10 Anime */}
+                <TopAnimeSection
+                  today={data.top10Animes.today}
+                  week={data.top10Animes.week}
+                  month={data.top10Animes.month}
+                />
 
-            {/* Most Popular */}
-            <AnimeGrid
-              animes={data.mostPopularAnimes.slice(0, 6)}
-              title="Most Popular"
-              icon={<Heart className="w-5 h-5 text-destructive fill-destructive" />}
-            />
-   {!isNative && (
-              <div className="mt-24">
-                <AppDownloadSection />
+                {/* Join Discord */}
+                <div className="mb-24">
+                  <DiscordSection />
+                </div>
+
+                <CuratedAnimeSections homeData={data} />
+
+                {/* Most Popular */}
+                <AnimeGrid
+                  animes={data.mostPopularAnimes.slice(0, 6)}
+                  title="Most Popular"
+                  icon={<Heart className="w-5 h-5 text-destructive fill-destructive" />}
+                />
+
+                {!isNative && (
+                  <div className="mt-24">
+                    <AppDownloadSection />
+                  </div>
+                )}
+
+                {/* Genre Cloud */}
+                <GenreCloud genres={data.genres} />
+
+                {/* Trending Forum Discussions */}
+                <TrendingForumSection />
+
+                {/* Watch Together Rooms */}
+                <WatchRoomSection />
+
+                {/* Most Favorite */}
+                <AnimeGrid
+                  animes={data.mostFavoriteAnimes.slice(0, 6)}
+                  title="Most Favorite"
+                  icon={<Sparkles className="w-5 h-5 text-amber" />}
+                />
+
+                {/* Infinite Scrolling Genre Sections */}
+                {showInfiniteEarly && <MobileInfiniteHomeSections />}
+                {!showInfiniteEarly && <InfiniteHomeSections />}
+
+                <ReviewPopup />
+              </>
+            ) : (
+              <div className="mt-12 space-y-6" aria-hidden>
+                <div className="h-28 rounded-2xl bg-white/5 animate-pulse" />
+                <div className="h-52 rounded-2xl bg-white/5 animate-pulse" />
               </div>
-            )} <br />  <br />
-            {/* Genre Cloud */}
-            <GenreCloud genres={data.genres} />
-
-            {/* Trending Forum Discussions */}
-            <TrendingForumSection />
-
-            {/* Watch Together Rooms */}
-            <WatchRoomSection />
-
-
-            {/* Most Favorite */}
-            <AnimeGrid
-              animes={data.mostFavoriteAnimes.slice(0, 6)}
-              title="Most Favorite"
-              icon={<Sparkles className="w-5 h-5 text-amber" />}
-            />
-            {/* Infinite Scrolling Genre Sections */}
-
-            {showInfiniteEarly && <MobileInfiniteHomeSections />}
-            {!showInfiniteEarly && <InfiniteHomeSections />}
-
-         
-
-            <ReviewPopup />
+            )}
           </>
         ) : null}
       </main>

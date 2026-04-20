@@ -71,6 +71,45 @@ function getSubtitleSelectionKey(subtitle: { lang: string; url: string; label?: 
   return `${subtitle.lang === 'custom' ? 'custom' : 'sub'}:${baseKey}`;
 }
 
+function normalizeSubtitleToVtt(rawText: string): string {
+  const text = String(rawText || '');
+  const trimmed = text.trim();
+  if (!trimmed) return '';
+
+  if (trimmed.startsWith('WEBVTT')) {
+    return text;
+  }
+
+  if (/^<!doctype html/i.test(trimmed) || /^<html/i.test(trimmed)) {
+    return '';
+  }
+
+  if (trimmed.includes('-->')) {
+    const withNormalizedTimestamps = text.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
+    return withNormalizedTimestamps.includes('WEBVTT')
+      ? withNormalizedTimestamps
+      : `WEBVTT\n\n${withNormalizedTimestamps}`;
+  }
+
+  return `WEBVTT\n\n00:00:00.000 --> 99:59:59.000\n${text}`;
+}
+
+function buildSubtitleFetchCandidates(subtitleUrl: string, referer?: string, offline?: boolean): string[] {
+  const candidates: string[] = [];
+  const addCandidate = (value?: string) => {
+    const normalized = String(value || '').trim();
+    if (!normalized) return;
+    if (!candidates.includes(normalized)) candidates.push(normalized);
+  };
+
+  addCandidate(subtitleUrl);
+  if (!offline) {
+    addCandidate(getProxiedSubtitleUrl(subtitleUrl, referer));
+  }
+
+  return candidates;
+}
+
 function parseQualityScore(quality?: string): number | null {
   const normalized = String(quality || '').toLowerCase();
   const match = normalized.match(/(\d{3,4})\s*p?/);
@@ -456,29 +495,87 @@ export function MobileVideoPlayer({
 
   // Load subtitles
   useEffect(() => {
+    if (!subtitles.length) {
+      setSubtitleBlobs({});
+      return;
+    }
+
+    let mounted = true;
+    const createdBlobUrls: string[] = [];
+
     const loadSubtitles = async () => {
       const blobs: Record<string, string> = {};
+
       for (let i = 0; i < subtitles.length; i += 1) {
         const sub = subtitles[i];
         const subtitleKey = getSubtitleSelectionKey(sub, i);
+        const subtitleSourceUrl = String(sub.url || '').trim();
+        if (!subtitleSourceUrl) continue;
+
+        if (subtitleSourceUrl.startsWith('asset://') || subtitleSourceUrl.includes('asset.localhost')) {
+          blobs[subtitleKey] = subtitleSourceUrl;
+          continue;
+        }
+
         try {
-          const url = !isOffline && headers?.Referer
-            ? getProxiedSubtitleUrl(sub.url, headers.Referer)
-            : sub.url;
-          const response = await fetch(url);
-          const text = await response.text();
-          const blob = new Blob([text], { type: 'text/vtt' });
-          blobs[subtitleKey] = URL.createObjectURL(blob);
+          const candidates = buildSubtitleFetchCandidates(
+            subtitleSourceUrl,
+            playbackReferer,
+            Boolean(isOffline)
+          );
+
+          let normalizedText = '';
+          for (const candidateUrl of candidates) {
+            try {
+              const response = await fetch(candidateUrl, {
+                headers: {
+                  Accept: 'text/vtt, text/plain, */*',
+                },
+                signal: AbortSignal.timeout(10000),
+              });
+
+              if (!response.ok) {
+                continue;
+              }
+
+              normalizedText = normalizeSubtitleToVtt(await response.text());
+              if (normalizedText) {
+                break;
+              }
+            } catch {
+              // Try next subtitle URL candidate.
+            }
+          }
+
+          if (!normalizedText) {
+            console.warn('Failed to load subtitle:', sub.lang, subtitleSourceUrl);
+            continue;
+          }
+
+          const blob = new Blob([normalizedText], { type: 'text/vtt' });
+          const blobUrl = URL.createObjectURL(blob);
+          createdBlobUrls.push(blobUrl);
+          blobs[subtitleKey] = blobUrl;
         } catch (e) {
           console.warn('Failed to load subtitle:', sub.lang, e);
         }
       }
-      setSubtitleBlobs(blobs);
+
+      if (mounted) {
+        setSubtitleBlobs(blobs);
+      }
     };
-    if (subtitles.length > 0) {
-      loadSubtitles();
-    }
-  }, [subtitles, headers, isOffline]);
+
+    setSubtitleBlobs({});
+    loadSubtitles();
+
+    return () => {
+      mounted = false;
+      createdBlobUrls.forEach((blobUrl) => {
+        URL.revokeObjectURL(blobUrl);
+      });
+    };
+  }, [subtitles, playbackReferer, isOffline]);
 
   useEffect(() => {
     if (!subtitles.length || currentSubtitle === 'off') return;
@@ -888,16 +985,18 @@ export function MobileVideoPlayer({
         {/* Subtitles */}
         {subtitles.map((sub, idx) => {
           const subtitleKey = getSubtitleSelectionKey(sub, idx);
-          const proxiedSubtitleUrl = !isOffline && headers?.Referer
-            ? getProxiedSubtitleUrl(sub.url, headers.Referer)
-            : sub.url;
+          const subtitleSourceUrl = String(sub.url || '').trim();
+          if (!subtitleSourceUrl) return null;
+          const proxiedSubtitleUrl = !isOffline
+            ? getProxiedSubtitleUrl(subtitleSourceUrl, playbackReferer)
+            : subtitleSourceUrl;
           return (
           <track
             key={subtitleKey}
             kind="subtitles"
             label={sub.label || sub.lang}
             srcLang={sub.lang}
-            src={subtitleBlobs[subtitleKey] || proxiedSubtitleUrl || ''}
+            src={subtitleBlobs[subtitleKey] || proxiedSubtitleUrl || subtitleSourceUrl}
             default={subtitleKey === currentSubtitle}
           />
         )})}

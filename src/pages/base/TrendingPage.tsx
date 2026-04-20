@@ -8,7 +8,7 @@ import { fetchHome, TrendingAnime as ApiTrendingAnime, AnimeCard } from "@/lib/a
 import { fetchAniListDiscover, fetchAniListMediaById, AniListMedia } from "@/lib/externalIntegrations";
 import { Flame, TrendingUp, Clock, Sparkles, Heart } from "lucide-react";
 import { Sparkline } from '@/components/ui/Sparkline';
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -65,6 +65,9 @@ function TrendingHero({ anime, rank, views }: { anime: AnimeCard; rank: number; 
           src={anime.poster}
           className="w-full h-full object-cover scale-105 group-hover:scale-100 transition-transform duration-1000"
           alt={anime.name}
+          loading="eager"
+          decoding="async"
+          fetchPriority="high"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-background via-background/60 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
@@ -125,28 +128,48 @@ function TrendingHero({ anime, rank, views }: { anime: AnimeCard; rank: number; 
 
 export default function TrendingPage() {
   const [timeFrame, setTimeFrame] = useState<TimeFrame>('week');
+  const [showExtendedDiscover, setShowExtendedDiscover] = useState(false);
 
   // Use improved trending RPC with timeframe
   const { data: internalTrending, isLoading: loadingInternal } = useTrendingAnime(50, timeFrame);
 
   // Fallback to API trending
   const { data: homepageData, isLoading: loadingHomepage } = useQuery({
-    queryKey: ['homepage'],
+    queryKey: ['home'],
     queryFn: fetchHome,
-    staleTime: 300000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    retry: false,
   });
 
   const { data: aniListTrending = [], isLoading: loadingAniListTrending } = useQuery({
     queryKey: ['anilist-trending-page'],
     queryFn: () => fetchAniListDiscover({ perPage: 18, sort: 'TRENDING_DESC' }),
+    enabled: showExtendedDiscover,
     staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
 
   const { data: aniListFavorites = [], isLoading: loadingAniListFavorites } = useQuery({
     queryKey: ['anilist-favorites-page'],
     queryFn: () => fetchAniListDiscover({ perPage: 18, sort: 'FAVOURITES_DESC' }),
+    enabled: showExtendedDiscover,
     staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
+
+  useEffect(() => {
+    if (loadingInternal || loadingHomepage) {
+      setShowExtendedDiscover(false);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setShowExtendedDiscover(true);
+    }, 350);
+
+    return () => window.clearTimeout(timer);
+  }, [loadingInternal, loadingHomepage, timeFrame]);
 
   const isLoading = loadingInternal || loadingHomepage;
 
@@ -474,7 +497,7 @@ export default function TrendingPage() {
                     <TrendingUp className="w-5 h-5 text-sky-400" />
                     <h2 className="text-xl md:text-2xl font-bold">Global Trending Pulse</h2>
                   </div>
-                  {loadingAniListTrending ? (
+                  {!showExtendedDiscover || loadingAniListTrending ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                       {Array.from({ length: 6 }).map((_, idx) => (
                         <Skeleton key={`anilist-trending-skeleton-${idx}`} className="aspect-[3/4] rounded-xl" />
@@ -502,7 +525,7 @@ export default function TrendingPage() {
                     <Heart className="w-5 h-5 text-pink-400" />
                     <h2 className="text-xl md:text-2xl font-bold">Fan Favorites</h2>
                   </div>
-                  {loadingAniListFavorites ? (
+                  {!showExtendedDiscover || loadingAniListFavorites ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                       {Array.from({ length: 6 }).map((_, idx) => (
                         <Skeleton key={`anilist-fav-skeleton-${idx}`} className="aspect-[3/4] rounded-xl" />

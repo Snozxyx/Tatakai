@@ -18,22 +18,73 @@ function getSessionId(): string {
   return sessionId;
 }
 
+const VISITOR_INFO_CACHE_KEY = 'tatakai_visitor_info_cache_v1';
+const VISITOR_INFO_TTL_MS = 30 * 60 * 1000;
+
+function getCachedVisitorInfo(): { ip?: string; country?: string; city?: string } | null {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const raw = sessionStorage.getItem(VISITOR_INFO_CACHE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as {
+      timestamp?: number;
+      data?: { ip?: string; country?: string; city?: string };
+    };
+
+    if (!parsed?.timestamp || !parsed?.data) return null;
+    if (Date.now() - parsed.timestamp > VISITOR_INFO_TTL_MS) return null;
+    return parsed.data;
+  } catch {
+    return null;
+  }
+}
+
+function setCachedVisitorInfo(data: { ip?: string; country?: string; city?: string }) {
+  if (typeof window === 'undefined') return;
+
+  try {
+    sessionStorage.setItem(
+      VISITOR_INFO_CACHE_KEY,
+      JSON.stringify({ timestamp: Date.now(), data })
+    );
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
 // Fetch visitor info (country, IP via external API)
 async function fetchVisitorInfo(): Promise<{ ip?: string; country?: string; city?: string }> {
   // Skip if offline
   if (!isOnline()) return {};
+
+  const cached = getCachedVisitorInfo();
+  if (cached) return cached;
   
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 1500);
+
   try {
-    const res = await fetch('https://ipapi.co/json/', { cache: 'force-cache' });
+    const res = await fetch('https://ipapi.co/json/', {
+      cache: 'force-cache',
+      signal: controller.signal,
+    });
     if (!res.ok) return {};
+
     const data = await res.json();
-    return {
+    const visitorInfo = {
       ip: data.ip,
       country: data.country_name,
       city: data.city,
     };
+
+    setCachedVisitorInfo(visitorInfo);
+    return visitorInfo;
   } catch {
     return {};
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -57,7 +108,9 @@ export async function trackPageVisit(pagePath: string, userId?: string): Promise
       referrer: document.referrer || null,
     });
   } catch (error) {
-    console.error('Failed to track page visit:', error);
+    if (import.meta.env.DEV) {
+      console.warn('Failed to track page visit:', error);
+    }
   }
 }
 
@@ -91,7 +144,9 @@ export async function startWatchSession(
     if (error) throw error;
     return data?.id || null;
   } catch (error) {
-    console.error('Failed to start watch session:', error);
+    if (import.meta.env.DEV) {
+      console.warn('Failed to start watch session:', error);
+    }
     return null;
   }
 }
@@ -113,16 +168,20 @@ export async function updateWatchSession(
       })
       .eq('id', watchSessionId);
   } catch (error) {
-    console.error('Failed to update watch session:', error);
+    if (import.meta.env.DEV) {
+      console.warn('Failed to update watch session:', error);
+    }
   }
 }
 
 // Hook to track page visits on navigation
-export function usePageTracking() {
+export function usePageTracking(enabled: boolean = true) {
   const { user } = useAuth();
   const lastPath = useRef<string>('');
 
   useEffect(() => {
+    if (!enabled || typeof window === 'undefined') return;
+
     const trackCurrentPage = () => {
       const currentPath = window.location.pathname;
 
@@ -136,24 +195,48 @@ export function usePageTracking() {
       }
     };
 
-    // Track initial page
-    trackCurrentPage();
+    const locationChangeEvent = 'tatakai:location-change';
+
+    const originalPushState = window.history.pushState;
+    const originalReplaceState = window.history.replaceState;
+
+    window.history.pushState = function (...args) {
+      const result = originalPushState.apply(this, args as [data: any, unused: string, url?: string | URL | null]);
+      window.dispatchEvent(new Event(locationChangeEvent));
+      return result;
+    };
+
+    window.history.replaceState = function (...args) {
+      const result = originalReplaceState.apply(this, args as [data: any, unused: string, url?: string | URL | null]);
+      window.dispatchEvent(new Event(locationChangeEvent));
+      return result;
+    };
+
+    let initialTrackTimeout: ReturnType<typeof setTimeout> | null = null;
+    let initialIdleHandle: number | null = null;
+
+    if ('requestIdleCallback' in window) {
+      initialIdleHandle = (window as any).requestIdleCallback(trackCurrentPage, { timeout: 1200 });
+    } else {
+      initialTrackTimeout = setTimeout(trackCurrentPage, 450);
+    }
 
     // Listen for popstate (browser back/forward)
     window.addEventListener('popstate', trackCurrentPage);
-
-    // Create a MutationObserver to detect URL changes (for SPA navigation)
-    const observer = new MutationObserver(() => {
-      trackCurrentPage();
-    });
-
-    observer.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener(locationChangeEvent, trackCurrentPage);
 
     return () => {
+      if (initialTrackTimeout !== null) clearTimeout(initialTrackTimeout);
+      if (initialIdleHandle !== null && 'cancelIdleCallback' in window) {
+        (window as any).cancelIdleCallback(initialIdleHandle);
+      }
+
       window.removeEventListener('popstate', trackCurrentPage);
-      observer.disconnect();
+      window.removeEventListener(locationChangeEvent, trackCurrentPage);
+      window.history.pushState = originalPushState;
+      window.history.replaceState = originalReplaceState;
     };
-  }, [user?.id]);
+  }, [user?.id, enabled]);
 }
 
 // Hook to track watch time

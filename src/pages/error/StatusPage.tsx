@@ -73,11 +73,6 @@ const KNOWN_PROXY_NODES: KnownProxyNode[] = [
     url: 'https://hoko.tatakai.me/api/v1/streamingProxy',
     type: 'nodejs',
   },
-  {
-    id: 'proxy-cf-moko',
-    url: 'https://moko.tatakai.me/api/v1/streamingProxy',
-    type: 'cf',
-  },
 ];
 
 function resolveProxyStatusEndpoint(apiBaseUrl: string, explicitBackendOrigin?: string): string {
@@ -240,7 +235,7 @@ export default function StatusPage() {
 
   const classifyProxyType = (url: string) => {
     const lower = (url || '').toLowerCase();
-    if (lower.includes('workers.dev') || lower.includes('cloudflare') || lower.includes('kira.tatakai.me') || lower.includes('moko.tatakai.me')) return 'cf';
+    if (lower.includes('workers.dev') || lower.includes('cloudflare') || lower.includes('kira.tatakai.me')) return 'cf';
     if (lower.includes('hoko.tatakai.me')) return 'nodejs';
     if (lower.includes('bun')) return 'bun';
     return 'nodejs';
@@ -308,14 +303,7 @@ export default function StatusPage() {
       // Fall back to direct node probes below.
     }
 
-    const backendHasHoko = mappedFromBackend.some((node) =>
-      String(node.url || '').toLowerCase().includes('hoko.tatakai.me')
-    );
-    const backendHasMoko = mappedFromBackend.some((node) =>
-      String(node.url || '').toLowerCase().includes('moko.tatakai.me')
-    );
-
-    if (mappedFromBackend.length > 0 && backendHasHoko && backendHasMoko) {
+    if (mappedFromBackend.length > 0) {
       setProxies(mappedFromBackend);
       return mappedFromBackend;
     }

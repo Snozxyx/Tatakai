@@ -46,6 +46,9 @@ function CollectionsHero({ anime, title }: { anime: AnimeCard; title: string }) 
           src={getProxiedImageUrl(anime.poster)}
           className="w-full h-full object-cover scale-105 group-hover:scale-100 transition-transform duration-1000 brightness-75"
           alt={anime.name}
+          loading="eager"
+          decoding="async"
+          fetchPriority="high"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-background via-background/40 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent opacity-80" />

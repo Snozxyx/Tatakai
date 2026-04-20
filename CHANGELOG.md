@@ -4,6 +4,29 @@ All notable changes to Tatakai are documented here.
 
 ---
 
+## [5.2.0] - 2026-04-20
+
+### Added
+- **Draft Recovery** — Added draft autosave/restore flows for tierlist and playlist editors, including stale-draft cleanup and safer debounce behavior
+- **Source Host Priority (Goku/Koro)** — Added stream host ranking to prefer `vod.netmagcdn.com:2228` before `watching.onl` variants for JustAnime/Goku paths
+- **Extended Changelog Coverage** — Expanded in-app release coverage for the new startup, proxy, and playback reliability work
+
+### Changed
+- **Homepage Startup Orchestration** — Deferred non-critical homepage sections and startup listeners to improve first meaningful paint
+- **Auth/Session Bootstrap** — Added fail-fast timeouts and deferred heartbeat/page-tracking startup to reduce initial request bursts
+- **Search Throughput** — Delayed secondary result streams (manga/character) when needed and tightened query enablement logic
+- **Proxy Balancer Reliability** — Added retry/backoff tuning, no-repeat proxy attempts per cycle, and in-flight deduplication for API proxy requests
+- **Subtitle Loading** — Normalized subtitle payloads to VTT and improved fallback candidate fetching in both desktop and mobile players
+- **Preview Video Stability** — Hardened anime card and trending hover previews with better ID fallback, source selection, and retry behavior
+
+### Fixed
+- **Anime Card Preview Playback** — Fixed non-HLS preview sources not attaching to the video element
+- **Trending Preview Failures** — Removed strict fast-mode fallback failures that blocked preview loading
+- **Watch Source Ordering** — Prioritized NetMag CDN host selection for JustAnime/Goku in watch-time source resolution
+- **Moko Proxy Residual Paths** — Removed legacy Moko references from active proxy candidate paths and status assumptions
+
+---
+
 ## [5.0.1] - 2026-04-18
 
 ### Added

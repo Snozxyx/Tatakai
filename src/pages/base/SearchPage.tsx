@@ -97,8 +97,15 @@ export default function SearchPage() {
   const [aniListSort, setAniListSort] = useState<string>('POPULARITY_DESC');
   const [aniListGenresText, setAniListGenresText] = useState<string>('');
   const [showAdvancedAssist, setShowAdvancedAssist] = useState(false);
+  const [enableSecondaryResultStreams, setEnableSecondaryResultStreams] = useState(false);
   const shouldSearchAnime = resultType === 'all' || resultType === 'anime';
-  const shouldSearchManga = resultType === 'all' || resultType === 'manga';
+  const shouldSearchManga = (resultType === 'all' || resultType === 'manga') && !isProducerRoute;
+  const shouldSearchCharacters = (resultType === 'all' || resultType === 'character') && !isProducerRoute;
+  const shouldDelaySecondaryStreams = resultType === 'all' && query.length > 0 && !isProducerRoute;
+  const shouldEnableMangaSearch =
+    shouldSearchManga && (!shouldDelaySecondaryStreams || enableSecondaryResultStreams);
+  const shouldEnableCharacterSearch =
+    shouldSearchCharacters && (!shouldDelaySecondaryStreams || enableSecondaryResultStreams);
   const { settings: contentSafetySettings } = useContentSafetySettings();
   const explicitMangaQuery = useMemo(() => isExplicitMangaSearchQuery(query), [query]);
 
@@ -390,7 +397,7 @@ export default function SearchPage() {
     hasNextPage: hasNextMangaPage,
     isFetchingNextPage: isFetchingNextMangaPage,
     isLoading: isLoadingManga
-  } = useInfiniteMangaSearch(query, 20, shouldSearchManga, mangaSearchOptions);
+  } = useInfiniteMangaSearch(query, 20, shouldEnableMangaSearch, mangaSearchOptions);
 
   const observer = useRef<IntersectionObserver>();
   const loadMoreLockRef = useRef(false);
@@ -513,7 +520,7 @@ export default function SearchPage() {
   const { data: characterSearch, isLoading: loadingCharacters } = useQuery({
     queryKey: ['character-search', query, page],
     queryFn: () => searchCharacters(query, page, 12),
-    enabled: query.length > 1,
+    enabled: shouldEnableCharacterSearch && query.length > 1,
     staleTime: 2 * 60 * 1000,
     retry: false,
     refetchOnWindowFocus: false,
@@ -842,6 +849,20 @@ export default function SearchPage() {
   }, [queryParam]);
 
   useEffect(() => {
+    if (!shouldDelaySecondaryStreams) {
+      setEnableSecondaryResultStreams(true);
+      return;
+    }
+
+    setEnableSecondaryResultStreams(false);
+    const timer = window.setTimeout(() => {
+      setEnableSecondaryResultStreams(true);
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [query, resultType, shouldDelaySecondaryStreams]);
+
+  useEffect(() => {
     if (decodedProducerName) {
       setResultType('anime');
     }
@@ -893,8 +914,8 @@ export default function SearchPage() {
   };
 
   const showAnimeResults = (resultType === 'all' || resultType === 'anime') && query.length > 0;
-  const showMangaResults = resultType === 'all' || resultType === 'manga';
-  const showCharacterResults = (resultType === 'all' || resultType === 'character') && query.length > 1;
+  const showMangaResults = shouldSearchManga;
+  const showCharacterResults = shouldEnableCharacterSearch && query.length > 1;
   const isQuerylessMangaMode = showMangaResults && mangaSearchMode !== 'search';
   const hasSearchContext = query.length > 0 || isQuerylessMangaMode;
   const hasMoreResults =
@@ -998,7 +1019,7 @@ export default function SearchPage() {
                   )}
                   {` • ${filteredAnimeResults.length} anime`}
                   {` • ${filteredMangaResults.length} manga`}
-                  {query.length > 1 && ` • ${characterResults.length} characters`}
+                  {showCharacterResults && ` • ${characterResults.length} characters`}
                   {activeFilterCount > 0 && ` • ${activeFilterCount} active filters`}
                   {!contentSafetySettings.showAdultEverywhere &&
                     ` • mature results ${(explicitMangaQuery || mangaAdultFilter || query.trim().length > 0) ? 'blurred' : 'hidden'}`}

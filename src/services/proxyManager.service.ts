@@ -30,9 +30,17 @@ function isLoopbackProxyUrl(url: string): boolean {
   }
 }
 
+function isMokoProxyUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return /(^|\.)moko\.tatakai\.me$/i.test(parsed.hostname);
+  } catch {
+    return /(^|\.)moko\.tatakai\.me/i.test(url);
+  }
+}
+
 const DEFAULT_STREAM_PROXY_PATH = '/api/v1/streamingProxy';
 const DEFAULT_NODE_PROXY_LOADER = 'https://hoko.tatakai.me/api/v1/streamingProxy';
-const DEFAULT_CF_PROXY_LOADER = 'https://moko.tatakai.me/api/v1/streamingProxy';
 const LEGACY_STREAM_PROXY_PATHS = [
   '/api/v2/hianime/proxy/m3u8-streaming-proxy',
   '/api/proxy/m3u8-streaming-proxy',
@@ -41,6 +49,18 @@ const LEGACY_STREAM_PROXY_PATHS = [
 const STREAM_PROXY_PASSWORD = String(
   import.meta.env.VITE_STREAM_PROXY_PASSWORD || import.meta.env.VITE_PROXY_PASSWORD || ''
 ).trim();
+const PROXY_FETCH_TIMEOUT_MS = {
+  api: Math.max(2500, Math.min(Number.parseInt(String(import.meta.env.VITE_PROXY_API_TIMEOUT_MS || '7000'), 10) || 7000, 20000)),
+  m3u8: Math.max(4000, Math.min(Number.parseInt(String(import.meta.env.VITE_PROXY_M3U8_TIMEOUT_MS || '10000'), 10) || 10000, 30000)),
+} as const;
+const PROXY_MAX_RETRIES = Math.max(1, Math.min(Number.parseInt(String(import.meta.env.VITE_PROXY_MAX_RETRIES || '2'), 10) || 2, 5));
+const PROXY_RETRY_DELAY_BASE_MS = Math.max(75, Math.min(Number.parseInt(String(import.meta.env.VITE_PROXY_RETRY_DELAY_BASE_MS || '180'), 10) || 180, 1500));
+const ENABLE_PROXY_INFLIGHT_DEDUPE =
+  String(import.meta.env.VITE_PROXY_INFLIGHT_DEDUPE ?? 'true').toLowerCase() !== 'false';
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
 
 function createNode(id: string, url: string, type: ProxyNode['type'], weight: number): ProxyNode {
   return {
@@ -57,7 +77,7 @@ function createNode(id: string, url: string, type: ProxyNode['type'], weight: nu
 
 function buildProxyPool(): ProxyNode[] {
   const fromTypedEnv: ProxyNode[] = [];
-  const cfUrl = normalizeUrl(import.meta.env.VITE_PROXY_CF_URL) || DEFAULT_CF_PROXY_LOADER;
+  const cfUrl = normalizeUrl(import.meta.env.VITE_PROXY_CF_URL);
   const nodeUrl = normalizeUrl(import.meta.env.VITE_PROXY_NODE_URL) || DEFAULT_NODE_PROXY_LOADER;
   const bunUrl = normalizeUrl(import.meta.env.VITE_PROXY_BUN_URL);
   const configuredDevProxyUrl = String(import.meta.env.VITE_PROXY_DEV_URL || '').trim();
@@ -66,15 +86,15 @@ function buildProxyPool(): ProxyNode[] {
     : normalizeUrl(configuredDevProxyUrl);
 
   // Hoko should always be the primary proxy when available.
-  if (nodeUrl) fromTypedEnv.push(createNode('proxy-node-1', nodeUrl, 'nodejs', 10));
-  if (cfUrl) fromTypedEnv.push(createNode('proxy-cf-1', cfUrl, 'cf', 6));
-  if (bunUrl) fromTypedEnv.push(createNode('proxy-bun-1', bunUrl, 'bun', 6));
-  if (devUrl) fromTypedEnv.push(createNode('proxy-dev-1', devUrl, 'nodejs', 9));
+  if (nodeUrl && !isMokoProxyUrl(nodeUrl)) fromTypedEnv.push(createNode('proxy-node-1', nodeUrl, 'nodejs', 10));
+  if (cfUrl && !isMokoProxyUrl(cfUrl)) fromTypedEnv.push(createNode('proxy-cf-1', cfUrl, 'cf', 6));
+  if (bunUrl && !isMokoProxyUrl(bunUrl)) fromTypedEnv.push(createNode('proxy-bun-1', bunUrl, 'bun', 6));
+  if (devUrl && !isMokoProxyUrl(devUrl)) fromTypedEnv.push(createNode('proxy-dev-1', devUrl, 'nodejs', 9));
 
   const fromPoolEnvRaw = (import.meta.env.VITE_PROXY_POOL_URLS || '')
     .split(',')
     .map((entry: string) => normalizeUrl(entry))
-    .filter((entry: string | null): entry is string => !!entry);
+    .filter((entry: string | null): entry is string => !!entry && !isMokoProxyUrl(entry));
 
   const dynamicPool = fromPoolEnvRaw.map((url, index) => {
     const lower = url.toLowerCase();
@@ -113,6 +133,7 @@ const PROXY_POOL: ProxyNode[] = buildProxyPool();
 class ProxyManager {
   private pool: ProxyNode[] = [...PROXY_POOL];
   private currentIndex: number = -1;
+  private inflightRequests: Map<string, Promise<Response>> = new Map();
 
   public getPoolStats() {
     return this.pool;
@@ -131,8 +152,8 @@ class ProxyManager {
   /**
    * Gets the best available proxy using a weighted round-robin or latency-based approach.
    */
-  public getOptimalProxy(): ProxyNode | null {
-    const available = this.pool.filter(p => p.status !== 'offline');
+  public getOptimalProxy(excludedProxyIds: Set<string> = new Set()): ProxyNode | null {
+    const available = this.pool.filter((proxy) => proxy.status !== 'offline' && !excludedProxyIds.has(proxy.id));
     if (available.length === 0) return null;
 
     const preferredHoko = available.find((proxy) => proxy.url.toLowerCase().includes('hoko.tatakai.me'));
@@ -188,36 +209,73 @@ class ProxyManager {
     proxy.lastChecked = Date.now();
   }
 
-  /**
-   * Executes a fetch request using the proxy balancer.
-   */
-  public async fetchProxied(targetUrl: string, options?: RequestInit, proxyType: 'api' | 'm3u8' = 'api', referer?: string): Promise<Response> {
-    const maxRetries = 2; // Try up to 2 different proxies
+  private shouldDedupeRequest(
+    options?: RequestInit,
+    proxyType: 'api' | 'm3u8' = 'api'
+  ): boolean {
+    if (!ENABLE_PROXY_INFLIGHT_DEDUPE) return false;
+    if (proxyType !== 'api') return false;
+
+    const method = String(options?.method || 'GET').toUpperCase();
+    if (method !== 'GET' && method !== 'HEAD') return false;
+    if (options?.body != null) return false;
+
+    return true;
+  }
+
+  private buildInflightKey(
+    targetUrl: string,
+    proxyType: 'api' | 'm3u8',
+    referer?: string,
+    options?: RequestInit
+  ): string {
+    const method = String(options?.method || 'GET').toUpperCase();
+    return `${proxyType}|${method}|${targetUrl}|${String(referer || '')}`;
+  }
+
+  private cloneResponseForCaller(response: Response): Response {
+    try {
+      return response.clone();
+    } catch {
+      return response;
+    }
+  }
+
+  private async executeFetchWithBalancer(
+    targetUrl: string,
+    options?: RequestInit,
+    proxyType: 'api' | 'm3u8' = 'api',
+    referer?: string
+  ): Promise<Response> {
+    const maxAttempts = Math.max(1, Math.min(PROXY_MAX_RETRIES, this.pool.length || 1));
+    const attemptedProxyIds = new Set<string>();
     let lastError: any;
 
-    for (let attempts = 0; attempts < maxRetries; attempts++) {
-      const proxy = this.getOptimalProxy();
+    for (let attempts = 0; attempts < maxAttempts; attempts++) {
+      const proxy = this.getOptimalProxy(attemptedProxyIds);
       if (!proxy) {
-        throw new Error('No online proxies available in the pool.');
+        break;
       }
+
+      attemptedProxyIds.add(proxy.id);
 
       const start = performance.now();
       try {
-        let fetchUrl = '';
         const headers: Record<string, string> = {
-          'Accept': 'application/json',
+          'Accept': proxyType === 'api' ? 'application/json' : '*/*',
           ...(options?.headers as Record<string, string> || {})
         };
 
         // Standard transparent proxy format (Bun, Node, CF)
-        // E.g., https://cf-proxy.com/?url=xyz&referer=abc
+        // E.g., https://proxy.example.com/?url=xyz&referer=abc
         const proxyParams = new URLSearchParams({ url: targetUrl, type: proxyType });
         if (referer) proxyParams.set('referer', referer);
         if (STREAM_PROXY_PASSWORD) proxyParams.set('password', STREAM_PROXY_PASSWORD);
-        fetchUrl = `${proxy.url}?${proxyParams.toString()}`;
+        const fetchUrl = `${proxy.url}?${proxyParams.toString()}`;
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout
+        const timeoutMs = PROXY_FETCH_TIMEOUT_MS[proxyType];
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
         const response = await fetch(fetchUrl, {
           ...options,
@@ -228,10 +286,12 @@ class ProxyManager {
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-          const latency = performance.now() - start;
           this.reportFailure(proxy.id, response.status);
           lastError = new Error(`Proxy ${proxy.id} failed with status: ${response.status}`);
-          continue; // Try next proxy
+          if (attempts < maxAttempts - 1) {
+            await sleep(PROXY_RETRY_DELAY_BASE_MS * (attempts + 1));
+          }
+          continue;
         }
 
         const latency = performance.now() - start;
@@ -241,10 +301,40 @@ class ProxyManager {
       } catch (err: any) {
         this.reportFailure(proxy.id, 0); // 0 means network error / timeout
         lastError = err;
+        if (attempts < maxAttempts - 1) {
+          await sleep(PROXY_RETRY_DELAY_BASE_MS * (attempts + 1));
+        }
       }
     }
 
     throw lastError || new Error('All proxy attempts failed');
+  }
+
+  /**
+   * Executes a fetch request using the proxy balancer.
+   */
+  public async fetchProxied(targetUrl: string, options?: RequestInit, proxyType: 'api' | 'm3u8' = 'api', referer?: string): Promise<Response> {
+    const shouldDedupe = this.shouldDedupeRequest(options, proxyType);
+    if (!shouldDedupe) {
+      return this.executeFetchWithBalancer(targetUrl, options, proxyType, referer);
+    }
+
+    const inflightKey = this.buildInflightKey(targetUrl, proxyType, referer, options);
+    const existing = this.inflightRequests.get(inflightKey);
+    if (existing) {
+      const sharedResponse = await existing;
+      return this.cloneResponseForCaller(sharedResponse);
+    }
+
+    const pendingRequest = this.executeFetchWithBalancer(targetUrl, options, proxyType, referer);
+    this.inflightRequests.set(inflightKey, pendingRequest);
+
+    try {
+      const response = await pendingRequest;
+      return this.cloneResponseForCaller(response);
+    } finally {
+      this.inflightRequests.delete(inflightKey);
+    }
   }
 }
 

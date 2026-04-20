@@ -2,13 +2,21 @@ import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
-export function useActiveSession() {
+export function useActiveSession(enabled: boolean = true) {
     const { user } = useAuth();
     const heartbeatInterval = useRef<any>(null);
 
     useEffect(() => {
+        if (!enabled) return;
+
+        let cancelled = false;
+
         const sendHeartbeat = async () => {
             try {
+                if (cancelled) return;
+                if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+                if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+
                 if (user) {
                     // Update authenticated user last_seen
                     await supabase
@@ -35,14 +43,19 @@ export function useActiveSession() {
             }
         };
 
-        // Initial heartbeat
-        sendHeartbeat();
-
-        // Start interval (every 90 seconds to stay under rate limits)
-        heartbeatInterval.current = setInterval(sendHeartbeat, 90000);
+        const initialDelayMs = user ? 3000 : 10000;
+        const initialTimer = setTimeout(() => {
+            void sendHeartbeat();
+            // Keep periodic updates, but avoid a startup network burst.
+            heartbeatInterval.current = setInterval(() => {
+                void sendHeartbeat();
+            }, 120000);
+        }, initialDelayMs);
 
         return () => {
+            cancelled = true;
+            clearTimeout(initialTimer);
             if (heartbeatInterval.current) clearInterval(heartbeatInterval.current);
         };
-    }, [user]);
+    }, [user, enabled]);
 }

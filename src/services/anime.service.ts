@@ -10,6 +10,59 @@ import type {
 
 const JUSTANIME_PROXY_BASE = String(import.meta.env.VITE_JUSTANIME_PROXY_BASE || `${TATAKAI_API_URL}/justanime`).replace(/\/+$/, "");
 
+function extractUpstreamHost(rawUrl?: string): string {
+  let candidate = String(rawUrl || "").trim();
+  if (!candidate) return "";
+
+  for (let depth = 0; depth < 3; depth += 1) {
+    try {
+      const parsed = new URL(candidate, "https://tatakai.local");
+      const nested = parsed.searchParams.get("url");
+      if (nested) {
+        try {
+          const decoded = decodeURIComponent(nested);
+          if (decoded && decoded !== candidate) {
+            candidate = decoded;
+            continue;
+          }
+        } catch {
+          if (nested && nested !== candidate) {
+            candidate = nested;
+            continue;
+          }
+        }
+      }
+
+      return String(parsed.host || "").toLowerCase();
+    } catch {
+      break;
+    }
+  }
+
+  return "";
+}
+
+function getPreferredGokuHostScore(rawUrl?: string): number {
+  const host = extractUpstreamHost(rawUrl);
+  if (!host) return 0;
+
+  if (host === "vod.netmagcdn.com:2228") return 600;
+  if (host.startsWith("vod.netmagcdn.com")) return 560;
+  if (host.includes("netmagcdn.com")) return 520;
+  if (host.includes("watching.onl")) return -520;
+  return 0;
+}
+
+function shouldPrioritizeGokuHosts(providerKey: string, fallbackServer: string): boolean {
+  const context = `${String(providerKey || "")} ${String(fallbackServer || "")}`.toLowerCase();
+  return (
+    context.includes("justanime") ||
+    context.includes("koro") ||
+    context.includes("goku") ||
+    context.includes("hd-1")
+  );
+}
+
 export async function fetchAnimeInfo(
   animeId: string
 ): Promise<{ anime: AnimeInfo; recommendedAnimes: AnimeCard[]; relatedAnimes: AnimeCard[] }> {
@@ -355,7 +408,20 @@ export async function fetchStreamingSources(
     const streamingLinks = results?.streamingLink || [];
     if (!Array.isArray(streamingLinks) || streamingLinks.length === 0) return null;
 
-    const parsedSources = streamingLinks
+    const prioritizeGokuHosts = shouldPrioritizeGokuHosts(providerKey, fallbackServer);
+    const orderedStreamingLinks = prioritizeGokuHosts
+      ? [...streamingLinks].sort((left: any, right: any) => {
+          const leftScore = getPreferredGokuHostScore(left?.link || left?.file);
+          const rightScore = getPreferredGokuHostScore(right?.link || right?.file);
+          if (leftScore !== rightScore) return rightScore - leftScore;
+
+          const leftIsM3u8 = Number(String(left?.type || "").toLowerCase() === "hls" || String(left?.link || left?.file || "").includes(".m3u8"));
+          const rightIsM3u8 = Number(String(right?.type || "").toLowerCase() === "hls" || String(right?.link || right?.file || "").includes(".m3u8"));
+          return rightIsM3u8 - leftIsM3u8;
+        })
+      : streamingLinks;
+
+    const parsedSources = orderedStreamingLinks
       .map((sLink: any) => ({
         url: sLink.link || sLink.file,
         type: sLink.type,

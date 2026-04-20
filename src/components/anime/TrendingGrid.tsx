@@ -41,6 +41,12 @@ function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: s
     malId: (anime as any)?.malId ?? (anime as any)?.malID ?? (anime as any)?.mal_id,
     anilistId: (anime as any)?.anilistId ?? (anime as any)?.anilistID ?? (anime as any)?.anilist_id,
   });
+  const previewAnimeId = routeAnimeId || String(anime.id || "").trim();
+  const previewAniListId =
+    (anime as any)?.anilistId ??
+    (anime as any)?.anilistID ??
+    (anime as any)?.anilist_id ??
+    null;
   const [isHovering, setIsHovering] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isPreviewM3U8, setIsPreviewM3U8] = useState(false);
@@ -51,19 +57,19 @@ function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: s
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!routeAnimeId) return;
+    if (!previewAnimeId) return;
 
-    const cached = trendingPreviewCache.get(routeAnimeId);
+    const cached = trendingPreviewCache.get(previewAnimeId);
     if (!cached) return;
 
     if (Date.now() - cached.cachedAt > TRENDING_PREVIEW_CACHE_TTL) {
-      trendingPreviewCache.delete(routeAnimeId);
+      trendingPreviewCache.delete(previewAnimeId);
       return;
     }
 
     setPreviewUrl(cached.url);
     setIsPreviewM3U8(cached.isM3U8);
-  }, [routeAnimeId]);
+  }, [previewAnimeId]);
 
   // Cleanup HLS on unmount
   useEffect(() => {
@@ -76,20 +82,20 @@ function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: s
   }, []);
 
   useEffect(() => {
-    if (!routeAnimeId) {
+    if (!previewAnimeId) {
       setPreviewError(true);
       return;
     }
 
-    if (!isHovering || previewUrl || previewError) return;
+    if (!isHovering || previewUrl) return;
 
     hoverTimeoutRef.current = setTimeout(async () => {
       setIsLoading(true);
+      setPreviewError(false);
       try {
-        const episodes = await fetchEpisodes(routeAnimeId, {
+        const episodes = await fetchEpisodes(previewAnimeId, {
           preferDirect: true,
           timeoutMs: 3800,
-          skipProxyFallback: true,
         });
         if (episodes.episodes.length > 0) {
           // Pick a random episode for preview
@@ -97,11 +103,6 @@ function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: s
           const previewEpisodeId = String(randomEpisode?.episodeId || "").includes("?ep=")
             ? String(randomEpisode?.episodeId || "")
             : `${randomEpisode?.episodeId}?ep=${randomEpisode?.number || 1}`;
-          const previewAniListId =
-            (anime as any)?.anilistId ??
-            (anime as any)?.anilistID ??
-            (anime as any)?.anilist_id ??
-            null;
           let sources: Awaited<ReturnType<typeof fetchStreamingSources>> | null = null;
           const preferredServers = ["justanime", "hd-1", "hd-2", "hd-3"];
           for (const server of preferredServers) {
@@ -121,7 +122,11 @@ function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: s
           }
 
           if (sources?.sources?.length) {
-            const source = sources.sources[0];
+            const source = sources.sources.find((entry) => typeof entry?.url === "string" && entry.url.trim()) || null;
+            if (!source) {
+              setPreviewError(true);
+              return;
+            }
             const proxiedUrl = getProxiedVideoUrl(
               source.url,
               sources.headers?.Referer,
@@ -130,7 +135,7 @@ function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: s
             );
             setPreviewUrl(proxiedUrl);
             setIsPreviewM3U8(Boolean(source.isM3U8));
-            trendingPreviewCache.set(routeAnimeId, {
+            trendingPreviewCache.set(previewAnimeId, {
               url: proxiedUrl,
               isM3U8: Boolean(source.isM3U8),
               cachedAt: Date.now(),
@@ -149,7 +154,7 @@ function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: s
     return () => {
       if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     };
-  }, [isHovering, routeAnimeId, previewUrl, previewError]);
+  }, [isHovering, previewAnimeId, previewUrl, anime.name, previewAniListId]);
 
   useEffect(() => {
     if (!previewUrl || !videoRef.current) return;
@@ -219,13 +224,20 @@ function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: s
         }
         navigate(`/search?q=${encodeURIComponent(anime.name)}`);
       }}
-      onMouseEnter={() => setIsHovering(true)}
+      onMouseEnter={() => {
+        setIsHovering(true);
+        if (previewError && !previewUrl) {
+          setPreviewError(false);
+        }
+      }}
       onMouseLeave={() => setIsHovering(false)}
       className={`relative group rounded-3xl overflow-hidden cursor-pointer ${spanClass} border border-border/30 min-h-[200px] md:min-h-0`}
     >
       <img 
         src={getTrendingPoster(anime.poster)} 
         alt={anime.name} 
+        loading="lazy"
+        decoding="async"
         className={`w-full h-full object-cover transition-all duration-700 ${
           isHovering && previewUrl ? 'opacity-0' : 'group-hover:scale-110'
         }`}

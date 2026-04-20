@@ -57,6 +57,7 @@ export function AnimeCardWithPreview({ anime, showPreview = true, disableClick =
     anilistID: (anime as any)?.anilistID,
     anilist_id: (anime as any)?.anilist_id,
   });
+  const previewAnimeId = routeAnimeId || String(anime.id || "").trim();
 
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -163,9 +164,9 @@ export function AnimeCardWithPreview({ anime, showPreview = true, disableClick =
 
   const loadPreview = useCallback(async () => {
 
-    if (previewUrl || previewError) return;
+    if (previewUrl) return;
 
-    if (!routeAnimeId) {
+    if (!previewAnimeId) {
       setPreviewError(true);
       return;
     }
@@ -173,12 +174,12 @@ export function AnimeCardWithPreview({ anime, showPreview = true, disableClick =
 
 
     setIsLoadingPreview(true);
+    setPreviewError(false);
 
     try {
-      const episodes = await fetchEpisodes(routeAnimeId, {
+      const episodes = await fetchEpisodes(previewAnimeId, {
         preferDirect: true,
         timeoutMs: 4200,
-        skipProxyFallback: true,
       });
 
       if (episodes?.episodes?.length > 0) {
@@ -209,7 +210,11 @@ export function AnimeCardWithPreview({ anime, showPreview = true, disableClick =
 
         if (sources?.sources?.length > 0) {
 
-          const source = sources.sources[0];
+          const source = sources.sources.find((entry) => typeof entry?.url === "string" && entry.url.trim()) || null;
+          if (!source) {
+            setPreviewError(true);
+            return;
+          }
 
           const proxiedUrl = getProxiedVideoUrl(
             source.url,
@@ -222,9 +227,8 @@ export function AnimeCardWithPreview({ anime, showPreview = true, disableClick =
 
 
 
-          // Use HLS.js for m3u8 streams
-
-          if (source.isM3U8 && Hls.isSupported() && videoRef.current) {
+          // Use HLS.js for m3u8 streams when available; otherwise assign the source directly.
+          if (videoRef.current && source.isM3U8 && Hls.isSupported()) {
 
             if (hlsRef.current) {
 
@@ -318,6 +322,23 @@ export function AnimeCardWithPreview({ anime, showPreview = true, disableClick =
 
             hlsRef.current = hls;
 
+          } else if (videoRef.current && source.isM3U8 && videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
+            if (hlsRef.current) {
+              hlsRef.current.destroy();
+              hlsRef.current = null;
+            }
+            videoRef.current.src = proxiedUrl;
+            videoRef.current.load();
+          } else if (videoRef.current && !source.isM3U8) {
+            if (hlsRef.current) {
+              hlsRef.current.destroy();
+              hlsRef.current = null;
+            }
+            videoRef.current.src = proxiedUrl;
+            videoRef.current.load();
+          } else {
+            setPreviewError(true);
+
           }
 
         }
@@ -326,7 +347,7 @@ export function AnimeCardWithPreview({ anime, showPreview = true, disableClick =
 
     } catch (error) {
 
-      console.log("Preview not available for:", routeAnimeId);
+      console.log("Preview not available for:", previewAnimeId);
 
       setPreviewError(true);
 
@@ -336,7 +357,7 @@ export function AnimeCardWithPreview({ anime, showPreview = true, disableClick =
 
     }
 
-  }, [routeAnimeId, previewUrl, previewError]);
+  }, [previewAnimeId, previewUrl, anime.name, anime.anilistId]);
 
 
 
@@ -392,6 +413,10 @@ export function AnimeCardWithPreview({ anime, showPreview = true, disableClick =
 
       if (isHovering && previewUrl) {
 
+        if (hlsRef.current) {
+          hlsRef.current.startLoad(-1);
+        }
+
         videoRef.current.play().catch(() => { });
 
       } else {
@@ -431,7 +456,12 @@ export function AnimeCardWithPreview({ anime, showPreview = true, disableClick =
         navigate(`/search?q=${encodeURIComponent(anime.name)}`);
       }}
 
-      onMouseEnter={() => setIsHovering(true)}
+      onMouseEnter={() => {
+        setIsHovering(true);
+        if (previewError && !previewUrl) {
+          setPreviewError(false);
+        }
+      }}
 
       onMouseLeave={() => setIsHovering(false)}
 
@@ -461,7 +491,7 @@ export function AnimeCardWithPreview({ anime, showPreview = true, disableClick =
 
 
 
-        {/* Video Preview - do not set src, HLS.js handles it via attachMedia */}
+        {/* Video Preview */}
 
         {showPreview && (
 

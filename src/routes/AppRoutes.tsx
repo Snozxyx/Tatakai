@@ -214,7 +214,7 @@ function DevtoolsRouteEnforcer() {
 }
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isBanned, isAdmin, isLoading } = useAuth();
+  const { user, isBanned, isAdmin, isLoading } = useAuth();
   const { isMaintenanceMode } = useMaintenanceMode();
   const location = useLocation();
 
@@ -224,8 +224,20 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isBannedAllowedPath = bannedAllowedPaths.some(path => location.pathname.startsWith(path));
   const publicPaths = ['/banned', '/maintenance', '/auth', '/error', '/setup'];
   const isPublicPath = publicPaths.some(path => location.pathname.startsWith(path));
+  const strictLoadingPaths = [
+    '/admin',
+    '/onboarding',
+    '/setup',
+    '/integration/mal/redirect',
+    '/integration/anilist/redirect',
+  ];
+  const requiresStrictBootstrap = strictLoadingPaths.some((path) =>
+    location.pathname.startsWith(path)
+  );
+  const shouldWaitForMaintenanceRoleResolution = isLoading && !!user && isMaintenanceMode;
 
-  if (isLoading) return <PageLoader />;
+  if (requiresStrictBootstrap && isLoading) return <PageLoader />;
+  if (shouldWaitForMaintenanceRoleResolution) return <PageLoader />;
   if (isBanned && !isBannedAllowedPath) return <Navigate to="/banned" replace />;
   if (isMaintenanceMode && !isAdmin && !isPublicPath) return <Navigate to="/maintenance" replace />;
 

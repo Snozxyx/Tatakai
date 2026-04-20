@@ -96,6 +96,59 @@ function parseQualityRank(value?: string): number {
   return 360;
 }
 
+function extractSourceHost(rawUrl?: string): string {
+  let candidate = String(rawUrl || "").trim();
+  if (!candidate) return "";
+
+  for (let depth = 0; depth < 3; depth += 1) {
+    try {
+      const parsed = new URL(candidate, "https://tatakai.local");
+      const nested = parsed.searchParams.get("url");
+      if (nested) {
+        try {
+          const decoded = decodeURIComponent(nested);
+          if (decoded && decoded !== candidate) {
+            candidate = decoded;
+            continue;
+          }
+        } catch {
+          if (nested && nested !== candidate) {
+            candidate = nested;
+            continue;
+          }
+        }
+      }
+
+      return String(parsed.host || "").toLowerCase();
+    } catch {
+      break;
+    }
+  }
+
+  return "";
+}
+
+function getPreferredHostScore(rawUrl?: string): number {
+  const host = extractSourceHost(rawUrl);
+  if (!host) return 0;
+
+  if (host === "vod.netmagcdn.com:2228") return 600;
+  if (host.startsWith("vod.netmagcdn.com")) return 560;
+  if (host.includes("netmagcdn.com")) return 520;
+  if (host.includes("watching.onl")) return -520;
+  return 0;
+}
+
+function shouldPrioritizeNetmagHost(serverName: string, providerLabel?: string): boolean {
+  const context = `${String(serverName || "")} ${String(providerLabel || "")}`.toLowerCase();
+  return (
+    context.includes("justanime") ||
+    context.includes("koro") ||
+    context.includes("goku") ||
+    context.includes("hd-1")
+  );
+}
+
 function providerQualityKey(providerName: string, category: "sub" | "dub") {
   return `${category}:${providerName.toLowerCase()}`;
 }
@@ -299,9 +352,15 @@ export function selectSourceForServer(sources: StreamingSource[], serverName: st
   const inferredCategory: "sub" | "dub" = category || (pool[0].isDub ? "dub" : "sub");
   const providerLabel = pool[0].providerName || pool[0].providerKey || serverName;
   const rankedByQuality = rankSourcesByPreferredQuality(pool, providerLabel, inferredCategory);
+  const prioritizeNetmag = shouldPrioritizeNetmagHost(serverName, providerLabel);
 
   return rankedByQuality
     .sort((a, b) => {
+      if (prioritizeNetmag) {
+        const hostDiff = getPreferredHostScore(b.url) - getPreferredHostScore(a.url);
+        if (hostDiff !== 0) return hostDiff;
+      }
+
       const aScore = Number(!!a.isM3U8) + Number(a.isDub === true);
       const bScore = Number(!!b.isM3U8) + Number(b.isDub === true);
       return bScore - aScore;

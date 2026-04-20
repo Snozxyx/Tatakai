@@ -27,6 +27,7 @@ export function useHomeData() {
   return useQuery({
     queryKey: ["home"],
     queryFn: fetchHome,
+    retry: false,
     staleTime: STALE_TIME.home,
     gcTime: isMobileNative ? 60 * 60 * 1000 : 30 * 60 * 1000, // 1 hour cache on mobile
   });

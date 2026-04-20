@@ -86,7 +86,6 @@ function readProxyQuerySnapshot(candidateUrl: string): { streamUrl?: string; ref
 }
 
 const REMOTE_NODE_STREAM_PROXY = 'https://hoko.tatakai.me/api/v1/streamingProxy';
-const REMOTE_CF_STREAM_PROXY = 'https://moko.tatakai.me/api/v1/streamingProxy';
 const DEFAULT_STREAM_PROXY_PATH = '/api/v1/streamingProxy';
 const LEGACY_STREAM_PROXY_PATHS = [
   '/api/v2/hianime/proxy/m3u8-streaming-proxy',
@@ -102,6 +101,15 @@ function isLoopbackProxyUrl(value: string): boolean {
     return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
   } catch {
     return false;
+  }
+}
+
+function isMokoProxyUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return /(^|\.)moko\.tatakai\.me$/i.test(parsed.hostname);
+  } catch {
+    return /(^|\.)moko\.tatakai\.me/i.test(value);
   }
 }
 
@@ -125,11 +133,11 @@ function buildProxyBaseCandidates(): string[] {
   const add = (value?: string) => {
     const normalized = String(value || '').trim().replace(/\/$/, '');
     if (!normalized) return;
+    if (isMokoProxyUrl(normalized)) return;
     if (!candidates.includes(normalized)) candidates.push(normalized);
   };
 
   add(resolveSingleStreamProxyBase());
-  add(REMOTE_CF_STREAM_PROXY);
 
   if (typeof window !== 'undefined') {
     add(`${window.location.origin}${DEFAULT_STREAM_PROXY_PATH}`);
@@ -232,6 +240,45 @@ function buildProxyCandidateUrls(
 function getSubtitleSelectionKey(subtitle: { lang: string; url: string; label?: string }, index: number): string {
   const baseKey = subtitle.url || subtitle.label || subtitle.lang || `subtitle-${index}`;
   return `${subtitle.lang === 'custom' ? 'custom' : 'sub'}:${baseKey}`;
+}
+
+function normalizeSubtitleToVtt(rawText: string): string {
+  const text = String(rawText || '');
+  const trimmed = text.trim();
+  if (!trimmed) return '';
+
+  if (trimmed.startsWith('WEBVTT')) {
+    return text;
+  }
+
+  if (/^<!doctype html/i.test(trimmed) || /^<html/i.test(trimmed)) {
+    return '';
+  }
+
+  if (trimmed.includes('-->')) {
+    const withNormalizedTimestamps = text.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
+    return withNormalizedTimestamps.includes('WEBVTT')
+      ? withNormalizedTimestamps
+      : `WEBVTT\n\n${withNormalizedTimestamps}`;
+  }
+
+  return `WEBVTT\n\n00:00:00.000 --> 99:59:59.000\n${text}`;
+}
+
+function buildSubtitleFetchCandidates(subtitleUrl: string, referer?: string, offline?: boolean): string[] {
+  const candidates: string[] = [];
+  const addCandidate = (value?: string) => {
+    const normalized = String(value || '').trim();
+    if (!normalized) return;
+    if (!candidates.includes(normalized)) candidates.push(normalized);
+  };
+
+  addCandidate(subtitleUrl);
+  if (!offline) {
+    addCandidate(getProxiedSubtitleUrl(subtitleUrl, referer));
+  }
+
+  return candidates;
 }
 
 function toTrackLanguageCode(lang?: string): string {
@@ -767,9 +814,10 @@ export function VideoPlayer({
 
 
 
-  // Create a key from subtitle URLs to detect changes
-
-  const subtitleKey = subtitles?.map(s => s.url).join('|') ?? '';
+  // Create a key from subtitle metadata to detect source changes.
+  const subtitleKey = subtitles
+    ?.map((s) => `${String(s.url || '').trim()}|${String(s.lang || '').trim()}|${String(s.label || '').trim()}`)
+    .join('|') ?? '';
   const subtitleReferer = headers?.Referer || '';
   const subtitleUserAgent = headers?.["User-Agent"] || '';
   const playbackReferer = headers?.Referer || '';
@@ -777,9 +825,9 @@ export function VideoPlayer({
 
 
 
-  // Prefetch subtitles to ensure CORS and headers are applied correctly
+  // Prefetch subtitles and normalize to VTT so track loading is deterministic.
 
-  // Also clear old blobs when subtitles change (e.g., switching between sub/dub)
+  // Also clear old blobs when subtitles change (e.g., switching between sub/dub).
 
   useEffect(() => {
 
@@ -796,6 +844,7 @@ export function VideoPlayer({
 
 
     let mounted = true;
+    const createdBlobUrls: string[] = [];
 
 
 
@@ -807,100 +856,62 @@ export function VideoPlayer({
 
     (async () => {
 
-      const apikey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-      const newBlobs: Record<string, string> = {};
-
-
 
       for (const sub of subtitles) {
 
         if (!mounted) break;
 
         try {
+          const subtitleSourceUrl = String(sub.url || '').trim();
+          if (!subtitleSourceUrl) continue;
+
           // Check if local asset
-          const isLocalSub = sub.url.startsWith('asset://') || sub.url.includes('asset.localhost');
+          const isLocalSub = subtitleSourceUrl.startsWith('asset://') || subtitleSourceUrl.includes('asset.localhost');
 
           if (isLocalSub) {
-            if (mounted) setSubtitleBlobs(prev => ({ ...prev, [sub.url]: sub.url }));
+            if (mounted) setSubtitleBlobs(prev => ({ ...prev, [subtitleSourceUrl]: subtitleSourceUrl }));
             continue;
           }
 
-          const proxiedSubtitleUrl = !isOffline
-            ? getProxiedSubtitleUrl(sub.url, headers?.Referer)
-            : sub.url;
+          const fetchCandidates = buildSubtitleFetchCandidates(
+            subtitleSourceUrl,
+            subtitleReferer,
+            Boolean(isOffline)
+          );
 
-          let res = await fetch(proxiedSubtitleUrl, {
+          let normalizedText = '';
+          for (const candidateUrl of fetchCandidates) {
+            try {
+              const response = await fetch(candidateUrl, {
+                headers: {
+                  Accept: 'text/vtt, text/plain, */*',
+                },
+                signal: AbortSignal.timeout(10000),
+              });
 
-            headers: {
-
-              Accept: 'text/vtt, text/plain, */*',
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-              'Referer': 'https://megacloud.blog/',
-              'Origin': 'https://megacloud.blog'
-
-            }
-
-          });
-
-          if (!res.ok && proxiedSubtitleUrl !== sub.url) {
-            res = await fetch(sub.url, {
-              headers: {
-                Accept: 'text/vtt, text/plain, */*'
+              if (!response.ok) {
+                continue;
               }
-            });
+
+              normalizedText = normalizeSubtitleToVtt(await response.text());
+              if (normalizedText) {
+                break;
+              }
+            } catch {
+              // Continue trying the next candidate URL.
+            }
           }
 
-          if (res.ok) {
-
-            let text = await res.text();
-
-
-
-            // Basic SRT to VTT conversion
-
-            if (!text.trim().startsWith('WEBVTT')) {
-
-              console.log('[VideoPlayer] Normalizing subtitle format for:', sub.lang);
-
-              // If it has SRT timestamps (00:00:00,000)
-
-              if (text.includes('-->')) {
-
-                // Convert commas to dots for timestamps
-
-                text = text.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
-
-                // Ensure WEBVTT header
-
-                if (!text.includes('WEBVTT')) {
-
-                  text = 'WEBVTT\n\n' + text;
-
-                }
-
-              } else {
-
-                // Try to wrap raw text as a single cue if it's completely broken but has content
-
-                text = 'WEBVTT\n\n00:00:00.000 --> 99:59:59.000\n' + text;
-
-              }
-
-            }
-
-
-
-            const blob = new Blob([text], { type: 'text/vtt' });
-
+          if (normalizedText) {
+            const blob = new Blob([normalizedText], { type: 'text/vtt' });
             const blobUrl = URL.createObjectURL(blob);
+            createdBlobUrls.push(blobUrl);
 
-            if (mounted) setSubtitleBlobs(prev => ({ ...prev, [sub.url]: blobUrl }));
-
+            if (mounted) {
+              setSubtitleBlobs((prev) => ({ ...prev, [subtitleSourceUrl]: blobUrl }));
+            }
           } else {
-
-            console.warn('Failed to fetch subtitle via proxy:', sub.lang, res.status);
-
+            console.warn('Failed to fetch subtitle:', sub.lang, subtitleSourceUrl);
           }
 
         } catch (e) {
@@ -919,9 +930,13 @@ export function VideoPlayer({
 
       mounted = false;
 
+      createdBlobUrls.forEach((blobUrl) => {
+        URL.revokeObjectURL(blobUrl);
+      });
+
     };
 
-  }, [subtitleKey, subtitleReferer, subtitleUserAgent]);
+  }, [subtitleKey, subtitleReferer, subtitleUserAgent, isOffline]);
 
 
 
@@ -2560,11 +2575,17 @@ export function VideoPlayer({
 
         {[...subtitles, ...customSubtitles].map((sub, idx) => {
           const subtitleKey = getSubtitleSelectionKey(sub, idx);
-          const blobUrl = subtitleBlobs[sub.url];
+          const subtitleSourceUrl = String(sub.url || '').trim();
+          if (!subtitleSourceUrl) return null;
+          const blobUrl = subtitleBlobs[subtitleSourceUrl];
           // For custom subs, the URL is already local/user-selected.
           // For provider subs, prefer prefetched blob, then proxy URL, then original URL.
-          const proxiedUrl = !isOffline ? getProxiedSubtitleUrl(sub.url, headers?.Referer) : sub.url;
-          const src = sub.lang === 'custom' ? sub.url : (blobUrl || proxiedUrl || sub.url);
+          const proxiedUrl = !isOffline
+            ? getProxiedSubtitleUrl(subtitleSourceUrl, subtitleReferer)
+            : subtitleSourceUrl;
+          const src = sub.lang === 'custom'
+            ? subtitleSourceUrl
+            : (blobUrl || proxiedUrl || subtitleSourceUrl);
 
           return (
             <track

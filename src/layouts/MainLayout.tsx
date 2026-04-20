@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { cn } from "@/lib/utils";
@@ -42,8 +42,9 @@ const getDevModeEnabled = (): boolean => {
 
 const MainLayout = ({ children }: { children: React.ReactNode }) => {
   useTheme();
-  usePageTracking();
-  useActiveSession();
+  const [deferredStartupReady, setDeferredStartupReady] = useState(false);
+  usePageTracking(deferredStartupReady);
+  useActiveSession(deferredStartupReady);
   
   const clientId = useClientId();
   useEffect(() => {
@@ -57,6 +58,33 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
   const isMobile = useIsMobile();
   const isMobileApp = Capacitor.isNativePlatform();
   const isDevtoolsBlockedPage = location.pathname.startsWith('/devtools-blocked');
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    let timeoutId: number | null = null;
+    let idleId: number | null = null;
+    let settled = false;
+
+    const markReady = () => {
+      if (settled) return;
+      settled = true;
+      setDeferredStartupReady(true);
+    };
+
+    if ('requestIdleCallback' in window) {
+      idleId = (window as any).requestIdleCallback(markReady, { timeout: 1800 });
+    }
+
+    timeoutId = window.setTimeout(markReady, 1500);
+
+    return () => {
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
+      if (idleId !== null && 'cancelIdleCallback' in window) {
+        (window as any).cancelIdleCallback(idleId);
+      }
+    };
+  }, []);
 
   const hideSidebarPages = ['/auth', '/onboarding', '/setup', '/maintenance', '/banned', '/error', '/devtools-blocked', '/smarttv', '/manga/read'];
   const isHiddenPage = hideSidebarPages.some(page => location.pathname.startsWith(page));
@@ -96,7 +124,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
             {showSidebar && <Sidebar />}
             <V5AnnouncementPopup />
             <GlobalListeners />
-            <PopupDisplay />
+            {deferredStartupReady && <PopupDisplay />}
             <ReduceMotionPrompt />
             <DownloadIndicator />
             <LogViewer />

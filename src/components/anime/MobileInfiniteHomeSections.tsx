@@ -40,7 +40,8 @@ function MobileCard({ anime }: { anime: any }) {
             src={getHighQualityPoster(anime.poster || '', anime.anilistId)}
             alt={anime.name || 'Anime'}
             className="h-full w-full object-cover"
-            loading="eager"
+            loading="lazy"
+            decoding="async"
             onError={(event) => {
               const image = event.currentTarget;
               if (image.dataset.fallbackStage === 'placeholder') return;

@@ -17,7 +17,11 @@ export interface AnimeSearchFilters {
 
 // Home Service
 export async function fetchHome(): Promise<HomeData> {
-  return apiGet<HomeData>("/home");
+  return apiGet<HomeData>("/home", {
+    retries: 1,
+    timeoutMs: 10000,
+    retryDelayBaseMs: 250,
+  });
 }
 
 // Search Service

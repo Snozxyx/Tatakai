@@ -53,6 +53,7 @@ const SECTION_CONFIGS: Array<{
 
 const DESKTOP_SECTION_BATCH_SIZE = 4;
 const MOBILE_SECTION_BATCH_SIZE = 3;
+const MAX_CONCURRENT_SECTION_REQUESTS = 2;
 
 const ANILIST_GENRE_ALIASES: Record<string, string> = {
   'sci-fi': 'Sci-Fi',
@@ -110,6 +111,35 @@ function shuffleConfigs<T>(items: T[]): T[] {
     arr[j] = temp;
   }
   return arr;
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  maxConcurrency: number,
+  mapper: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  if (items.length === 0) return [];
+
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+
+  const worker = async () => {
+    while (true) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+
+      if (currentIndex >= items.length) {
+        return;
+      }
+
+      results[currentIndex] = await mapper(items[currentIndex], currentIndex);
+    }
+  };
+
+  const workerCount = Math.min(Math.max(maxConcurrency, 1), items.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+
+  return results;
 }
 
 const SHUFFLED_SECTION_CONFIGS = shuffleConfigs(SECTION_CONFIGS);
@@ -171,9 +201,11 @@ export function useInfiniteHomeSections() {
       if (configs.length === 0) {
         return { sections: [], nextPage: null };
       }
-      
-      const sections = await Promise.all(
-        configs.map((config, index) => fetchGenreSection(config, startIndex + index + 1))
+
+      const sections = await mapWithConcurrency(
+        configs,
+        MAX_CONCURRENT_SECTION_REQUESTS,
+        (config, index) => fetchGenreSection(config, startIndex + index + 1)
       );
       let validSections = sections.filter(s => s.animes.length > 0);
 
@@ -186,10 +218,10 @@ export function useInfiniteHomeSections() {
           .slice(0, 2);
 
         if (rescueConfigs.length > 0) {
-          const rescueSections = await Promise.all(
-            rescueConfigs.map((config, index) =>
-              fetchGenreSection(config, startIndex + sectionBatchSize + index + 1)
-            )
+          const rescueSections = await mapWithConcurrency(
+            rescueConfigs,
+            MAX_CONCURRENT_SECTION_REQUESTS,
+            (config, index) => fetchGenreSection(config, startIndex + sectionBatchSize + index + 1)
           );
           validSections = rescueSections.filter((section) => section.animes.length > 0);
         }
@@ -202,6 +234,7 @@ export function useInfiniteHomeSections() {
     },
     getNextPageParam: (lastPage) => lastPage.nextPage,
     initialPageParam: 0,
+    retry: 1,
     staleTime: 10 * 60 * 1000, // 10 minutes
   });
 }

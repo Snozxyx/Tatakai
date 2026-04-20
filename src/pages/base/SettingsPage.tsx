@@ -106,6 +106,19 @@ const normalizePreferredMangaLanguage = (value: unknown): PreferredMangaLanguage
 
 const FALLBACK_CHANGELOG = [
   {
+    version: '5.2.0',
+    date: '2026-04-20',
+    changes: [
+      'Source Host Priority: JustAnime/Goku stream selection now prefers vod.netmagcdn.com:2228 before watching.onl variants',
+      'Preview Playback Stability: Fixed anime card/trending preview edge cases for non-HLS sources and retry behavior',
+      'Homepage Startup Optimization: Deferred non-critical sections and startup listeners to improve first paint responsiveness',
+      'Proxy Reliability Upgrade: Added bounded retries, no-repeat proxy attempts, and in-flight dedupe for proxy requests',
+      'Subtitle Robustness: Added subtitle normalization-to-VTT and improved fetch fallbacks for desktop and mobile players',
+      'Editor Draft Recovery: Added autosave/restore for tierlist and playlist editing with stale draft cleanup',
+      'Auth/Session Bootstrap: Added fail-fast timeouts and reduced startup background request pressure',
+    ],
+  },
+  {
     version: '5.0.1',
     date: '2026-04-18',
     changes: [
