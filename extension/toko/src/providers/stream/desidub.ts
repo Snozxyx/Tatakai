@@ -90,7 +90,7 @@ async function findSources(titles: string[], epNumber: number): Promise<SourceRe
           headers: { Referer: `${BASE_URL}/`, 'User-Agent': UA },
           subtitles: [],
           audioLanguage: isDub ? 'Hindi/Dub' : 'Japanese/Sub',
-          sourceType: isHls ? 'hls' : (finalUrl.includes('.mp4') ? 'mp4' : 'embed'),
+          sourceType: isHls ? 'hls' : (finalUrl.includes('.mp4') ? 'mp4' : 'custom'),
         });
       });
 

@@ -168,7 +168,7 @@ async function extractMp4UploadSources(watchUrl: string, episode: number): Promi
           quality: normalizeQuality(''),
           headers: HEADERS,
           subtitles: [],
-          sourceType: 'embed' as any, // Will need resolution
+          sourceType: 'custom', // Embed URL — may need player-side resolution
         });
       }
     });

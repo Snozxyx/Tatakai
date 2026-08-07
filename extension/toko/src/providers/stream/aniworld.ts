@@ -1,3 +1,14 @@
+/**
+ * AniWorld — scraper adapter (https://aniworld.to)
+ *
+ * German-language anime site. Series live at
+ *   /anime/stream/{slug}/staffel-{season}/episode-{episode}
+ * and expose hoster links as `/redirect/{id}` buttons (VOE, Doodstream,
+ * Filemoon, Vidmoly, …). The `/redirect/{id}` URL 302-redirects to the hoster
+ * embed page; we then pull an m3u8/master playlist out of it.
+ *
+ * Search is a POST to `/ajax/search` with `keyword=<query>`.
+ */
 import { normalizeQuality, detectSourceType } from '../../utils/quality.js';
 import type { StreamProvider, SourceOptions, SourceResult } from '../../types.js';
 
@@ -32,71 +43,159 @@ async function search(query: string): Promise<AniWorldSearchItem[]> {
   }
 }
 
-interface AniWorldEpisode {
-  id: string;
-  number: number;
+interface EpisodeRef {
+  season: number;
+  episode: number;
   url: string;
 }
 
-async function findEpisodes(slug: string): Promise<AniWorldEpisode[]> {
-  try {
-    const res = await __tatakai_fetch__(`${BASE_URL}/anime/stream/${slug}`);
-    if (!res.ok) return [];
-    const html = await res.text();
-
-    const episodes: AniWorldEpisode[] = [];
-    const epRegex = /<tr[^>]*data-episode-id="(\d+)"[^>]*>.*?<meta itemprop="episodeNumber" content="(\d+)".*?<a itemprop="url" href="([^"]+)">/gs;
-    let match: RegExpExecArray | null;
-    while ((match = epRegex.exec(html)) !== null) {
-      episodes.push({
-        id: match[1],
-        number: parseInt(match[2]),
-        url: `${BASE_URL}${match[3]}`,
-      });
-    }
-    return episodes;
-  } catch {
-    return [];
+function buildEpisodeUrls(slug: string, season: number, episode: number): string[] {
+  // AniWorld uses German "staffel-N/episode-M". Try common structures.
+  const candidates: string[] = [];
+  for (const s of [season, 1]) {
+    candidates.push(`${BASE_URL}/anime/stream/${slug}/staffel-${s}/episode-${episode}`);
   }
+  candidates.push(`${BASE_URL}/anime/stream/${slug}/filme/episode-${episode}`);
+  candidates.push(`${BASE_URL}/anime/stream/${slug}/episode-${episode}`);
+  return candidates;
 }
 
-async function getRedirectUrl(episodeUrl: string): Promise<string | null> {
-  try {
-    const res = await __tatakai_fetch__(episodeUrl);
-    if (!res.ok) return null;
-    const html = await res.text();
+async function findEpisodePage(slug: string, epNumber: number): Promise<string | null> {
+  // Fetch the series page to discover seasons/episodes.
+  const seriesUrls = [
+    `${BASE_URL}/anime/stream/${slug}`,
+    `${BASE_URL}/anime/stream/${slug}/staffel-1`,
+  ];
+  for (const url of seriesUrls) {
+    try {
+      const res = await __tatakai_fetch__(url, { headers: { Referer: `${BASE_URL}/` } });
+      if (!res.ok) continue;
+      const html = await res.text();
 
-    // Priority: lang-key 3 (dub), 1 (sub), 2 — looking for VidMoly icon
-    const langPriority = ['3', '1', '2'];
-    const liBlocks = html.split(/<li/g);
+      // Direct link to the specific episode?
+      const exact = new RegExp(
+        `href="(/anime/stream/${slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/staffel-\\d+/episode-${epNumber})"`,
+      ).exec(html);
+      if (exact) return `${BASE_URL}${exact[1]}`;
+    } catch { /* try next */ }
+  }
+  // Fall back to constructed URLs — the first that returns 200 wins.
+  for (const candidate of buildEpisodeUrls(slug, 1, epNumber)) {
+    try {
+      const res = await __tatakai_fetch__(candidate, { method: 'HEAD', headers: { Referer: `${BASE_URL}/` } });
+      if (res.ok) return candidate;
+    } catch { /* keep trying */ }
+  }
+  return null;
+}
 
-    for (const key of langPriority) {
-      for (const block of liBlocks) {
-        if (block.includes(`data-lang-key="${key}"`) && block.toLowerCase().includes('icon vidmoly')) {
-          const urlMatch = block.match(/data-link-target="([^"]+)"/);
-          if (urlMatch) return `${BASE_URL}${urlMatch[1]}`;
-        }
+interface RedirectLink {
+  id: string;
+  hoster: string;
+}
+
+function extractRedirectLinks(html: string): RedirectLink[] {
+  const links: RedirectLink[] = [];
+  const seen = new Set<string>();
+
+  // Modern markup: <a href="/redirect/12345"> ... <strong>VOE</strong>
+  const pattern = /href="\/redirect\/(\d+)"[^>]*>[\s\S]*?<strong>\s*([^<]+?)\s*<\/strong>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(html)) !== null) {
+    const id = match[1];
+    const hoster = match[2].trim();
+    if (!seen.has(id)) {
+      seen.add(id);
+      links.push({ id, hoster });
+    }
+  }
+
+  // Fallback: plain /redirect/{id} anchors with hoster name in the link text.
+  if (links.length === 0) {
+    const simple = /href="\/redirect\/(\d+)"[^>]*>([\s\S]{0,80}?)<\/a>/gi;
+    while ((match = simple.exec(html)) !== null) {
+      const id = match[1];
+      const hoster = (match[2].replace(/<[^>]+>/g, '').trim() || 'unknown').split('\n')[0].trim();
+      if (!seen.has(id)) {
+        seen.add(id);
+        links.push({ id, hoster });
       }
     }
+  }
+
+  return links;
+}
+
+const HOSTER_PRIORITY = ['vidmoly', 'filemoon', 'voe', 'doodstream', 'dood', 'streamtape', 'vidoza'];
+
+function pickRedirect(links: RedirectLink[]): RedirectLink | null {
+  if (links.length === 0) return null;
+  const ranked = [...links].sort((a, b) => {
+    const score = (name: string) => {
+      const lower = name.toLowerCase();
+      const idx = HOSTER_PRIORITY.findIndex(h => lower.includes(h));
+      return idx === -1 ? HOSTER_PRIORITY.length : idx;
+    };
+    return score(a.hoster) - score(b.hoster);
+  });
+  return ranked[0];
+}
+
+async function followRedirect(id: string, referer: string): Promise<string | null> {
+  try {
+    const res = await __tatakai_fetch__(`${BASE_URL}/redirect/${id}`, {
+      // Do not follow redirects automatically; inspect the Location header.
+      redirect: 'manual' as any,
+      headers: { Referer: referer },
+    });
+    const loc = res.headers.get('location') || (res as any).headers.get('Location');
+    if (loc) {
+      return loc.startsWith('http') ? loc : `${BASE_URL}${loc}`;
+    }
+    // If the worker already followed the redirect, return the final URL.
+    if ((res as any).url && (res as any).url !== `${BASE_URL}/redirect/${id}`) {
+      return (res as any).url;
+    }
     return null;
   } catch {
     return null;
   }
 }
 
-async function extractM3u8(hosterUrl: string): Promise<string | null> {
+async function extractStreamFromHoster(hosterUrl: string, hosterName: string): Promise<string | null> {
   try {
-    const res = await __tatakai_fetch__(hosterUrl);
+    const origin = new URL(hosterUrl).origin;
+    const res = await __tatakai_fetch__(hosterUrl, {
+      headers: {
+        Referer: BASE_URL,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      },
+    });
     if (!res.ok) return null;
     const html = await res.text();
 
-    // Try explicit file: '...' pattern first (VidMoly pattern)
-    const fileMatch = html.match(/file\s*:\s*["'](https?:\/\/[^"']+\/master\.m3u8[^"']*)["']/);
-    if (fileMatch) return fileMatch[1];
+    // Master m3u8 (preferred)
+    const master = html.match(/["'](https?:\/\/[^"']+\/master\.m3u8[^"']*)["']/i)
+      || html.match(/["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/i);
+    if (master) return master[1];
 
-    // Fallback: any m3u8 URL
-    const m3u8Match = html.match(/["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/);
-    return m3u8Match ? m3u8Match[1] : null;
+    // Hoster-specific sources:
+    // - Vidmoly/Filemoon: sources: [{file:"...m3u8"}]
+    const sourcesMatch = html.match(/sources\s*:\s*\[([\s\S]*?)\]/);
+    if (sourcesMatch) {
+      const file = sourcesMatch[1].match(/file\s*:\s*["']([^"']+)["']/);
+      if (file?.[1]) return file[1];
+    }
+
+    // - VOE: meta redirect or `let/const source = "..."`
+    const voeMatch = html.match(/(?:source|file|hls)\s*[:=]\s*["']([^"']+\.m3u8[^"']*)["']/i);
+    if (voeMatch) return voeMatch[1];
+
+    // Doodstream: often passes a `/pass_md5/...` URL that yields an mp4.
+    const doodMatch = html.match(/\/pass_md5\/[a-z0-9\/]+/i);
+    if (doodMatch) return `${origin}${doodMatch[0]}`;
+
+    return null;
   } catch {
     return null;
   }
@@ -104,40 +203,57 @@ async function extractM3u8(hosterUrl: string): Promise<string | null> {
 
 const provider: StreamProvider = {
   name: 'aniworld',
+
   async single(opts: SourceOptions): Promise<SourceResult[]> {
+    const title = opts.titles[0] ?? '';
+    const targetEp = opts.episode ?? 1;
+
+    const searchResults = await search(title);
+    if (searchResults.length === 0) return [];
+
+    // link looks like "/anime/stream/{slug}"
+    const slugMatch = searchResults[0].link.match(/\/anime\/stream\/([^/?#]+)/);
+    if (!slugMatch) return [];
+    const slug = slugMatch[1];
+
+    const episodePage = await findEpisodePage(slug, targetEp);
+    if (!episodePage) return [];
+
+    let html: string;
     try {
-      const title = opts.titles[0] ?? '';
-      const targetEp = opts.episode ?? 1;
-
-      // 1. Search
-      const searchResults = await search(title);
-      if (searchResults.length === 0) return [];
-      const slug = searchResults[0].link.replace('/anime/stream/', '');
-
-      // 2. Get episode list
-      const episodes = await findEpisodes(slug);
-      if (episodes.length === 0) return [];
-      const episode = episodes.find(e => e.number === targetEp) ?? episodes[0];
-
-      // 3. Get server redirect URL from episode page
-      const redirectUrl = await getRedirectUrl(episode.url);
-      if (!redirectUrl) return [];
-
-      // 4. Extract m3u8 from hoster page
-      const m3u8Url = await extractM3u8(redirectUrl);
-      if (!m3u8Url) return [];
-
-      return [{
-        source: 'aniworld',
-        url: m3u8Url,
-        quality: normalizeQuality(''),
-        headers: { Referer: `${BASE_URL}/` },
-        subtitles: [],
-        sourceType: 'hls' as const,
-      }];
+      const res = await __tatakai_fetch__(episodePage, { headers: { Referer: `${BASE_URL}/` } });
+      if (!res.ok) return [];
+      html = await res.text();
     } catch {
       return [];
     }
+
+    const redirects = extractRedirectLinks(html);
+    if (redirects.length === 0) return [];
+
+    // Try each hoster in priority order until one yields a stream.
+    for (const link of [pickRedirect(redirects), ...redirects].filter(Boolean) as RedirectLink[]) {
+      const hosterUrl = await followRedirect(link.id, episodePage);
+      if (!hosterUrl) continue;
+      const stream = await extractStreamFromHoster(hosterUrl, link.hoster);
+      if (stream) {
+        return [{
+          source: 'aniworld',
+          url: stream,
+          quality: normalizeQuality(''),
+          headers: {
+            Referer: hosterUrl,
+            Origin: new URL(hosterUrl).origin,
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+          },
+          subtitles: [],
+          audioLanguage: 'de',
+          sourceType: detectSourceType(stream),
+        }];
+      }
+    }
+
+    return [];
   },
 };
 

@@ -68,11 +68,24 @@ export function useCombinedSources(
             const localSources = Array.isArray((local as any)?.sources) ? (local as any).sources : [];
             if (localSources.length > 0) {
               const TOKO_EXT_ID = 'tatakai.extension.toko';
+              // Resolve a per-source language label. Multilingual Toko providers
+              // (Arabic/French/German/Polish/Chinese dubs) return `audioLanguage`
+              // (BCP 47) and/or `language` ("Arabic Dub"). Fall back to the
+              // sub/dub category for legacy sources that set neither.
+              const resolveLang = (src: any): string =>
+                String(src.language || src.audioLanguage || category || '').trim();
+              const resolveIsDub = (src: any, lang: string): boolean => {
+                if (typeof src.isDub === 'boolean') return src.isDub;
+                if (src.audioLanguage && src.audioLanguage !== 'ja') return true;
+                return /dub/i.test(lang) || category === 'dub';
+              };
+
               const providerServers: EpisodeServer[] = localSources.map((src: any, idx: number) => {
                 const isToko = (src.providerKey || src.providerName) === TOKO_EXT_ID;
                 const resolvedName = isToko
                   ? (src.providerName || 'Toko')
                   : String(src.providerName || src.provider || "Local runtime");
+                const lang = resolveLang(src);
                 return {
                   serverId: idx,
                   serverName: String(src.providerKey || src.providerName || src.provider || `local-${idx}`),
@@ -80,8 +93,9 @@ export function useCombinedSources(
                   providerName: resolvedName,
                   displayName: resolvedName,
                   isProviderServer: true,
-                  language: category,
-                  isDub: category === "dub",
+                  language: lang,
+                  langCode: src.audioLanguage ? String(src.audioLanguage) : undefined,
+                  isDub: resolveIsDub(src, lang),
                   isEmbed: !!src.isEmbed,
                   hasM3U8: !!src.isM3U8,
                 };
@@ -91,15 +105,17 @@ export function useCombinedSources(
                 headers: { Referer: "", "User-Agent": "" },
                 sources: localSources.map((src: any) => {
                   const isToko = String(src.providerKey || '') === TOKO_EXT_ID;
+                  const lang = resolveLang(src);
                   return {
                     url: String(src.url || ""),
-                    isM3U8: !!src.isM3U8,
+                    isM3U8: !!src.isM3U8 || (src.sourceType === 'hls') || /\.m3u8/i.test(String(src.url || '')),
                     quality: src.quality ? String(src.quality) : "auto",
-                    language: category,
-                    isDub: category === "dub",
+                    language: lang,
+                    langCode: src.audioLanguage ? String(src.audioLanguage) : undefined,
+                    isDub: resolveIsDub(src, lang),
                     providerName: isToko ? (src.providerName || 'Toko') : (src.providerName ? String(src.providerName) : "Local runtime"),
                     providerKey: src.providerKey ? String(src.providerKey) : "local-runtime",
-                    server: src.providerKey ? String(src.providerKey) : "local-runtime",
+                    server: src.server || src.providerKey ? String(src.server || src.providerKey) : "local-runtime",
                   };
                 }),
                 subtitles: [],

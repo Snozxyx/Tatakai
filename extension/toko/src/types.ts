@@ -33,8 +33,22 @@ export interface SourceResult {
   quality: string;
   headers: Record<string, string>;
   subtitles: SubtitleTrack[];
+  /**
+   * BCP 47 / ISO 639-1 code for the audio track (e.g. "ar", "fr", "ja").
+   * The Watch page uses this (or `language`) to build language tabs and the
+   * auto-download engine matches it against preferredLanguages.
+   */
   audioLanguage?: string;
-  sourceType?: 'torrent' | 'hls' | 'mp4' | 'custom' | 'unknown';
+  /**
+   * Optional human-readable language label such as "Arabic Dub" or "French".
+   * Passed through to the app's SourceLanguageTabs for display.
+   */
+  language?: string;
+  sourceType?: 'torrent' | 'hls' | 'mp4' | 'custom';
+  /** Provider/server identity used by the Watch page for server selection. */
+  providerName?: string;
+  providerKey?: string;
+  server?: string;
 }
 
 export interface LanguageCapability {

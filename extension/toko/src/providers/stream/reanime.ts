@@ -1,72 +1,144 @@
+/**
+ * Re:ANIME — direct-stream adapter (https://reanime.to)
+ *
+ * Resolves episodes by AniList ID through the public Flix API:
+ *   GET /api/flix/{anilistId}/{episode}
+ *
+ * The API returns FlixCloud embed URLs (https://flixcloud.cc/e/{id}?v=N).
+ * Those embed pages do not expose a plain stream URL directly — the real HLS/MP4
+ * is encrypted behind a WASM + PBKDF2 + AES-CBC scheme. We ported the reference
+ * (Seanime/A2) decoder into utils/flixcloud.ts so this provider returns a
+ * directly playable URL whenever decryption succeeds, and falls back to the
+ * embed URL (custom source type) otherwise.
+ */
 import { normalizeQuality, detectSourceType } from '../../utils/quality.js';
-import type { StreamProvider, SourceOptions, SourceResult } from '../../types.js';
+import { resolveFlixCloud } from '../../utils/flixcloud.js';
+import type { StreamProvider, SourceOptions, SourceResult, SubtitleTrack } from '../../types.js';
 
 declare const __tatakai_fetch__: (url: string, init?: RequestInit) => Promise<Response>;
 
 const BASE_URL = 'https://reanime.to';
+const ALT_BASE_URL = 'https://reanime.net';
+
+interface FlixServer {
+  $id?: string;
+  serverName?: string;
+  dataLink?: string;
+  dataType?: string;
+  continue?: boolean;
+  softsub?: boolean;
+}
+
+interface FlixResponse {
+  success?: boolean;
+  servers?: FlixServer[];
+}
+
+function languageLabel(dataType?: string): string {
+  if (dataType === 'dub' || dataType === 's-dub') return 'English/Dub';
+  return 'Japanese/Sub';
+}
+
+function absoluteUrl(url: string, base: string): string {
+  try {
+    return new URL(url, base).toString();
+  } catch {
+    return url;
+  }
+}
+
+async function fetchFlix(anilistId: number, episode: number): Promise<FlixServer[]> {
+  const bases = [BASE_URL, ALT_BASE_URL];
+  for (const base of bases) {
+    try {
+      const url = `${base}/api/flix/${anilistId}/${episode}`;
+      const res = await __tatakai_fetch__(url, {
+        headers: {
+          Accept: 'application/json',
+          'Accept-Encoding': 'identity',
+          Referer: `${base}/`,
+        },
+      });
+      if (!res.ok) continue;
+
+      const text = await res.text();
+      if (!text) continue;
+      const data = JSON.parse(text) as FlixResponse;
+      if (data?.servers?.length) return data.servers;
+    } catch {
+      // try next base
+    }
+  }
+  return [];
+}
 
 const provider: StreamProvider = {
   name: 'reanime',
-  async single(opts: SourceOptions): Promise<SourceResult[]> {
-    try {
-      const anilistId = opts.anilistId;
-      const episode = opts.episode ?? 1;
-      
-      if (!anilistId) return [];
 
-      // Direct API: /api/flix/{anilistId}/{episode}
-      const url = `${BASE_URL}/api/flix/${anilistId}/${episode}`;
-      console.log('[Reanime] Calling direct API:', url);
-      
-      const res = await __tatakai_fetch__(url, {
-        headers: { 
-          Accept: 'application/json',
-          'Accept-Encoding': 'identity', // Disable gzip to avoid decompression errors
-          Referer: `${BASE_URL}/`,
-        },
+  async single(opts: SourceOptions): Promise<SourceResult[]> {
+    const anilistId = opts.anilistId;
+    const episode = opts.episode ?? 1;
+    if (!anilistId) return [];
+
+    const servers = await fetchFlix(anilistId, episode);
+    if (servers.length === 0) return [];
+
+    // HD-2 is the reference-preferred server; keep first unique dataLink per
+    // (serverName, dataType) so we do not emit the same FlixCloud id twice.
+    const preference = (name?: string): number => {
+      const n = (name || '').toLowerCase();
+      if (n.includes('hd-2')) return 0;
+      if (n.includes('hd-1')) return 1;
+      if (n.includes('maze')) return 2;
+      return 3;
+    };
+
+    const usable = servers
+      .filter(s => Boolean(s?.dataLink))
+      .sort((a, b) => {
+        const byServer = preference(a.serverName) - preference(b.serverName);
+        if (byServer !== 0) return byServer;
+        const aDub = a.dataType === 'dub' ? 1 : 0;
+        const bDub = b.dataType === 'dub' ? 1 : 0;
+        return aDub - bDub;
       });
 
-      if (!res.ok) {
-        console.log('[Reanime] API returned', res.status);
-        return [];
-      }
+    const seen = new Set<string>();
+    const results: SourceResult[] = [];
 
-      const contentType = res.headers.get('content-type') || '';
-      console.log('[Reanime] Content-Type:', contentType);
+    for (const server of usable) {
+      const embedUrl = absoluteUrl(server.dataLink!, BASE_URL);
+      if (seen.has(embedUrl)) continue;
+      seen.add(embedUrl);
 
-      let data: any;
-      try {
-        const text = await res.text();
-        console.log('[Reanime] Response text length:', text.length);
-        console.log('[Reanime] Response preview:', text.substring(0, 200));
-        data = JSON.parse(text);
-      } catch (parseErr) {
-        console.error('[Reanime] Failed to parse response:', parseErr);
-        return [];
-      }
+      // Attempt to decrypt the FlixCloud embed to a direct stream URL.
+      const resolved = await resolveFlixCloud(embedUrl, __tatakai_fetch__);
+      const streamUrl = resolved?.url || embedUrl;
 
-      if (!data || !data.servers || data.servers.length === 0) {
-        console.log('[Reanime] No servers in response:', data);
-        return [];
-      }
+      const subtitles: SubtitleTrack[] = (resolved?.subtitles || []).map((sub, i) => ({
+        url: sub.url,
+        label: sub.language,
+        language: sub.language,
+        default: sub.isDefault && i === 0,
+      }));
 
-      console.log('[Reanime] Found', data.servers.length, 'servers');
-      
-      return data.servers
-        .filter((server: any) => Boolean(server?.dataLink))
-        .map((server: any) => ({
-          source: 'reanime',
-          url: server.dataLink,
-          quality: normalizeQuality(server.serverName || 'auto'),
-          headers: { Referer: `${BASE_URL}/` },
-          subtitles: [],
-          audioLanguage: server.dataType === 'dub' ? 'English/Dub' : 'Japanese/Sub',
-          sourceType: 'embed' as const,
-        }));
-    } catch (err) {
-      console.error('[Reanime] Error:', err);
-      return [];
+      results.push({
+        source: 'reanime',
+        url: streamUrl,
+        quality: normalizeQuality(server.serverName || 'auto'),
+        headers: { Referer: `${BASE_URL}/` },
+        subtitles,
+        audioLanguage: languageLabel(server.dataType),
+        // FlixCloud always serves HLS once decrypted; embed fallback is custom.
+        sourceType: resolved ? detectSourceType(streamUrl) : 'custom',
+      });
+
+      // One playable direct source is enough — stop after the first success to
+      // keep fan-out fast. If decryption failed we still only want one embed.
+      break;
     }
+
+    return results;
   },
 };
 

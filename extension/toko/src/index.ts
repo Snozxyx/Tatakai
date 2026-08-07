@@ -45,6 +45,7 @@ import anikoto from './providers/stream/anikoto.js';
 import mkissa from './providers/stream/mkissa.js';
 import anizone from './providers/stream/anizone.js';
 import animesalt from './providers/stream/animesalt.js';
+import { I18N_STREAM_PROVIDERS } from './providers/i18n/index.js';
 
 import nyaa from './providers/torrent/nyaa.js';
 import acgrip from './providers/torrent/acgrip.js';
@@ -67,6 +68,8 @@ const STREAM_PROVIDERS: StreamProvider[] = [
   animepahe, animeya, toonstream, animelok, watchanimeworld,
   desidub, hindidubbed, aniworld, senshi, reanime, fouranime,
   anikoto, mkissa, anizone, animesalt,
+  // Multilingual dubs (Arabic/French/German/Polish/Chinese/…)
+  ...I18N_STREAM_PROVIDERS,
 ];
 
 const TORRENT_PROVIDERS: TorrentProvider[] = [
@@ -106,9 +109,9 @@ type DebugProviderResult<T> = {
  * Failed or timed-out providers are silently dropped; their results are excluded.
  * Requirements: 2.11
  */
-async function runProviders<T>(
-  providers: Array<{ name: string }>,
-  fn: (p: any) => Promise<T[]>,
+async function runProviders<T, P extends { name: string }>(
+  providers: P[],
+  fn: (p: P) => Promise<T[]>,
   diagnostics?: ProviderDiagnostic[],
 ): Promise<T[]> {
   const results = await Promise.all(providers.map(async (provider) => {
@@ -139,7 +142,7 @@ async function runProviders<T>(
       return [] as T[];
     }
   }));
-  return results.flat();
+  return results.flat() as T[];
 }
 
 function mergeMangaChapters(all: MangaChapterEntry[]): MangaChapterEntry[] {
