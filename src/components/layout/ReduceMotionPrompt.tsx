@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Activity, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { useIsMobile } from '@/hooks/ui/use-mobile';
 
 const PROMPT_KEY = 'tatakai_reduce_motion_prompt_seen';
 const REDUCE_MOTION_KEY = 'tatakai_reduce_motion';
@@ -42,7 +42,7 @@ export function ReduceMotionPrompt() {
     // store global preference (used by web + onboarding)
     localStorage.setItem(REDUCE_MOTION_KEY, String(enabled));
 
-    // also sync mobile config object (if present) so MobileSettings shows the
+    // also sync mobile config object (if present) so other UI surfaces show the
     // same preference consistently across the app
     try {
       const saved = localStorage.getItem('tatakai_mobile_config');
@@ -117,3 +117,4 @@ export function ReduceMotionPrompt() {
 
   return typeof document !== 'undefined' ? createPortal(content, document.body) : content;
 }
+

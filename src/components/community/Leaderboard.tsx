@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useLeaderboard, LeaderboardType, useUserRank } from '@/hooks/useLeaderboard';
+import { useLeaderboard, LeaderboardType, useUserRank } from '@/hooks/community/useLeaderboard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Trophy, Medal, Award, Users, Star, MessageSquare, TrendingUp, UserPlus, Flame } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -197,3 +197,4 @@ export function Leaderboard() {
     </div>
   );
 }
+

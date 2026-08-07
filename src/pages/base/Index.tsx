@@ -1,10 +1,11 @@
-import { useHomeData } from "@/hooks/useAnimeData";
+import { useHomeData } from "@/hooks/api/useAnimeData";
 import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { Header } from "@/components/layout/Header";
-import { useIsNativeApp, useIsDesktopApp } from "@/hooks/useIsNativeApp";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsNativeApp, useIsDesktopApp } from "@/hooks/ui/useIsNativeApp";
+import { updateDiscordRpc } from "@/lib/discordRpc";
+import { useIsMobile } from "@/hooks/ui/use-mobile";
 import { Capacitor } from '@capacitor/core';
 import { cn } from "@/lib/utils";
 import { HeroSection } from "@/components/anime/HeroSection";
@@ -26,15 +27,16 @@ import { AIRecommendationBanner } from "@/components/anime/AIRecommendationBanne
 import { TierlistSection } from "@/components/home/TierlistSection";
 import { ReviewPopup } from "@/components/ui/ReviewPopup";
 import { LanguagesSection } from "@/components/anime/LanguagesSection";
-import { AppDownloadSection } from "@/components/layout/AppDownloadSection";
-import { ReleaseV5Banner } from "@/components/layout/ReleaseV5Banner";
+import { ReleaseV5Banner } from "@/components/layout/MangaBanner";
 import { IndexMangaShowcase } from "@/components/manga/IndexMangaShowcase";
 import { LastReadMangaSection } from "@/components/manga/LastReadMangaSection";
 import { Heart, Sparkles } from "lucide-react";
 import { DiscordSection } from "@/components/home/DiscordSection";
+import { DownloadSection } from "@/components/home/DownloadSection";
+import { AppDownloadBanner } from "@/components/layout/AppDownloadBanner";
 import { useEffect, useState } from "react";
 import { BecauseYouWatched } from "@/components/anime/BecauseYouWatched";
-import { CuratedAnimeSections } from "@/components/home/CuratedAnimeSections";
+import { TorrentSessionBanner } from "@/components/home/TorrentSessionBanner";
 
 const Index = () => {
   const { data, isLoading, error } = useHomeData();
@@ -49,12 +51,7 @@ const Index = () => {
   const showSidebar = !isMobile && !isMobileApp;
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).electron) {
-      (window as any).electron.updateRPC({
-        details: 'Browsing Anime',
-        state: 'Main Menu'
-      });
-    }
+    updateDiscordRpc('Browsing Anime', 'Main Menu');
   }, []);
 
   useEffect(() => {
@@ -90,9 +87,10 @@ const Index = () => {
 
       <main className={cn(
         "relative z-10 pr-6 py-6 max-w-[1800px] mx-auto pb-24 md:pb-6",
-        isDesktopApp ? "pl-6" : "pl-6 md:pl-32" // Original web padding
+        isDesktopApp ? "pl-24" : "pl-6 md:pl-32" // Desktop app sidebar is fixed w-20, so content needs larger offset
       )}>
         <Header />
+        <div className="hidden md:block h-4 lg:h-6" aria-hidden />
 
         {/* Quick-action buttons: mood picker + random anime */}
         {/* <div className="flex items-center gap-3 mb-4 flex-wrap mt-4">
@@ -129,6 +127,10 @@ const Index = () => {
 
             {/* Continue Watching - LocalStorage for guests */}
             <LocalContinueWatching />
+            
+            {/* Torrent Sessions - Desktop only */}
+            <TorrentSessionBanner />
+
             <LastReadMangaSection />
 
             {/* My Playlists */}
@@ -165,11 +167,14 @@ const Index = () => {
                 />
 
                 {/* Join Discord */}
-                <div className="mb-24">
+                <div className="mb-12">
                   <DiscordSection />
                 </div>
 
-                <CuratedAnimeSections homeData={data} />
+                {/* Download Desktop App */}
+                <div className="mb-24">
+                  <DownloadSection />
+                </div>
 
                 {/* Most Popular */}
                 <AnimeGrid
@@ -177,12 +182,6 @@ const Index = () => {
                   title="Most Popular"
                   icon={<Heart className="w-5 h-5 text-destructive fill-destructive" />}
                 />
-
-                {!isNative && (
-                  <div className="mt-24">
-                    <AppDownloadSection />
-                  </div>
-                )}
 
                 {/* Genre Cloud */}
                 <GenreCloud genres={data.genres} />
@@ -217,8 +216,10 @@ const Index = () => {
       </main>
 
       {!showSidebar && <MobileNav />}
+      <AppDownloadBanner />
     </div>
   );
 };
 
 export default Index;
+

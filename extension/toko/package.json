@@ -1,0 +1,14 @@
+{
+  "name": "toko-extension",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsx build.ts"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "jszip": "^3.10.1",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}

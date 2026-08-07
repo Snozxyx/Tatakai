@@ -3,8 +3,10 @@ import { GlassPanel } from "@/components/ui/GlassPanel";
 import { AnimeCard, getProxiedImageUrl, getHighQualityPoster } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 import { AnimeCardWithPreview } from "./AnimeCardWithPreview";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/ui/useTheme";
 import { buildPreferredAnimeRouteId } from "@/lib/animeIdMapping";
+import { BlurhashImage } from "@/components/ui/blurhash-image";
+import { FeatureFlag, useFeatureFlag } from '@/core/feature-flags';
 
 interface AnimeGridProps {
   animes: AnimeCard[];
@@ -16,6 +18,16 @@ interface AnimeGridProps {
 export function AnimeGrid({ animes, title, icon, enablePreview = false }: AnimeGridProps) {
   const navigate = useNavigate();
   const { isUltraLite } = useTheme();
+  const blurhashEnabled = useFeatureFlag(FeatureFlag.BLURHASH_IMAGES);
+  const uniqueAnimes = animes.filter((anime, index, list) => {
+    const mediaType = String((anime as any).mediaType || "anime").toLowerCase();
+    const key = `${mediaType}:${String(anime.id || "").trim().toLowerCase()}`;
+    return index === list.findIndex((candidate) => {
+      const candidateType = String((candidate as any).mediaType || "anime").toLowerCase();
+      const candidateKey = `${candidateType}:${String(candidate.id || "").trim().toLowerCase()}`;
+      return candidateKey === key;
+    });
+  });
 
   return (
     <section className="mb-24">
@@ -29,7 +41,7 @@ export function AnimeGrid({ animes, title, icon, enablePreview = false }: AnimeG
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        {animes.map((anime) => {
+        {uniqueAnimes.map((anime, index) => {
           const routeAnimeId =
             buildPreferredAnimeRouteId({
               id: anime.id,
@@ -42,29 +54,46 @@ export function AnimeGrid({ animes, title, icon, enablePreview = false }: AnimeG
               anilist_id: (anime as any)?.anilist_id,
             });
 
+          const cardKey = `${String((anime as any).mediaType || "anime")}:${String(anime.id || "unknown")}:${index}`;
           return enablePreview ? (
-            <AnimeCardWithPreview key={anime.id} anime={anime} showPreview={true} />
+            <AnimeCardWithPreview key={cardKey} anime={anime} showPreview={true} />
           ) : (
             <GlassPanel
-              key={anime.id}
+              key={cardKey}
               hoverEffect={!isUltraLite}
               className="group cursor-pointer overflow-hidden"
               onClick={() => {
+                const mediaType = (anime as any).mediaType || 'anime';
+                const baseRoute = mediaType === 'manga' ? '/manga' : '/anime';
+                
                 if (routeAnimeId) {
-                  navigate(`/anime/${routeAnimeId}`);
+                  navigate(`${baseRoute}/${routeAnimeId}`);
                   return;
                 }
                 navigate(`/search?q=${encodeURIComponent(anime.name)}`);
               }}
             >
               <div className="relative aspect-[3/4]">
-                <img
-                  src={getHighQualityPoster(anime.poster, anime.anilistId)}
-                  alt={anime.name}
-                  loading="lazy"
-                  decoding="async"
-                  className={`w-full h-full object-cover ${!isUltraLite ? 'transition-transform duration-500 group-hover:scale-110' : ''}`}
-                />
+                {blurhashEnabled ? (
+                  <BlurhashImage
+                    src={getHighQualityPoster(anime.poster, anime.anilistId)}
+                    alt={anime.name}
+                    loading="lazy"
+                    decoding="async"
+                    blurhash={(anime as any).blurhash ?? undefined}
+                    imgClassName={`w-full h-full object-cover ${!isUltraLite ? 'transition-transform duration-500 group-hover:scale-110' : ''}`}
+                    style={{ imageRendering: 'high-quality' as any }}
+                  />
+                ) : (
+                  <img
+                    src={getHighQualityPoster(anime.poster, anime.anilistId)}
+                    alt={anime.name}
+                    loading="lazy"
+                    decoding="async"
+                    className={`w-full h-full object-cover ${!isUltraLite ? 'transition-transform duration-500 group-hover:scale-110' : ''}`}
+                    style={{ imageRendering: 'high-quality' as any }}
+                  />
+                )}
                 <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
 
                 {/* Type Badge */}

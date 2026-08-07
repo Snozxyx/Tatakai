@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { BookMarked, ChevronRight, Loader2, Play } from "lucide-react";
 import { GlassPanel } from "@/components/ui/GlassPanel";
-import { useMangaContinueReading } from "@/hooks/useMangaReadlist";
+import { useMangaContinueReading } from "@/hooks/user/useMangaReadlist";
 import { useAuth } from "@/contexts/AuthContext";
 import { getProxiedImageUrl } from "@/lib/api";
 
@@ -13,10 +13,10 @@ export function LastReadMangaSection() {
     <section className="mb-12">
       <div className="mb-6 flex items-end justify-between gap-3">
         <div>
-          <h2 className="text-2xl md:text-3xl font-black flex items-center gap-3">
-            <BookMarked className="w-6 h-6 text-primary" />
-            Continue Reading
-          </h2>
+             <h3 className="font-display text-2xl font-semibold tracking-tight flex items-center gap-2">
+          <BookMarked className="w-5 h-5 text-orange" />
+          Last Read Manga
+        </h3>
           <p className="text-sm md:text-base text-muted-foreground mt-1.5 font-medium">
             Jump back into your latest manga, manhwa, and comics instantly.
           </p>
@@ -118,3 +118,4 @@ export function LastReadMangaSection() {
     </section>
   );
 }
+

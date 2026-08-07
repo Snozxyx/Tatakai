@@ -2,6 +2,8 @@ import { createRoot } from "react-dom/client";
 import { HelmetProvider } from "react-helmet-async";
 import App from "./App.tsx";
 import "./index.css";
+import "./utils/debug-extension"; // Extension debugger for console
+import "@/lib/i18n"; // Must be loaded once before React renders
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { WebappWrapper } from '@/components/WebappWrapper';
 import { initConsoleProtection, logger } from '@/lib/logger';
@@ -18,12 +20,10 @@ try {
 // Initialize production console protection early
 initConsoleProtection();
 
-// Inject X-Admin-Secret into backend-bound fetch calls when configured.
-installGlobalAdminSecretFetchPatch();
+// X-Admin-Secret injection disabled
+// installGlobalAdminSecretFetchPatch();
 
-// Production mode: suppress console in production (already handled by production.ts import)
-
-import { analytics } from '@/services/AnalyticsService';
+import { analytics } from '@/core/analytics/AnalyticsService';
 analytics.init();
 
 // Initialize Discord Activity SDK when running inside Discord embedded mode.
@@ -32,11 +32,11 @@ void initDiscordActivity();
 // Global error handlers (captures window errors and unhandled promise rejections)
 if (typeof window !== 'undefined') {
   // Check and expose Tauri API
-  if ((window as any).__TAURI_INTERNALS__ || (window as any).__TAURI__) {
-    console.log('✅ Tauri API detected');
-  } else {
-    console.log('❌ Tauri API not detected');
-  }
+  // if ((window as any).__TAURI_INTERNALS__ || (window as any).__TAURI__) {
+  //   console.log('✅ Tauri API detected');
+  // } else {
+  //   console.log('❌ Tauri API not detected');
+  // }
 
   window.addEventListener('error', (event) => {
     try {

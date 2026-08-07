@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Download, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useIsNativeApp } from '@/hooks/useIsNativeApp';
+import { useIsNativeApp } from '@/hooks/ui/useIsNativeApp';
 import { Capacitor } from '@capacitor/core';
 
 export function AppDownloadBanner() {
@@ -28,7 +28,7 @@ export function AppDownloadBanner() {
   };
 
   const handleDownload = () => {
-    window.open('https://github.com/YOUR_GITHUB_USERNAME/Tatakai/releases/latest', '_blank');
+    window.open('https://github.com/snozxyx/Tatakai/releases/latest', '_blank');
   };
 
   if (!isVisible) {
@@ -57,10 +57,10 @@ export function AppDownloadBanner() {
             </div>
             <div className="flex-1 pt-0.5">
               <h3 className="font-semibold text-sm mb-1">
-                Get the Tatakai App
+                Watch in the Tatakai app
               </h3>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Download for offline viewing, faster performance, and desktop notifications
+                Full playback, offline downloads, Discord RPC, and fewer web limits — grab the desktop or mobile build.
               </p>
             </div>
           </div>
@@ -103,3 +103,4 @@ export function AppDownloadBanner() {
     </div>
   );
 }
+

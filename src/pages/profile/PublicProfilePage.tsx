@@ -7,20 +7,22 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { TierListGrid } from '@/components/tierlist/TierListCard';
-import { usePublicProfile, usePublicWatchlist, usePublicWatchHistory } from '@/hooks/useProfileFeatures';
-import { useUserTierLists } from '@/hooks/useTierLists';
+import { usePublicProfile, usePublicWatchlist, usePublicWatchHistory } from '@/hooks/user/useProfileFeatures';
+import { useUserTierLists } from '@/hooks/user/useTierLists';
 import {
   ArrowLeft, User, Clock, Heart, List, Trophy, Eye, EyeOff, Calendar, Play, Lock, Globe, UserPlus, UserMinus, ShieldCheck, Shield
 } from 'lucide-react';
-import { useFollow } from '@/hooks/useFollow';
+import { useFollow } from '@/hooks/community/useFollow';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 
 export default function PublicProfilePage() {
   const { username: usernameParam, atUsername, slug } = useParams<{ username?: string; atUsername?: string; slug?: string }>();
   const navigate = useNavigate();
+  const isDesktopApp = useIsDesktopApp();
 
   // Support both /user/:username, /@username, and /:slug routes
   const username = usernameParam ||
@@ -54,7 +56,7 @@ export default function PublicProfilePage() {
       <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
         <Background />
         <Sidebar />
-        <main className="relative z-10 pl-6 md:pl-32 pr-6 py-6 max-w-[1400px] mx-auto pb-24 md:pb-6">
+        <main className={`relative z-10 ${isDesktopApp ? 'pl-6' : 'pl-6 md:pl-32'} pr-6 py-6 max-w-[1400px] mx-auto pb-24 md:pb-6`}>
           <div className="flex items-center gap-4 mb-8">
             <button
               onClick={() => navigate(-1)}
@@ -87,7 +89,7 @@ export default function PublicProfilePage() {
       <Background />
       <Sidebar />
 
-      <main className="relative z-10 pl-6 md:pl-32 pr-6 py-6 max-w-[1400px] mx-auto pb-24 md:pb-6">
+      <main className={`relative z-10 ${isDesktopApp ? 'pl-6' : 'pl-6 md:pl-32'} pr-6 py-6 max-w-[1400px] mx-auto pb-24 md:pb-6`}>
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <button
@@ -373,3 +375,4 @@ export default function PublicProfilePage() {
     </div>
   );
 }
+

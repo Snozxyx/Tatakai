@@ -8,7 +8,7 @@ import {
   useUpdateChangelog, 
   useDeleteChangelog,
   type Changelog 
-} from '@/hooks/useAdminFeatures';
+} from '@/hooks/admin/useAdminFeatures';
 import { toast } from 'sonner';
 import { 
   History, Plus, X, Trash2, Loader2, Edit2, Eye, EyeOff, Star

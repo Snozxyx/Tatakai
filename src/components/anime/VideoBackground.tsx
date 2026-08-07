@@ -1,148 +1,120 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Hls from 'hls.js';
-import { fetchEpisodes, fetchStreamingSources, getProxiedVideoUrl, getProxiedImageUrl } from '@/lib/api';
+import { getProxiedImageUrl } from '@/lib/api';
+import { usePreviewSource } from '@/hooks/usePreviewSource';
 
 interface VideoBackgroundProps {
   animeId: string;
   poster: string;
   children: React.ReactNode;
+  /** AniList ID for preview resolution (req 9.6) */
+  anilistId?: number;
+  /** Titles array for multi-title fallback search */
+  titles?: string[];
 }
 
-export function VideoBackground({ animeId, poster, children }: VideoBackgroundProps) {
+export function VideoBackground({ animeId, poster, children, anilistId, titles }: VideoBackgroundProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const [isVideoReady, setIsVideoReady] = useState(false);
-  const [hasError, setHasError] = useState(false);
+  const { startHover, source } = usePreviewSource();
 
-  const loadRandomEpisode = useCallback(async () => {
-    try {
-      const episodesData = await fetchEpisodes(animeId);
-      if (!episodesData?.episodes?.length) {
-        setHasError(true);
-        return;
-      }
-
-      // Pick a random episode
-      const randomIndex = Math.floor(Math.random() * Math.min(episodesData.episodes.length, 5)); // Limit to first 5 episodes
-      const randomEpisode = episodesData.episodes[randomIndex];
-
-      // Fetch streaming sources with retry logic.
-      // Always prioritize JustAnime (mx1.tatakai.me proxy path) first.
-      let sources = null;
-      const servers = ['justanime', 'hd-1', 'hd-2', 'megacloud'];
-      
-      for (const server of servers) {
-        try {
-          sources = await fetchStreamingSources(randomEpisode.episodeId, server, 'sub');
-          if (sources?.sources?.length) break;
-        } catch {
-          continue;
-        }
-      }
-      
-      if (!sources?.sources?.length) {
-        setHasError(true);
-        return;
-      }
-
-      const source = sources.sources[0];
-      // Use the centralized proxy helper
-      const proxiedUrl = getProxiedVideoUrl(source.url, sources.headers?.Referer);
-
-      if (videoRef.current && source.isM3U8 && Hls.isSupported()) {
-        const hls = new Hls({
-          enableWorker: true,
-          lowLatencyMode: false,
-          backBufferLength: 30,
-          maxBufferLength: 30,
-          maxMaxBufferLength: 60,
-          xhrSetup: () => {},
-        });
-
-        hls.loadSource(proxiedUrl);
-        hls.attachMedia(videoRef.current);
-
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          setIsVideoReady(true);
-          if (videoRef.current) {
-            videoRef.current.muted = true;
-            videoRef.current.currentTime = Math.random() * 60;
-            videoRef.current.play().catch(() => {});
-          }
-        });
-
-        hls.on(Hls.Events.ERROR, (_, data) => {
-          if (data.fatal) {
-            console.error('VideoBackground HLS error:', data.type);
-            setHasError(true);
-          }
-        });
-
-        hlsRef.current = hls;
-      } else if (videoRef.current?.canPlayType('application/vnd.apple.mpegurl')) {
-        videoRef.current.src = proxiedUrl;
-        videoRef.current.muted = true;
-        videoRef.current.play().catch(() => {});
-        setIsVideoReady(true);
-      } else {
-        // Fallback for non-HLS
-        setHasError(true);
-      }
-    } catch (error) {
-      console.error('Error loading video background:', error);
-      setHasError(true);
-    }
-  }, [animeId]);
-
+  // Resolve preview on mount (no hover guard for detail page — req 9.6)
   useEffect(() => {
-    loadRandomEpisode();
+    if (!anilistId) return;
+    startHover(anilistId, titles ?? [], undefined);
+  }, [anilistId, titles, startHover]);
 
-    return () => {
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
+  // Attach video src when source resolves (req 9.7)
+  useEffect(() => {
+    if (!videoRef.current || !source?.streamUrl) return;
+    const videoEl = videoRef.current;
+
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+
+    const seekToPreviewTimestamp = () => {
+      if (videoRef.current && source.previewTimestampSec > 0) {
+        videoRef.current.currentTime = source.previewTimestampSec;
       }
     };
-  }, [loadRandomEpisode]);
+
+    const playVideo = () => {
+      videoEl.play()
+        .then(() => setIsVideoReady(true))
+        .catch(() => setIsVideoReady(false));
+    };
+
+    if (source.isHls) {
+      if (!Hls.isSupported()) {
+        setIsVideoReady(false);
+        return;
+      }
+
+      const hls = new Hls();
+      hlsRef.current = hls;
+      hls.loadSource(source.streamUrl);
+      hls.attachMedia(videoEl);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        seekToPreviewTimestamp();
+        playVideo();
+      });
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (data.fatal) setIsVideoReady(false);
+      });
+      return;
+    }
+
+    videoEl.src = source.streamUrl;
+    videoEl.addEventListener('loadedmetadata', seekToPreviewTimestamp, { once: true });
+    playVideo();
+  }, [source]);
+
+  const hasVideo = isVideoReady && !!source?.streamUrl;
+
+  useEffect(() => {
+    return () => {
+      hlsRef.current?.destroy();
+      hlsRef.current = null;
+    };
+  }, []);
 
   return (
     <div className="relative min-h-[70vh] md:min-h-[80vh] overflow-hidden">
       {/* Video or Poster Background */}
       <div className="absolute inset-0">
-        {!hasError && (
-          <video
-            ref={videoRef}
-            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${
-              isVideoReady ? 'opacity-50' : 'opacity-0'
-            }`}
-            loop
-            muted
-            playsInline
-          />
-        )}
-        
-        {/* Fallback poster */}
+        {/* Video — only shown when source resolved and ready (req 9.6, 9.7) */}
+        <video
+          ref={videoRef}
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${hasVideo ? 'opacity-50' : 'opacity-0'}`}
+          loop
+          muted
+          playsInline
+        />
+
+        {/* Poster fallback — shown when no video source or not yet ready (req 9.5) */}
         <img
           src={getProxiedImageUrl(poster)}
           alt=""
           loading="lazy"
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${
-            isVideoReady && !hasError ? 'opacity-0' : 'opacity-50'
-          }`}
+          data-preview-unavailable={!hasVideo ? 'true' : undefined}
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${hasVideo ? 'opacity-0' : 'opacity-50'}`}
         />
-        
-        {/* Gradient Overlays */}
+
+        {/* Gradient Overlays — unchanged (req 9.7) */}
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/90 to-background/30" />
         <div className="absolute inset-0 bg-gradient-to-r from-background via-background/60 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-transparent to-background" />
-        
+
         {/* Vignette effect */}
         <div className="absolute inset-0 shadow-[inset_0_0_200px_rgba(0,0,0,0.9)]" />
-        
+
         {/* Noise texture overlay */}
         <div className="absolute inset-0 opacity-[0.02] bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIj48ZmlsdGVyIGlkPSJhIiB4PSIwIiB5PSIwIj48ZmVUdXJidWxlbmNlIGJhc2VGcmVxdWVuY3k9Ii43NSIgc3RpdGNoVGlsZXM9InN0aXRjaCIgdHlwZT0iZnJhY3RhbE5vaXNlIi8+PGZlQ29sb3JNYXRyaXggdHlwZT0ic2F0dXJhdGUiIHZhbHVlcz0iMCIvPjwvZmlsdGVyPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbHRlcj0idXJsKCNhKSIgb3BhY2l0eT0iMC4wNSIvPjwvc3ZnPg==')]" />
       </div>
-      
+
       {/* Content */}
       <div className="relative z-10">
         {children}

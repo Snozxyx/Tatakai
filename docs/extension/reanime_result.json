@@ -1,0 +1,69 @@
+{
+  "success": true,
+  "servers": [
+    {
+      "$id": "hd1-myuvbku7ryk5-sub",
+      "serverName": "HD-1",
+      "dataLink": "https://flixcloud.cc/e/myuvbku7ryk5?v=1",
+      "dataType": "sub",
+      "continue": false,
+      "softsub": false
+    },
+    {
+      "$id": "hd1-myuvbku7ryk5-dub",
+      "serverName": "HD-1",
+      "dataLink": "https://flixcloud.cc/e/myuvbku7ryk5?v=1",
+      "dataType": "dub",
+      "continue": false,
+      "softsub": false
+    },
+    {
+      "$id": "hd1-rtt4nppua1i6-sub",
+      "serverName": "HD-1",
+      "dataLink": "https://flixcloud.cc/e/rtt4nppua1i6?v=1",
+      "dataType": "sub",
+      "continue": false,
+      "softsub": false
+    },
+    {
+      "$id": "hd1-rtt4nppua1i6-dub",
+      "serverName": "HD-1",
+      "dataLink": "https://flixcloud.cc/e/rtt4nppua1i6?v=1",
+      "dataType": "dub",
+      "continue": false,
+      "softsub": false
+    },
+    {
+      "$id": "hd2-myuvbku7ryk5-sub",
+      "serverName": "HD-2",
+      "dataLink": "https://flixcloud.cc/e/myuvbku7ryk5?v=2",
+      "dataType": "sub",
+      "continue": false,
+      "softsub": false
+    },
+    {
+      "$id": "hd2-myuvbku7ryk5-dub",
+      "serverName": "HD-2",
+      "dataLink": "https://flixcloud.cc/e/myuvbku7ryk5?v=2",
+      "dataType": "dub",
+      "continue": false,
+      "softsub": false
+    },
+    {
+      "$id": "hd2-rtt4nppua1i6-sub",
+      "serverName": "HD-2",
+      "dataLink": "https://flixcloud.cc/e/rtt4nppua1i6?v=2",
+      "dataType": "sub",
+      "continue": false,
+      "softsub": false
+    },
+    {
+      "$id": "hd2-rtt4nppua1i6-dub",
+      "serverName": "HD-2",
+      "dataLink": "https://flixcloud.cc/e/rtt4nppua1i6?v=2",
+      "dataType": "dub",
+      "continue": false,
+      "softsub": false
+    }
+  ]
+}

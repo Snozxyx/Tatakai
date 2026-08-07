@@ -1,3 +1,5 @@
+import type { Character, StaffMember, MediaRelation, ExternalLink } from "@/core/content/types";
+
 export interface MangaCard {
   id: string;
   name: string;
@@ -88,6 +90,10 @@ export interface MangaDetail {
   };
   matchConfidence: number;
   matchedBy: "anilist" | "mal" | "title" | "provider";
+  characters?: Character[];
+  staff?: StaffMember[];
+  relations?: MediaRelation[];
+  externalLinks?: ExternalLink[];
 }
 
 export interface MangaDetailResponse {

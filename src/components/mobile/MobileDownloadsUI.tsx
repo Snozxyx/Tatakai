@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { Download, X, RotateCcw, Trash2, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
-import { useMobileDownload } from '@/hooks/useMobileDownload';
+import { useMobileDownload } from '@/hooks/media/useMobileDownload';
 import { cn } from '@/lib/utils';
 
 export function MobileDownloadsUI() {

@@ -1,10 +1,10 @@
 import { Play, Flame } from "lucide-react";
-import { TrendingAnime, getProxiedVideoUrl } from "@/lib/api";
+import { TrendingAnime } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
-import { fetchEpisodes, fetchStreamingSources } from "@/lib/api";
 import Hls from "hls.js";
 import { buildPreferredAnimeRouteId } from "@/lib/animeIdMapping";
+import { usePreviewSource } from "@/hooks/usePreviewSource";
 
 interface TrendingGridProps {
   animes: TrendingAnime[];
@@ -26,6 +26,17 @@ type CachedTrendingPreview = {
 const TRENDING_PREVIEW_CACHE_TTL = 20 * 60 * 1000;
 const trendingPreviewCache = new Map<string, CachedTrendingPreview>();
 
+const resolveAniListId = (value: unknown): number | null => {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+
+  const prefixed = raw.match(/^anilist[:_-]?(\d+)$/i);
+  if (prefixed?.[1]) return Number(prefixed[1]);
+
+  const numeric = Number(raw);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+};
+
 const getTrendingPoster = (poster: string) => {
   if (!poster) return '/placeholder.svg';
   return poster
@@ -46,6 +57,7 @@ function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: s
     (anime as any)?.anilistId ??
     (anime as any)?.anilistID ??
     (anime as any)?.anilist_id ??
+    resolveAniListId(anime.id) ??
     null;
   const [isHovering, setIsHovering] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -55,6 +67,7 @@ function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: s
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { source, loading, startHover, cancelHover } = usePreviewSource();
 
   useEffect(() => {
     if (!previewAnimeId) return;
@@ -82,79 +95,35 @@ function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: s
   }, []);
 
   useEffect(() => {
-    if (!previewAnimeId) {
-      setPreviewError(true);
+    if (!isHovering || !previewAniListId) {
+      if (!isHovering) cancelHover();
       return;
     }
 
-    if (!isHovering || previewUrl) return;
+    startHover(previewAniListId, [anime.name]);
+  }, [anime.name, cancelHover, isHovering, previewAniListId, startHover]);
 
-    hoverTimeoutRef.current = setTimeout(async () => {
-      setIsLoading(true);
-      setPreviewError(false);
-      try {
-        const episodes = await fetchEpisodes(previewAnimeId, {
-          preferDirect: true,
-          timeoutMs: 3800,
-        });
-        if (episodes.episodes.length > 0) {
-          // Pick a random episode for preview
-          const randomEpisode = episodes.episodes[Math.floor(Math.random() * episodes.episodes.length)];
-          const previewEpisodeId = String(randomEpisode?.episodeId || "").includes("?ep=")
-            ? String(randomEpisode?.episodeId || "")
-            : `${randomEpisode?.episodeId}?ep=${randomEpisode?.number || 1}`;
-          let sources: Awaited<ReturnType<typeof fetchStreamingSources>> | null = null;
-          const preferredServers = ["justanime", "hd-1", "hd-2", "hd-3"];
-          for (const server of preferredServers) {
-            try {
-              const candidate = await fetchStreamingSources(previewEpisodeId, server, "sub", {
-                timeoutMs: 4500,
-                animeName: anime.name,
-                anilistId: previewAniListId,
-              });
-              if (candidate?.sources?.length) {
-                sources = candidate;
-                break;
-              }
-            } catch {
-              // Try next server.
-            }
-          }
+  useEffect(() => {
+    const streamUrl = source?.streamUrl ?? null;
 
-          if (sources?.sources?.length) {
-            const source = sources.sources.find((entry) => typeof entry?.url === "string" && entry.url.trim()) || null;
-            if (!source) {
-              setPreviewError(true);
-              return;
-            }
-            const proxiedUrl = getProxiedVideoUrl(
-              source.url,
-              sources.headers?.Referer,
-              sources.headers?.['User-Agent'],
-              { preferProxyManager: true }
-            );
-            setPreviewUrl(proxiedUrl);
-            setIsPreviewM3U8(Boolean(source.isM3U8));
-            trendingPreviewCache.set(previewAnimeId, {
-              url: proxiedUrl,
-              isM3U8: Boolean(source.isM3U8),
-              cachedAt: Date.now(),
-            });
-          } else {
-            setPreviewError(true);
-          }
-        }
-      } catch (error) {
+    if (!streamUrl || !videoRef.current) {
+      if (isHovering && !loading && !previewUrl) {
         setPreviewError(true);
-      } finally {
-        setIsLoading(false);
       }
-    }, 140);
+      setPreviewUrl(null);
+      setIsPreviewM3U8(false);
+      return;
+    }
 
-    return () => {
-      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    };
-  }, [isHovering, previewAnimeId, previewUrl, anime.name, previewAniListId]);
+    setPreviewError(false);
+    setPreviewUrl(streamUrl);
+    setIsPreviewM3U8(Boolean(source?.isHls));
+    trendingPreviewCache.set(previewAnimeId, {
+      url: streamUrl,
+      isM3U8: Boolean(source?.isHls),
+      cachedAt: Date.now(),
+    });
+  }, [isHovering, loading, previewAnimeId, previewUrl, source]);
 
   useEffect(() => {
     if (!previewUrl || !videoRef.current) return;
@@ -215,6 +184,10 @@ function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: s
     }
   }, [isHovering, previewUrl]);
 
+  useEffect(() => {
+    setIsLoading(Boolean(isHovering && loading && !previewUrl));
+  }, [isHovering, loading, previewUrl]);
+
   return (
     <div 
       onClick={() => {
@@ -230,7 +203,10 @@ function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: s
           setPreviewError(false);
         }
       }}
-      onMouseLeave={() => setIsHovering(false)}
+      onMouseLeave={() => {
+        setIsHovering(false);
+        cancelHover();
+      }}
       className={`relative group rounded-3xl overflow-hidden cursor-pointer ${spanClass} border border-border/30 min-h-[200px] md:min-h-0`}
     >
       <img 

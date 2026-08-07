@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useWatchHistory } from '@/hooks/useWatchHistory';
-import { useEnhancedRecommendations } from '@/hooks/useEnhancedRecommendations';
+import { useWatchHistory } from '@/hooks/user/useWatchHistory';
+import { useEnhancedRecommendations } from '@/hooks/api/useEnhancedRecommendations';
 import { AnimeCardWithPreview } from './AnimeCardWithPreview';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { getProxiedImageUrl } from '@/lib/api';
@@ -86,3 +86,4 @@ export function BecauseYouWatched({ className }: BecauseYouWatchedProps) {
     </section>
   );
 }
+

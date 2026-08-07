@@ -16,22 +16,22 @@ import {
   Volume2,
   VolumeX,
   ChevronLeft,
-  Download,
   Rewind,
   FastForward,
   Camera,
 } from "lucide-react";
 import Hls from "hls.js";
 import { toast } from "sonner";
-import { useVideoSettings } from "@/hooks/useVideoSettings";
-import { useAniskip } from "@/hooks/useAniskip";
+import { useVideoSettings } from "@/hooks/media/useVideoSettings";
+import { useAniskip } from "@/hooks/media/useAniskip";
 import { getProxiedImageUrl, getProxiedVideoUrl, getProxiedSubtitleUrl, trackEvent } from "@/lib/api";
 import { ScreenOrientation } from '@capacitor/screen-orientation';
 import { StatusBar } from '@capacitor/status-bar';
 import { Capacitor } from '@capacitor/core';
 import { KeepAwake } from '@capacitor-community/keep-awake';
-import { useMobileDownload } from "@/hooks/useMobileDownload";
 import { cn } from "@/lib/utils";
+import { formatTime } from "@/core/player/time-utils";
+import { buildSubtitleFetchCandidates, getSubtitleSelectionKey, normalizeSubtitleToVtt } from "@/core/player/subtitle-utils";
 
 interface MobileVideoPlayerProps {
   sources: Array<{ url: string; isM3U8: boolean; quality?: string }>;
@@ -49,6 +49,7 @@ interface MobileVideoPlayerProps {
   introWindow?: { start: number; end: number } | null;
   outroWindow?: { start: number; end: number } | null;
   initialSeekSeconds?: number;
+  hideTimelineUi?: boolean;
   onProgressUpdate?: (progressSeconds: number, durationSeconds?: number, completed?: boolean) => void;
   animeId?: string;
   animeName?: string;
@@ -59,56 +60,7 @@ interface MobileVideoPlayerProps {
   isOffline?: boolean;
 }
 
-function formatTime(seconds: number): string {
-  if (isNaN(seconds) || !isFinite(seconds)) return "0:00";
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
-}
-
-function getSubtitleSelectionKey(subtitle: { lang: string; url: string; label?: string }, index: number): string {
-  const baseKey = subtitle.url || subtitle.label || subtitle.lang || `subtitle-${index}`;
-  return `${subtitle.lang === 'custom' ? 'custom' : 'sub'}:${baseKey}`;
-}
-
-function normalizeSubtitleToVtt(rawText: string): string {
-  const text = String(rawText || '');
-  const trimmed = text.trim();
-  if (!trimmed) return '';
-
-  if (trimmed.startsWith('WEBVTT')) {
-    return text;
-  }
-
-  if (/^<!doctype html/i.test(trimmed) || /^<html/i.test(trimmed)) {
-    return '';
-  }
-
-  if (trimmed.includes('-->')) {
-    const withNormalizedTimestamps = text.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
-    return withNormalizedTimestamps.includes('WEBVTT')
-      ? withNormalizedTimestamps
-      : `WEBVTT\n\n${withNormalizedTimestamps}`;
-  }
-
-  return `WEBVTT\n\n00:00:00.000 --> 99:59:59.000\n${text}`;
-}
-
-function buildSubtitleFetchCandidates(subtitleUrl: string, referer?: string, offline?: boolean): string[] {
-  const candidates: string[] = [];
-  const addCandidate = (value?: string) => {
-    const normalized = String(value || '').trim();
-    if (!normalized) return;
-    if (!candidates.includes(normalized)) candidates.push(normalized);
-  };
-
-  addCandidate(subtitleUrl);
-  if (!offline) {
-    addCandidate(getProxiedSubtitleUrl(subtitleUrl, referer));
-  }
-
-  return candidates;
-}
+// formatTime + subtitle helper functions moved to @/core/player/*
 
 function parseQualityScore(quality?: string): number | null {
   const normalized = String(quality || '').toLowerCase();
@@ -144,6 +96,40 @@ function selectPreferredSource(
   return sources.find((source) => String(source.quality || '').toLowerCase() === preferredQuality) || sources[0];
 }
 
+function normalizeSubtitleLanguage(value?: string): string {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return '';
+  if (normalized === 'en' || normalized.startsWith('eng') || normalized.includes('english')) return 'en';
+  if (normalized === 'es' || normalized.startsWith('spa') || normalized.includes('spanish') || normalized.includes('espanol')) return 'es';
+  if (normalized === 'fr' || normalized.startsWith('fra') || normalized.startsWith('fre') || normalized.includes('french')) return 'fr';
+  if (normalized === 'de' || normalized.startsWith('deu') || normalized.startsWith('ger') || normalized.includes('german')) return 'de';
+  if (normalized === 'ja' || normalized.startsWith('jpn') || normalized.includes('japanese')) return 'ja';
+  if (normalized === 'pt' || normalized.startsWith('por') || normalized.includes('portuguese')) return 'pt';
+  if (normalized === 'ar' || normalized.startsWith('ara') || normalized.includes('arabic')) return 'ar';
+  if (normalized === 'hi' || normalized.startsWith('hin') || normalized.includes('hindi')) return 'hi';
+  if (normalized.length >= 2) return normalized.slice(0, 2);
+  return normalized;
+}
+
+function subtitleMatchesPreference(subtitle: { lang?: string; label?: string }, preference: string): boolean {
+  const normalizedPreference = String(preference || '').trim().toLowerCase();
+  const language = normalizeSubtitleLanguage(subtitle.lang);
+  const label = String(subtitle.label || '').toLowerCase();
+  const combined = `${String(subtitle.lang || '').toLowerCase()} ${label}`;
+
+  if (normalizedPreference === 'english') return language === 'en' || combined.includes('english') || combined.includes('eng');
+  if (normalizedPreference === 'spanish') return language === 'es' || combined.includes('spanish') || combined.includes('espanol');
+  if (normalizedPreference === 'french') return language === 'fr' || combined.includes('french');
+  if (normalizedPreference === 'german') return language === 'de' || combined.includes('german');
+  if (normalizedPreference === 'japanese') return language === 'ja' || combined.includes('japanese');
+  if (normalizedPreference === 'portuguese') return language === 'pt' || combined.includes('portuguese');
+  if (normalizedPreference === 'arabic') return language === 'ar' || combined.includes('arabic');
+  if (normalizedPreference === 'hindi') return language === 'hi' || combined.includes('hindi');
+  if (normalizedPreference.length === 2) return language === normalizedPreference;
+
+  return combined.includes(normalizedPreference);
+}
+
 type SkipSegment = {
   startTime: number;
   endTime: number;
@@ -166,6 +152,7 @@ export function MobileVideoPlayer({
   introWindow,
   outroWindow,
   initialSeekSeconds,
+  hideTimelineUi: _hideTimelineUi,
   onProgressUpdate,
   animeId,
   animeName,
@@ -182,7 +169,6 @@ export function MobileVideoPlayer({
   
   const { settings } = useVideoSettings();
   const { skipTimes, fetchSkipTimes } = useAniskip();
-  const { startDownload, queue } = useMobileDownload();
 
   const tatakaiSkipSegments = useMemo<SkipSegment[]>(() => {
     const segments: SkipSegment[] = [];
@@ -349,8 +335,7 @@ export function MobileVideoPlayer({
       if (currentSubtitle !== 'off') {
         if (currentSubtitle === 'auto') {
           const englishIndex = subtitles.findIndex((sub) => {
-            const label = `${sub.lang || ''} ${sub.label || ''}`.toLowerCase();
-            return label.includes('english') || label === 'en';
+            return subtitleMatchesPreference(sub, 'english');
           });
           selectedIndex = englishIndex >= 0 ? englishIndex : 0;
         } else {
@@ -359,16 +344,7 @@ export function MobileVideoPlayer({
           if (selectedIndex < 0) {
             const key = currentSubtitle.toLowerCase();
             selectedIndex = subtitles.findIndex((sub) => {
-              const label = `${sub.lang || ''} ${sub.label || ''}`.toLowerCase();
-              if (key === 'english') return label.includes('english') || label === 'en';
-              if (key === 'spanish') return label.includes('spanish') || label.includes('espanol') || label === 'es';
-              if (key === 'french') return label.includes('french') || label === 'fr';
-              if (key === 'german') return label.includes('german') || label === 'de';
-              if (key === 'japanese') return label.includes('japanese') || label === 'ja';
-              if (key === 'portuguese') return label.includes('portuguese') || label === 'pt';
-              if (key === 'arabic') return label.includes('arabic') || label === 'ar';
-              if (key === 'hindi') return label.includes('hindi') || label === 'hi';
-              return false;
+              return subtitleMatchesPreference(sub, key);
             });
           }
         }
@@ -521,7 +497,8 @@ export function MobileVideoPlayer({
           const candidates = buildSubtitleFetchCandidates(
             subtitleSourceUrl,
             playbackReferer,
-            Boolean(isOffline)
+            Boolean(isOffline),
+            (url, referer) => getProxiedSubtitleUrl(url, referer)
           );
 
           let normalizedText = '';
@@ -584,8 +561,7 @@ export function MobileVideoPlayer({
     if (keys.includes(currentSubtitle)) return;
 
     const englishIndex = subtitles.findIndex((sub) => {
-      const label = `${sub.lang || ''} ${sub.label || ''}`.toLowerCase();
-      return label.includes('english') || label === 'en';
+      return subtitleMatchesPreference(sub, 'english');
     });
     const fallbackIndex = englishIndex >= 0 ? englishIndex : 0;
     setCurrentSubtitle(getSubtitleSelectionKey(subtitles[fallbackIndex], fallbackIndex));
@@ -910,28 +886,6 @@ export function MobileVideoPlayer({
     }
   };
 
-  // Handle download
-  const handleDownload = async () => {
-    if (!animeId || !episodeId || !animeName) {
-      toast.error("Cannot download: missing info");
-      return;
-    }
-    const source = sources[0];
-    if (!source) {
-      toast.error("No video source available");
-      return;
-    }
-    await startDownload({
-      animeId,
-      animeTitle: animeName,
-      season: 1,
-      episode: episodeNumber || 1,
-      poster: animePoster || poster || '',
-      videoUrl: source.url,
-    });
-    toast.success("Download started");
-  };
-
   // Retry on error
   const handleRetry = () => {
     if (onRetryCurrentServer) onRetryCurrentServer();
@@ -946,13 +900,20 @@ export function MobileVideoPlayer({
         <div className="text-center p-6">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <p className="text-white text-lg mb-4">{videoError}</p>
-          <div className="flex gap-4 justify-center">
+          <div className="flex flex-wrap gap-3 justify-center">
             <button
               onClick={handleRetry}
               className="flex items-center gap-2 px-6 py-3 bg-primary rounded-xl text-white text-lg"
             >
               <RefreshCw className="w-5 h-5" />
               Retry
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              className="flex items-center gap-2 px-6 py-3 bg-white/10 rounded-xl text-white text-lg"
+            >
+              <RefreshCw className="w-5 h-5" />
+              Refresh
             </button>
             {onServerSwitch && (
               <button
@@ -1066,16 +1027,6 @@ export function MobileVideoPlayer({
               </div>
               
               <div className="flex items-center gap-2">
-                {/* Download button */}
-                {!isOffline && animeId && (
-                  <button
-                    onClick={handleDownload}
-                    className="p-2.5 rounded-full bg-white/10 backdrop-blur-md active:bg-white/20 border border-white/10"
-                  >
-                    <Download className="w-5 h-5 text-white" />
-                  </button>
-                )}
-                
                 {/* Lock button */}
                 <button
                   onClick={() => setIsLocked(true)}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useSmartTV } from '@/hooks/useSmartTV';
+import { useSmartTV } from '@/hooks/ui/useSmartTV';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ChevronUp, ChevronDown, ChevronLeft, ChevronRight, 
@@ -210,3 +210,4 @@ export function SmartTVVoiceSearch({ onSearch }: { onSearch: (query: string) => 
     </button>
   );
 }
+

@@ -12,7 +12,7 @@ import {
   Eye, AlertTriangle, ExternalLink, Pin
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { usePinForumPost } from '@/hooks/useForum';
+import { usePinForumPost } from '@/hooks/community/useForum';
 import { cn } from '@/lib/utils';
 
 export function ContentModerationManager() {
@@ -433,3 +433,4 @@ export function ContentModerationManager() {
     </div>
   );
 }
+

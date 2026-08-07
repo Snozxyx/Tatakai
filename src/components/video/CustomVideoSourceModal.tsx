@@ -5,8 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { searchAnime, fetchEpisodes, type AnimeCard, type EpisodeData } from '@/lib/api';
-import { useDebounce } from '@/hooks/useDebounce';
+import { type AnimeCard, type EpisodeData } from '@/lib/api';
+import { contentGraph, toAnimeCard } from '@/core';
+import { useDebounce } from '@/hooks/ui/useDebounce';
 import { Skeleton } from '@/components/ui/skeleton-custom';
 
 interface CustomVideoSourceModalProps {
@@ -38,9 +39,9 @@ export function CustomVideoSourceModal({ isOpen, onClose, onSelect }: CustomVide
     useEffect(() => {
         if (debouncedSearch.trim().length > 2) {
             setLoading(true);
-            searchAnime(debouncedSearch)
+            contentGraph.search({ query: debouncedSearch, page: 1, perPage: 20 })
                 .then(res => {
-                    setResults(res.animes || []);
+                    setResults((res.media || []).map(toAnimeCard));
                 })
                 .catch(err => {
                     console.error("Search failed", err);
@@ -55,16 +56,8 @@ export function CustomVideoSourceModal({ isOpen, onClose, onSelect }: CustomVide
     // Fetch Episodes when anime selected
     useEffect(() => {
         if (selectedAnime) {
-            setLoadingEpisodes(true);
-            fetchEpisodes(selectedAnime.id)
-                .then(res => {
-                    setEpisodes(res.episodes || []);
-                })
-                .catch(err => {
-                    console.error("Fetch episodes failed", err);
-                    setEpisodes([]);
-                })
-                .finally(() => setLoadingEpisodes(false));
+            setLoadingEpisodes(false);
+            setEpisodes([]);
         }
     }, [selectedAnime]);
 
@@ -191,3 +184,4 @@ export function CustomVideoSourceModal({ isOpen, onClose, onSelect }: CustomVide
         </Dialog>
     );
 }
+

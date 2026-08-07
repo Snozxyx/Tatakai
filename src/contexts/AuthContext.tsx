@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { getLocalContinueWatching, clearLocalContinueWatching } from '@/lib/localStorage';
-import { notifyUserCreated } from '@/services/discordWebhook';
+import { notifyUserCreated } from '@/core/network/discord-webhook';
 
 export interface Profile {
   id: string;

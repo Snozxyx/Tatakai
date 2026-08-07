@@ -12,7 +12,7 @@ import { TierListEditor } from '@/components/tierlist/TierListEditor';
 import { TierListGrid } from '@/components/tierlist/TierListCard';
 import { TierListCommentsSection } from '@/components/tierlist/TierListCommentsSection';
 import { useAuth } from '@/contexts/AuthContext';
-import { useUserTierLists, usePublicTierLists, useTierListByShareCode, useDeleteTierList, DEFAULT_TIERS } from '@/hooks/useTierLists';
+import { useUserTierLists, usePublicTierLists, useTierListByShareCode, useDeleteTierList, DEFAULT_TIERS } from '@/hooks/user/useTierLists';
 import {
   useAddTierListCollaborator,
   useRemoveTierListCollaborator,
@@ -20,17 +20,19 @@ import {
   useTierListCollaborators,
   useUpdateTierListCollaboratorRole,
   TierCollaboratorRole
-} from '@/hooks/useTierListCollaboration';
+} from '@/hooks/user/useTierListCollaboration';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ArrowLeft, Plus, User, Trash2, Edit, Share2, Heart, Eye, Globe, Lock, MessageSquare, Users, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 
 // Main Tier Lists page - list all public tier lists + user's own
 export default function TierListPage() {
   const navigate = useNavigate();
+  const isDesktopApp = useIsDesktopApp();
   const { user } = useAuth();
   const [showEditor, setShowEditor] = useState(false);
   const [editingTierList, setEditingTierList] = useState<any>(null);
@@ -59,7 +61,7 @@ export default function TierListPage() {
         <Background />
         <Sidebar />
 
-        <main className="relative z-10 pl-6 md:pl-32 pr-6 py-6 max-w-[1400px] mx-auto pb-24 md:pb-6">
+        <main className={`relative z-10 ${isDesktopApp ? 'pl-6' : 'pl-6 md:pl-32'} pr-6 py-6 max-w-[1400px] mx-auto pb-24 md:pb-6`}>
           <div className="flex items-center gap-4 mb-8">
             <button
               onClick={handleCloseEditor}
@@ -93,7 +95,7 @@ export default function TierListPage() {
       <Background />
       <Sidebar />
 
-      <main className="relative z-10 pl-6 md:pl-32 pr-6 py-6 max-w-[1400px] mx-auto pb-24 md:pb-6">
+      <main className={`relative z-10 ${isDesktopApp ? 'pl-6' : 'pl-6 md:pl-32'} pr-6 py-6 max-w-[1400px] mx-auto pb-24 md:pb-6`}>
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <button
@@ -175,6 +177,7 @@ export default function TierListPage() {
 export function TierListViewPage() {
   const { shareCode } = useParams<{ shareCode: string }>();
   const navigate = useNavigate();
+  const isDesktopApp = useIsDesktopApp();
   const { user } = useAuth();
   const { data: tierList, isLoading, error } = useTierListByShareCode(shareCode || '');
   const { data: tierListAccess } = useTierListAccess(tierList?.id);
@@ -310,7 +313,7 @@ export function TierListViewPage() {
       <Background />
       <Sidebar />
 
-      <main className="relative z-10 pl-6 md:pl-32 pr-6 py-6 max-w-[1400px] mx-auto pb-24 md:pb-6">
+      <main className={`relative z-10 ${isDesktopApp ? 'pl-6' : 'pl-6 md:pl-32'} pr-6 py-6 max-w-[1400px] mx-auto pb-24 md:pb-6`}>
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <button
@@ -590,3 +593,4 @@ export function TierListViewPage() {
     </div>
   );
 }
+

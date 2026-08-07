@@ -5,7 +5,6 @@ import { GlassPanel } from "@/components/ui/GlassPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { useAnimelokSearch } from "@/hooks/useAnimelok";
 import {
     Globe, Plus, Trash2, Edit3, Save, X,
     Film, PlusCircle, Search, Loader2, ChevronRight, Hash
@@ -105,7 +104,6 @@ export function LanguageManager() {
     });
 
     // Anime Search logic (for adding anime)
-    const { data: searchResults, isLoading: searching } = useAnimelokSearch(animeSearchQuery);
 
     return (
         <div className="space-y-8 pb-20">
@@ -262,7 +260,7 @@ export function LanguageManager() {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 gap-2">
+                            {/* <div className="grid grid-cols-1 gap-2">
                                 {searching ? (
                                     <div className="flex justify-center p-10"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
                                 ) : searchResults?.animes?.map((a: any) => (
@@ -279,7 +277,7 @@ export function LanguageManager() {
                                         <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
                                     </button>
                                 ))}
-                            </div>
+                            </div> */}
                         </div>
                     </GlassPanel>
                 </div>
@@ -287,3 +285,4 @@ export function LanguageManager() {
         </div>
     );
 }
+

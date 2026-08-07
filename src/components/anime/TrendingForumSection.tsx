@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useForumPosts, type ForumPost } from '@/hooks/useForum';
+import { useForumPosts, type ForumPost } from '@/hooks/community/useForum';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { 
@@ -124,3 +124,4 @@ export function TrendingForumSection() {
     </section>
   );
 }
+

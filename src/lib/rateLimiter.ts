@@ -7,14 +7,24 @@ const DEFAULT_WINDOW = 60; // seconds
 const buckets = new Map<string, Bucket>();
 
 // Periodically cleanup old buckets
-setInterval(() => {
+const cleanupTimer = setInterval(() => {
   const now = Date.now() / 1000;
   for (const [key, b] of buckets) {
     if (b.reset + 60 < now) {
       buckets.delete(key);
     }
   }
-}, 60_000).unref();
+}, 60_000);
+
+// Node timers expose unref(); browser timers do not.
+if (
+  typeof cleanupTimer === "object" &&
+  cleanupTimer !== null &&
+  "unref" in cleanupTimer &&
+  typeof cleanupTimer.unref === "function"
+) {
+  cleanupTimer.unref();
+}
 
 export function checkRateLimit(key: string, limit = DEFAULT_LIMIT, windowSeconds = DEFAULT_WINDOW) {
   const now = Math.floor(Date.now() / 1000);

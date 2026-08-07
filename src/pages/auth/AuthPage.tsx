@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Eye, EyeOff, Mail, Lock, User, Play, ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
-import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from '@/hooks/useIsNativeApp';
+import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from '@/hooks/ui/useIsNativeApp';
 import { cn } from '@/lib/utils';
 
 const emailSchema = z.string().email('Please enter a valid email');
@@ -15,9 +15,11 @@ const passwordSchema = z.string().min(6, 'Password must be at least 6 characters
 
 // Random video backgrounds
 const VIDEO_SOURCES = [
-  'https://tatakai.jiobase.com/storage/v1/object/public/Public/bg/3.mp4',
-  'https://tatakai.jiobase.com/storage/v1/object/public/Public/bg/2.webm',
-  'https://tatakai.jiobase.com/storage/v1/object/public/Public/bg/1.mp4',
+  './videos/1.mp4',
+  './videos/2.webm',
+  './videos/3.mp4',
+  './videos/5.mp4',
+  './videos/6.mp4',
   `${window.location.origin}/videos/5.mp4`,
   `${window.location.origin}/videos/6.mp4`,
 ];
@@ -353,3 +355,4 @@ export default function AuthPage() {
     </div>
   );
 }
+

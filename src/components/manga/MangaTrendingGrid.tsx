@@ -1,7 +1,7 @@
 import { Flame } from "lucide-react";
 import { UnifiedMediaCardProps } from "@/components/UnifiedMediaCard";
 import { useNavigate } from "react-router-dom";
-import { getProxiedImageUrl } from "@/lib/api";
+import { getHighQualityImage } from "@/lib/api";
 
 interface MangaTrendingGridProps {
   items: UnifiedMediaCardProps["item"][];
@@ -31,7 +31,7 @@ function MangaTrendingCard({
       className={`relative group rounded-3xl overflow-hidden cursor-pointer ${spanClass} border border-border/30 min-h-[200px] md:min-h-0`}
     >
       <img
-        src={getProxiedImageUrl(item.poster)}
+        src={getHighQualityImage(item.poster)}
         alt={item.name}
         className="w-full h-full object-cover transition-all duration-700 group-hover:scale-110"
       />

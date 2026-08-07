@@ -2,9 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 
 const VIDEO_SOURCES = [
-  'https://tatakai.jiobase.com/storage/v1/object/public/Public/bg/3.mp4',
-  'https://tatakai.jiobase.com/storage/v1/object/public/Public/bg/2.webm',
-  'https://tatakai.jiobase.com/storage/v1/object/public/Public/bg/1.mp4',
+  './videos/1.mp4',
+  './videos/2.webm',
+  './videos/3.mp4',
+  './videos/5.mp4',
+  './videos/6.mp4',
 ];
 
 interface StatusPageBackgroundProps {

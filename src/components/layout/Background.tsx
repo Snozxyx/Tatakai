@@ -1,4 +1,4 @@
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/ui/useTheme";
 import { cn } from "@/lib/utils";
 
 export function Background() {
@@ -41,3 +41,4 @@ export function Background() {
     </div>
   );
 }
+

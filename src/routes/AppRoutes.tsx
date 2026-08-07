@@ -2,9 +2,10 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { Routes, Route, Navigate, useLocation, useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useMaintenanceMode } from "@/hooks/useAdminMessages";
-import { useIsNativeApp } from "@/hooks/useIsNativeApp";
-import { useAntiDevTools } from '@/hooks/useAntiDevTools';
+import { useMaintenanceMode } from "@/hooks/admin/useAdminMessages";
+import { useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
+import { WebWatchGate } from '@/components/layout/WebWatchGate';
+import { useAntiDevTools } from '@/hooks/ui/useAntiDevTools';
 import {
   clearDevtoolsTrapState,
   isDevtoolsGuardBypassedHost,
@@ -13,23 +14,24 @@ import {
   persistDevtoolsTrapState,
 } from '@/lib/devtoolsTrap';
 import { Capacitor } from '@capacitor/core';
+import { Miniplayer } from '@/components/video/Miniplayer';
+import { initializePlayerAdapters } from '@/core/player/adapters-init';
 
 // Base Pages
 const Index = lazy(() => import("../pages/base/Index"));
+const HomeGate = lazy(() => import("../pages/base/HomeGate"));
+const LandingPage = lazy(() => import("../pages/base/LandingPage"));
+const DownloadPage = lazy(() => import("../pages/base/DownloadPage"));
 const SearchPage = lazy(() => import("../pages/base/SearchPage"));
 const GenrePage = lazy(() => import("../pages/base/GenrePage"));
-const LanguagesPage = lazy(() => import("../pages/base/LanguagesPage"));
-const LanguageAnimePage = lazy(() => import("../pages/base/LanguageAnimePage"));
 const TrendingPage = lazy(() => import("../pages/base/TrendingPage"));
 const RecommendationsPage = lazy(() => import("../pages/base/RecommendationsPage"));
-const SchedulePage = lazy(() => import("../pages/base/SchedulePage"));
-const RegionalSchedulePage = lazy(() => import("../pages/base/RegionalSchedulePage"));
 const SuggestionsPage = lazy(() => import("../pages/base/SuggestionsPage"));
-const DownloadPage = lazy(() => import("../pages/base/DownloadPage"));
-const MobileAppSoonPage = lazy(() => import("../pages/base/MobileAppSoonPage"));
 const DiscordPage = lazy(() => import("../pages/base/DiscordPage"));
 const CharacterPage = lazy(() => import("../pages/base/CharacterPage"));
 const SettingsPage = lazy(() => import("../pages/base/SettingsPage"));
+const ExtensionHubPage = lazy(() => import("../pages/base/ExtensionHubPage"));
+const ExtensionDetailPage = lazy(() => import("../pages/base/ExtensionDetailPage"));
 
 // Auth & Onboarding
 const AuthPage = lazy(() => import("../pages/auth/AuthPage"));
@@ -51,6 +53,7 @@ const MangaHomePage = lazy(() => import("../pages/manga/MangaHomePage"));
 const MangaGenreBrowsePage = lazy(() => import("../pages/manga/MangaGenreBrowsePage"));
 const MangaPage = lazy(() => import("../pages/manga/MangaPage"));
 const MangaReaderPage = lazy(() => import("../pages/manga/MangaReaderPage"));
+const NovelComingSoon = lazy(() => import("../pages/novel/NovelComingSoon"));
 
 // Profile & Personal
 const ProfilePage = lazy(() => import("../pages/profile/ProfilePage"));
@@ -94,12 +97,18 @@ const PageLoader = () => (
   </div>
 );
 
+import { extensionRegistry } from '@/core/extensions/ExtensionRegistry';
+
 function CatchAllHandler() {
   const { slug } = useParams<{ slug: string }>();
   const [isRedirectLoading, setIsRedirectLoading] = useState(true);
 
+  // Check Extension Registry for custom pages
+  const extPages = extensionRegistry.getPages();
+  const matchedExtPage = extPages.find(p => p.path === `/${slug}` || p.path === slug);
+
   useEffect(() => {
-    if (slug?.startsWith('@')) {
+    if (slug?.startsWith('@') || matchedExtPage) {
       setIsRedirectLoading(false);
       return;
     }
@@ -125,10 +134,15 @@ function CatchAllHandler() {
     };
 
     checkRedirect();
-  }, [slug]);
+  }, [slug, matchedExtPage]);
 
   if (slug?.startsWith('@')) {
     return <ProfilePage key={slug} />;
+  }
+
+  if (matchedExtPage) {
+    const Component = matchedExtPage.component;
+    return <Component />;
   }
 
   if (isRedirectLoading) return <PageLoader />;
@@ -141,6 +155,23 @@ export function GlobalListeners() {
   const { user, isLoading } = useAuth();
   const isSetupComplete = localStorage.getItem('tatakai_setup_complete') === 'true';
   const isNative = useIsNativeApp();
+
+  useEffect(() => {
+    initializePlayerAdapters();
+
+    // Sync torrent settings with main process on startup (desktop only)
+    if (typeof window !== 'undefined' && (window as any).tatakaiRuntime?.updateTorrentSettings) {
+      const schedule = localStorage.getItem('tatakai_bandwidth_schedule') || 'default';
+      const limitDownload = Number(localStorage.getItem('tatakai_torrent_limit_dl') || 0);
+      const limitUpload = Number(localStorage.getItem('tatakai_torrent_limit_ul') || 0);
+
+      (window as any).tatakaiRuntime.updateTorrentSettings({
+        schedule,
+        limitDownload,
+        limitUpload
+      });
+    }
+  }, []);
 
   useEffect(() => {
     if (isNative && !isSetupComplete && location.pathname !== '/setup') {
@@ -168,11 +199,13 @@ export function GlobalListeners() {
 export function DeepLinkHandler() {
   const navigate = useNavigate();
   useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).electron) {
-      (window as any).electron.onNavigate((path: string) => {
-        navigate(path);
-      });
-    }
+    if (typeof window === 'undefined' || !(window as any).electron?.onNavigate) return;
+    const unsubscribe = (window as any).electron.onNavigate((path: string) => {
+      navigate(path);
+    });
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
   }, [navigate]);
   return null;
 }
@@ -276,11 +309,17 @@ const AppRoutes = () => {
         <Route path="/error" element={<StatusPageGuard allowedWhen={false}><ErrorPage /></StatusPageGuard>} />
         <Route path="/devtools-blocked" element={<DevtoolsBlockedPage />} />
         <Route path="/char/:charname" element={<CharacterPage />} />
+        <Route path="/character/:charname" element={<CharacterPage />} />
+        <Route path="/extensions" element={<ProtectedRoute><ExtensionHubPage /></ProtectedRoute>} />
+        <Route path="/extensions/:extensionId" element={<ProtectedRoute><ExtensionDetailPage /></ProtectedRoute>} />
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
         <Route path="/setup" element={<SetupPage />} />
         <Route path="/discord" element={<DiscordPage />} />
-        <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+        <Route path="/" element={<HomeGate />} />
+        <Route path="/welcome" element={<LandingPage />} />
+        <Route path="/download" element={<DownloadPage />} />
+        <Route path="/browse" element={<ProtectedRoute><Index /></ProtectedRoute>} />
         <Route path="/mal/:id" element={<ExternalIdRedirect type="mal" />} />
         <Route path="/anilist/:id" element={<ExternalIdRedirect type="anilist" />} />
         <Route path="/anime/:animeId" element={<ProtectedRoute><AnimePage /></ProtectedRoute>} />
@@ -288,18 +327,15 @@ const AppRoutes = () => {
         <Route path="/manga/discover" element={<ProtectedRoute><MangaGenreBrowsePage /></ProtectedRoute>} />
         <Route path="/manga/genre/:genre" element={<ProtectedRoute><MangaGenreBrowsePage /></ProtectedRoute>} />
         <Route path="/manga/:mangaId" element={<ProtectedRoute><MangaPage /></ProtectedRoute>} />
-        <Route path="/manga/read/:mangaId" element={<ProtectedRoute><MangaReaderPage /></ProtectedRoute>} />
-        <Route path="/watch/:episodeId" element={<ProtectedRoute><WatchPage /></ProtectedRoute>} />
+        <Route path="/manga/read/:mangaId" element={<ProtectedRoute><WebWatchGate><MangaReaderPage /></WebWatchGate></ProtectedRoute>} />
+        <Route path="/novel/comingsoon" element={<ProtectedRoute><NovelComingSoon /></ProtectedRoute>} />
+        <Route path="/watch/:episodeId" element={<ProtectedRoute><WebWatchGate><WatchPage /></WebWatchGate></ProtectedRoute>} />
         <Route path="/downloads" element={<ProtectedRoute>{isMobileApp ? <MobileOfflinePage /> : <OfflineLibraryPage />}</ProtectedRoute>} />
         <Route path="/offline-library" element={<ProtectedRoute><OfflineLibraryPage /></ProtectedRoute>} />
         <Route path="/offline" element={<ProtectedRoute><OfflineLibraryPage /></ProtectedRoute>} />
         <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
         <Route path="/search/producer/:producerName" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
-        <Route path="/download" element={<ProtectedRoute><DownloadPage /></ProtectedRoute>} />
-        <Route path="/mobile-app" element={<ProtectedRoute><MobileAppSoonPage /></ProtectedRoute>} />
         <Route path="/image-search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
-        <Route path="/languages" element={<ProtectedRoute><LanguagesPage /></ProtectedRoute>} />
-        <Route path="/languages/:language" element={<ProtectedRoute><LanguageAnimePage /></ProtectedRoute>} />
         <Route path="/genre/:genre" element={<ProtectedRoute><GenrePage /></ProtectedRoute>} />
         <Route path="/trending" element={<ProtectedRoute><TrendingPage /></ProtectedRoute>} />
         <Route path="/collections" element={<ProtectedRoute><CollectionsPage /></ProtectedRoute>} />
@@ -334,8 +370,11 @@ const AppRoutes = () => {
         <Route path="/isshoni" element={<ProtectedRoute><IsshoNiPage /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
+      <Miniplayer />
     </Suspense>
   );
 };
 
 export default AppRoutes;
+
+

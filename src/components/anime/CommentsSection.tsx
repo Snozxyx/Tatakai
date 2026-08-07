@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useComments, useReplies, useAddComment, useDeleteComment, useLikeComment, usePinComment } from '@/hooks/useComments';
+import { useComments, useReplies, useAddComment, useDeleteComment, useLikeComment, usePinComment } from '@/hooks/community/useComments';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -390,3 +390,4 @@ export function CommentsSection({ animeId, episodeId }: CommentsSectionProps) {
     </div>
   );
 }
+

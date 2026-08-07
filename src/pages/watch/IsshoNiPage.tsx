@@ -10,8 +10,9 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
-import { usePublicWatchRooms, useUserWatchRooms, useCreateRoom, useInfinitePublicWatchRooms, WatchRoom } from '@/hooks/useWatchRoom';
-import { getProxiedImageUrl, searchAnime, fetchEpisodes } from '@/lib/api';
+import { usePublicWatchRooms, useUserWatchRooms, useCreateRoom, useInfinitePublicWatchRooms, WatchRoom } from '@/hooks/media/useWatchRoom';
+import { getProxiedImageUrl } from '@/lib/api';
+import { contentGraph, toAnimeCard } from '@/core';
 import {
     Users, Plus, Lock, Globe, Key, ArrowLeft, Play, Clock,
     Sparkles, Film, UserPlus, Crown, Eye, Radio, Tv, Zap, Search,
@@ -20,9 +21,10 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
-import { useDebounce } from "@/hooks/useDebounce";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useDebounce } from "@/hooks/ui/useDebounce";
+import { useIsMobile } from "@/hooks/ui/use-mobile";
 import { useRef, useCallback } from 'react';
+import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 
 // Reusable Room Card Component
 export function WatchRoomCard({ room }: { room: WatchRoom }) {
@@ -121,6 +123,7 @@ export function WatchRoomCard({ room }: { room: WatchRoom }) {
 
 export default function IsshoNiPage() {
     const navigate = useNavigate();
+    const isDesktopApp = useIsDesktopApp();
     const [searchParams] = useSearchParams();
     const { user } = useAuth();
     const isMobile = useIsMobile();
@@ -206,8 +209,8 @@ export default function IsshoNiPage() {
             }
             setIsSearching(true);
             try {
-                const results = await searchAnime(debouncedAnimeSearch);
-                setSearchResults(results.animes.slice(0, 5));
+                const results = await contentGraph.search({ query: debouncedAnimeSearch, page: 1, perPage: 5 });
+                setSearchResults((results.media || []).map(toAnimeCard).slice(0, 5));
             } catch (error) {
                 console.error('Search failed:', error);
             } finally {
@@ -267,7 +270,7 @@ export default function IsshoNiPage() {
             <Background />
             <Sidebar />
 
-            <main className="relative z-10 pl-4 md:pl-32 pr-4 md:pr-6 py-4 md:py-6 max-w-[1600px] mx-auto pb-24 md:pb-6">
+            <main className={`relative z-10 ${isDesktopApp ? 'pl-4' : 'pl-4 md:pl-32'} pr-4 md:pr-6 py-4 md:py-6 max-w-[1600px] mx-auto pb-24 md:pb-6`}>
                 {/* Hero Header */}
                 <div className="relative mb-12">
                     <div className="absolute inset-0 -z-10">
@@ -383,7 +386,7 @@ export default function IsshoNiPage() {
 
                                                                     // Auto-fetch first episode title
                                                                     try {
-                                                                        const episodesData = await fetchEpisodes(anime.id).catch(() => null);
+                                                                        const episodesData = null;
                                                                         if (episodesData?.episodes?.[0]) {
                                                                             const firstEp = episodesData.episodes[0];
                                                                             setNewRoom(prev => ({
@@ -689,3 +692,4 @@ export default function IsshoNiPage() {
         </div>
     );
 }
+

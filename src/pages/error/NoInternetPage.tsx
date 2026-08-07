@@ -11,7 +11,17 @@ interface NoInternetPageProps {
 // Helper function to get correct video path
 const getVideoPath = (filename: string) => {
   const isElectron = typeof window !== 'undefined' && (window as any).electron;
-  return isElectron ? `./${filename}` : `/${filename}`;
+  if (!isElectron) return `/${filename}`;
+  try {
+    // In Electron: window.location.href = file:///C:/...dist/index.html
+    // Strip the filename to get base directory
+    const base = window.location.href
+      .replace(/[?#].*$/, '')
+      .replace(/\/[^/]*$/, '/');
+    return `${base}${filename}`;
+  } catch {
+    return `/${filename}`;
+  }
 };
 
 // Video sources - local videos bundled with the app (in public/videos)
@@ -42,6 +52,7 @@ const TEXT_VARIATIONS = [
 export default function NoInternetPage({ isNative = false }: NoInternetPageProps) {
   const navigate = useNavigate();
   const [isRetrying, setIsRetrying] = useState(false);
+  const isElectron = typeof window !== 'undefined' && !!(window as any).electron;
 
   // Pick random video and text on mount
   const randomVideoSrc = useMemo(() => {
@@ -60,12 +71,20 @@ export default function NoInternetPage({ isNative = false }: NoInternetPageProps
   };
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row bg-background">
+    // In Electron the TitleBar is 32px (pt-8). Use fixed positioning to cover
+    // the entire viewport below the title bar, ignoring any sidebar offset.
+    <div
+      className={`flex flex-col lg:flex-row bg-background ${
+        isElectron
+          ? 'fixed inset-0 top-8 z-[100]'
+          : 'min-h-screen'
+      }`}
+    >
       {/* Left Side - Main Glass Card with opaque background */}
       <div className="w-full lg:w-1/2 min-h-screen bg-background flex flex-col justify-center items-center p-6 lg:p-12 relative">
         {/* Back button */}
-        <button 
-          onClick={() => navigate('/')} 
+        <button
+          onClick={() => navigate('/')}
           className="absolute top-6 left-6 flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors group"
         >
           <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
@@ -105,9 +124,9 @@ export default function NoInternetPage({ isNative = false }: NoInternetPageProps
                 }}
               />
             ))}
-            
+
             {/* Icon container */}
-            <motion.div 
+            <motion.div
               className="relative z-10 w-20 h-20 rounded-2xl bg-gradient-to-br from-muted/80 to-muted border border-border shadow-xl flex items-center justify-center"
               animate={{ scale: [1, 1.02, 1] }}
               transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
@@ -127,7 +146,7 @@ export default function NoInternetPage({ isNative = false }: NoInternetPageProps
               No Internet Connection
             </h2>
             <p className="text-muted-foreground text-base leading-relaxed">
-              {isNative 
+              {isNative
                 ? "You're currently offline. Don't worry - your downloaded anime is still available in the offline library."
                 : "We couldn't connect to the server. Please check your internet connection and try again."
               }
@@ -135,7 +154,7 @@ export default function NoInternetPage({ isNative = false }: NoInternetPageProps
           </motion.div>
 
           {/* Action Buttons */}
-          <motion.div 
+          <motion.div
             className="flex flex-col gap-3"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -191,7 +210,7 @@ export default function NoInternetPage({ isNative = false }: NoInternetPageProps
           </motion.div>
 
           {/* Status indicator */}
-          <motion.div 
+          <motion.div
             className="mt-10 pt-8 border-t border-border/50 flex items-center justify-center gap-3"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -214,16 +233,17 @@ export default function NoInternetPage({ isNative = false }: NoInternetPageProps
           loop
           playsInline
           className="absolute inset-0 w-full h-full object-cover"
+          onError={(e) => { (e.currentTarget as HTMLVideoElement).style.display = 'none'; }}
         >
           <source src={randomVideoSrc} type={randomVideoSrc.endsWith('.webm') ? 'video/webm' : 'video/mp4'} />
         </video>
-        
+
         {/* Dark Overlay (20%) */}
         <div className="absolute inset-0 bg-black/20" />
-        
+
         {/* Content over video */}
         <div className="absolute inset-0 flex flex-col justify-end p-12">
-          <motion.div 
+          <motion.div
             className="max-w-md"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

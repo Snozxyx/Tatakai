@@ -5,11 +5,14 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { AnimeCardWithPreview } from "@/components/anime/AnimeCardWithPreview";
 import { useQuery } from "@tanstack/react-query";
-import { fetchHome, AnimeCard, fetchJikanSeasonNow, fetchJikanSeasonUpcoming, jikanToAnimeCard, getProxiedImageUrl } from "@/lib/api";
+import { AnimeCard, getProxiedImageUrl } from "@/lib/api";
+import { contentGraph, toAnimeCard, toHomeData } from "@/core";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CardSkeleton } from "@/components/ui/skeleton-custom";
 import { ArrowLeft, TrendingUp, Star, Clock, Flame, Heart, PlayCircle, Library, Calendar, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
+import { MangaTrendingSection } from '@/components/manga/MangaTrendingSection';
 
 type TabType = 'trending' | 'popular' | 'favorites' | 'airing' | 'completed' | 'season-now' | 'upcoming';
 
@@ -72,7 +75,7 @@ function CollectionsHero({ anime, title }: { anime: AnimeCard; title: string }) 
             className="flex items-center gap-2 px-4 md:px-8 py-2 md:py-3 bg-white text-black rounded-xl md:rounded-2xl text-sm md:text-base font-bold hover:scale-105 transition-all shadow-xl"
           >
             <PlayCircle className="w-5 h-5" />
-            {anime.id.startsWith('mal-') ? 'View on MAL' : 'Watch Now'}
+            Watch Now
           </button>
           <button
             onClick={handleClick}
@@ -88,26 +91,27 @@ function CollectionsHero({ anime, title }: { anime: AnimeCard; title: string }) 
 
 export default function CollectionsPage() {
   const navigate = useNavigate();
+  const isDesktopApp = useIsDesktopApp();
   const [activeTab, setActiveTab] = useState<TabType>("popular");
 
   // Fetch home data for internal collections
   const { data: homeData, isLoading: loadingHome } = useQuery({
     queryKey: ['home'],
-    queryFn: fetchHome,
+    queryFn: async () => toHomeData(await contentGraph.getHomePage()),
     staleTime: 5 * 60 * 1000,
   });
 
   // Fetch Jikan season data
   const { data: seasonNowData, isLoading: loadingSeasonNow } = useQuery({
     queryKey: ['jikan-season-now'],
-    queryFn: () => fetchJikanSeasonNow(1),
+    queryFn: () => contentGraph.getSeasonal(undefined, undefined, 1, 24),
     staleTime: 10 * 60 * 1000,
     enabled: activeTab === 'season-now',
   });
 
   const { data: upcomingData, isLoading: loadingUpcoming } = useQuery({
     queryKey: ['jikan-upcoming'],
-    queryFn: () => fetchJikanSeasonUpcoming(1),
+    queryFn: () => contentGraph.getUpcoming(1, 24),
     staleTime: 10 * 60 * 1000,
     enabled: activeTab === 'upcoming',
   });
@@ -118,11 +122,11 @@ export default function CollectionsPage() {
 
   const currentCollection = useMemo(() => {
     // Jikan tabs
-    if (activeTab === 'season-now' && seasonNowData?.data) {
-      return seasonNowData.data.map(jikanToAnimeCard);
+    if (activeTab === 'season-now' && seasonNowData?.media) {
+      return seasonNowData.media.map(toAnimeCard);
     }
-    if (activeTab === 'upcoming' && upcomingData?.data) {
-      return upcomingData.data.map(jikanToAnimeCard);
+    if (activeTab === 'upcoming' && upcomingData?.media) {
+      return upcomingData.media.map(toAnimeCard);
     }
 
     // Internal API tabs
@@ -163,7 +167,7 @@ export default function CollectionsPage() {
       <Background />
       <Sidebar />
 
-      <main className="relative z-10 pl-4 md:pl-32 pr-4 md:pr-6 py-4 md:py-6 max-w-[1800px] mx-auto pb-24 md:pb-6">
+      <main className={`relative z-10 ${isDesktopApp ? 'pl-4' : 'pl-4 md:pl-32'} pr-4 md:pr-6 py-4 md:py-6 max-w-[1800px] mx-auto pb-24 md:pb-6`}>
         {/* Header */}
         <div className="mb-8 md:mb-12">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
@@ -262,6 +266,16 @@ export default function CollectionsPage() {
             </TabsContent>
           </AnimatePresence>
         </Tabs>
+
+        {/* ── Manga Discovery ───────────────────────────────────────── */}
+        <div className="mt-12">
+          <MangaTrendingSection
+            title="Discover Manga"
+            defaultTab="manhwa"
+            showTabs
+            limit={18}
+          />
+        </div>
       </main>
 
       <MobileNav />

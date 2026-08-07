@@ -8,8 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { API_URL, unwrapApiData } from '@/lib/api/api-client';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { TATAKAI_API_URL, unwrapApiData } from '@/lib/api/api-client';
 import {
   Plus, Trash2, Edit2, Server, Search, Film, Globe, CheckCircle, XCircle, ExternalLink, Play, Link2, Loader2
 } from 'lucide-react';
@@ -157,7 +157,7 @@ export function VideoServerManager() {
 
     try {
       // Try internal HiAnime API first (for correct Tatakai IDs)
-      const internalRes = await fetch(`${API_URL}/search?q=${encodeURIComponent(query)}&page=1`, {
+      const internalRes = await fetch(`${TATAKAI_API_URL}/search?q=${encodeURIComponent(query)}&page=1`, {
         headers: { Accept: 'application/json' },
         signal: AbortSignal.timeout(8000),
       });
@@ -291,6 +291,9 @@ export function VideoServerManager() {
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>Add Custom Video Source</DialogTitle>
+              <DialogDescription>
+                Fill in the details below to add a custom streaming source for a specific anime episode.
+              </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4 py-4">

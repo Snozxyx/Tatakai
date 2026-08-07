@@ -2,10 +2,10 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { useWatchHistory } from '@/hooks/useWatchHistory';
-import { useWatchStreaks } from '@/hooks/useWatchStreaks';
-import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from '@/hooks/useIsNativeApp';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { useWatchHistory } from '@/hooks/user/useWatchHistory';
+import { useWatchStreaks } from '@/hooks/user/useWatchStreaks';
+import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from '@/hooks/ui/useIsNativeApp';
+import { useIsMobile } from '@/hooks/ui/use-mobile';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
 import { Background } from '@/components/layout/Background';
@@ -398,3 +398,4 @@ export default function WrappedPage() {
     </div>
   );
 }
+

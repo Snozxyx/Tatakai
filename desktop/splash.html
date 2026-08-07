@@ -1,178 +1,316 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tatakai</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: #09090b; /* Zinc-950 */
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            color: white;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            overflow: hidden;
-            user-select: none;
-            cursor: default;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tatakai</title>
+  <link
+    rel="preconnect"
+    href="https://fonts.googleapis.com"
+  />
+  <link
+    rel="preconnect"
+    href="https://fonts.gstatic.com"
+    crossorigin
+  />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=Outfit:wght@700;800&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    /* ── Design tokens (mirrors src/index.css) ─────────────────────────── */
+    :root {
+      --bg:          hsl(0 0% 4%);
+      --surface:     hsl(340 12% 8%);
+      --border:      hsl(340 10% 20%);
+      --fg:          hsl(340 5% 95%);
+      --fg-muted:    hsl(340 10% 60%);
+      --primary:     hsl(340 82% 65%);
+      --secondary:   hsl(320 70% 55%);
+      --radius:      1.25rem;
+    }
 
-        /* Dynamic Background */
-        .bg {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: radial-gradient(circle at 50% 50%, #18181b 0%, #09090b 100%);
-            z-index: -2;
-        }
+    /* ── Reset ─────────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-        .orb {
-            position: absolute;
-            border-radius: 50%;
-            filter: blur(60px);
-            opacity: 0.3;
-            animation: float 8s infinite ease-in-out;
-            z-index: -1;
-        }
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      user-select: none;
+      cursor: default;
+      -webkit-font-smoothing: antialiased;
+    }
 
-        .orb-1 {
-            top: -30%;
-            left: -20%;
-            width: 80%;
-            height: 80%;
-            background: 0 0% 98; /* Violet-600 */
-            animation-delay: 0s;
-        }
+    body {
+ z-index: 1;
+      /* width: min(88vw, 420px); */
+      /* border-radius: 24px; */
+      border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+      background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--surface) 86%, transparent),
+        color-mix(in srgb, var(--bg) 92%, transparent)
+      );
+      box-shadow:
+        0 14px 45px color-mix(in srgb, var(--bg) 65%, transparent),
+        inset 0 1px 0 color-mix(in srgb, var(--fg) 10%, transparent);
+      backdrop-filter: blur(10px);
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      display: flex;
+      align-items: center;
+      
+      justify-content: center;
+    }
 
-        .orb-2 {
-            bottom: -30%;
-            right: -20%;
-            width: 80%;
-            height: 80%;
-            background: 0 0% 2%; /* Blue-600 */
-            animation-delay: -4s;
-        }
+    /* .chrome {
+    
+    } */
+/* .chrome {
+      position: relative;
+      z-index: 1;
+      width: min(88vw, 420px);
+      border-radius: 24px;
+      border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+      background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--surface) 86%, transparent),
+        color-mix(in srgb, var(--bg) 92%, transparent)
+      );
+      box-shadow:
+        0 14px 45px color-mix(in srgb, var(--bg) 65%, transparent),
+        inset 0 1px 0 color-mix(in srgb, var(--fg) 10%, transparent);
+      backdrop-filter: blur(10px);
+      padding: 22px;
+    } */
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      opacity: 0.7;
+    }
 
-        @keyframes float {
-            0%, 100% { transform: translate(0, 0) scale(1); }
-            50% { transform: translate(20px, 30px) scale(1.05); }
-        }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--fg) 35%, transparent);
+    }
 
-        /* Content */
-        .container {
-            z-index: 10;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 1.5rem;
-            opacity: 0;
-            animation: fadeIn 0.8s ease-out forwards;
-        }
+    /* ── Gradient mesh background (matches app's --gradient-mesh) ──────── */
+    .mesh {
+      position: fixed;
+      inset: 0;
+      border-radius: 22px;
+      background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 10%, transparent), color-mix(in srgb, var(--secondary) 10%, transparent));
+      border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
+      backdrop-filter: blur(10px);
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.45;
+    }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
-        }
+    /* ── Content ────────────────────────────────────────────────────────── */
+    .content {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.1rem;
+      animation: appear 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+      padding: 6px 8px 10px;
+    }
 
-        .logo-container {
-            position: relative;
-            width: 120px;
-            height: 120px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin-bottom: 0.5rem;
-        }
+    @keyframes appear {
+      from { opacity: 0; transform: translateY(8px) scale(0.97); }
+      to   { opacity: 1; transform: translateY(0)   scale(1);    }
+    }
 
-        .logo {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            filter: drop-shadow(0 0 25px rgba(124, 58, 237, 0.4));
-            animation: breathe 3s infinite ease-in-out;
-        }
-        
-        @keyframes breathe {
-            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 25px rgba(124, 58, 237, 0.4)); }
-            50% { transform: scale(1.05); filter: drop-shadow(0 0 40px rgba(124, 58, 237, 0.6)); }
-        }
+    /* ── Logo mark ──────────────────────────────────────────────────────── */
+    .logo-wrap {
+      width: 88px;
+      height: 88px;
+      border-radius: 200px;
+      /* background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 10%, transparent), color-mix(in srgb, var(--secondary) 10%, transparent)); */
+      /* border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent); */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: pulse-glow 3s ease-in-out infinite;
+      overflow: hidden;
+    }
 
-        .title {
-            font-size: 3rem;
-            font-weight: 800;
-            letter-spacing: -0.03em;
-            background: linear-gradient(135deg, #fff 0%, #d1ceda 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin: 0;
-            text-shadow: 0 0 30px rgba(167, 139, 250, 0.2);
-        }
+    /* @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 20px color-mix(in srgb, var(--primary) 35%, transparent); }
+      50%       { box-shadow: 0 0 40px color-mix(in srgb, var(--primary) 55%, transparent); }
+    } */
 
-        .loader {
-            width: 180px;
-            height: 3px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 4px;
-            overflow: hidden;
-            margin-top: 1.5rem;
-            position: relative;
-        }
+    .logo-wrap img {
+      width: 62px;
+      height: 62px;
+      object-fit: contain;
+      border-radius: 1px;
+      clip-path: circle(49% at 50% 50%);
+      filter: drop-shadow(0 0 12px color-mix(in srgb, var(--primary) 40%, transparent));
+    }
+  /* position: relative;
+      z-index: 1;
+      width: min(88vw, 420px);
+      border-radius: 24px;
+      border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+      background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--surface) 86%, transparent),
+        color-mix(in srgb, var(--bg) 92%, transparent)
+      );
+      box-shadow:
+        0 14px 45px color-mix(in srgb, var(--bg) 65%, transparent),
+        inset 0 1px 0 color-mix(in srgb, var(--fg) 10%, transparent);
+      backdrop-filter: blur(10px);
+      padding: 22px; */
+    /* ── Wordmark ────────────────────────────────────────────────────────── */
+    .wordmark {
+      font-family: 'Outfit', sans-serif;
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      background: linear-gradient(135deg, var(--fg) 0%, color-mix(in srgb, var(--fg) 70%, var(--primary) 30%) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1;
+    }
 
-        .loader-bar {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, #8b5cf6, transparent);
-            transform: translateX(-100%);
-            animation: loading 1.5s infinite ease-in-out;
-        }
+    .tagline {
+      font-size: 0.8rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: color-mix(in srgb, var(--fg-muted) 88%, transparent);
+      font-weight: 600;
+    }
 
-        @keyframes loading {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-        }
+    /* ── Progress bar ────────────────────────────────────────────────────── */
+    .progress-track {
+      width: 220px;
+      height: 3px;
+      background: color-mix(in srgb, var(--border) 60%, transparent);
+      border-radius: 999px;
+      overflow: hidden;
+    }
 
-        .version {
-            position: absolute;
-            bottom: 24px;
-            font-size: 0.75rem;
-            font-weight: 500;
-            color: rgba(255, 255, 255, 0.3);
-            letter-spacing: 0.1em;
-            font-family: monospace;
-        }
-        .portal{
-            position: absolute;
-            bottom: 51px;
-            font-size: small;
-            font-weight: 500;
-            color: rgba(255, 255, 255, 0.3);
-            letter-spacing: 0.2em;
-            font-family: monospace;
-        }
-    </style>
+    .progress-fill {
+      height: 100%;
+      width: 40%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--primary), var(--secondary));
+      animation: shimmer 1.6s ease-in-out infinite;
+      transform-origin: left;
+    }
+
+    @keyframes shimmer {
+      0%   { transform: translateX(-250%); }
+      100% { transform: translateX(350%);  }
+    }
+
+    /* ── Version tag ─────────────────────────────────────────────────────── */
+    .version {
+      position: fixed;
+      bottom: 16px;
+      font-size: 0.7rem;
+      font-weight: 500;
+      color: var(--fg-muted);
+      letter-spacing: 0.08em;
+      font-family: 'Space Grotesk', monospace;
+      z-index: 1;
+    }
+  </style>
 </head>
 <body>
-    <div class="bg">
-        <div class="orb orb-1"></div>
-        <div class="orb orb-2"></div>
-    </div>
+  <div class="mesh"></div>
+    <!-- <div class="topbar" aria-hidden="true">
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+    </div> -->
+  <div class="chrome">
 
-    <div class="container">
-        <h1 class="title">Tatakai</h1>
-        <div class="loader">
-            <div class="loader-bar"></div>
-        </div>
-    </div>
-    <div class="version">v4.1.20</div>
+    <div class="content">
+      <div class="logo-wrap">
+        <img src="../public/tatakai-logo-square.png" alt="Tatakai logo" />
+      </div>
 
+      <h1 class="wordmark">Tatakai</h1>
+          <h2 class="tagline">By @Snozxyx</h2>
+      <div class="progress-track">
+        <div class="progress-fill"></div>
+      </div>
+    </div>
+  </div>
+
+  <span class="version" id="ver">Loading…</span>
+
+  <script>
+    (function applySplashThemeFromQuery() {
+      var params = new URLSearchParams(window.location.search || '');
+      function hsl(token) {
+        if (!token) return null;
+        var t = decodeURIComponent(String(token)).trim();
+        if (!t) return null;
+        return 'hsl(' + t + ')';
+      }
+      var root = document.documentElement;
+      var bg = hsl(params.get('background'));
+      var fg = hsl(params.get('foreground'));
+      var fgMuted = hsl(params.get('mutedForeground'));
+      var border = hsl(params.get('border'));
+      var primary = hsl(params.get('primary'));
+      var secondary = hsl(params.get('secondary'));
+      var card = hsl(params.get('card'));
+
+      if (bg) root.style.setProperty('--bg', bg);
+      if (card) root.style.setProperty('--surface', card);
+      if (border) root.style.setProperty('--border', border);
+      if (fg) root.style.setProperty('--fg', fg);
+      if (fgMuted) root.style.setProperty('--fg-muted', fgMuted);
+      if (primary) root.style.setProperty('--primary', primary);
+      if (secondary) root.style.setProperty('--secondary', secondary);
+
+      var mesh = document.querySelector('.mesh');
+      if (mesh && primary && secondary) {
+        mesh.style.background =
+          'radial-gradient(at 0% 0%, color-mix(in srgb, ' + primary + ' 18%, transparent) 0px, transparent 55%),' +
+          'radial-gradient(at 100% 0%, color-mix(in srgb, ' + secondary + ' 18%, transparent) 0px, transparent 55%),' +
+          'radial-gradient(at 100% 100%, color-mix(in srgb, ' + primary + ' 12%, transparent) 0px, transparent 55%),' +
+          'radial-gradient(at 0% 100%, color-mix(in srgb, ' + secondary + ' 12%, transparent) 0px, transparent 55%)';
+      } else if (mesh && primary) {
+        mesh.style.background =
+          'radial-gradient(at 0% 0%, color-mix(in srgb, ' + primary + ' 18%, transparent) 0px, transparent 55%),' +
+          'radial-gradient(at 100% 100%, color-mix(in srgb, ' + primary + ' 12%, transparent) 0px, transparent 55%)';
+      }
+
+      var logo = document.querySelector('.logo-wrap');
+      if (logo && primary && secondary) {
+        logo.style.borderColor = 'color-mix(in srgb, ' + primary + ' 35%, transparent)';
+        logo.style.background =
+          'linear-gradient(135deg, color-mix(in srgb, ' + primary + ' 15%, transparent), color-mix(in srgb, ' + secondary + ' 15%, transparent))';
+      }
+
+      var fill = document.querySelector('.progress-fill');
+      if (fill && primary && secondary) {
+        fill.style.background = 'linear-gradient(90deg, ' + primary + ', ' + secondary + ')';
+      }
+    })();
+
+    // Inject version from package.json via Electron's process.versions if available
+    try {
+      const ver = (typeof process !== 'undefined' && process.env && process.env.npm_package_version)
+        ? process.env.npm_package_version
+        : null;
+      if (ver) document.getElementById('ver').textContent = 'v' + ver;
+      else document.getElementById('ver').textContent = '';
+    } catch (_) {
+      document.getElementById('ver').textContent = '';
+    }
+  </script>
 </body>
 </html>

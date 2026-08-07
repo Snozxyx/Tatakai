@@ -1,223 +1,236 @@
-export type AnimeIdCandidate = {
-  id?: unknown;
-  name?: unknown;
-  malId?: unknown;
-  malID?: unknown;
-  mal_id?: unknown;
-  anilistId?: unknown;
-  anilistID?: unknown;
-  anilist_id?: unknown;
-};
+type CandidateValue = string | number | null | undefined;
 
-export type AnimeIdMappingEntry = {
-  hianimeId: string;
-  malId: number | null;
-  anilistId: number | null;
-  name?: string;
+export type AnimeIdMappingCandidate = {
+  id?: CandidateValue;
+  anime_id?: CandidateValue;
+  animeId?: CandidateValue;
+  tatakaiId?: CandidateValue;
+  tatakaiID?: CandidateValue;
+  tatakai_id?: CandidateValue;
+  name?: CandidateValue;
+  jname?: CandidateValue;
+  title?: CandidateValue;
+  titleEnglish?: CandidateValue;
+  titleRomaji?: CandidateValue;
+  titleNative?: CandidateValue;
+  malId?: CandidateValue;
+  malID?: CandidateValue;
+  mal_id?: CandidateValue;
+  anilistId?: CandidateValue;
+  anilistID?: CandidateValue;
+  anilist_id?: CandidateValue;
+  idMal?: CandidateValue;
+  [key: string]: unknown;
 };
 
 export type AnimeIdMappingIndex = {
-  byHianimeId: Map<string, AnimeIdMappingEntry>;
-  byMalId: Map<number, AnimeIdMappingEntry>;
-  byAniListId: Map<number, AnimeIdMappingEntry>;
-  byName: Map<string, AnimeIdMappingEntry>;
+  byName: Map<string, string>;
+  byRawId: Map<string, string>;
+  byExternalId: Map<string, string>;
 };
 
-const EXTERNAL_ID_PATTERN = /^(mal|anilist)-(\d+)$/i;
+export type ParsedAnimeId = {
+  provider: 'mal' | 'anilist';
+  id: number;
+};
 
-export const toPositiveInt = (value: unknown): number | null => {
-  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
-    return Math.floor(value);
+const normalizeLookupKey = (value?: CandidateValue) => String(value ?? '').trim().toLowerCase();
+
+const normalizeRouteId = (value?: CandidateValue) => String(value ?? '').trim();
+
+const isExternalRouteId = (value?: string) => {
+  const raw = String(value ?? '').trim();
+  if (!raw) return false;
+  return /^(mal|anilist)-\d+$/i.test(raw) || /^\d+$/.test(raw);
+};
+
+const getCandidateId = (candidate: AnimeIdMappingCandidate) =>
+  candidate.tatakaiId ?? candidate.tatakaiID ?? candidate.tatakai_id ?? candidate.id ?? candidate.anime_id ?? candidate.animeId;
+
+const getTatakaiId = (candidate: AnimeIdMappingCandidate) =>
+  normalizeRouteId(candidate.tatakaiId ?? candidate.tatakaiID ?? candidate.tatakai_id);
+
+const getCandidateName = (candidate: AnimeIdMappingCandidate) =>
+  candidate.name ?? candidate.jname ?? candidate.title ?? candidate.titleEnglish ?? candidate.titleRomaji ?? candidate.titleNative;
+
+const getMalId = (candidate: AnimeIdMappingCandidate) =>
+  toPositiveInt(candidate.malId ?? candidate.malID ?? candidate.mal_id ?? candidate.idMal);
+
+const getAnilistId = (candidate: AnimeIdMappingCandidate) =>
+  toPositiveInt(candidate.anilistId ?? candidate.anilistID ?? candidate.anilist_id);
+
+const getKnownRouteId = (candidate: AnimeIdMappingCandidate) => {
+  const tatakaiId = getTatakaiId(candidate);
+  if (tatakaiId) return tatakaiId;
+
+  const explicitId = getCandidateId(candidate);
+  const parsedExplicitId = parseExternalAnimeId(typeof explicitId === 'string' ? explicitId : undefined);
+  if (parsedExplicitId) {
+    return `${parsedExplicitId.provider}:${parsedExplicitId.id}`;
   }
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (!trimmed) return null;
-    const parsed = Number(trimmed);
-    if (Number.isFinite(parsed) && parsed > 0) {
-      return Math.floor(parsed);
-    }
+
+  const normalizedId = normalizeRouteId(explicitId);
+  if (normalizedId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(normalizedId)) {
+    return normalizedId;
   }
-  return null;
+
+  const externalRouteId = buildExternalAnimeRouteId(getMalId(candidate), getAnilistId(candidate));
+  if (externalRouteId) {
+    return externalRouteId;
+  }
+
+  return normalizedId || undefined;
 };
 
-const normalizeName = (value: unknown): string => {
-  if (typeof value !== "string") return "";
-  return value
-    .toLowerCase()
-    .replace(/[\W_]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-};
+const setPreferredMapping = (map: Map<string, string>, key: string, routeId: string) => {
+  if (!key || !routeId) return;
 
-export const parseExternalAnimeId = (
-  value: unknown
-): { provider: "mal" | "anilist"; id: number } | null => {
-  if (typeof value !== "string") return null;
-  const match = value.trim().match(EXTERNAL_ID_PATTERN);
-  if (!match) return null;
-  const parsed = toPositiveInt(match[2]);
-  if (!parsed) return null;
-  return { provider: match[1].toLowerCase() as "mal" | "anilist", id: parsed };
-};
-
-export const isExternalAnimeId = (value: unknown): boolean => {
-  return parseExternalAnimeId(value) !== null;
-};
-
-const extractExternalIds = (candidate: AnimeIdCandidate) => {
-  const malId =
-    toPositiveInt(candidate.malId) ??
-    toPositiveInt(candidate.malID) ??
-    toPositiveInt(candidate.mal_id) ??
-    null;
-
-  const anilistId =
-    toPositiveInt(candidate.anilistId) ??
-    toPositiveInt(candidate.anilistID) ??
-    toPositiveInt(candidate.anilist_id) ??
-    null;
-
-  return { malId, anilistId };
-};
-
-export const createAnimeIdMappingIndex = (): AnimeIdMappingIndex => ({
-  byHianimeId: new Map<string, AnimeIdMappingEntry>(),
-  byMalId: new Map<number, AnimeIdMappingEntry>(),
-  byAniListId: new Map<number, AnimeIdMappingEntry>(),
-  byName: new Map<string, AnimeIdMappingEntry>(),
-});
-
-export const registerAnimeIdMapping = (
-  index: AnimeIdMappingIndex,
-  candidate: AnimeIdCandidate
-) => {
-  const rawId = typeof candidate.id === "string" ? candidate.id.trim() : "";
-  if (!rawId || isExternalAnimeId(rawId)) {
+  const existing = map.get(key);
+  if (!existing) {
+    map.set(key, routeId);
     return;
   }
 
-  const { malId, anilistId } = extractExternalIds(candidate);
-  const normalizedName = normalizeName(candidate.name);
+  if (!isExternalRouteId(routeId) && isExternalRouteId(existing)) {
+    map.set(key, routeId);
+    return;
+  }
 
-  const entry: AnimeIdMappingEntry = {
-    hianimeId: rawId,
-    malId,
-    anilistId,
-    name: normalizedName || undefined,
+  if (isExternalRouteId(routeId) && !isExternalRouteId(existing)) {
+    return;
+  }
+};
+
+export function toPositiveInt(value: CandidateValue): number | undefined {
+  if (value === null || value === undefined || value === '') return undefined;
+
+  const parsed = typeof value === 'number' ? value : Number.parseInt(String(value).trim(), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return undefined;
+
+  return Math.trunc(parsed);
+}
+
+export function parseExternalAnimeId(value?: string | null): ParsedAnimeId | null {
+  const rawValue = String(value ?? '').trim();
+  if (!rawValue) return null;
+
+  const match = rawValue.match(/^(mal|anilist)[\-_:]?([0-9]+)$/i);
+  if (!match) return null;
+
+  return {
+    provider: match[1].toLowerCase() as ParsedAnimeId['provider'],
+    id: Number.parseInt(match[2], 10),
+  };
+}
+
+export function buildExternalAnimeRouteId(malId?: CandidateValue, anilistId?: CandidateValue): string | undefined {
+  const parsedAnilistId = toPositiveInt(anilistId);
+  if (parsedAnilistId) return `anilist:${parsedAnilistId}`;
+
+  const parsedMalId = toPositiveInt(malId);
+  if (parsedMalId) return `mal:${parsedMalId}`;
+
+  return undefined;
+}
+
+export function createAnimeIdMappingIndex(): AnimeIdMappingIndex {
+  return {
+    byName: new Map<string, string>(),
+    byRawId: new Map<string, string>(),
+    byExternalId: new Map<string, string>(),
+  };
+}
+
+export function registerAnimeIdMappings(index: AnimeIdMappingIndex, candidates: AnimeIdMappingCandidate[]) {
+  for (const candidate of candidates) {
+    const routeId = getKnownRouteId(candidate);
+    if (!routeId) continue;
+
+    const candidateId = normalizeLookupKey(getCandidateId(candidate));
+    if (candidateId) setPreferredMapping(index.byRawId, candidateId, routeId);
+
+    const candidateName = normalizeLookupKey(getCandidateName(candidate));
+    if (candidateName) setPreferredMapping(index.byName, candidateName, routeId);
+
+    const malId = getMalId(candidate);
+    if (malId) setPreferredMapping(index.byExternalId, `mal-${malId}`, routeId);
+
+    const anilistId = getAnilistId(candidate);
+    if (anilistId) setPreferredMapping(index.byExternalId, String(anilistId), routeId);
+  }
+}
+
+export function collectAnimeCandidatesFromHome(homeData: any): AnimeIdMappingCandidate[] {
+  const candidates: AnimeIdMappingCandidate[] = [];
+
+  const pushMany = (items: unknown) => {
+    if (!Array.isArray(items)) return;
+    for (const item of items) {
+      if (item && typeof item === 'object') {
+        candidates.push(item as AnimeIdMappingCandidate);
+      }
+    }
   };
 
-  index.byHianimeId.set(rawId, entry);
-  if (malId) index.byMalId.set(malId, entry);
-  if (anilistId) index.byAniListId.set(anilistId, entry);
-  if (normalizedName) index.byName.set(normalizedName, entry);
-};
+  pushMany(homeData?.latestEpisodeAnimes);
+  pushMany(homeData?.spotlightAnimes);
+  pushMany(homeData?.topAiringAnimes);
+  pushMany(homeData?.topUpcomingAnimes);
+  pushMany(homeData?.trendingAnimes);
+  pushMany(homeData?.mostPopularAnimes);
+  pushMany(homeData?.mostFavoriteAnimes);
+  pushMany(homeData?.latestCompletedAnimes);
+  pushMany(homeData?.top10Animes?.today);
+  pushMany(homeData?.top10Animes?.week);
+  pushMany(homeData?.top10Animes?.month);
 
-export const registerAnimeIdMappings = (
-  index: AnimeIdMappingIndex,
-  candidates: AnimeIdCandidate[]
-) => {
-  for (const candidate of candidates) {
-    registerAnimeIdMapping(index, candidate);
-  }
-};
+  return candidates;
+}
 
-export const resolveMappedHianimeId = (
-  index: AnimeIdMappingIndex,
-  candidate: AnimeIdCandidate
-): string | null => {
-  const rawId = typeof candidate.id === "string" ? candidate.id.trim() : "";
-  if (rawId && !isExternalAnimeId(rawId)) {
-    return rawId;
-  }
-
-  const parsedExternal = parseExternalAnimeId(rawId);
-  if (parsedExternal) {
-    const mapped =
-      parsedExternal.provider === "mal"
-        ? index.byMalId.get(parsedExternal.id)
-        : index.byAniListId.get(parsedExternal.id);
-    if (mapped?.hianimeId) return mapped.hianimeId;
-  }
-
-  const { malId, anilistId } = extractExternalIds(candidate);
-  if (malId) {
-    const mapped = index.byMalId.get(malId);
-    if (mapped?.hianimeId) return mapped.hianimeId;
-  }
-  if (anilistId) {
-    const mapped = index.byAniListId.get(anilistId);
-    if (mapped?.hianimeId) return mapped.hianimeId;
-  }
-
-  const normalizedName = normalizeName(candidate.name);
-  if (normalizedName) {
-    const mapped = index.byName.get(normalizedName);
-    if (mapped?.hianimeId) return mapped.hianimeId;
-  }
-
-  return null;
-};
-
-export const buildExternalAnimeRouteId = (
-  malId?: unknown,
-  anilistId?: unknown
-): string | null => {
-  const mal = toPositiveInt(malId);
-  if (mal) return `mal-${mal}`;
-  const anilist = toPositiveInt(anilistId);
-  if (anilist) return `anilist-${anilist}`;
-  return null;
-};
-
-export const buildPreferredAnimeRouteId = (
-  candidate: AnimeIdCandidate,
+export function buildPreferredAnimeRouteId(
+  candidate: AnimeIdMappingCandidate | null | undefined,
   index?: AnimeIdMappingIndex
-): string | null => {
-  if (index) {
-    const mappedHianimeId = resolveMappedHianimeId(index, candidate);
-    if (mappedHianimeId) return mappedHianimeId;
+): string | undefined {
+  if (!candidate) return undefined;
+
+  const tatakaiId = getTatakaiId(candidate);
+  if (tatakaiId) return tatakaiId;
+
+  const explicitId = getCandidateId(candidate);
+  const parsedExplicitId = parseExternalAnimeId(typeof explicitId === 'string' ? explicitId : undefined);
+  if (parsedExplicitId) {
+    return `${parsedExplicitId.provider}:${parsedExplicitId.id}`;
   }
 
-  const rawId = typeof candidate.id === "string" ? candidate.id.trim() : "";
-  const parsedExternal = parseExternalAnimeId(rawId);
-  if (parsedExternal) {
-    return `${parsedExternal.provider}-${parsedExternal.id}`;
+  const normalizedExplicitId = normalizeRouteId(explicitId);
+  if (normalizedExplicitId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(normalizedExplicitId)) {
+    return normalizedExplicitId;
   }
 
-  const hasExternalPrefix = /^(mal|anilist)-/i.test(rawId);
-  if (rawId && !hasExternalPrefix) {
-    return rawId;
-  }
-
-  const { malId, anilistId } = extractExternalIds(candidate);
-  return buildExternalAnimeRouteId(malId, anilistId);
-};
-
-export const collectAnimeCandidatesFromHome = (homeData: any): AnimeIdCandidate[] => {
-  if (!homeData || typeof homeData !== "object") return [];
-
-  const collections: AnimeIdCandidate[] = [];
-  const buckets = [
-    homeData.spotlightAnimes,
-    homeData.trendingAnimes,
-    homeData.latestEpisodeAnimes,
-    homeData.topAiringAnimes,
-    homeData.topUpcomingAnimes,
-    homeData.mostPopularAnimes,
-    homeData.mostFavoriteAnimes,
-    homeData.latestCompletedAnimes,
-    homeData.top10Animes?.today,
-    homeData.top10Animes?.week,
-    homeData.top10Animes?.month,
-  ];
-
-  for (const bucket of buckets) {
-    if (!Array.isArray(bucket)) continue;
-    for (const item of bucket) {
-      if (!item || typeof item !== "object") continue;
-      collections.push(item as AnimeIdCandidate);
+  const malId = getMalId(candidate);
+  const anilistId = getAnilistId(candidate);
+  const externalRouteId = buildExternalAnimeRouteId(malId, anilistId);
+  if (externalRouteId) {
+    if (index) {
+      const externalLookup = index.byExternalId.get(externalRouteId);
+      if (externalLookup) return externalLookup;
     }
+
+    return externalRouteId;
   }
 
-  return collections;
-};
+  const normalizedId = normalizeLookupKey(explicitId);
+  if (index && normalizedId) {
+    const mappedById = index.byRawId.get(normalizedId);
+    if (mappedById) return mappedById;
+  }
+
+  const candidateName = normalizeLookupKey(getCandidateName(candidate));
+  if (index && candidateName) {
+    const mappedByName = index.byName.get(candidateName);
+    if (mappedByName) return mappedByName;
+  }
+
+  const fallbackRouteId = normalizedExplicitId || normalizeRouteId(explicitId);
+  return fallbackRouteId || undefined;
+}

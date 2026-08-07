@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useAppConfig, AppConfigKey } from '@/hooks/useAppConfig';
+import { useAppConfig, AppConfigKey } from '@/hooks/ui/useAppConfig';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -174,3 +174,4 @@ export function AppVersionManager() {
         </div>
     );
 }
+

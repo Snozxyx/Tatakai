@@ -1,7 +1,19 @@
+/**
+ * MangaPage.tsx
+ * Comprehensive Manga information and chapter listing page.
+ * Orchestrates data from multiple sources:
+ * 1. TatakaiAPI (Main detail & metadata)
+ * 2. AniList (Banner, chapters/volumes count)
+ * 3. Jikan/MAL (Serialization, HQ images)
+ * 4. User Readlist (Progress tracking)
+ */
+
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { useMangaDetail, useMangaChapters } from "@/hooks/useMangaData";
+import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { useMangaDetail, useMangaChapters } from "@/hooks/api/useMangaData";
 import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
@@ -10,9 +22,9 @@ import { Skeleton } from "@/components/ui/skeleton-custom";
 import { UnifiedMediaCard, type UnifiedMediaCardProps } from "@/components/UnifiedMediaCard";
 import { EpisodeComments } from "@/components/video/EpisodeComments";
 import { AddToPlaylistButton } from "@/components/playlist/AddToPlaylistButton";
-import { getProxiedImageUrl } from "@/lib/api";
+import { getProxiedImageUrl, fetchJikanCover } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { searchManga } from "@/services/manga.service";
+import { searchManga } from "@/core/content/manga-client";
 import { inferMangaAdultFlag } from "@/lib/contentSafety";
 import type { MangaSearchItem } from "@/types/manga";
 import {
@@ -27,16 +39,65 @@ import {
   BookmarkCheck,
   Loader2,
   Search,
+  ExternalLink as ExternalLinkIcon,
+  Globe,
+  Palette,
+  PenTool,
+  GitGraph,
+  ChevronRight,
+  Puzzle,
+  ChevronDown,
 } from "lucide-react";
+
+import type { MediaRelation } from "@/core/content/types";
+
+// --- Helper Component: Relation Tree ---
+function RelationTree({ relations }: { relations: MediaRelation[] }) {
+  const navigate = useNavigate();
+
+  if (relations.length === 0) return null;
+
+  return (
+    <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+      {relations.map((rel) => {
+        const isNovel = rel.format?.toUpperCase().includes('NOVEL');
+        const isManga = rel.format?.toUpperCase().includes('MANGA') || rel.format?.toUpperCase().includes('ONE_SHOT');
+
+        return (
+          <div key={rel.id} className="w-[160px] md:w-[200px] flex-shrink-0 flex flex-col">
+            <UnifiedMediaCard
+              item={{
+                id: String(rel.id),
+                name: rel.titleEnglish || rel.titleRomaji || "Untitled",
+                poster: rel.coverImage || "",
+                type: rel.relationType,
+                status: rel.format || undefined,
+                mediaType: isManga ? 'manga' : (isNovel ? 'manga' : 'anime'),
+                href: isNovel ? '/novel/comingsoon' : undefined
+              }}
+              className="flex-1"
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 import { Helmet } from "react-helmet-async";
-import { useIsNativeApp } from '@/hooks/useIsNativeApp';
-import { useContentSafetySettings } from "@/hooks/useContentSafetySettings";
+import { useIsNativeApp } from '@/hooks/ui/useIsNativeApp';
+import { useContentSafetySettings } from "@/hooks/user/useContentSafetySettings";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   useMangaReadlistItem,
   useRemoveFromMangaReadlist,
   useUpsertMangaReadlist,
-} from "@/hooks/useMangaReadlist";
+} from "@/hooks/user/useMangaReadlist";
+import {
+  fetchExtensionMangaChapters,
+  mergeChaptersWithExtensions,
+} from "@/core/content/manga-extension-runtime";
+import { MangaChapterProviderRows } from "@/components/manga/MangaChapterProviderRows";
 
 const normalizeLanguageKey = (value: string | null | undefined) => {
   const normalized = String(value || "").trim().toLowerCase();
@@ -86,12 +147,14 @@ const getChapterDisplayNumber = (chapter: any): number | null => {
   return null;
 };
 
-const queryAniListBanner = async (id: number) => {
+const queryAniListMetadata = async (id: number) => {
   try {
     const query = `
       query ($id: Int) {
         Media (id: $id, type: MANGA) {
           bannerImage
+          chapters
+          volumes
         }
       }
     `;
@@ -101,7 +164,7 @@ const queryAniListBanner = async (id: number) => {
       body: JSON.stringify({ query, variables: { id } })
     });
     const data = await res.json();
-    return data?.data?.Media?.bannerImage;
+    return data?.data?.Media;
   } catch {
     return null;
   }
@@ -140,9 +203,27 @@ export default function MangaPage() {
   const { user, profile } = useAuth();
   const { settings: contentSafetySettings, updateSettings: updateContentSafetySettings } = useContentSafetySettings();
   const [allowAdultForSession, setAllowAdultForSession] = useState(false);
+  const [expandedChapterOrder, setExpandedChapterOrder] = useState<number | null>(null);
 
   const { data: mangaData, isLoading: loadingInfo, error } = useMangaDetail(mangaId);
   const { data: chapterData, isLoading: loadingChapters } = useMangaChapters(mangaId);
+
+  // Fetch extension manga chapters (Toko + other installed manga extensions) and merge
+  // with API data before rendering. Requirements: 8.4, 8.5
+  const [extensionChapterPayload, setExtensionChapterPayload] = useState<
+    Awaited<ReturnType<typeof fetchExtensionMangaChapters>> | null
+  >(null);
+
+  useEffect(() => {
+    if (!mangaData?.detail) return;
+    const { anilistId, malId, canonicalTitle, title } = mangaData.detail;
+    const titleStr = canonicalTitle || title?.english || title?.romaji || '';
+    fetchExtensionMangaChapters({
+      anilistId: typeof anilistId === 'number' ? anilistId : undefined,
+      malId: typeof malId === 'number' ? malId : undefined,
+      title: titleStr || undefined,
+    }).then(setExtensionChapterPayload).catch(() => {/* silent */ });
+  }, [mangaData?.detail]);
   const { data: readlistEntry } = useMangaReadlistItem(mangaId);
   const addToReadlist = useUpsertMangaReadlist();
   const removeFromReadlist = useRemoveFromMangaReadlist();
@@ -150,6 +231,21 @@ export default function MangaPage() {
   const [coverImageSrc, setCoverImageSrc] = useState<string>(() => getProxiedImageUrl(rawCoverImage));
   const [coverFallbackTried, setCoverFallbackTried] = useState(false);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
+  const [anilistMetadata, setAnilistMetadata] = useState<{ chapters?: number; volumes?: number } | null>(null);
+
+  const malId = mangaData?.detail?.malId;
+  const { data: jikanData } = useQuery({
+    queryKey: ["jikan-manga", malId],
+    queryFn: async () => {
+      if (!malId) return null;
+      const res = await fetch(`/api/v3/manga/mal/${malId}/full`);
+      if (!res.ok) return null;
+      const json = await res.json();
+      return json?.data ?? null;
+    },
+    enabled: !!malId,
+    staleTime: 24 * 60 * 60 * 1000,
+  });
 
   useEffect(() => {
     setCoverFallbackTried(false);
@@ -159,13 +255,28 @@ export default function MangaPage() {
   useEffect(() => {
     const anilistId = mangaData?.detail?.anilistId;
     if (anilistId) {
-      queryAniListBanner(anilistId).then(banner => {
-        if (banner) setBannerUrl(getProxiedImageUrl(banner));
+      queryAniListMetadata(anilistId).then(metadata => {
+        if (metadata) {
+          if (metadata.bannerImage) setBannerUrl(getProxiedImageUrl(metadata.bannerImage));
+          setAnilistMetadata({
+            chapters: metadata.chapters,
+            volumes: metadata.volumes,
+          });
+        }
       });
     }
   }, [mangaData?.detail?.anilistId]);
 
-  const chapters = useMemo(() => chapterData?.mappedChapters || [], [chapterData?.mappedChapters]);
+  const chapters = useMemo(() => {
+    const base = chapterData?.mappedChapters ? chapterData.mappedChapters : [];
+    if (!extensionChapterPayload?.chapters?.length) return base;
+    // Merge Toko/extension chapters into the base chapter list (req 8.4, 8.5)
+    if (chapterData) {
+      const merged = mergeChaptersWithExtensions(chapterData, extensionChapterPayload);
+      return merged.mappedChapters ?? base;
+    }
+    return base;
+  }, [chapterData, extensionChapterPayload]);
   const isChapterListLoading = loadingChapters && !chapterData;
   const [preferredProvider, setPreferredProvider] = useState<string>("auto");
   const [preferredLanguage, setPreferredLanguage] = useState<string>("auto");
@@ -797,9 +908,9 @@ export default function MangaPage() {
           {/* Banner Image Background */}
           {bannerUrl && (
             <div className="absolute top-0 left-0 w-full h-[50vh] xl:h-[60vh] -z-10 overflow-hidden opacity-30 md:opacity-40">
-              <img 
-                src={bannerUrl} 
-                alt="Banner" 
+              <img
+                src={bannerUrl}
+                alt="Banner"
                 className="w-full h-full object-cover blur-[12px] brightness-[0.6] transform scale-105"
               />
               <div className="absolute inset-0 bg-gradient-to-b from-background/10 via-background/60 to-background" />
@@ -815,86 +926,101 @@ export default function MangaPage() {
             <span className="font-medium text-sm">Back</span>
           </button>
 
-          {/* Hero Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] xl:grid-cols-[350px_1fr] gap-8 mb-12">
-            {/* Poster */}
-            <div className="relative mx-auto lg:mx-0 w-full max-w-[280px] lg:max-w-none group">
-              <div className="aspect-[3/4] rounded-3xl overflow-hidden shadow-2xl relative ring-1 ring-white/10 group-hover:ring-primary/50 transition-all duration-500 z-10 bg-background/80">
-                <img
-                  src={coverImageSrc}
-                  alt={displayTitle}
-                  className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
-                  onError={() => {
-                    if (rawCoverImage && !coverFallbackTried && coverImageSrc !== rawCoverImage) {
-                      setCoverFallbackTried(true);
-                      setCoverImageSrc(rawCoverImage);
-                      return;
-                    }
-                    if (coverImageSrc !== "/placeholder.svg") {
-                      setCoverImageSrc("/placeholder.svg");
-                    }
-                  }}
-                />
-                <div className="absolute inset-0 rounded-3xl ring-1 ring-inset ring-white/10 pointer-events-none" />
-                <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-background/90 via-background/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              </div>
-            </div>
+          {/* Hero Section — AnimePage-aligned GlassPanel layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-16 pt-4 md:pt-8">
+            <GlassPanel className="overflow-hidden mx-auto lg:mx-0 w-full max-w-[320px] lg:max-w-none">
+              <img
+                src={coverImageSrc}
+                alt={displayTitle}
+                className="w-full aspect-[3/4] object-cover"
+                onError={() => {
+                  if (rawCoverImage && !coverFallbackTried && coverImageSrc !== rawCoverImage) {
+                    setCoverFallbackTried(true);
+                    setCoverImageSrc(rawCoverImage);
+                    return;
+                  }
+                  if (coverImageSrc !== "/placeholder.svg") {
+                    setCoverImageSrc("/placeholder.svg");
+                  }
+                }}
+              />
+            </GlassPanel>
 
-            {/* Info */}
-            <div className="flex flex-col justify-end space-y-6">
-              <div className="space-y-4">
-                <div className="flex flex-wrap items-center gap-3">
-                  {info.status && (
-                    <span className="px-3 py-1 rounded-full bg-primary/20 text-primary text-xs font-bold uppercase tracking-wider backdrop-blur-sm border border-primary/20">
-                      {info.status}
-                    </span>
+            <div className="lg:col-span-2 space-y-6">
+              <div>
+                <h1 className="font-display text-4xl md:text-5xl font-bold mb-4">{displayTitle}</h1>
+
+                <div className="flex flex-wrap gap-3 mb-6">
+                  {displayRating && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber/20 text-amber">
+                      <Star className="w-4 h-4 fill-amber" />
+                      <span className="font-bold">{displayRating}</span>
+                    </div>
                   )}
                   {info.mediaType && (
-                    <span className="px-3 py-1 rounded-full bg-white/5 text-foreground text-xs font-bold uppercase tracking-wider backdrop-blur-sm border border-white/10 flex items-center gap-1.5">
-                      <BookOpen className="w-3.5 h-3.5" />
-                      {info.mediaType}
-                    </span>
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted">
+                      <BookOpen className="w-4 h-4" />
+                      <span className="capitalize">{info.mediaType}</span>
+                    </div>
                   )}
-                  {displayRating && (
-                    <span className="px-3 py-1 rounded-full bg-amber/10 text-amber text-xs font-bold uppercase tracking-wider backdrop-blur-sm border border-amber/20 flex items-center gap-1.5">
-                      <Star className="w-3.5 h-3.5 fill-current" />
-                      {displayRating}
-                    </span>
+                  {info.status && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/20 text-primary">
+                      <span className="font-semibold capitalize">
+                        {String(info.status).toLowerCase().replace(/_/g, " ")}
+                      </span>
+                    </div>
+                  )}
+                  {typeof info.totalChapters === "number" && info.totalChapters > 0 && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted">
+                      <Layers className="w-4 h-4" />
+                      <span>{info.totalChapters} Chapters</span>
+                    </div>
                   )}
                   {typeof info.totalVolumes === "number" && info.totalVolumes > 0 && (
-                    <span className="px-3 py-1 rounded-full bg-white/5 text-foreground text-xs font-bold uppercase tracking-wider backdrop-blur-sm border border-white/10 flex items-center gap-1.5">
-                      <Layers className="w-3.5 h-3.5" />
-                      {info.totalVolumes} Volumes
-                    </span>
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted">
+                      <BookOpen className="w-4 h-4" />
+                      <span>{info.totalVolumes} Volumes</span>
+                    </div>
                   )}
                 </div>
 
-                <h1 className="text-3xl md:text-5xl lg:text-6xl font-display font-bold leading-tight tracking-tight lg:leading-[1.1]">
-                  {displayTitle}
-                </h1>
-
                 {info.authors && info.authors.length > 0 && (
-                  <p className="text-muted-foreground text-sm md:text-base font-medium flex items-center gap-2">
-                    <Users className="w-4 h-4" />
-                    By {info.authors.join(", ")}
+                  <p className="text-muted-foreground text-sm md:text-base font-medium flex flex-wrap items-center gap-2 mb-4">
+                    <Users className="w-4 h-4 shrink-0" />
+                    By{" "}
+                    {info.authors.map((author, idx) => (
+                      <button
+                        key={author}
+                        type="button"
+                        className="hover:text-primary transition-colors"
+                        onClick={() => navigate(`/search?q=${encodeURIComponent(author)}`)}
+                      >
+                        {author}
+                        {idx < info.authors.length - 1 ? "," : ""}
+                      </button>
+                    ))}
                   </p>
                 )}
 
-                <div className="flex flex-wrap items-center gap-2 mt-4">
-                  {info.genres?.map(genre => (
-                    <span key={genre} className="px-2.5 py-1 rounded-md bg-white/5 text-muted-foreground text-[10px] font-bold uppercase tracking-wider border border-white/5">
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {info.genres?.map((genre) => (
+                    <button
+                      key={genre}
+                      type="button"
+                      onClick={() => navigate(`/manga/genre/${encodeURIComponent(genre)}`)}
+                      className="px-3 py-1.5 rounded-lg bg-muted text-sm font-medium hover:bg-primary/20 hover:text-primary transition-colors"
+                    >
                       {genre}
-                    </span>
+                    </button>
                   ))}
                 </div>
               </div>
 
-              {/* Actions */}
-              <div className="flex flex-wrap items-center gap-4 pt-4">
+              <div className="flex flex-wrap items-center gap-3">
                 <button
                   onClick={handleReadNow}
                   disabled={sortedChapters.length === 0}
-                  className="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-8 py-4 rounded-2xl font-bold hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-primary/25 disabled:opacity-50 disabled:cursor-not-allowed group w-full sm:w-auto"
+                  className="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-8 py-3.5 rounded-xl font-bold hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-primary/25 disabled:opacity-50 disabled:cursor-not-allowed group"
                 >
                   <BookOpen className="w-5 h-5 group-hover:scale-110 transition-transform" />
                   {hasSavedProgress ? "Continue Reading" : "Read From Chapter 1"}
@@ -904,12 +1030,12 @@ export default function MangaPage() {
                   animeName={displayTitle}
                   animePoster={info.coverImage || undefined}
                   mediaType="manga"
-                  className="h-auto border border-white/15 bg-white/5 text-foreground px-6 py-4 rounded-2xl font-bold hover:bg-white/10 active:scale-95 transition-all w-full sm:w-auto"
+                  className="h-auto border border-white/15 bg-white/5 text-foreground px-6 py-3.5 rounded-xl font-bold hover:bg-white/10 active:scale-95 transition-all"
                 />
                 <button
                   onClick={handleToggleReadlist}
                   disabled={addToReadlist.isPending || removeFromReadlist.isPending}
-                  className="flex items-center justify-center gap-2 border border-white/15 bg-white/5 text-foreground px-6 py-4 rounded-2xl font-bold hover:bg-white/10 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+                  className="flex items-center justify-center gap-2 border border-white/15 bg-white/5 text-foreground px-6 py-3.5 rounded-xl font-bold hover:bg-white/10 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isInReadlist ? <BookmarkCheck className="w-5 h-5 text-primary" /> : <BookmarkPlus className="w-5 h-5" />}
                   {!user ? "Sign In for Readlist" : isInReadlist ? "In Readlist" : "Add to Readlist"}
@@ -932,6 +1058,53 @@ export default function MangaPage() {
                       {info.synopsis}
                     </p>
                   </GlassPanel>
+                </section>
+              )}
+
+              {/* Relation Tree */}
+              {info.relations && info.relations.length > 0 && (
+                <section className="mb-8">
+                  <h3 className="font-display text-xl md:text-2xl font-bold mb-4 flex items-center gap-2">
+                    <GitGraph className="w-5 h-5 text-primary" />
+                    Series Tree
+                  </h3>
+                  <RelationTree relations={info.relations} />
+                </section>
+              )}
+
+              {/* Characters Section — AnimePage-aligned GlassPanel cards */}
+              {info.characters && info.characters.length > 0 && (
+                <section className="mb-10">
+                  <h3 className="font-display text-xl md:text-2xl font-bold mb-6 flex items-center gap-2">
+                    <Users className="w-5 h-5 text-primary" />
+                    Characters
+                  </h3>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
+                    {info.characters.slice(0, 12).map((char: any, index: number) => (
+                      <GlassPanel
+                        key={`${char.id || char.name}-${index}`}
+                        className="p-0 overflow-hidden cursor-pointer group hover:bg-white/10 transition-colors"
+                        onClick={() =>
+                          navigate(
+                            `/character/${char.id || encodeURIComponent(char.name)}?name=${encodeURIComponent(char.name)}`,
+                          )
+                        }
+                      >
+                        <img
+                          src={getProxiedImageUrl(char.image || char.poster || char.imageUrl || "") || "/placeholder.svg"}
+                          alt={char.name}
+                          className="w-full aspect-[3/4] object-cover"
+                          loading="lazy"
+                        />
+                        <div className="p-2">
+                          <p className="font-bold text-xs truncate group-hover:text-primary transition-colors">{char.name}</p>
+                          <p className="text-[9px] text-muted-foreground uppercase tracking-wider truncate">
+                            {char.role || "Character"}
+                          </p>
+                        </div>
+                      </GlassPanel>
+                    ))}
+                  </div>
                 </section>
               )}
 
@@ -959,8 +1132,8 @@ export default function MangaPage() {
                         {isChapterListLoading
                           ? "Loading..."
                           : hasChapterFilters
-                          ? `${filteredDisplayChapters.length} of ${displayChapters.length} matches`
-                          : `${displayChapters.length} available`}
+                            ? `${filteredDisplayChapters.length} of ${displayChapters.length} matches`
+                            : `${displayChapters.length} available`}
                       </span>
                     </div>
                   </div>
@@ -1060,83 +1233,38 @@ export default function MangaPage() {
                     </div>
                   </GlassPanel>
                 ) : filteredDisplayChapters.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                    {chapterCards.map((chapter) => {
-                      const sourceKey = getBestSourceKey(chapter);
-                      const highlightedSource = getBestSource(chapter);
-                      const releaseDate =
-                        highlightedSource?.releaseDate ||
-                        chapter.sources?.find((source) => source.releaseDate)?.releaseDate;
-
-                      const languageBadges = Array.from(
-                        new Set(chapter.sources?.map((source) => formatLanguageLabel(source.language)) || []),
-                      ).slice(0, 3);
-
-                      return (
-                        <button
-                          key={`${chapter.canonicalOrder}-${sourceKey || "no-source"}`}
-                          onClick={() => {
-                            if (!sourceKey) return;
-                            navigate(`/manga/read/${mangaId}?chapterKey=${encodeURIComponent(sourceKey)}&page=0`);
-                          }}
-                          className="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-primary/50 hover:bg-primary/10 transition-all text-left group flex items-center justify-between"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <p className="font-bold text-sm truncate group-hover:text-primary transition-colors">
-                              {chapter.chapterTitle || `Chapter ${chapter.chapterNumber ?? "?"}`}
-                            </p>
-                            {typeof chapter.volume === "number" && chapter.volume > 0 && (
-                              <p className="text-[10px] font-bold uppercase tracking-wider text-primary/90 mt-1">
-                                Volume {chapter.volume}
-                              </p>
-                            )}
-                            <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider mt-1">
-                              {releaseDate ? new Date(releaseDate).toLocaleDateString() : "Unknown date"}
-                            </p>
-                            <div className="mt-2 flex flex-wrap gap-1">
-                              {chapter.sources?.slice(0, 2).map((source) => {
-                                const sourceLanguage = formatLanguageLabel(source.language);
-                                const providerMatch =
-                                  preferredProvider !== "auto" && source.provider === preferredProvider;
-                                const languageMatch =
-                                  effectivePreferredLanguage !== "auto" &&
-                                  normalizeLanguageKey(source.language) === effectivePreferredLanguage;
-
-                                return (
-                                  <span
-                                    key={`${chapter.canonicalOrder}-${source.provider}-${sourceLanguage}`}
-                                    className={cn(
-                                      "rounded-md px-1.5 py-0.5 text-[9px] uppercase tracking-wider border",
-                                      providerMatch || languageMatch
-                                        ? "border-primary/50 bg-primary/15 text-primary"
-                                        : "border-white/10 bg-white/5 text-muted-foreground",
-                                    )}
-                                  >
-                                    {source.provider} • {sourceLanguage}
-                                  </span>
-                                );
-                              })}
-
-                              {chapter.sources.length > 2 && (
-                                <span className="rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-muted-foreground">
-                                  +{chapter.sources.length - 2} sources
-                                </span>
-                              )}
-
-                              {languageBadges.map((language) => (
-                                <span
-                                  key={`${chapter.canonicalOrder}-lang-${language}`}
-                                  className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-emerald-300"
-                                >
-                                  {language}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                          <BookOpen className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors opacity-0 group-hover:opacity-100" />
-                        </button>
-                      );
-                    })}
+                  <div className="flex flex-col gap-2">
+                    {chapterCards.map((chapter) => (
+                      <MangaChapterProviderRows
+                        key={`${chapter.canonicalOrder}-${chapter.chapterNumber ?? "?"}`}
+                        chapter={{
+                          chapterNumber: chapter.chapterNumber ?? null,
+                          chapterTitle: chapter.chapterTitle ?? null,
+                          sources: (chapter.sources || []).map((src) => ({
+                            provider: src.provider,
+                            chapterKey: src.chapterKey || "",
+                            providerChapterId: src.providerChapterId || src.chapterKey || "",
+                            language: src.language ?? null,
+                            scanlator: src.scanlator ?? null,
+                          })),
+                        }}
+                        bestSource={getBestSource(chapter)}
+                        preferredProvider={preferredProvider}
+                        effectivePreferredLanguage={effectivePreferredLanguage}
+                        onNavigate={(provider, chapterKey) => {
+                          const encodedProvider = encodeURIComponent(provider);
+                          const src = chapter.sources?.find(
+                            (s) => s.provider === provider && s.chapterKey === chapterKey,
+                          );
+                          const providerChapterId = encodeURIComponent(
+                            src?.providerChapterId || chapterKey,
+                          );
+                          navigate(
+                            `/manga/read/${mangaId}?chapterKey=${encodeURIComponent(chapterKey)}&provider=${encodedProvider}&providerChapterId=${providerChapterId}&page=0`,
+                          );
+                        }}
+                      />
+                    ))}
                   </div>
                 ) : (
                   <GlassPanel className="p-8 text-center">
@@ -1144,8 +1272,8 @@ export default function MangaPage() {
                       {sortedChapters.length === 0
                         ? "No chapters available yet."
                         : hasChapterFilters
-                        ? "No chapters match your current filters or search."
-                        : "No chapters match the selected provider/language filters. Try Auto."}
+                          ? "No chapters match your current filters or search."
+                          : "No chapters match the selected provider/language filters. Try Auto."}
                     </p>
                   </GlassPanel>
                 )}
@@ -1258,7 +1386,9 @@ export default function MangaPage() {
                 ) : recommendationCards.length > 0 ? (
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     {recommendationCards.map((card) => (
-                      <UnifiedMediaCard key={`manga-rec-${card.id}`} item={card} />
+                      <div key={`manga-rec-${card.id}`} className="flex flex-col">
+                        <UnifiedMediaCard item={card} className="flex-1" />
+                      </div>
                     ))}
                   </div>
                 ) : (
@@ -1321,9 +1451,22 @@ export default function MangaPage() {
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <p>Status: <span className="text-foreground">{info.status || "unknown"}</span></p>
                   <p>Format: <span className="text-foreground">{info.mediaType || "manga"}</span></p>
-                  <p>Total chapters: <span className="text-foreground">{info.totalChapters ?? "?"}</span></p>
-                  <p>Total volumes: <span className="text-foreground">{info.totalVolumes ?? "?"}</span></p>
+                  <p>Total chapters: <span className="text-foreground">{info.totalChapters ?? anilistMetadata?.chapters ?? "?"}</span></p>
+                  <p>Total volumes: <span className="text-foreground">{info.totalVolumes ?? anilistMetadata?.volumes ?? "?"}</span></p>
+
+                  {info.publishers && info.publishers.length > 0 && (
+                    <p>Publishers: <span className="text-foreground">{info.publishers.join(", ")}</span></p>
+                  )}
+
+                  {jikanData?.serializations && jikanData.serializations.length > 0 && (
+                    <p>Serialization: <span className="text-foreground">{jikanData.serializations.map((s: any) => s.name).join(", ")}</span></p>
+                  )}
+
+                  {info.yearStart && (
+                    <p>Aired: <span className="text-foreground">{info.yearStart}{info.yearEnd ? ` to ${info.yearEnd}` : " (Ongoing)"}</span></p>
+                  )}
                 </div>
+
                 <div className="mt-4">
                   <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                     Genres

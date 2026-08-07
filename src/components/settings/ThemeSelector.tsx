@@ -1,4 +1,4 @@
-import { useTheme, Theme } from '@/hooks/useTheme';
+import { useTheme, Theme } from '@/hooks/ui/useTheme';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Check, Palette, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -98,3 +98,4 @@ export function ThemeSelector() {
     </GlassPanel>
   );
 }
+

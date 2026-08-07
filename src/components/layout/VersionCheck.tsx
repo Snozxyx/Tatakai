@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAppConfig } from '@/hooks/useAppConfig';
+import { useAppConfig } from '@/hooks/ui/useAppConfig';
 import { toast } from 'sonner';
 import { Smartphone } from 'lucide-react';
 
@@ -76,3 +76,4 @@ export function VersionCheck({ children }: { children: React.ReactNode }) {
 
     return <>{children}</>;
 }
+

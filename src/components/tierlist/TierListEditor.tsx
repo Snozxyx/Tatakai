@@ -10,9 +10,10 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Search, Trash2, Save, Share2, Lock, Globe, GripVertical, X, Film, Users } from 'lucide-react';
-import { useCreateTierList, useUpdateTierList, DEFAULT_TIERS, type TierListItem } from '@/hooks/useTierLists';
+import { useCreateTierList, useUpdateTierList, DEFAULT_TIERS, type TierListItem } from '@/hooks/user/useTierLists';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { contentGraph, toAnimeCard } from '@/core';
 
 interface SearchResult {
   id: string;
@@ -253,7 +254,12 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
     setIsSearching(true);
     try {
       if (type === 'anime') {
-        const data = await import('@/lib/api').then(mod => mod.searchAnime(query, pageNum));
+        const search = await contentGraph.search({ query, page: pageNum, perPage: 24 });
+        const animeCards = (search?.media || []).map(toAnimeCard);
+        const data = {
+          animes: animeCards,
+          hasNextPage: Number(search?.pageInfo?.currentPage || 1) < Number(search?.pageInfo?.lastPage || 1),
+        };
 
         const newResults = data.animes.map((anime) => ({
           id: anime.id,
@@ -266,22 +272,45 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
         setSearchResults(prev => pageNum === 1 ? newResults : [...prev, ...newResults]);
         setHasNextPage(data.hasNextPage);
       } else {
-        const response = await import('@/lib/api').then(mod => mod.searchCharacters(query, pageNum));
-
+        // Search characters via AniList
+        const charGql = `
+          query ($search: String, $page: Int) {
+            Page(page: $page, perPage: 24) {
+              characters(search: $search) {
+                id
+                name { full }
+                image { large }
+                media(perPage: 1, sort: START_DATE_DESC) {
+                  nodes { title { romaji } }
+                }
+              }
+              pageInfo {
+                hasNextPage
+              }
+            }
+          }
+        `;
+        const res = await fetch('https://graphql.anilist.co', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: charGql, variables: { search: query, page: pageNum } })
+        });
+        const json = await res.json();
+        
         if (requestId !== latestSearchRequestRef.current) return;
-        if (response.success) {
-          const newResults = response.data.map((char) => ({
-            id: `char-${char.malId != null && Number.isFinite(Number(char.malId)) ? String(char.malId) : String(char._id)}`,
-            title: char.name,
-            image: char.image,
-            type: 'character' as const,
-          }));
-          setSearchResults(prev => pageNum === 1 ? newResults : [...prev, ...newResults]);
-          setHasNextPage(pageNum < (response.pagination?.totalPages || 1));
-        } else {
-          if (pageNum === 1) setSearchResults([]);
-          setHasNextPage(false);
-        }
+        
+        const characters = json?.data?.Page?.characters || [];
+        const hasNext = json?.data?.Page?.pageInfo?.hasNextPage || false;
+        
+        const newResults = characters.map((char: any) => ({
+          id: String(char.id),
+          title: char.name.full,
+          image: char.image.large,
+          type: 'character' as const,
+        }));
+        
+        setSearchResults(prev => pageNum === 1 ? newResults : [...prev, ...newResults]);
+        setHasNextPage(hasNext);
       }
     } catch (error) {
       if (requestId !== latestSearchRequestRef.current) return;
@@ -589,3 +618,4 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
     </div>
   );
 }
+

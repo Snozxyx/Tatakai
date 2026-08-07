@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { usePlaylists, usePlaylistItems, Playlist } from '@/hooks/usePlaylist';
+import { usePlaylists, usePlaylistItems, Playlist } from '@/hooks/user/usePlaylist';
 import { useAuth } from '@/contexts/AuthContext';
 import { getProxiedImageUrl } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -165,3 +165,4 @@ export function PlaylistSection() {
     </section>
   );
 }
+

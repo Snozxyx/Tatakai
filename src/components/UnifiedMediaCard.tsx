@@ -1,4 +1,5 @@
-import { Play, BookOpen, Star, Film } from "lucide-react";
+import { Play, BookOpen, Star, Film, ShieldAlert } from "lucide-react";
+
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import { useNavigate } from "react-router-dom";
 import { getProxiedImageUrl } from "@/lib/api";
@@ -9,7 +10,7 @@ export interface UnifiedMediaCardProps {
     id: string; // The specific ID used for routing (malId, anilistId, or pure string id)
     name: string;
     poster: string;
-    type?: string; 
+    type?: string;
     status?: string;
     rating?: string | number;
     episodes?: { sub?: number; dub?: number }; // For anime
@@ -26,7 +27,7 @@ export interface UnifiedMediaCardProps {
 
 export function UnifiedMediaCard({ item, className = "" }: UnifiedMediaCardProps) {
   const navigate = useNavigate();
-  
+
   const isAnime = item.mediaType === 'anime';
   const isManga = item.mediaType === 'manga';
   const isCharacter = item.mediaType === 'character';
@@ -77,7 +78,7 @@ export function UnifiedMediaCard({ item, className = "" }: UnifiedMediaCardProps
 
   const renderMetadata = () => {
     if (isCharacter) return null;
-    
+
     return (
       <div className="flex flex-wrap items-center gap-2 mt-2">
         {item.rating && (
@@ -86,13 +87,13 @@ export function UnifiedMediaCard({ item, className = "" }: UnifiedMediaCardProps
             {item.rating}
           </span>
         )}
-        
+
         {isAnime && item.episodes?.sub != null && (
           <span className="text-xs text-muted-foreground bg-white/5 px-1.5 py-0.5 rounded-md">
             {item.episodes.sub} sub {item.episodes.dub ? `• ${item.episodes.dub} dub` : ''}
           </span>
         )}
-        
+
         {isManga && item.chapters != null && item.chapters > 0 && (
           <span className="text-xs text-muted-foreground bg-white/5 px-1.5 py-0.5 rounded-md">
             {item.chapters} ch
@@ -112,7 +113,7 @@ export function UnifiedMediaCard({ item, className = "" }: UnifiedMediaCardProps
           src={getProxiedImageUrl(item.poster || '')}
           alt={item.name}
           className={cn(
-            "w-full h-full object-cover transition-transform duration-500 group-hover:scale-105",
+            "w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-110",
             shouldBlurAdult && "blur-md scale-110"
           )}
           loading="lazy"
@@ -135,10 +136,12 @@ export function UnifiedMediaCard({ item, className = "" }: UnifiedMediaCardProps
         />
 
         {isAdultItem && (
-          <div className="absolute top-2 right-2 z-20 rounded-full border border-rose-500/40 bg-rose-500/20 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-rose-200">
+          <div className="absolute top-2 right-2 z-20 flex items-center gap-1 rounded-full border border-rose-500/50 bg-rose-600/90 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-lg shadow-rose-600/40 backdrop-blur-md animate-pulse">
+            <ShieldAlert className="w-3 h-3 text-rose-100" />
             18+
           </div>
         )}
+
 
         {shouldBlurAdult && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50">
@@ -147,7 +150,7 @@ export function UnifiedMediaCard({ item, className = "" }: UnifiedMediaCardProps
             </div>
           </div>
         )}
-        
+
         {/* Media Type Badge */}
         {item.mediaType && (
           <div className="absolute top-2 left-2 z-10">
@@ -168,7 +171,7 @@ export function UnifiedMediaCard({ item, className = "" }: UnifiedMediaCardProps
         )}
 
         <div className="absolute inset-0 bg-gradient-to-t from-background/95 via-background/20 to-transparent opacity-80 group-hover:opacity-90 transition-opacity" />
-        
+
         {/* Hover Action Overlay */}
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
           <div className="w-12 h-12 rounded-full bg-primary/90 text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/30 backdrop-blur-sm transform scale-50 group-hover:scale-100 transition-transform duration-300 ease-out">
@@ -176,7 +179,7 @@ export function UnifiedMediaCard({ item, className = "" }: UnifiedMediaCardProps
           </div>
         </div>
 
-        <div className="absolute bottom-0 w-full p-4">
+        <div className="absolute bottom-0 w-full p-4 min-h-[80px] flex flex-col justify-end">
           <h3 className="font-display font-bold text-base md:text-lg leading-tight line-clamp-2 text-white group-hover:text-primary transition-colors">
             {item.name}
           </h3>

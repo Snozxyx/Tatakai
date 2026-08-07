@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#151517" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>Tatakai Home</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS via CDN for rapid styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Custom Apple-style Dark Theme mapped to your existing JS classes -->
+  <style type="text/tailwindcss">
+    
+    @layer utilities {
+      .scrollbar-hide::-webkit-scrollbar { display: none; }
+      .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+      .pb-safe { padding-bottom: calc(env(safe-area-inset-bottom, 20px) + 80px); }
+    }
+
+    @layer components {
+      /* Base Global & Shell */
+      body { @apply bg-[#151517] text-[#F5F5F7] font-sans antialiased selection:bg-[#FF2D55]/30; }
+      .hidden { display: none !important; }
+      .app-shell { @apply min-h-screen pb-safe; }
+
+      /* Modals & Screens */
+      .login-screen { @apply min-h-screen grid place-items-center p-6 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#1C1C1E] to-[#151517]; }
+      .login-card { @apply w-full max-w-[400px] p-8 rounded-[2rem] bg-[#1C1C1E]/80 backdrop-blur-2xl border border-white/10 shadow-2xl shadow-black/50 flex flex-col gap-2; }
+      
+      .brand-mark, .icon-brand { 
+        @apply w-12 h-12 flex items-center justify-center rounded-3xl text-white font-bold text-xl shadow-lg shadow-[#FF2D55]/20; 
+      }     
+       .login-card h1 { @apply text-4xl font-extrabold tracking-tight mt-4; }
+      .login-card h1 span { @apply text-[#FF2D55]; }
+      .login-card p { @apply text-[#86868B] text-sm font-medium mb-4; }
+      
+      .field { @apply flex flex-col gap-1.5 mt-4; }
+      .field span, .playback-options span { @apply text-[11px] font-bold text-[#86868B] uppercase tracking-wider pl-1; }
+      .field input, .search-bar input, .select-control { @apply w-full h-12 px-4 rounded-xl bg-[#2C2C2E] border border-white/5 text-white outline-none focus:bg-[#3A3A3C] focus:ring-2 focus:ring-[#FF2D55]/50 transition-all; }
+      
+      /* Buttons */
+      .btn { @apply inline-flex items-center justify-center px-6 h-12 rounded-xl font-semibold transition-all duration-200 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-[#FF2D55]; }
+      .btn-primary { @apply w-full mt-6 bg-[#FF2D55] text-white hover:bg-[#FF375F] shadow-lg shadow-[#FF2D55]/20; }
+      .btn-ghost { @apply bg-[#2C2C2E] hover:bg-[#3A3A3C] text-white border border-white/5; }
+      .icon-btn { @apply w-10 h-10 rounded-full bg-[#2C2C2E] flex items-center justify-center hover:bg-[#3A3A3C] transition-colors border border-white/5 text-sm font-bold; }
+      .error-msg { @apply text-[#FF453A] text-sm font-medium mt-2 min-h-[20px]; }
+
+      /* Top Navigation */
+      .topbar { @apply sticky top-0 z-20 flex flex-wrap md:flex-nowrap items-center justify-between gap-4 px-4 md:px-8 py-4 bg-[#151517]/80 backdrop-blur-2xl border-b border-white/10; }
+      .search-bar { @apply flex-1 flex gap-2 max-w-xl; }
+      .topbar-actions { @apply flex items-center gap-3; }
+      .user-pill, .badge { @apply inline-flex items-center px-3 py-1 h-8 rounded-lg bg-[#2C2C2E] border border-white/5 text-[11px] font-bold text-[#86868B] uppercase tracking-wide; }
+
+      /* Main Layout */
+      .main { @apply w-full max-w-[1600px] mx-auto p-4 md:p-8; }
+      .view-header { @apply flex items-end justify-between gap-4 mb-6; }
+      .view-header h2, .sheet-head h2 { @apply text-3xl md:text-4xl font-extrabold tracking-tight text-white; }
+      .eyebrow { @apply text-[11px] font-bold text-[#FF2D55] uppercase tracking-widest mb-1; }
+
+      /* Hero Section (JS Injected) */
+      .hero { @apply relative w-full h-[50vh] min-h-[450px] rounded-[2rem] overflow-hidden border border-white/10 mb-10 bg-[#1C1C1E] shadow-2xl shadow-black/40; }
+      .hero img { @apply absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-screen; }
+      .hero::after { content: ''; @apply absolute inset-0 bg-gradient-to-t from-[#151517] via-[#151517]/40 to-transparent; }
+      .hero-content { @apply relative z-10 flex flex-col justify-end h-full p-8 md:p-12 w-full md:w-3/4 lg:w-1/2 gap-4; }
+      .hero-title { @apply text-4xl md:text-6xl font-extrabold tracking-tight text-white leading-none; }
+      .hero-copy { @apply text-base text-white/70 line-clamp-3 leading-relaxed font-medium max-w-xl; }
+      .hero-actions { @apply flex flex-wrap gap-3 mt-2; }
+
+      /* Content Rails & Grids */
+      .rail-head { @apply flex justify-between items-end mb-4 px-1; }
+      .rail-head h3 { @apply text-2xl font-bold tracking-tight text-white; }
+      .rail-head .muted { @apply text-sm text-[#86868B] font-medium; }
+      .rail { @apply flex gap-4 md:gap-5 overflow-x-auto pb-6 pt-2 px-1 snap-x snap-mandatory scrollbar-hide; }
+      .rail > * { @apply shrink-0 w-[150px] md:w-[180px] snap-start; }
+      
+      .poster-grid { @apply grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6; }
+      
+      /* Poster Cards */
+      .poster-card { @apply flex flex-col rounded-2xl overflow-hidden bg-[#1C1C1E] border border-white/5 cursor-pointer transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl hover:shadow-black/50 hover:border-white/20 outline-none focus-visible:ring-2 focus-visible:ring-[#FF2D55]; }
+      .poster-art { @apply w-full aspect-[2/3] bg-[#2C2C2E] flex items-center justify-center text-4xl font-bold text-white/10 relative overflow-hidden; }
+      .poster-art img { @apply absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out; }
+      .poster-card:hover .poster-art img, .poster-card:focus-visible .poster-art img { @apply scale-105; }
+      .poster-body { @apply p-4 flex flex-col gap-2; }
+      .poster-title { @apply text-[15px] font-semibold leading-snug line-clamp-2 text-white/95; }
+      .poster-meta { @apply flex flex-wrap gap-1.5; }
+
+      /* Detail View */
+      .detail-hero { @apply relative rounded-[2rem] overflow-hidden border border-white/10 mb-8 bg-[#1C1C1E] mt-4; }
+      .detail-hero img { @apply absolute inset-0 w-full h-full object-cover opacity-30; }
+      .detail-hero::after { content: ''; @apply absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-[#151517] via-[#151517]/90 to-transparent; }
+      .detail-inner { @apply relative z-10 p-6 md:p-12 flex flex-col md:flex-row gap-8 items-start md:items-end min-h-[400px]; }
+      .detail-poster { @apply w-36 md:w-56 aspect-[2/3] rounded-2xl border border-white/10 object-cover shadow-2xl; }
+      .detail-title { @apply text-4xl md:text-6xl font-extrabold tracking-tight text-white mb-4 leading-none; }
+      .detail-description { @apply text-white/70 text-base leading-relaxed mt-5 max-w-4xl font-medium; }
+      .detail-meta { @apply flex flex-wrap gap-2; }
+
+      /* Rows (Episodes & Sources) */
+      .episodes-panel { @apply flex flex-col gap-3 mt-8; }
+      .episode-row, .source-row, .extension-row { @apply flex items-center gap-4 p-3 pr-5 rounded-2xl bg-[#1C1C1E] border border-white/5 cursor-pointer transition-all duration-200 hover:bg-[#2C2C2E] hover:border-white/10 w-full text-left outline-none focus-visible:ring-2 focus-visible:ring-[#FF2D55]; }
+      .episode-num { @apply w-12 h-10 rounded-xl bg-[#FF2D55]/15 text-[#FF2D55] font-extrabold flex items-center justify-center text-sm; }
+      .episode-title, .source-title { @apply flex-1 text-base font-semibold truncate text-white; }
+      
+      /* Source Sheet (Modal) */
+      .source-sheet { @apply fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-md p-4 pb-12 transition-opacity; }
+      .sheet-panel { @apply w-full max-w-3xl max-h-[80vh] bg-[#1C1C1E]/95 backdrop-blur-3xl border border-white/10 rounded-[2rem] p-6 md:p-8 overflow-y-auto shadow-2xl flex flex-col gap-4; }
+      .sheet-head { @apply flex items-start justify-between gap-4 mb-2; }
+      .playback-options { @apply flex flex-wrap gap-4 mb-6 p-4 rounded-2xl bg-[#2C2C2E]/50 border border-white/5; }
+      .playback-options label { @apply flex-1 flex flex-col gap-2; }
+      .source-list { @apply flex flex-col gap-3; }
+      .source-tags { @apply flex flex-wrap justify-end gap-2; }
+
+      /* Empty States & Skeletons */
+      .empty-state, .skeleton-block { @apply min-h-[200px] rounded-[2rem] border border-white/10 border-dashed flex items-center justify-center p-8 text-[#86868B] text-center font-medium; }
+      .skeleton-block { border-style: solid; @apply bg-[#1C1C1E] animate-pulse border-none; }
+
+      /* Player Screen */
+      .player-screen { @apply fixed inset-0 z-[60] flex flex-col bg-black; }
+      .player-top { @apply absolute top-0 left-0 w-full h-24 p-6 flex items-start gap-4 bg-gradient-to-b from-black/80 to-transparent z-10 transition-opacity hover:opacity-100; }
+      .player-top h2 { @apply text-lg font-semibold text-white truncate mt-2.5; }
+      video { @apply flex-1 w-full h-full bg-black outline-none; }
+
+      /* Bottom Navigation (Mobile) */
+      .bottom-nav { @apply fixed bottom-0 left-0 w-full z-30 grid grid-cols-4 gap-2 p-3 bg-[#151517]/80 backdrop-blur-3xl border-t border-white/10 pb-[env(safe-area-inset-bottom,12px)]; }
+      .nav-btn { @apply flex flex-col items-center justify-center p-3 rounded-xl text-[#86868B] text-[12px] font-bold transition-all hover:bg-white/5 outline-none focus-visible:ring-2 focus-visible:ring-[#FF2D55]; }
+      .nav-btn.active { @apply text-[#FF2D55] bg-[#FF2D55]/10; }
+
+      /* TV Mode Adjustments */
+      body.tv-mode { @apply text-lg; }
+      body.tv-mode .rail { @apply gap-6; }
+      body.tv-mode .rail > * { @apply w-[220px]; }
+      body.tv-mode .episode-row { @apply p-4; }
+      body.tv-mode .episode-num { @apply w-16 h-12 text-lg; }
+    }
+  </style>
+</head>
+<body>
+  
+  <!-- LOGIN SCREEN -->
+  <div id="login-screen" class="login-screen">
+    <div class="login-card">
+      <div class="brand-mark">
+        <img src="https://raw.githubusercontent.com/Snozxyx/Tatakai/refs/heads/main/public/tatakai-logo-square.png" >
+      </div>
+      <h1>Tatakai <span>Home</span></h1>
+      <p>Connect to the host library.</p>
+      <form id="login-form">
+        <label class="field">
+          <span>User</span>
+          <input id="user-id" name="userId" value="admin" autocomplete="username" />
+        </label>
+        <label class="field">
+          <span>Password</span>
+          <input id="password" name="password" type="password" autocomplete="current-password" required />
+        </label>
+        <button type="submit" class="btn btn-primary">Connect</button>
+        <p id="login-error" class="error-msg" aria-live="polite"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- APP SHELL -->
+  <div id="app-shell" class="app-shell hidden">
+    <!-- Topbar -->
+    <header class="topbar">
+      <button type="button" class="icon-brand nav-jump" data-view="home" aria-label="Home">T</button>
+      <form id="search-form" class="search-bar" role="search">
+        <input id="search-input" type="search" placeholder="Search ..." autocomplete="off" />
+        <button type="submit" class="icon-btn" aria-label="Search">
+          <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+        </button>
+      </form>
+      <div class="topbar-actions">
+        <span id="user-label" class="user-pill">Connected</span>
+        <button type="button" id="btn-logout" class="icon-btn" aria-label="Sign out">
+          <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="main">
+      <!-- Home View -->
+      <section id="home-view" class="view">
+        <div id="hero" class="hero skeleton-block"></div>
+        <div id="home-sections" class="section-stack"></div>
+      </section>
+
+      <!-- Browse View -->
+      <section id="browse-view" class="view hidden">
+        <div class="view-header">
+          <div>
+            <p class="eyebrow"></p>
+            <h2>Browse</h2>
+          </div>
+          <select id="genre-filter" class="select-control" aria-label="Genre"></select>
+        </div>
+        <div id="browse-grid" class="poster-grid"></div>
+        <div class="flex justify-center mt-10">
+          <button type="button" id="btn-load-more" class="btn btn-ghost hidden">Load more titles</button>
+        </div>
+      </section>
+
+      <!-- Downloads View -->
+      <section id="downloads-view" class="view hidden">
+        <div class="view-header">
+          <div>
+            <p class="eyebrow">Host</p>
+            <h2>Downloads</h2>
+          </div>
+          <button type="button" id="btn-refresh-downloads" class="btn btn-ghost">Refresh</button>
+        </div>
+        <div id="downloads-grid" class="poster-grid"></div>
+      </section>
+
+      <!-- Extensions View -->
+      <section id="extensions-view" class="view hidden">
+        <div class="view-header">
+          <div>
+            <p class="eyebrow">Host</p>
+            <h2>Extensions</h2>
+          </div>
+          <button type="button" id="btn-refresh-extensions" class="btn btn-ghost">Refresh</button>
+        </div>
+        <div id="extensions-list" class="flex flex-col gap-3"></div>
+      </section>
+
+      <!-- Detail View -->
+      <section id="detail-view" class="view hidden">
+        <button type="button" id="btn-back" class="btn btn-ghost mb-4">
+          <svg class="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg> Back
+        </button>
+        <div id="detail-content"></div>
+      </section>
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav" aria-label="Main">
+      <button type="button" class="nav-btn active" data-view="home">Home</button>
+      <button type="button" class="nav-btn" data-view="browse">Browse</button>
+      <button type="button" class="nav-btn" data-view="downloads">Downloads</button>
+      <button type="button" class="nav-btn" data-view="extensions">Extensions</button>
+    </nav>
+  </div>
+
+  <!-- SOURCE SHEET -->
+  <aside id="source-sheet" class="source-sheet hidden" aria-live="polite">
+    <div class="sheet-panel">
+      <div class="sheet-head">
+        <div>
+          <p id="sheet-kicker" class="eyebrow">Sources</p>
+          <h2 id="sheet-title">Episode</h2>
+        </div>
+        <button type="button" id="btn-close-sources" class="icon-btn" aria-label="Close">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <div class="playback-options">
+        <label>
+          <span>Audio Format</span>
+          <select id="language-mode" class="select-control">
+            <option value="sub">Sub</option>
+            <option value="dub">Dub</option>
+          </select>
+        </label>
+        <label>
+          <span>Video Quality</span>
+          <select id="resolution-mode" class="select-control">
+            <option value="1080p">1080p</option>
+            <option value="720p">720p</option>
+            <option value="480p">480p</option>
+          </select>
+        </label>
+      </div>
+      <div id="source-list" class="source-list"></div>
+    </div>
+  </aside>
+
+  <!-- PLAYER SCREEN -->
+  <div id="player-screen" class="player-screen hidden">
+    <div class="player-top">
+      <button type="button" id="btn-close-player" class="btn btn-ghost !bg-black/50 !backdrop-blur-md">
+        <svg class="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg> Close
+      </button>
+      <h2 id="player-title">Playing</h2>
+    </div>
+    <video id="player-video" controls playsinline preload="metadata"></video>
+  </div>
+
+  <script src="/ui/vendor/hls.min.js"></script>
+  
+  <!-- CORE JAVASCRIPT LOGIC (Unmodified to ensure full functionality) -->
+  <script>
+    (function () {
+      'use strict';
+
+      const STORAGE_KEY = 'tatakai_home_token';
+      const STORAGE_USER = 'tatakai_home_user';
+
+      const state = {
+        token: localStorage.getItem(STORAGE_KEY) || '',
+        user: JSON.parse(localStorage.getItem(STORAGE_USER) || 'null'),
+        home: null,
+        downloads: [],
+        extensions: [],
+        mediaCache: new Map(),
+        selectedMedia: null,
+        selectedDownload: null,
+        currentView: 'home',
+        previousView: 'home',
+        browseQuery: '',
+        browseGenre: '',
+        browsePage: 1,
+        browseHasNext: false,
+        sourceContext: null,
+        hls: null,
+        focusables: [],
+        focusIndex: 0,
+      };
+
+      const $ = (sel) => document.querySelector(sel);
+      const refs = {
+        loginScreen: $('#login-screen'),
+        appShell: $('#app-shell'),
+        loginForm: $('#login-form'),
+        loginError: $('#login-error'),
+        userLabel: $('#user-label'),
+        searchForm: $('#search-form'),
+        searchInput: $('#search-input'),
+        hero: $('#hero'),
+        homeSections: $('#home-sections'),
+        browseGrid: $('#browse-grid'),
+        downloadsGrid: $('#downloads-grid'),
+        extensionsList: $('#extensions-list'),
+        detailContent: $('#detail-content'),
+        genreFilter: $('#genre-filter'),
+        loadMore: $('#btn-load-more'),
+        sourceSheet: $('#source-sheet'),
+        sourceList: $('#source-list'),
+        sheetTitle: $('#sheet-title'),
+        sheetKicker: $('#sheet-kicker'),
+        languageMode: $('#language-mode'),
+        resolutionMode: $('#resolution-mode'),
+        playerScreen: $('#player-screen'),
+        video: $('#player-video'),
+        playerTitle: $('#player-title'),
+      };
+
+      function detectTvMode() {
+        const ua = navigator.userAgent.toLowerCase();
+        const tv =
+          /smart-tv|smarttv|googletv|appletv|hbbtv|netcast|viera|tizen|webos|roku|firetv|android tv|crkey/i.test(ua) ||
+          window.matchMedia('(pointer: coarse) and (min-width: 1280px)').matches;
+        if (tv) document.body.classList.add('tv-mode');
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      }
+
+      function stripHtml(value) {
+        return String(value || '')
+          .replace(/<br\s*\/?>/gi, ' ')
+          .replace(/<[^>]+>/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+      }
+
+      function clampText(value, max = 260) {
+        const text = stripHtml(value);
+        if (text.length <= max) return text;
+        return `${text.slice(0, max - 3).trim()}...`;
+      }
+
+      function titleOf(media) {
+        return media?.titleEnglish || media?.titleRomaji || media?.titleNative || media?.name || media?.title || 'Untitled';
+      }
+
+      function posterOf(media) {
+        return media?.coverImageLarge || media?.coverImageMedium || media?.poster || media?.posterUrl || '';
+      }
+
+      function bannerOf(media) {
+        return media?.bannerImage || posterOf(media);
+      }
+
+      function cacheMedia(media) {
+        if (!media) return '';
+        const id = String(media.anilistId || media.id || media.tatakaiId || titleOf(media));
+        state.mediaCache.set(id, media);
+        return id;
+      }
+
+      function initials(value) {
+        return String(value || '?').trim().charAt(0).toUpperCase() || '?';
+      }
+
+      function badge(value) {
+        const text = String(value || '').trim();
+        return text ? `<span class="badge">${escapeHtml(text)}</span>` : '';
+      }
+
+      function appendAccessToken(rawUrl) {
+        if (!state.token) return rawUrl;
+        try {
+          const url = new URL(rawUrl, window.location.origin);
+          url.searchParams.set('access_token', state.token);
+          if (url.origin === window.location.origin) {
+            return `${url.pathname}${url.search}${url.hash}`;
+          }
+          return url.href;
+        } catch {
+          const sep = String(rawUrl).includes('?') ? '&' : '?';
+          return `${rawUrl}${sep}access_token=${encodeURIComponent(state.token)}`;
+        }
+      }
+
+      function queryString(params) {
+        const qs = new URLSearchParams();
+        Object.entries(params || {}).forEach(([key, value]) => {
+          if (value == null || value === '') return;
+          qs.set(key, String(value));
+        });
+        const raw = qs.toString();
+        return raw ? `?${raw}` : '';
+      }
+
+      async function api(path, options = {}) {
+        const headers = {
+          Accept: 'application/json',
+          ...(options.headers || {}),
+        };
+        if (state.token) {
+          headers.Authorization = `Bearer ${state.token}`;
+          headers['X-Tatakai-Token'] = state.token;
+        }
+        const res = await fetch(path, {
+          ...options,
+          headers,
+          credentials: 'same-origin',
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || json.success === false) {
+          const err = new Error(json.error || json.message || res.statusText || 'request_failed');
+          err.code = json.error || json.code;
+          err.status = res.status;
+          throw err;
+        }
+        return json.data !== undefined ? json.data : json;
+      }
+
+      function saveSession(token, user) {
+        state.token = token;
+        state.user = user;
+        localStorage.setItem(STORAGE_KEY, token);
+        localStorage.setItem(STORAGE_USER, JSON.stringify(user));
+      }
+
+      function clearSession() {
+        state.token = '';
+        state.user = null;
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(STORAGE_USER);
+      }
+
+      function showLogin() {
+        refs.loginScreen.classList.remove('hidden');
+        refs.appShell.classList.add('hidden');
+        refs.playerScreen.classList.add('hidden');
+        refs.sourceSheet.classList.add('hidden');
+        refreshFocusables();
+      }
+
+      function showApp() {
+        refs.loginScreen.classList.add('hidden');
+        refs.appShell.classList.remove('hidden');
+        refs.userLabel.textContent = state.user?.name || state.user?.id || 'Connected';
+        refreshFocusables();
+      }
+
+      function setView(view) {
+        state.previousView = state.currentView === 'detail' ? state.previousView : state.currentView;
+        state.currentView = view;
+        document.querySelectorAll('.view').forEach((node) => node.classList.add('hidden'));
+        const target = $(`#${view}-view`);
+        if (target) target.classList.remove('hidden');
+        document.querySelectorAll('.nav-btn').forEach((btn) => {
+          btn.classList.toggle('active', btn.dataset.view === view);
+        });
+        refreshFocusables();
+      }
+
+      function renderPosterArt(item) {
+        const poster = posterOf(item);
+        if (poster) return `<img loading="lazy" src="${escapeHtml(poster)}" alt="">`;
+        return `<span>${escapeHtml(initials(titleOf(item)))}</span>`;
+      }
+
+      function renderMediaCard(media) {
+        const id = cacheMedia(media);
+        const meta = [
+          media?.format,
+          media?.seasonYear,
+          media?.averageScore ? `${media.averageScore}%` : '',
+        ].filter(Boolean);
+        return `
+          <article class="poster-card" role="button" tabindex="0" data-action="open-media" data-id="${escapeHtml(id)}">
+            <div class="poster-art">${renderPosterArt(media)}</div>
+            <div class="poster-body">
+              <div class="poster-title">${escapeHtml(titleOf(media))}</div>
+              <div class="poster-meta">${meta.map(badge).join('')}</div>
+            </div>
+          </article>`;
+      }
+
+      function renderDownloadCard(item, index) {
+        const title = item?.name || item?.title || 'Download';
+        return `
+          <article class="poster-card" role="button" tabindex="0" data-action="open-download" data-index="${index}">
+            <div class="poster-art">${item?.poster ? `<img loading="lazy" src="${escapeHtml(item.poster)}" alt="">` : `<span>${escapeHtml(initials(title))}</span>`}</div>
+            <div class="poster-body">
+              <div class="poster-title">${escapeHtml(title)}</div>
+              <div class="poster-meta">${badge(`${item?.episodeCount || item?.episodes?.length || 0} eps`)}</div>
+            </div>
+          </article>`;
+      }
+
+      function renderHero() {
+        const spotlight = Array.isArray(state.home?.spotlight) ? state.home.spotlight : [];
+        const media = spotlight[0] || state.home?.trending?.[0] || null;
+        if (!media) {
+          refs.hero.className = 'hero skeleton-block';
+          refs.hero.textContent = 'Loading catalog';
+          return;
+        }
+        const id = cacheMedia(media);
+        refs.hero.className = 'hero';
+        refs.hero.innerHTML = `
+          ${bannerOf(media) ? `<img src="${escapeHtml(bannerOf(media))}" alt="">` : ''}
+          <div class="hero-content">
+            <p class="eyebrow">Tatakai Home</p>
+            <h1 class="hero-title">${escapeHtml(titleOf(media))}</h1>
+            <div class="detail-meta">
+              ${badge(media.format)}
+              ${badge(media.status)}
+              ${badge(media.seasonYear)}
+              ${media.averageScore ? badge(`${media.averageScore}%`) : ''}
+            </div>
+            <p class="hero-copy">${escapeHtml(clampText(media.description, 220))}</p>
+            <div class="hero-actions">
+              <button type="button" class="btn btn-primary" data-action="open-media" data-id="${escapeHtml(id)}">Open</button>
+              <button type="button" class="btn btn-ghost nav-jump" data-view="browse">Browse</button>
+            </div>
+          </div>`;
+      }
+
+      function renderRail(title, items) {
+        const rows = Array.isArray(items) ? items.filter(Boolean) : [];
+        if (!rows.length) return '';
+        return `
+          <section class="rail-section">
+            <div class="rail-head">
+              <h3>${escapeHtml(title)}</h3>
+              <span class="muted">${rows.length} titles</span>
+            </div>
+            <div class="rail">${rows.map(renderMediaCard).join('')}</div>
+          </section>`;
+      }
+
+      function renderHome() {
+        renderHero();
+        const sections = [
+          ['Trending', state.home?.trending],
+          ['Top Airing', state.home?.topAiring],
+          ['Popular', state.home?.popular],
+          ['Upcoming', state.home?.topUpcoming],
+          ['Completed', state.home?.latestCompleted],
+          ['Top 10 Today', state.home?.top10?.today],
+        ];
+        refs.homeSections.innerHTML = sections.map(([title, rows]) => renderRail(title, rows)).join('');
+        populateGenres();
+        refreshFocusables();
+      }
+
+      function populateGenres() {
+        const genres = Array.isArray(state.home?.genres) ? state.home.genres : [];
+        refs.genreFilter.innerHTML = [
+          '<option value="">All genres</option>',
+          ...genres.map((genre) => `<option value="${escapeHtml(genre)}">${escapeHtml(genre)}</option>`),
+        ].join('');
+        refs.genreFilter.value = state.browseGenre;
+      }
+
+      function buildEpisodes(media) {
+        const existing = Array.isArray(media?.episodesList) ? media.episodesList : [];
+        if (existing.length) return existing;
+        const streaming = Array.isArray(media?.streamingEpisodes) ? media.streamingEpisodes : [];
+        if (streaming.length) {
+          return streaming.map((ep, index) => ({
+            id: ep.url || `${media.anilistId}?ep=${index + 1}`,
+            number: index + 1,
+            title: ep.title || `Episode ${index + 1}`,
+            thumbnail: ep.thumbnail || null,
+          }));
+        }
+        const count = Math.min(Number(media?.episodes || 0), 2000);
+        return Array.from({ length: count }, (_row, index) => ({
+          id: `${media?.anilistId || 'anime'}?ep=${index + 1}`,
+          number: index + 1,
+          title: `Episode ${index + 1}`,
+        }));
+      }
+
+      function renderDetailMedia(media) {
+        state.selectedMedia = media;
+        state.selectedDownload = null;
+        const episodes = buildEpisodes(media);
+        refs.detailContent.innerHTML = `
+          <section class="detail-hero">
+            ${bannerOf(media) ? `<img src="${escapeHtml(bannerOf(media))}" alt="">` : ''}
+            <div class="detail-inner">
+              <img class="detail-poster" src="${escapeHtml(posterOf(media))}" alt="">
+              <div>
+                <p class="eyebrow">AniList</p>
+                <h1 class="detail-title">${escapeHtml(titleOf(media))}</h1>
+                <div class="detail-meta">
+                  ${badge(media.format)}
+                  ${badge(media.status)}
+                  ${badge(media.seasonYear)}
+                  ${media.episodes ? badge(`${media.episodes} eps`) : ''}
+                  ${media.averageScore ? badge(`${media.averageScore}%`) : ''}
+                </div>
+                <p class="detail-description">${escapeHtml(clampText(media.description, 420))}</p>
+              </div>
+            </div>
+          </section>
+          <section class="episodes-panel">
+            ${episodes.length
+              ? episodes.map((ep, index) => `
+                <button type="button" class="episode-row" data-action="play-media-episode" data-index="${index}">
+                  <span class="episode-num">${escapeHtml(ep.number ?? index + 1)}</span>
+                  <span class="episode-title">${escapeHtml(ep.title || `Episode ${ep.number ?? index + 1}`)}</span>
+                  ${badge('Sources')}
+                </button>`).join('')
+              : '<div class="empty-state">No episode data yet.</div>'}
+          </section>`;
+        setView('detail');
+      }
+
+      function renderDetailDownload(item) {
+        state.selectedDownload = item;
+        state.selectedMedia = null;
+        const episodes = Array.isArray(item?.episodes) ? item.episodes : [];
+        refs.detailContent.innerHTML = `
+          <section class="detail-hero">
+            ${item?.bannerImage ? `<img src="${escapeHtml(item.bannerImage)}" alt="">` : ''}
+            <div class="detail-inner">
+              <div class="detail-poster poster-art">${item?.poster ? `<img src="${escapeHtml(item.poster)}" alt="">` : `<span>${escapeHtml(initials(item?.name))}</span>`}</div>
+              <div>
+                <p class="eyebrow">Download</p>
+                <h1 class="detail-title">${escapeHtml(item?.name || 'Download')}</h1>
+                <div class="detail-meta">
+                  ${badge(`${episodes.length} eps`)}
+                  ${item?.anilistId ? badge(`AL ${item.anilistId}`) : ''}
+                </div>
+              </div>
+            </div>
+          </section>
+          <section class="episodes-panel">
+            ${episodes.length
+              ? episodes.map((ep, index) => `
+                <button type="button" class="episode-row" data-action="play-download-episode" data-index="${index}">
+                  <span class="episode-num">${escapeHtml(ep.number ?? index + 1)}</span>
+                  <span class="episode-title">${escapeHtml(ep.title || ep.file || `Episode ${ep.number ?? index + 1}`)}</span>
+                  ${badge('Local')}
+                </button>`).join('')
+              : '<div class="empty-state">No playable episodes found.</div>'}
+          </section>`;
+        setView('detail');
+      }
+
+      async function loadHome() {
+        refs.hero.className = 'hero skeleton-block';
+        refs.hero.textContent = '';
+        refs.homeSections.innerHTML = '';
+        try {
+          state.home = await api('/api/home/catalog/home');
+          renderHome();
+        } catch (err) {
+          refs.hero.className = 'hero empty-state';
+          refs.hero.textContent = err.code === 'forbidden' ? 'Catalog permission is not enabled for this user.' : 'Catalog unavailable.';
+        }
+      }
+
+      async function loadBrowse({ reset = false } = {}) {
+        if (reset) {
+          state.browsePage = 1;
+          state.browseHasNext = false;
+          refs.browseGrid.innerHTML = '<div class="empty-state w-full col-span-full">Loading...</div>';
+        }
+        try {
+          const data = await api(`/api/home/catalog/search${queryString({
+            q: state.browseQuery,
+            page: state.browsePage,
+            perPage: 24,
+            genres: state.browseGenre,
+            sort: state.browseQuery ? 'SEARCH_MATCH' : 'POPULARITY_DESC',
+          })}`);
+          const rows = Array.isArray(data?.media) ? data.media : Array.isArray(data) ? data : [];
+          state.browseHasNext = Boolean(data?.pageInfo?.hasNextPage);
+          const html = rows.map(renderMediaCard).join('') || '<div class="empty-state w-full col-span-full">No results.</div>';
+          refs.browseGrid.innerHTML = reset || state.browsePage === 1 ? html : refs.browseGrid.innerHTML + html;
+          refs.loadMore.classList.toggle('hidden', !state.browseHasNext);
+          refreshFocusables();
+        } catch (err) {
+          refs.browseGrid.innerHTML = `<div class="empty-state w-full col-span-full">${escapeHtml(err.message || 'Browse unavailable.')}</div>`;
+          refs.loadMore.classList.add('hidden');
+        }
+      }
+
+      let consentPollTimer = null;
+
+      function stopConsentPoll() {
+        if (consentPollTimer) {
+          clearInterval(consentPollTimer);
+          consentPollTimer = null;
+        }
+      }
+
+      function showConsentWaiting() {
+        refs.downloadsGrid.innerHTML = '<div class="empty-state w-full col-span-full">Waiting for host approval.</div>';
+        stopConsentPoll();
+        consentPollTimer = setInterval(() => {
+          void loadDownloads();
+        }, 8000);
+      }
+
+      async function loadDownloads() {
+        refs.downloadsGrid.innerHTML = '<div class="empty-state w-full col-span-full">Loading</div>';
+        try {
+          const rows = await api('/api/home/catalog');
+          stopConsentPoll();
+          state.downloads = Array.isArray(rows) ? rows : [];
+          refs.downloadsGrid.innerHTML = state.downloads.length
+            ? state.downloads.map(renderDownloadCard).join('')
+            : '<div class="empty-state w-full col-span-full">No downloads in the host library yet.</div>';
+          refreshFocusables();
+        } catch (err) {
+          if (err.code === 'consent_required') {
+            try {
+              await api('/api/home/consent/request', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ label: navigator.userAgent.slice(0, 80) }),
+              });
+            } catch {
+            }
+            showConsentWaiting();
+            return;
+          }
+          if (err.code === 'catalog_sharing_disabled') {
+            refs.downloadsGrid.innerHTML = '<div class="empty-state w-full col-span-full">Download sharing is off on the host.</div>';
+            return;
+          }
+          refs.downloadsGrid.innerHTML = `<div class="empty-state w-full col-span-full">${escapeHtml(err.message || 'Downloads unavailable.')}</div>`;
+        }
+      }
+
+      async function loadExtensions() {
+        refs.extensionsList.innerHTML = '<div class="empty-state">Loading</div>';
+        try {
+          const rows = await api('/api/home/extensions');
+          state.extensions = Array.isArray(rows) ? rows : [];
+          refs.extensionsList.innerHTML = state.extensions.length
+            ? state.extensions.map((ext) => `
+              <div class="extension-row">
+                <div class="flex-1">
+                  <div class="poster-title">${escapeHtml(ext.name || ext.id)}</div>
+                  <div class="poster-meta">
+                    ${badge(ext.type || 'source')}
+                    ${ext.version ? badge(`v${ext.version}`) : ''}
+                  </div>
+                </div>
+                ${badge('Loaded')}
+              </div>`).join('')
+            : '<div class="empty-state">No loaded host extensions.</div>';
+          refreshFocusables();
+        } catch (err) {
+          refs.extensionsList.innerHTML = err.code === 'forbidden'
+            ? '<div class="empty-state">Extension playback is handled by the host.</div>'
+            : `<div class="empty-state">${escapeHtml(err.message || 'Extensions unavailable.')}</div>`;
+        }
+      }
+
+      async function openMedia(id) {
+        const cached = state.mediaCache.get(String(id));
+        if (cached) renderDetailMedia(cached);
+        const anilistId = cached?.anilistId || Number(id);
+        if (!Number.isFinite(Number(anilistId)) || Number(anilistId) <= 0) return;
+        try {
+          const media = await api(`/api/home/catalog/media/${encodeURIComponent(String(anilistId))}`);
+          cacheMedia(media);
+          renderDetailMedia(media);
+        } catch {
+        }
+      }
+
+      function openDownload(index) {
+        const item = state.downloads[Number(index)];
+        if (!item) return;
+        renderDetailDownload(item);
+      }
+
+      function openSourceSheet(media, episode) {
+        state.sourceContext = { media, episode };
+        refs.sheetTitle.textContent = `${titleOf(media)} - Episode ${episode.number ?? ''}`.trim();
+        refs.sheetKicker.textContent = refs.languageMode.value === 'dub' ? 'Dub sources' : 'Sub sources';
+        refs.sourceSheet.classList.remove('hidden');
+        refs.sourceList.innerHTML = '<div class="empty-state">Resolving sources</div>';
+        refreshFocusables();
+        void resolveSources();
+      }
+
+      async function resolveSources() {
+        const context = state.sourceContext;
+        if (!context?.media || !context?.episode) return;
+        refs.sourceList.innerHTML = '<div class="empty-state">Resolving sources...</div>';
+        refs.sheetKicker.textContent = refs.languageMode.value === 'dub' ? 'Dub sources' : 'Sub sources';
+        try {
+          const media = context.media;
+          const ep = context.episode;
+          const data = await api('/api/home/playback/resolve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              media,
+              animeName: titleOf(media),
+              anilistId: media.anilistId,
+              tatakaiId: media.tatakaiId,
+              episodeNumber: ep.number,
+              episode: ep.number,
+              episodeCount: media.episodes,
+              category: refs.languageMode.value,
+              resolution: refs.resolutionMode.value,
+            }),
+          });
+          const rows = Array.isArray(data?.playableSources) ? data.playableSources : [];
+          state.sourceContext.sources = rows;
+          refs.sourceList.innerHTML = rows.length
+            ? rows.map((source, index) => renderSourceRow(source, index)).join('')
+            : renderSourceEmpty(data);
+          refreshFocusables();
+        } catch (err) {
+          refs.sourceList.innerHTML = `<div class="empty-state">${escapeHtml(err.message || 'No sources available.')}</div>`;
+        }
+      }
+
+      function renderSourceEmpty(data) {
+        const firstError = Array.isArray(data?.errors) && data.errors[0]?.message ? data.errors[0].message : '';
+        return `<div class="empty-state">${escapeHtml(firstError || 'No sources available.')}</div>`;
+      }
+
+      function renderSourceRow(source, index) {
+        const tags = [
+          source.quality || 'auto',
+          source.sourceType,
+          source.requiresStart ? 'torrent' : '',
+          source.subtitles?.length ? 'subs' : '',
+          source.audioLanguage || '',
+        ].filter(Boolean);
+        return `
+          <button type="button" class="source-row" data-action="play-source" data-index="${index}">
+            <div class="flex-1">
+              <div class="source-title">${escapeHtml(source.source || source.extensionName || 'Source')}</div>
+              <div class="poster-meta !mt-1">${escapeHtml(source.extensionName || source.extensionId || '')}</div>
+            </div>
+            <div class="source-tags">${tags.map(badge).join('')}</div>
+          </button>`;
+      }
+
+      async function playSelectedSource(index) {
+        const source = state.sourceContext?.sources?.[Number(index)];
+        if (!source) return;
+        if (source.error) {
+          refs.sourceList.innerHTML = `<div class="empty-state">${escapeHtml(source.error)}</div>`;
+          return;
+        }
+        let playable = source;
+        if (source.requiresStart && source.sourceToken) {
+          refs.sourceList.innerHTML = '<div class="empty-state">Starting torrent...</div>';
+          try {
+            const started = await api('/api/home/playback/start', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sourceToken: source.sourceToken }),
+            });
+            if (started?.success === false) throw new Error(started.error || 'torrent_start_failed');
+            playable = started.source;
+          } catch (err) {
+            refs.sourceList.innerHTML = `<div class="empty-state">${escapeHtml(err.message || 'Could not start torrent.')}</div>`;
+            return;
+          }
+        }
+        playSource(playable, state.sourceContext?.media, state.sourceContext?.episode);
+      }
+
+      function streamDownloadUrl(item, ep, index) {
+        const key = String(ep?.number ?? ep?.id ?? ep?.file ?? index + 1);
+        return appendAccessToken(`/api/home/catalog/${encodeURIComponent(item.name)}/stream/${encodeURIComponent(key)}`);
+      }
+
+      function playDownloadEpisode(index) {
+        const item = state.selectedDownload;
+        const ep = item?.episodes?.[Number(index)];
+        if (!item || !ep) return;
+        playVideo({
+          title: `${item.name} - Episode ${ep.number ?? Number(index) + 1}`,
+          url: streamDownloadUrl(item, ep, index),
+          isHls: false,
+          subtitles: Array.isArray(ep.subtitles) ? ep.subtitles : [],
+        });
+      }
+
+      function playSource(source, media, episode) {
+        const label = `${titleOf(media)} - Episode ${episode?.number ?? ''}`.trim();
+        playVideo({
+          title: label,
+          url: appendAccessToken(source.url),
+          isHls: Boolean(source.isHls) || /\.m3u8($|\?)/i.test(String(source.url || '')),
+          subtitles: Array.isArray(source.subtitles) ? source.subtitles : [],
+        });
+      }
+
+      function clearTracks() {
+        refs.video.querySelectorAll('track').forEach((track) => track.remove());
+      }
+
+      function addTracks(tracks) {
+        clearTracks();
+        (tracks || []).forEach((track, index) => {
+          if (!track?.url) return;
+          const el = document.createElement('track');
+          el.kind = 'subtitles';
+          el.label = track.label || track.language || `Subtitle ${index + 1}`;
+          el.srclang = track.language || track.lang || 'en';
+          el.src = appendAccessToken(track.url);
+          if (track.default || index === 0) el.default = true;
+          refs.video.appendChild(el);
+          const textTrack = refs.video.textTracks?.[refs.video.textTracks.length - 1];
+          if (textTrack) textTrack.mode = track.default || index === 0 ? 'showing' : 'disabled';
+        });
+      }
+
+      function destroyHls() {
+        if (state.hls) {
+          try {
+            state.hls.destroy();
+          } catch {
+          }
+          state.hls = null;
+        }
+      }
+
+      function playVideo({ title, url, isHls, subtitles }) {
+        destroyHls();
+        refs.video.pause();
+        refs.video.removeAttribute('src');
+        addTracks(subtitles);
+        refs.playerTitle.textContent = title || 'Playing';
+        refs.playerScreen.classList.remove('hidden');
+        refs.sourceSheet.classList.add('hidden');
+
+        if (isHls && window.Hls && window.Hls.isSupported()) {
+          const hls = new window.Hls({
+            xhrSetup: (xhr) => {
+              xhr.withCredentials = true;
+            },
+          });
+          state.hls = hls;
+          hls.loadSource(url);
+          hls.attachMedia(refs.video);
+          hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+            refs.video.play().catch(() => {});
+          });
+          return;
+        }
+
+        refs.video.src = url;
+        refs.video.play().catch(() => {});
+      }
+
+      function closePlayer() {
+        refs.video.pause();
+        refs.video.removeAttribute('src');
+        clearTracks();
+        destroyHls();
+        refs.playerScreen.classList.add('hidden');
+      }
+
+      function bindEvents() {
+        refs.loginForm.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          refs.loginError.textContent = '';
+          try {
+            const data = await api('/api/home/auth/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId: $('#user-id').value || 'admin',
+                password: $('#password').value,
+                label: 'web-ui',
+              }),
+            });
+            saveSession(data.token, data.user);
+            showApp();
+            await bootstrapData();
+          } catch (err) {
+            refs.loginError.textContent =
+              err.code === 'invalid_credentials'
+                ? 'Wrong password.'
+                : err.code === 'password_not_configured'
+                  ? 'Home Server password is not set.'
+                  : 'Login failed.';
+          }
+        });
+
+        $('#btn-logout').addEventListener('click', () => {
+          stopConsentPoll();
+          clearSession();
+          closePlayer();
+          showLogin();
+        });
+
+        refs.searchForm.addEventListener('submit', (event) => {
+          event.preventDefault();
+          state.browseQuery = refs.searchInput.value.trim();
+          setView('browse');
+          void loadBrowse({ reset: true });
+        });
+
+        refs.genreFilter.addEventListener('change', () => {
+          state.browseGenre = refs.genreFilter.value;
+          setView('browse');
+          void loadBrowse({ reset: true });
+        });
+
+        refs.loadMore.addEventListener('click', () => {
+          if (!state.browseHasNext) return;
+          state.browsePage += 1;
+          void loadBrowse();
+        });
+
+        $('#btn-refresh-downloads').addEventListener('click', () => void loadDownloads());
+        $('#btn-refresh-extensions').addEventListener('click', () => void loadExtensions());
+        $('#btn-back').addEventListener('click', () => setView(state.previousView || 'home'));
+        $('#btn-close-sources').addEventListener('click', () => refs.sourceSheet.classList.add('hidden'));
+        $('#btn-close-player').addEventListener('click', closePlayer);
+
+        refs.languageMode.addEventListener('change', () => void resolveSources());
+        refs.resolutionMode.addEventListener('change', () => void resolveSources());
+
+        document.addEventListener('click', (event) => {
+          const target = event.target.closest('[data-action], .nav-jump, .nav-btn');
+          if (!target) return;
+          const view = target.dataset.view;
+          if (view) {
+            setView(view);
+            if (view === 'browse' && !refs.browseGrid.children.length) void loadBrowse({ reset: true });
+            if (view === 'downloads') void loadDownloads();
+            if (view === 'extensions') void loadExtensions();
+            return;
+          }
+
+          const action = target.dataset.action;
+          if (action === 'open-media') void openMedia(target.dataset.id);
+          if (action === 'open-download') openDownload(target.dataset.index);
+          if (action === 'play-media-episode') {
+            const ep = buildEpisodes(state.selectedMedia)[Number(target.dataset.index)];
+            if (state.selectedMedia && ep) openSourceSheet(state.selectedMedia, ep);
+          }
+          if (action === 'play-download-episode') playDownloadEpisode(target.dataset.index);
+          if (action === 'play-source') void playSelectedSource(target.dataset.index);
+        });
+
+        document.addEventListener('keydown', handleKeys);
+      }
+
+      async function bootstrapData() {
+        await loadHome();
+        void loadBrowse({ reset: true });
+      }
+
+      async function tryBootstrap() {
+        if (!state.token) {
+          showLogin();
+          return;
+        }
+        try {
+          await api('/api/home/status');
+          showApp();
+          await bootstrapData();
+        } catch {
+          clearSession();
+          showLogin();
+        }
+      }
+
+      function activeFocusRoot() {
+        if (!refs.playerScreen.classList.contains('hidden')) return refs.playerScreen;
+        if (!refs.sourceSheet.classList.contains('hidden')) return refs.sourceSheet;
+        if (!refs.appShell.classList.contains('hidden')) {
+          return $(`#${state.currentView}-view`) || refs.appShell;
+        }
+        return refs.loginScreen;
+      }
+
+      function refreshFocusables() {
+        const root = activeFocusRoot();
+        state.focusables = Array.from(
+          root.querySelectorAll('button, input, select, .poster-card, .episode-row, .source-row'),
+        ).filter((el) => el.offsetParent !== null && !el.disabled);
+        const activeIndex = state.focusables.indexOf(document.activeElement);
+        state.focusIndex = activeIndex >= 0 ? activeIndex : 0;
+      }
+
+      function moveFocus(delta) {
+        refreshFocusables();
+        if (!state.focusables.length) return;
+        state.focusIndex = (state.focusIndex + delta + state.focusables.length) % state.focusables.length;
+        state.focusables[state.focusIndex]?.focus();
+      }
+
+      function gridColumns() {
+        const root = activeFocusRoot();
+        const grid = root.querySelector('.poster-grid, .rail');
+        if (!grid) return 1;
+        const first = grid.querySelector('.poster-card');
+        if (!first) return 1;
+        const width = first.getBoundingClientRect().width || 180;
+        return Math.max(1, Math.floor((grid.getBoundingClientRect().width || width) / width));
+      }
+
+      function handleKeys(event) {
+        if (!refs.playerScreen.classList.contains('hidden')) {
+          if (event.key === 'Escape' || event.key === 'Backspace') {
+            event.preventDefault();
+            closePlayer();
+          }
+          return;
+        }
+        if (!refs.sourceSheet.classList.contains('hidden') && (event.key === 'Escape' || event.key === 'Backspace')) {
+          event.preventDefault();
+          refs.sourceSheet.classList.add('hidden');
+          return;
+        }
+        if (event.key === 'ArrowRight') {
+          event.preventDefault();
+          moveFocus(1);
+        } else if (event.key === 'ArrowLeft') {
+          event.preventDefault();
+          moveFocus(-1);
+        } else if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          moveFocus(gridColumns());
+        } else if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          moveFocus(-gridColumns());
+        } else if (event.key === 'Enter' && document.activeElement?.click) {
+          document.activeElement.click();
+        } else if ((event.key === 'Escape' || event.key === 'Backspace') && state.currentView === 'detail') {
+          event.preventDefault();
+          setView(state.previousView || 'home');
+        }
+      }
+
+      detectTvMode();
+      bindEvents();
+      tryBootstrap();
+    })();
+  </script>
+</body>
+</html>

@@ -10,10 +10,11 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { useStatusIncidents } from '@/hooks/useAdminFeatures';
+import { useStatusIncidents } from '@/hooks/admin/useAdminFeatures';
 import { formatDistanceToNow } from 'date-fns';
 import { StatusPageBackground } from '@/components/layout/StatusPageBackground';
 import { TATAKAI_API_URL, withClientHeaders } from '@/lib/api/api-client';
+import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 
 interface ServiceStatus {
   name: string;
@@ -189,6 +190,7 @@ async function probeKnownProxyNode(node: KnownProxyNode, proxyPassword: string):
 
 export default function StatusPage() {
   const navigate = useNavigate();
+  const isDesktopApp = useIsDesktopApp();
   const { data: incidents = [], isLoading: loadingIncidents } = useStatusIncidents(false);
   const [proxies, setProxies] = useState<ProxyDisplayNode[]>([]);
   const [scrapers, setScrapers] = useState<ScraperHealthNode[]>([]);
@@ -590,7 +592,7 @@ export default function StatusPage() {
         <div className="absolute top-0 left-1/4 w-px h-full bg-gradient-to-b from-transparent via-accent/10 to-transparent" />
       </div>
 
-      <main className="relative z-10 pl-6 md:pl-32 pr-6 py-6 max-w-[1400px] mx-auto pb-24 md:pb-6">
+      <main className={`relative z-10 ${isDesktopApp ? 'pl-6' : 'pl-6 md:pl-32'} pr-6 py-6 max-w-[1400px] mx-auto pb-24 md:pb-6`}>
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <button

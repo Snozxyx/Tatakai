@@ -13,7 +13,7 @@ import {
   useAddToPlaylist,
   useAnimeInPlaylists,
   Playlist 
-} from '@/hooks/usePlaylist';
+} from '@/hooks/user/usePlaylist';
 import { useAuth } from '@/contexts/AuthContext';
 import { getProxiedImageUrl } from '@/lib/api';
 import { 
@@ -317,3 +317,4 @@ export function AddToPlaylistButton({
     </Dialog>
   );
 }
+

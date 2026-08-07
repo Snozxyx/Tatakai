@@ -4,7 +4,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { useNotifications } from "@/hooks/useNotifications";
+import { useNotifications } from "@/hooks/community/useNotifications";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import { Button } from "@/components/ui/button";
 import { Bell, Check, Trash2, Loader2, CheckCircle2 } from "lucide-react";
@@ -135,3 +135,4 @@ export function NotificationModal({ open, onOpenChange }: NotificationModalProps
         </Dialog>
     );
 }
+

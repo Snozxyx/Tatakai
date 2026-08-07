@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useAnimeSeasons } from '@/hooks/useAnimeSeasons';
+import { useAnimeSeasons } from '@/hooks/api/useAnimeSeasons';
 import { getProxiedImageUrl } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Layers, ChevronRight, ChevronLeft } from 'lucide-react';

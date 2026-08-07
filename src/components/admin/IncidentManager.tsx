@@ -7,7 +7,7 @@ import {
   useCreateIncident, 
   useUpdateIncident,
   type StatusIncident 
-} from '@/hooks/useAdminFeatures';
+} from '@/hooks/admin/useAdminFeatures';
 import { toast } from 'sonner';
 import { 
   AlertCircle, Plus, X, CheckCircle, AlertTriangle, 

@@ -5,15 +5,19 @@ import { MobileNav } from '@/components/layout/MobileNav';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMLRecommendations, useTasteProfile } from '@/hooks/useMLRecommendations';
-import { usePersonalizedRecommendations } from '@/hooks/useRecommendations';
+import { useMLRecommendations, useTasteProfile, type MLRecommendation, type TasteProfile } from '@/hooks/api/useMLRecommendations';
+import { usePersonalizedRecommendations } from '@/hooks/api/useRecommendations';
 import { useAuth } from '@/contexts/AuthContext';
+import { useHomeData } from '@/hooks/api/useAnimeData';
+import { FeatureFlag, useFeatureFlag } from '@/core/feature-flags';
 import { Sparkles, TrendingUp, Brain, Star, Film, Target, ThumbsUp, ThumbsDown, EyeOff, ChevronDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getProxiedImageUrl } from '@/lib/api';
-import { MLRecommendation, TasteProfile } from '@/lib/mlRecommendations';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { AnimeGrid } from '@/components/anime/AnimeGrid';
+import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
+import { MangaTrendingSection } from '@/components/manga/MangaTrendingSection';
 
 type RecommendationFeedback = 'like' | 'dislike' | 'already_seen' | 'skip';
 
@@ -236,11 +240,14 @@ function TasteProfileDisplay({ profile }: { profile: TasteProfile }) {
 }
 
 export default function RecommendationsPage() {
+  const isDesktopApp = useIsDesktopApp();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { data: tasteProfile, isLoading: loadingProfile } = useTasteProfile();
   const { data: recommendations, isLoading: loadingRecs } = useMLRecommendations(30);
   const { data: personalizedRecs, isLoading: loadingPersonalized } = usePersonalizedRecommendations(12);
+  const contentGraphEnabled = useFeatureFlag(FeatureFlag.CONTENT_GRAPH);
+  const { data: homeData } = useHomeData();
   const [filter, setFilter] = useState<'all' | 'high' | 'medium'>('all');
   const [loadingProgress, setLoadingProgress] = useState(0);
 
@@ -364,7 +371,7 @@ export default function RecommendationsPage() {
       <Background />
       <Sidebar />
 
-      <main className="relative z-10 pl-4 md:pl-28 pr-4 md:pr-6 py-4 md:py-6">
+      <main className={`relative z-10 ${isDesktopApp ? 'pl-4' : 'pl-4 md:pl-28'} pr-4 md:pr-6 py-4 md:py-6`}>
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
@@ -416,7 +423,7 @@ export default function RecommendationsPage() {
           ) : personalizedRecs && personalizedRecs.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
               {personalizedRecs.slice(0, 12).map((item: any, index: number) => (
-                <Link key={item.anime.id} to={`/anime/${item.anime.id}`}>
+                <Link key={`${item.anime.id}-${index}`} to={`/anime/${item.anime.id}`}>
                   <GlassPanel hoverEffect className="group cursor-pointer overflow-hidden">
                     <div className="relative aspect-[3/4]">
                       <img
@@ -524,13 +531,31 @@ export default function RecommendationsPage() {
               ))}
             </div>
           ) : (
-            <GlassPanel className="p-8 text-center">
-              <Film className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <p className="text-muted-foreground">
-                No recommendations found. Try watching more anime to improve suggestions.
-              </p>
-            </GlassPanel>
+            contentGraphEnabled && homeData ? (
+              <AnimeGrid
+                animes={homeData.mostPopularAnimes.slice(0, 12)}
+                title="Popular Right Now"
+                icon={<Sparkles className="w-5 h-5 text-primary" />}
+              />
+            ) : (
+              <GlassPanel className="p-8 text-center">
+                <Film className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                <p className="text-muted-foreground">
+                  No recommendations found. Try watching more anime to improve suggestions.
+                </p>
+              </GlassPanel>
+            )
           )}
+        </div>
+
+        {/* ── Manga Recommendations ──────────────────────────────────── */}
+        <div className="mt-12">
+          <MangaTrendingSection
+            title="Manga You Might Love"
+            defaultTab="manga"
+            showTabs
+            limit={18}
+          />
         </div>
       </main>
 
@@ -538,3 +563,4 @@ export default function RecommendationsPage() {
     </div>
   );
 }
+

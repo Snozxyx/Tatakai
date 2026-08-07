@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { notifyError } from '@/services/discordWebhook';
+import { notifyError } from '@/core/network/discord-webhook';
 
 function generateErrorId() {
   return `err_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,8)}`;

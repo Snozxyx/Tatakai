@@ -2,7 +2,7 @@ import { Play, LayoutGrid, Search, TrendingUp, Heart, User, Settings, LogIn, Use
 import { NavIcon } from "@/components/ui/NavIcon";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from "@/hooks/useIsNativeApp";
+import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from "@/hooks/ui/useIsNativeApp";
 import { cn } from "@/lib/utils";
 
 export function Sidebar() {
@@ -20,7 +20,7 @@ export function Sidebar() {
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <nav className={cn(
+    <nav data-sidebar className={cn(
       "fixed z-[100] flex flex-col transition-all duration-300",
       isDesktopApp
         ? "left-0 top-0 h-screen w-20 bg-background/60 backdrop-blur-2xl border-r border-white/5 pt-12 items-center"
@@ -114,3 +114,4 @@ export function Sidebar() {
     </nav>
   );
 }
+

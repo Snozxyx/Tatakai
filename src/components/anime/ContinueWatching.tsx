@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { useContinueWatching } from '@/hooks/useWatchHistory';
+import { useContinueWatching } from '@/hooks/user/useWatchHistory';
 import { useAuth } from '@/contexts/AuthContext';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Play, Clock } from 'lucide-react';
@@ -81,3 +81,4 @@ export function ContinueWatching() {
     </section>
   );
 }
+

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Background } from '@/components/layout/Background';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -28,25 +28,46 @@ import {
     useCloseRoom,
     useUpdateRoom,
     useUpdateParticipantReady
-} from '@/hooks/useWatchRoom';
-import { getProxiedImageUrl, fetchEpisodeServers, fetchCombinedSources, fetchAnimeInfo } from '@/lib/api';
+} from '@/hooks/media/useWatchRoom';
+import { getProxiedImageUrl } from '@/lib/api';
+import { fetchCombinedSources, fetchAnimeInfo } from '@/lib/api/api-client';
 import {
     Search, ChevronRight, PlayCircle, ArrowLeft, Users, Send,
     Crown, LogOut, Lock, MessageSquare, Film, Settings, X, Subtitles,
     Copy, Check, Timer, Zap, Play, DownloadCloud, ListOrdered, BarChart3, ArrowUp, ArrowDown, Smile
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEpisodes, useAnimeInfo } from '@/hooks/useAnimeData';
+import { useEpisodes, useAnimeInfo } from '@/hooks/api/useAnimeData';
 import { VideoPlayer } from '@/components/video/VideoPlayer';
 import { EmbedPlayer } from '@/components/video/EmbedPlayer';
 import { CustomVideoSourceModal } from '@/components/video/CustomVideoSourceModal'; // Import the new modal
 import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
+import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
+
+function splitProviderServers(providerServers: any[] = []) {
+    const grouped = {
+        sub: [] as any[],
+        dub: [] as any[],
+    };
+
+    for (const server of providerServers) {
+        const label = [server?.language, server?.displayName, server?.serverName, server?.providerName]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+        const isDub = Boolean(server?.isDub) || label.includes('dub');
+        grouped[isDub ? 'dub' : 'sub'].push(server);
+    }
+
+    return grouped;
+}
 
 export default function WatchRoomPage() {
     const { roomId } = useParams<{ roomId: string }>();
     const navigate = useNavigate();
+    const isDesktopApp = useIsDesktopApp();
     const { user, isModerator, isAdmin } = useAuth();
     const queryClient = useQueryClient();
     const joinedFlagKey = roomId ? `watch-room-joined-${roomId}` : null;
@@ -181,12 +202,6 @@ export default function WatchRoomPage() {
         }
     }, [isParticipant, joinedFlagKey]);
 
-    const { data: serversData } = useQuery({
-        queryKey: ['episode-servers', currentEpisodeId],
-        queryFn: () => (currentEpisodeId && room?.anime_id !== 'custom') ? fetchEpisodeServers(currentEpisodeId) : null,
-        enabled: !!currentEpisodeId && room?.anime_id !== 'custom'
-    });
-
     const { data: animeInfo } = useQuery({
         queryKey: ['anime-info', room?.anime_id],
         queryFn: () => room?.anime_id && room.anime_id !== 'custom' ? fetchAnimeInfo(room.anime_id) : null,
@@ -211,7 +226,8 @@ export default function WatchRoomPage() {
                     subtitles: [],
                     intro: null,
                     outro: null,
-                    tracks: []
+                    tracks: [],
+                    providerServers: []
                 };
             }
 
@@ -219,7 +235,7 @@ export default function WatchRoomPage() {
 
             return fetchCombinedSources(
                 currentEpisodeId,
-                animeInfo?.anime.info.name,
+                animeInfo?.titleEnglish || animeInfo?.titleRomaji,
                 room?.episode_number || 1,
                 selectedServer,
                 selectedCategory
@@ -227,6 +243,11 @@ export default function WatchRoomPage() {
         },
         enabled: (!!currentEpisodeId || (room?.anime_id === 'custom' && !!room.episode_id)) && (room?.anime_id === 'custom' || !!animeInfo)
     });
+
+    const serversData = useMemo(
+        () => splitProviderServers(streamingData?.providerServers || []),
+        [streamingData?.providerServers]
+    );
 
     // Error Handling for Video Player
     const handlePlayerError = useCallback(() => {
@@ -313,6 +334,14 @@ export default function WatchRoomPage() {
     // Real-time Subscriptions
     useEffect(() => {
         if (!roomId) return;
+        // Ensure any previous room channel for this room is removed first.
+        try {
+            const existing = supabase.getChannels?.().find((c: any) => c.topic?.endsWith(`room-${roomId}`));
+            if (existing) supabase.removeChannel(existing);
+        } catch (e) {
+            // ignore if getChannels not available
+        }
+
         const channel = supabase.channel(`room-${roomId}`)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'watch_room_messages', filter: `room_id=eq.${roomId}` }, () => refetchMessages())
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'watch_rooms', filter: `id=eq.${roomId}` }, () => {
@@ -675,7 +704,7 @@ export default function WatchRoomPage() {
             <Background />
             <Sidebar />
 
-            <main className="relative z-10 pl-4 md:pl-28 pr-4 md:pr-6 py-4 md:py-6 min-h-screen flex flex-col">
+            <main className={`relative z-10 ${isDesktopApp ? 'pl-4' : 'pl-4 md:pl-28'} pr-4 md:pr-6 py-4 md:py-6 min-h-screen flex flex-col`}>
                 {/* Header */}
                 <div className="flex items-center justify-between gap-4 mb-4 flex-shrink-0">
                     <div className="flex items-center gap-4">
@@ -1248,3 +1277,4 @@ export default function WatchRoomPage() {
         </div>
     );
 }
+

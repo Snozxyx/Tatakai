@@ -9,7 +9,7 @@ import {
   useUpdatePopup,
   useDeletePopup,
   type Popup
-} from '@/hooks/useAdminFeatures';
+} from '@/hooks/admin/useAdminFeatures';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import {

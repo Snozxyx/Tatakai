@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useAdminLogs, type AdminLog, useDeleteAdminLogs } from '@/hooks/useAdminLogs';
+import { useAdminLogs, type AdminLog, useDeleteAdminLogs } from '@/hooks/admin/useAdminLogs';
 import { formatDistanceToNow } from 'date-fns';
 import { Search, FileText, Trash2, Eye, CheckCircle, XCircle, Shield, User, Copy } from 'lucide-react';
 import { getProxiedImageUrl } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/ui/use-toast';
 
 export function AdminLogs() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -250,3 +250,5 @@ export function AdminLogs() {
     </div>
   );
 }
+
+

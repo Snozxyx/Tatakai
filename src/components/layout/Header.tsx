@@ -2,7 +2,8 @@ import { Search, User, LogOut, Shield, Download, Camera, Loader2, X, Film } from
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useIsNativeApp } from "@/hooks/useIsNativeApp";
+import { useIsNativeApp, useIsDesktopApp } from "@/hooks/ui/useIsNativeApp";
+import { DownloadIndicator } from "@/components/layout/DownloadIndicator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { NotificationBell } from "@/components/ui/NotificationBell";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,6 +28,7 @@ export function Header() {
   const navigate = useNavigate();
   const { user, profile, isAdmin, isModerator, isBanned, signOut, isLoading } = useAuth();
   const isNative = useIsNativeApp();
+  const isDesktopApp = useIsDesktopApp();
 
   // Image search states
   const [showImageSearch, setShowImageSearch] = useState(false);
@@ -197,7 +199,7 @@ export function Header() {
             <NotificationBell />
           </div>
 
-        
+          {isDesktopApp && <DownloadIndicator />}
 
           {isLoading ? (
             <div className="w-10 h-10 rounded-full bg-muted animate-pulse" />
@@ -382,3 +384,4 @@ export function Header() {
     </header>
   );
 }
+

@@ -6,7 +6,7 @@ import { Star, X, Heart, ThumbsUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { notifyReviewPopup } from '@/services/discordWebhook';
+import { notifyReviewPopup } from '@/core/network/discord-webhook';
 
 interface ReviewPopupProps {
     isOpen?: boolean;

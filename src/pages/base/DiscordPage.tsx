@@ -11,10 +11,11 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 
 /* ─── Bot Links ──────────────────────────────────────────────────────── */
 const BOT_INVITE_URL  = 'https://discord.com/oauth2/authorize?client_id=1465759908363530370&permissions=8&scope=bot%20applications.commands';
-const SUPPORT_URL     = 'https://discord.gg/tatakai';
+const SUPPORT_URL     = 'https://dsc.gg/tatakai';
 
 /* ─── Feature cards ──────────────────────────────────────────────────── */
 const FEATURES = [
@@ -92,13 +93,14 @@ const COMMANDS = [
 
 export default function DiscordPage() {
   const navigate = useNavigate();
+  const isDesktopApp = useIsDesktopApp();
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <Background />
       <Sidebar />
 
-      <main className="relative z-10 pl-6 md:pl-32 pr-6 py-6 max-w-[1100px] mx-auto pb-28 md:pb-8">
+      <main className={`relative z-10 ${isDesktopApp ? 'pl-6' : 'pl-6 md:pl-32'} pr-6 py-6 max-w-[1100px] mx-auto pb-28 md:pb-8`}>
 
         {/* ─── Back ──────────────────────────────────────────────────── */}
         <button

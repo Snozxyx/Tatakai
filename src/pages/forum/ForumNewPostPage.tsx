@@ -6,10 +6,10 @@ import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { useCreateForumPost } from '@/hooks/useForum';
+import { useCreateForumPost } from '@/hooks/community/useForum';
 import { useAuth } from '@/contexts/AuthContext';
 import { ArrowLeft, Send, AlertTriangle, MessageCircle, HelpCircle, Star, FileText, Newspaper, Laugh, Palette, Lightbulb, Tv, Image as ImageIcon, X, Upload } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/ui/use-toast';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
@@ -324,3 +324,5 @@ export default function ForumNewPostPage() {
     </div>
   );
 }
+
+

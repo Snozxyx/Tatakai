@@ -9,6 +9,9 @@
     --background: 0 0% 2%;
     --foreground: 0 0% 98%;
 
+    /* Desktop sidebar layout */
+    --sidebar-width: 80px;
+
     --card: 240 10% 4%;
     --card-foreground: 0 0% 98%;
 
@@ -132,6 +135,7 @@
 
 /* Accessibility - Reduce Motion */
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {
@@ -173,6 +177,7 @@ html.quality-animations * {
 
 /* Mobile Performance Optimizations */
 @media (max-width: 768px) {
+
   /* Enable hardware acceleration for smoother scrolling */
   .scroll-container,
   [data-scroll],
@@ -183,15 +188,16 @@ html.quality-animations * {
     perspective: 1000px;
     will-change: scroll-position;
   }
-  
+
   /* Optimize major containers with content-visibility */
-  main, 
+  main,
   .hero-section,
   .trending-grid,
   .anime-grid,
   .episode-list {
     content-visibility: auto;
-    contain-intrinsic-size: 1px 500px; /* Placeholder size for layout stability */
+    contain-intrinsic-size: 1px 500px;
+    /* Placeholder size for layout stability */
   }
 
   /* Optimize images for mobile */
@@ -200,11 +206,12 @@ html.quality-animations * {
     contain-intrinsic-size: 200px 300px;
     image-rendering: -webkit-optimize-contrast;
   }
-  
+
   /* Reduce repaints on scroll */
   .glass-panel {
     contain: layout paint;
-    transform: translateZ(0); /* Force GUI layer */
+    transform: translateZ(0);
+    /* Force GUI layer */
   }
 }
 
@@ -213,10 +220,10 @@ html.quality-animations * {
   /* Disable text selection for app-like feel */
   -webkit-user-select: none;
   user-select: none;
-  
+
   /* Disable tap highlight */
   -webkit-tap-highlight-color: transparent;
-  
+
   /* Prevent overscroll */
   overscroll-behavior: none;
 }
@@ -232,18 +239,17 @@ html.quality-animations * {
   0% {
     background-position: -200% 0;
   }
+
   100% {
     background-position: 200% 0;
   }
 }
 
 .mobile-skeleton {
-  background: linear-gradient(
-    90deg,
-    hsl(var(--muted)) 25%,
-    hsl(var(--muted-foreground) / 0.1) 50%,
-    hsl(var(--muted)) 75%
-  );
+  background: linear-gradient(90deg,
+      hsl(var(--muted)) 25%,
+      hsl(var(--muted-foreground) / 0.1) 50%,
+      hsl(var(--muted)) 75%);
   background-size: 200% 100%;
   animation: mobile-shimmer 1.5s ease-in-out infinite;
 }
@@ -285,7 +291,17 @@ html.high-contrast a {
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   }
 
+  .glass-panel-translucent {
+    @apply relative overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-xl;
+    box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6);
+  }
+
+  .badge-18plus {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-600/90 text-white font-black text-[10px] tracking-wider uppercase border border-rose-400/50 shadow-lg shadow-rose-600/30 backdrop-blur-md animate-pulse;
+  }
+
   .glass-panel-hover {
+
     @apply transition-all duration-500;
   }
 
@@ -479,10 +495,12 @@ body[data-theme='brutalist-concrete'] .gradient-text {
     transform: scale(1);
     opacity: 1;
   }
+
   50% {
     transform: scale(1.3);
     opacity: 0.8;
   }
+
   100% {
     transform: scale(1);
     opacity: 0;
@@ -606,11 +624,49 @@ body[data-theme='brutalist-concrete'] .gradient-text {
 }
 
 .video-with-subtitles::-webkit-media-text-track-container {
-  padding-bottom: 60px;
+  padding-bottom: calc(var(--tatakai-controls-height, 72px) + 12px);
   text-align: center;
 }
 
 /* Fullscreen subtitle adjustments */
+.video-player-container:fullscreen,
+.video-player-container:-webkit-full-screen,
+.video-player-container.is-player-fullscreen {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  max-height: none !important;
+  border-radius: 0 !important;
+  aspect-ratio: auto !important;
+  background: #000;
+}
+
+/* CSS-class-based fullscreen fallback (when the Fullscreen API is blocked) */
+.video-player-container.is-player-fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 9999 !important;
+}
+
+.video-player-container:fullscreen video,
+.video-player-container:-webkit-full-screen video,
+.video-player-container.is-player-fullscreen video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+}
+
+.video-player-container:fullscreen .video-controls-gradient,
+.video-player-container:-webkit-full-screen .video-controls-gradient,
+.video-player-container.is-player-fullscreen .video-controls-gradient {
+  z-index: 40;
+}
+
+.video-player-container:fullscreen .video-with-subtitles::-webkit-media-text-track-container,
+.video-player-container:-webkit-full-screen .video-with-subtitles::-webkit-media-text-track-container {
+  padding-bottom: calc(var(--tatakai-controls-height, 96px) + 16px);
+}
+
 .video-player-container:fullscreen .subtitle-small::cue {
   font-size: 1.1em;
 }
@@ -625,6 +681,33 @@ body[data-theme='brutalist-concrete'] .gradient-text {
 
 .video-player-container:fullscreen .subtitle-xlarge::cue {
   font-size: 2.2em;
+}
+
+/* ── App fullscreen mode (Electron) ───────────────────────────────────────────
+ * Applied to <html> when the player enters OS-level fullscreen via IPC.
+ * Hides TitleBar, Sidebar, and all chrome so the video fills the entire screen.
+ */
+.app-fullscreen [data-titlebar] {
+  display: none !important;
+}
+
+.app-fullscreen [data-sidebar] {
+  display: none !important;
+}
+
+.app-fullscreen [data-mobile-nav] {
+  display: none !important;
+}
+
+/* Remove the top padding added for the titlebar */
+.app-fullscreen>div,
+.app-fullscreen .min-h-screen {
+  padding-top: 0 !important;
+}
+
+/* Ensure the fullscreen player sits above everything */
+.app-fullscreen .is-player-fullscreen {
+  z-index: 99999 !important;
 }
 
 /* Mobile subtitle adjustments */
@@ -1176,50 +1259,156 @@ body[data-theme="harvest"] .glass-panel {
    RANK NAME ANIMATIONS
 ═══════════════════════════════════════════════════════════════ */
 
-@keyframes rn-scroll   { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
-@keyframes rn-scroll-f { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
-@keyframes rn-pulse    { 0%,100%{opacity:1} 50%{opacity:0.65} }
+@keyframes rn-scroll {
+
+  0%,
+  100% {
+    background-position: 0% 50%
+  }
+
+  50% {
+    background-position: 100% 50%
+  }
+}
+
+@keyframes rn-scroll-f {
+
+  0%,
+  100% {
+    background-position: 0% 50%
+  }
+
+  50% {
+    background-position: 100% 50%
+  }
+}
+
+@keyframes rn-pulse {
+
+  0%,
+  100% {
+    opacity: 1
+  }
+
+  50% {
+    opacity: 0.65
+  }
+}
 
 @keyframes rn-ice-glow {
-  0%,100%{ filter: drop-shadow(0 0 4px #93c5fd) brightness(1); }
-  50%    { filter: drop-shadow(0 0 12px #e0f2fe) brightness(1.5); }
+
+  0%,
+  100% {
+    filter: drop-shadow(0 0 4px #93c5fd) brightness(1);
+  }
+
+  50% {
+    filter: drop-shadow(0 0 12px #e0f2fe) brightness(1.5);
+  }
 }
+
 @keyframes rn-spectral {
-  0%    { filter: drop-shadow(0 0 5px #60a5fa); }
-  50%   { filter: drop-shadow(0 0 14px #a5b4fc) drop-shadow(0 0 3px #fff); }
-  100%  { filter: drop-shadow(0 0 5px #60a5fa); }
+  0% {
+    filter: drop-shadow(0 0 5px #60a5fa);
+  }
+
+  50% {
+    filter: drop-shadow(0 0 14px #a5b4fc) drop-shadow(0 0 3px #fff);
+  }
+
+  100% {
+    filter: drop-shadow(0 0 5px #60a5fa);
+  }
 }
+
 @keyframes rn-electric {
-  0%,100%{ filter: drop-shadow(0 0 4px #a78bfa); opacity:1; }
-  20%    { filter: drop-shadow(0 0 16px #fbbf24) drop-shadow(0 0 4px #fff); opacity:0.75; }
-  40%    { filter: drop-shadow(0 0 6px #c4b5fd); opacity:1; }
-  70%    { filter: drop-shadow(0 0 18px #fbbf24) drop-shadow(0 0 6px #ede9fe); opacity:0.8; }
+
+  0%,
+  100% {
+    filter: drop-shadow(0 0 4px #a78bfa);
+    opacity: 1;
+  }
+
+  20% {
+    filter: drop-shadow(0 0 16px #fbbf24) drop-shadow(0 0 4px #fff);
+    opacity: 0.75;
+  }
+
+  40% {
+    filter: drop-shadow(0 0 6px #c4b5fd);
+    opacity: 1;
+  }
+
+  70% {
+    filter: drop-shadow(0 0 18px #fbbf24) drop-shadow(0 0 6px #ede9fe);
+    opacity: 0.8;
+  }
 }
+
 @keyframes rn-demon {
-  0%,100%{ filter: drop-shadow(0 0 5px #a855f7); }
-  50%    { filter: drop-shadow(0 0 14px #dc2626) drop-shadow(0 0 5px #fbbf24); }
+
+  0%,
+  100% {
+    filter: drop-shadow(0 0 5px #a855f7);
+  }
+
+  50% {
+    filter: drop-shadow(0 0 14px #dc2626) drop-shadow(0 0 5px #fbbf24);
+  }
 }
+
 @keyframes rn-fire {
-  0%,100%{ filter: drop-shadow(0 0 5px #f97316); }
-  33%    { filter: drop-shadow(0 0 14px #ef4444) drop-shadow(0 0 3px #fbbf24); }
-  66%    { filter: drop-shadow(0 0 10px #f97316) drop-shadow(0 0 6px #fef08a); }
+
+  0%,
+  100% {
+    filter: drop-shadow(0 0 5px #f97316);
+  }
+
+  33% {
+    filter: drop-shadow(0 0 14px #ef4444) drop-shadow(0 0 3px #fbbf24);
+  }
+
+  66% {
+    filter: drop-shadow(0 0 10px #f97316) drop-shadow(0 0 6px #fef08a);
+  }
 }
+
 @keyframes rn-saiyan {
-  0%,100%{ filter: drop-shadow(0 0 6px #fbbf24); opacity:1; }
-  25%    { filter: drop-shadow(0 0 20px #fff) drop-shadow(0 0 8px #fbbf24); opacity:0.85; }
-  75%    { filter: drop-shadow(0 0 16px #fde047) drop-shadow(0 0 4px #fff); opacity:0.9; }
+
+  0%,
+  100% {
+    filter: drop-shadow(0 0 6px #fbbf24);
+    opacity: 1;
+  }
+
+  25% {
+    filter: drop-shadow(0 0 20px #fff) drop-shadow(0 0 8px #fbbf24);
+    opacity: 0.85;
+  }
+
+  75% {
+    filter: drop-shadow(0 0 16px #fde047) drop-shadow(0 0 4px #fff);
+    opacity: 0.9;
+  }
 }
 
 /* Rank 1-2: Filler / Genin — plain */
-.rn-gray  { color: #6b7280; font-weight: 500; }
-.rn-gray2 { color: #9ca3af; font-weight: 500; }
+.rn-gray {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.rn-gray2 {
+  color: #9ca3af;
+  font-weight: 500;
+}
 
 /* Rank 3-4: Chunin / Jonin — nature green pulse */
 .rn-nature {
   color: #4ade80;
   font-weight: 600;
   animation: rn-pulse 2.5s ease-in-out infinite;
-  text-shadow: 0 0 6px rgba(74,222,128,0.5);
+  text-shadow: 0 0 6px rgba(74, 222, 128, 0.5);
 }
 
 /* Rank 5-6: Plus Ultra / Pro Hero — frost ice */
@@ -1275,7 +1464,7 @@ body[data-theme="harvest"] .glass-panel {
   color: transparent;
   font-weight: 800;
   animation: rn-scroll 2.5s ease-in-out infinite;
-  filter: drop-shadow(0 0 6px rgba(244,114,182,0.7));
+  filter: drop-shadow(0 0 6px rgba(244, 114, 182, 0.7));
 }
 
 /* Rank 14: Dragon Slayer — animated fire */
@@ -1304,7 +1493,7 @@ body[data-theme="harvest"] .glass-panel {
 /* Rank 16: One Punch — holographic prismatic rainbow */
 .rn-onepunch {
   background: linear-gradient(90deg,
-    #ff0080, #ff4500, #ffd700, #00ff80, #0080ff, #8000ff, #ff0080);
+      #ff0080, #ff4500, #ffd700, #00ff80, #0080ff, #8000ff, #ff0080);
   background-size: 500% auto;
   -webkit-background-clip: text;
   background-clip: text;
@@ -1312,5 +1501,5 @@ body[data-theme="harvest"] .glass-panel {
   font-weight: 900;
   letter-spacing: 0.05em;
   animation: rn-scroll 1.2s linear infinite;
-  filter: drop-shadow(0 0 10px rgba(255,255,255,0.6));
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.6));
 }

@@ -10,8 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Loader2, Download, Trash2, Play, HardDrive, FolderOpen } from 'lucide-react';
-import { useOfflineLibrary, useMobileDownload } from '@/hooks/useMobileDownload';
-import { OfflineEpisode } from '@/services/mobileDownloadService';
+import { useOfflineLibrary, useMobileDownload, type OfflineEpisode } from '@/hooks/media/useMobileDownload';
 import { toast } from 'sonner';
 import { MobileDownloadsUI } from '@/components/mobile/MobileDownloadsUI';
 
