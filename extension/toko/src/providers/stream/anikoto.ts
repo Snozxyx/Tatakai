@@ -241,12 +241,76 @@ async function resolveEmbedToStream(embedUrl: string, referer: string): Promise<
   return null;
 }
 
+/**
+ * Fallback: the Anikoto watch page exposes direct "DL" (download) links to the
+ * pahe CDN (`pahe.nekostream.site/...`) even when the numeric anime id / AJAX
+ * endpoints can't be resolved from static HTML. These are real m3u8 playlists.
+ */
+async function extractDirectFromWatchPage(slug: string, base: string, ep: number): Promise<SourceResult[]> {
+  try {
+    const url = ep > 1 ? `${base}/watch/${slug}/ep-${ep}` : `${base}/watch/${slug}`;
+    const res = await __tatakai_fetch__(url, {
+      headers: { 'User-Agent': UA, Accept: 'text/html', Referer: `${base}/home` },
+    });
+    if (!res.ok) return [];
+    const html = await res.text();
+
+    const out: SourceResult[] = [];
+    const seen = new Set<string>();
+
+    const paheRe = /https?:\/\/pahe\.nekostream\.site\/[A-Za-z0-9_-]+/gi;
+    let m: RegExpExecArray | null;
+    while ((m = paheRe.exec(html))) {
+      const u = m[0];
+      if (seen.has(u)) continue;
+      seen.add(u);
+      out.push({
+        source: 'anikoto-pahe',
+        url: u,
+        quality: 'auto',
+        headers: { Referer: base, 'User-Agent': UA, Origin: base },
+        subtitles: [],
+        audioLanguage: 'ja',
+        sourceType: 'hls',
+      });
+    }
+
+    const m3u8Re = /https?:\/\/[^"'\s)]+\.m3u8[^"'\s)]*/gi;
+    while ((m = m3u8Re.exec(html))) {
+      const u = m[0];
+      if (seen.has(u)) continue;
+      seen.add(u);
+      out.push({
+        source: 'anikoto',
+        url: u,
+        quality: 'auto',
+        headers: { Referer: base, 'User-Agent': UA },
+        subtitles: [],
+        audioLanguage: 'ja',
+        sourceType: 'hls',
+      });
+    }
+
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 const provider: StreamProvider = {
   name: 'anikoto',
 
   async single(opts: SourceOptions): Promise<SourceResult[]> {
     const targetEp = opts.episode ?? 1;
     const anime = await searchAnime(opts.titles);
+
+    // Try direct watch-page pahe m3u8 extraction first (works without JS-only
+    // data-id/AJAX), then fall back to the server resolution path.
+    if (anime) {
+      const direct = await extractDirectFromWatchPage(anime.slug, anime.base, targetEp);
+      if (direct.length > 0) return direct;
+    }
+
     if (!anime) return [];
 
     const animeId = await resolveAnimeId(anime.slug, anime.base);
@@ -291,12 +355,13 @@ const provider: StreamProvider = {
           'User-Agent': UA,
         },
         subtitles: [],
-        audioLanguage: (server.type || '').toLowerCase() === 'dub' ? 'English/Dub' : 'Japanese/Sub',
+        audioLanguage: (server.type || '').toLowerCase() === 'dub' ? 'en' : 'ja',
         sourceType: type,
       }];
     }
 
-    return [];
+    // Last resort: direct watch-page extraction.
+    return extractDirectFromWatchPage(anime.slug, anime.base, targetEp);
   },
 };
 
