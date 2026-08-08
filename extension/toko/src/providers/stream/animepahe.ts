@@ -2,9 +2,12 @@ import { normalizeQuality, detectSourceType } from '../../utils/quality.js';
 import { buildSearchQueries } from '../../utils/titleNorm.js';
 import type { StreamProvider, SourceOptions, SourceResult } from '../../types.js';
 
-declare const __tatakai_fetch__: (url: string, init?: RequestInit) => Promise<Response>;
+import { fetchResponse } from '../../utils/http.js';
 
-const BASE_URL = 'https://animepahe.com';
+// animepahe.com now 30x-redirects to a rotating mirror (animepahe.pw, .ru, .ac).
+// The extension worker follows redirects but some mirrors reject requests
+// without a browser UA, so we try the canonical domain first then mirrors.
+const BASE_URLS = ['https://animepahe.com', 'https://animepahe.pw', 'https://animepahe.ru', 'https://animepahe.ac'];
 
 interface AnimePaheSearchItem {
   session: string;
@@ -29,51 +32,85 @@ interface AnimePaheSource {
   audio: string;
 }
 
-const COOKIE_HEADERS = {
-  Cookie: '__ddg1_=;__ddg2_=;av=1',
-  Referer: `${BASE_URL}/`,
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-};
+function headersFor(base: string, path = '/'): Record<string, string> {
+  return {
+    Cookie: '__ddg1_=;__ddg2_=;av=1',
+    Referer: `${base}${path}`,
+    Origin: base,
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    Accept: 'application/json, text/plain, */*',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'X-Requested-With': 'XMLHttpRequest',
+  };
+}
+
+/**
+ * GET a JSON API path across the known animepahe mirrors, returning the first
+ * successful JSON body. Mirrors occasionally 5xx or rotate; this keeps the
+ * provider resilient without forcing the worker to chase redirects.
+ */
+async function apiGetJson<T>(path: string): Promise<T | null> {
+  for (const base of BASE_URLS) {
+    try {
+      const res = await fetchResponse(`${base}${path}`, { headers: headersFor(base, path.split('?')[0]) });
+      if (!res.ok) continue;
+      const text = await res.text();
+      if (!text) continue;
+      try {
+        return JSON.parse(text) as T;
+      } catch {
+        // Some mirrors return an HTML interstitial; try the next mirror.
+        continue;
+      }
+    } catch {
+      // try next mirror
+    }
+  }
+  return null;
+}
 
 async function searchAnime(query: string): Promise<AnimePaheSearchItem[]> {
-  try {
-    const res = await __tatakai_fetch__(
-      `${BASE_URL}/api?m=search&q=${encodeURIComponent(query)}`,
-      { headers: COOKIE_HEADERS },
-    );
-    if (!res.ok) return [];
-    const data = await res.json() as { data?: AnimePaheSearchItem[] };
-    return data.data ?? [];
-  } catch {
-    return [];
-  }
+  const data = await apiGetJson<{ data?: AnimePaheSearchItem[] }>(
+    `/api?m=search&l=8&q=${encodeURIComponent(query)}`,
+  );
+  return data?.data ?? [];
 }
 
 async function getEpisodes(animeSession: string, page = 1): Promise<AnimePaheEpisodeData> {
-  try {
-    const res = await __tatakai_fetch__(
-      `${BASE_URL}/api?m=release&id=${animeSession}&sort=episode_asc&page=${page}`,
-      { headers: COOKIE_HEADERS },
-    );
-    if (!res.ok) return {};
-    return await res.json() as AnimePaheEpisodeData;
-  } catch {
-    return {};
-  }
+  const data = await apiGetJson<AnimePaheEpisodeData>(
+    `/api?m=release&id=${animeSession}&sort=episode_asc&page=${page}`,
+  );
+  return data ?? {};
 }
 
 async function getEpisodeSources(animeSession: string, epSession: string): Promise<AnimePaheSource[]> {
-  try {
-    const res = await __tatakai_fetch__(
-      `${BASE_URL}/api?m=links&id=${animeSession}&session=${epSession}&p=kwik`,
-      { headers: COOKIE_HEADERS },
-    );
-    if (!res.ok) return [];
-    const data = await res.json() as { data?: AnimePaheSource[] };
-    return data.data ?? [];
-  } catch {
-    return [];
+  // The legacy m=links endpoint now requires a numeric anime id and returns
+  // "not enough arguments" when given a session UUID. The /play/{anime}/{ep}
+  // page renders the Kwik buttons server-side, so scrape the embed URLs from
+  // there instead.
+  for (const base of BASE_URLS) {
+    try {
+      const res = await fetchResponse(`${base}/play/${animeSession}/${epSession}`, {
+        headers: headersFor(base, `/anime/${animeSession}`),
+      });
+      if (!res.ok) continue;
+      const html = await res.text();
+      // Play page links look like <a class="..." href="https://kwik.cx/e/...">
+      // or data-src attributes pointing at kwik/pahewin embeds.
+      const sources: AnimePaheSource[] = [];
+      const seen = new Set<string>();
+      const re = /https?:\/\/(kwik\.[a-z]+|pahe\.win|kwik\.cx)\/e\/[A-Za-z0-9_-]+/gi;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(html))) {
+        const u = m[0];
+        if (seen.has(u)) continue;
+        seen.add(u);
+        sources.push({ kwik: u, quality: 'auto', audio: 'japanese' });
+      }
+      if (sources.length > 0) return sources;
+    } catch { /* try next mirror */ }
   }
+  return [];
 }
 
 // ── Kwik JS Unpacker ─────────────────────────────────────────────────────────
@@ -131,26 +168,35 @@ function unpackKwikJs(packedJS: string): string | null {
 
 async function extractDirectKwikStream(kwikUrl: string): Promise<string | null> {
   try {
-    const res = await __tatakai_fetch__(kwikUrl, {
-      headers: { Referer: `${BASE_URL}/`, 'User-Agent': COOKIE_HEADERS['User-Agent'] },
+    const ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+    const res = await fetchResponse(kwikUrl, {
+      headers: { Referer: 'https://kwik.cx/', 'User-Agent': ua },
     });
     if (!res.ok) return null;
     const body = await res.text();
 
+    // 1. P.A.C.K.E.R.-obfuscated script: eval(function(p,a,c,k,e,d){...})
     const packedMatch = body.match(/eval\(function\(p,a,c,k,e,[rd].*?\)\)/s);
     if (packedMatch) {
       const unpacked = unpackKwikJs(packedMatch[0]);
       if (unpacked) {
-        const sourceMatch = unpacked.match(/const\s+source\s*=\s*['"]([^'"]+)['"]/);
+        // Newer kwik player assigns `const source = "..."` directly.
+        const sourceMatch =
+          unpacked.match(/const\s+source\s*=\s*['"]([^'"]+)['"]/) ||
+          unpacked.match(/source\s*=\s*['"](https?:\/\/[^'"]+)['"]/);
         if (sourceMatch?.[1] && sourceMatch[1].startsWith('http')) {
           return sourceMatch[1];
         }
       }
     }
 
-    // Direct match if un-packed
+    // 2. Direct match if the source is already un-packed (jwplayer config etc.)
     const directMatch = body.match(/source\s*:\s*['"]([^'"]+\.(?:m3u8|mp4)[^'"]*)['"]/i);
     if (directMatch?.[1]) return directMatch[1];
+
+    // 3. Loose m3u8/mp4 URL inside a script.
+    const loose = body.match(/["'`](https?:\/\/[^"'`\s]+\.(?:m3u8|mp4)[^"'`\s]*)["'`]/i);
+    if (loose?.[1]) return loose[1];
 
     return null;
   } catch {

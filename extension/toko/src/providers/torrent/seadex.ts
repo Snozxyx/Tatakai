@@ -7,7 +7,7 @@
 import { normalizeQuality } from '../../utils/quality.js';
 import type { TorrentProvider, SourceOptions, SourceResult } from '../../types.js';
 
-declare const __tatakai_fetch__: (url: string, init?: RequestInit) => Promise<Response>;
+import { fetchResponse } from '../../utils/http.js';
 
 interface SeaDexItem {
   title?: string;
@@ -28,7 +28,7 @@ const provider: TorrentProvider = {
 
     let res: Response;
     try {
-      res = await __tatakai_fetch__(url);
+      res = await fetchResponse(url);
     } catch {
       return [];
     }

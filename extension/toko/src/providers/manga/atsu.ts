@@ -5,8 +5,7 @@
  */
 import type { MangaProvider, MangaChapterEntry, MangaChapterParams, MangaPageEntry } from '../../types.js';
 
-declare const __tatakai_fetch__: (url: string, init?: RequestInit) => Promise<Response>;
-declare const __tatakai_parse_html__: (html: string) => any;
+import { fetchResponse, loadHtml } from '../../utils/http.js';
 
 const BASE = 'https://atsu.moe';
 const PROVIDER_NAME = 'atsu';
@@ -15,13 +14,13 @@ const HEADERS = { 'User-Agent': UA, Referer: `${BASE}/` };
 
 async function search(title: string): Promise<{ slug: string } | null> {
   try {
-    const res = await __tatakai_fetch__(
+    const res = await fetchResponse(
       `${BASE}/search?q=${encodeURIComponent(title)}`,
       { headers: HEADERS },
     );
     if (!res.ok) return null;
     const html = await res.text();
-    const $ = __tatakai_parse_html__(html);
+    const $ = loadHtml(html);
     let slug: string | null = null;
     $.find('a[href*="/manga/"], a[href*="/series/"]').each((_: number, el: any) => {
       if (slug) return;
@@ -46,12 +45,12 @@ const provider: MangaProvider = {
       // Try /manga/ then /series/
       let html = '';
       for (const path of [`/manga/${found.slug}`, `/series/${found.slug}`]) {
-        const res = await __tatakai_fetch__(`${BASE}${path}`, { headers: HEADERS });
+        const res = await fetchResponse(`${BASE}${path}`, { headers: HEADERS });
         if (res.ok) { html = await res.text(); break; }
       }
       if (!html) return [];
 
-      const $ = __tatakai_parse_html__(html);
+      const $ = loadHtml(html);
       const results: MangaChapterEntry[] = [];
 
       $.find('a[href*="/chapter"], a[href*="/ch"]').each((i: number, el: any) => {
@@ -84,7 +83,7 @@ const provider: MangaProvider = {
       const href = decodeURIComponent(encoded);
       const url = href.startsWith('http') ? href : `${BASE}${href}`;
 
-      const res = await __tatakai_fetch__(url, { headers: HEADERS });
+      const res = await fetchResponse(url, { headers: HEADERS });
       if (!res.ok) return [];
       const html = await res.text();
 
@@ -103,7 +102,7 @@ const provider: MangaProvider = {
         } catch { /* fall through to HTML */ }
       }
 
-      const $ = __tatakai_parse_html__(html);
+      const $ = loadHtml(html);
       const imgPages: MangaPageEntry[] = [];
       $.find('img[src*="cdn"], img[src*="page"], .reader img, .chapter-img').each((i: number, el: any) => {
         const src = el.attr?.('src') ?? el.attr?.('data-src') ?? '';

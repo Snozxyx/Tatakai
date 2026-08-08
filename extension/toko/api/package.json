@@ -1,0 +1,16 @@
+{
+  "name": "toko-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Toko in API form — runs the Toko scraping/mapping bundle as an HTTP server inside the Tatakai app.",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  }
+}

@@ -1,7 +1,7 @@
 import { normalizeQuality, detectSourceType } from '../../utils/quality.js';
 import type { StreamProvider, SourceOptions, SourceResult } from '../../types.js';
 
-declare const __tatakai_fetch__: (url: string, init?: RequestInit) => Promise<Response>;
+import { fetchResponse } from '../../utils/http.js';
 
 const BASE_URL = 'https://senshi.live';
 
@@ -26,7 +26,7 @@ interface SenshiSource {
 async function search(query: string): Promise<SenshiAnime[]> {
   try {
     console.log('[Senshi.search] Fetching:', `${BASE_URL}/anime/filter`);
-    const res = await __tatakai_fetch__(`${BASE_URL}/anime/filter`, {
+    const res = await fetchResponse(`${BASE_URL}/anime/filter`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ searchTerm: query, page: 1, limit: 5 }),
@@ -44,7 +44,7 @@ async function search(query: string): Promise<SenshiAnime[]> {
 
 async function findEpisodes(animeId: string): Promise<SenshiEpisode[]> {
   try {
-    const res = await __tatakai_fetch__(`${BASE_URL}/episodes/${animeId}`);
+    const res = await fetchResponse(`${BASE_URL}/episodes/${animeId}`);
     if (!res.ok) return [];
     const data = await res.json() as SenshiEpisode[];
     return Array.isArray(data) ? data : [];
@@ -55,7 +55,7 @@ async function findEpisodes(animeId: string): Promise<SenshiEpisode[]> {
 
 async function findEpisodeServer(malId: string, epId: number): Promise<SenshiSource[]> {
   try {
-    const res = await __tatakai_fetch__(`${BASE_URL}/episode-embeds/${malId}/${epId}`);
+    const res = await fetchResponse(`${BASE_URL}/episode-embeds/${malId}/${epId}`);
     if (!res.ok) return [];
     const data = await res.json() as SenshiSource[];
     return Array.isArray(data) ? data : [];

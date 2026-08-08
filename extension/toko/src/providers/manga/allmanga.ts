@@ -5,8 +5,7 @@
  */
 import type { MangaProvider, MangaChapterEntry, MangaChapterParams, MangaPageEntry } from '../../types.js';
 
-declare const __tatakai_fetch__: (url: string, init?: RequestInit) => Promise<Response>;
-declare const __tatakai_parse_html__: (html: string) => any;
+import { fetchResponse, loadHtml } from '../../utils/http.js';
 
 const BASE = 'https://allmanga.to';
 const PROVIDER_NAME = 'allmanga';
@@ -15,13 +14,13 @@ const HEADERS = { 'User-Agent': UA, Referer: `${BASE}/` };
 
 async function searchManga(title: string): Promise<{ slug: string } | null> {
   try {
-    const res = await __tatakai_fetch__(
+    const res = await fetchResponse(
       `${BASE}/search?query=${encodeURIComponent(title)}&type=manga`,
       { headers: HEADERS },
     );
     if (!res.ok) return null;
     const html = await res.text();
-    const $ = __tatakai_parse_html__(html);
+    const $ = loadHtml(html);
     let slug: string | null = null;
     $.find('a[href*="/manga/"]').each((_: number, el: any) => {
       if (slug) return;
@@ -43,10 +42,10 @@ const provider: MangaProvider = {
       const found = await searchManga(title);
       if (!found) return [];
 
-      const res = await __tatakai_fetch__(`${BASE}/manga/${found.slug}`, { headers: HEADERS });
+      const res = await fetchResponse(`${BASE}/manga/${found.slug}`, { headers: HEADERS });
       if (!res.ok) return [];
       const html = await res.text();
-      const $ = __tatakai_parse_html__(html);
+      const $ = loadHtml(html);
       const results: MangaChapterEntry[] = [];
 
       $.find('a[href*="/chapter/"], a[href*="/ch-"]').each((i: number, el: any) => {
@@ -80,10 +79,10 @@ const provider: MangaProvider = {
       const href = decodeURIComponent(encoded);
       const url = href.startsWith('http') ? href : `${BASE}${href}`;
 
-      const res = await __tatakai_fetch__(url, { headers: HEADERS });
+      const res = await fetchResponse(url, { headers: HEADERS });
       if (!res.ok) return [];
       const html = await res.text();
-      const $ = __tatakai_parse_html__(html);
+      const $ = loadHtml(html);
       const pages: MangaPageEntry[] = [];
 
       $.find('img[src*="cdn"], img[src*="manga"], .reader-img img, #reader img, .page img').each((i: number, el: any) => {

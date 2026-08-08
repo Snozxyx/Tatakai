@@ -1,5 +1,5 @@
 /**
- * AniLiberty torrent provider adapter (HTML scrape via __tatakai_parse_html__).
+ * AniLiberty torrent provider adapter (HTML scrape via loadHtml).
  * Source: net-new
  * Requirements: 4.2, 4.3
  */
@@ -7,8 +7,7 @@
 import { normalizeQuality } from '../../utils/quality.js';
 import type { TorrentProvider, SourceOptions, SourceResult } from '../../types.js';
 
-declare const __tatakai_fetch__: (url: string, init?: RequestInit) => Promise<Response>;
-declare const __tatakai_parse_html__: (html: string) => any;
+import { fetchResponse, loadHtml } from '../../utils/http.js';
 
 const provider: TorrentProvider = {
   name: 'aniliberty',
@@ -18,7 +17,7 @@ const provider: TorrentProvider = {
 
     let res: Response;
     try {
-      res = await __tatakai_fetch__(url);
+      res = await fetchResponse(url);
     } catch {
       return [];
     }
@@ -36,7 +35,7 @@ const provider: TorrentProvider = {
 
     let $: any;
     try {
-      $ = __tatakai_parse_html__(html);
+      $ = loadHtml(html);
     } catch {
       return [];
     }

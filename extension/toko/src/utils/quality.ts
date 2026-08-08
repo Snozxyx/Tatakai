@@ -30,13 +30,17 @@ export function normalizeQuality(raw: string): Quality {
 }
 
 /**
- * Detects whether a URL points to an HLS stream, MP4 file, or unknown type.
+ * Detects whether a URL points to an HLS stream, MP4 file, or custom/embed type.
+ *
+ * Returns 'custom' for anything that is not plainly HLS or MP4 (e.g. embed
+ * pages or short-link redirects). This mirrors the SDK SourceResult.sourceType
+ * union of 'torrent' | 'hls' | 'mp4' | 'custom'.
  *
  * @param url - The source URL to inspect.
  */
-export function detectSourceType(url: string): 'hls' | 'mp4' | 'unknown' {
-  if (!url) return 'unknown';
-  if (url.endsWith('.m3u8') || url.includes('/hls/')) return 'hls';
-  if (/\.(mp4|m4v|webm|mkv)$/i.test(url)) return 'mp4';
-  return 'unknown';
+export function detectSourceType(url: string): 'hls' | 'mp4' | 'custom' {
+  if (!url) return 'custom';
+  if (/\.m3u8($|[?#/])/i.test(url) || url.includes('/hls/')) return 'hls';
+  if (/\.(mp4|m4v|webm|mkv)($|[?#])/i.test(url)) return 'mp4';
+  return 'custom';
 }

@@ -1,8 +1,7 @@
 import { normalizeQuality, detectSourceType } from '../../utils/quality.js';
 import type { StreamProvider, SourceOptions, SourceResult, SubtitleTrack } from '../../types.js';
 
-declare const __tatakai_fetch__: (url: string, init?: RequestInit) => Promise<Response>;
-declare const __tatakai_parse_html__: (html: string) => any;
+import { fetchResponse, loadHtml } from '../../utils/http.js';
 
 const BASE = 'https://4anime.com.ro';
 const API = 'https://4anime.com.ro/ajax';
@@ -33,7 +32,7 @@ interface ServerItem {
 
 async function search(keyword: string): Promise<SearchResult[]> {
   try {
-    const res = await __tatakai_fetch__(
+    const res = await fetchResponse(
       `${API}/search/suggest?keyword=${encodeURIComponent(keyword)}`,
       { headers: COMMON_HEADERS },
     );
@@ -41,7 +40,7 @@ async function search(keyword: string): Promise<SearchResult[]> {
     const data = await res.json() as { status: boolean; html: string };
     if (!data?.html) return [];
 
-    const $ = __tatakai_parse_html__(data.html);
+    const $ = loadHtml(data.html);
     const results: SearchResult[] = [];
 
     $.find('div.item').each((_: number, el: any) => {
@@ -61,14 +60,14 @@ async function search(keyword: string): Promise<SearchResult[]> {
 
 async function findEpisodes(animeid: string): Promise<EpisodeItem[]> {
   try {
-    const res = await __tatakai_fetch__(`${API}/episode/list/${animeid}`, {
+    const res = await fetchResponse(`${API}/episode/list/${animeid}`, {
       headers: COMMON_HEADERS,
     });
     if (!res.ok) return [];
     const data = await res.json() as { status: boolean; html: string };
     if (!data?.html) return [];
 
-    const $ = __tatakai_parse_html__(data.html);
+    const $ = loadHtml(data.html);
     const episodes: EpisodeItem[] = [];
 
     $.find('li.ep-item').each((_: number, el: any) => {
@@ -88,12 +87,12 @@ async function findEpisodes(animeid: string): Promise<EpisodeItem[]> {
 
 async function getServers(episodeId: string): Promise<ServerItem[]> {
   try {
-    const res = await __tatakai_fetch__(`${API}/episode/servers?episodeId=${episodeId}`, {
+    const res = await fetchResponse(`${API}/episode/servers?episodeId=${episodeId}`, {
       headers: COMMON_HEADERS,
     });
     if (!res.ok) return [];
     const data = await res.json() as { html: string };
-    const $ = __tatakai_parse_html__(data.html);
+    const $ = loadHtml(data.html);
     const servers: ServerItem[] = [];
 
     $.find('.servers-sub .server-item, .servers-dub .server-item').each((_: number, el: any) => {
@@ -112,7 +111,7 @@ async function getServers(episodeId: string): Promise<ServerItem[]> {
 
 async function getSources(serverId: string): Promise<{ embedUrl: string } | null> {
   try {
-    const res = await __tatakai_fetch__(`${API}/episode/sources?id=${serverId}`, {
+    const res = await fetchResponse(`${API}/episode/sources?id=${serverId}`, {
       headers: COMMON_HEADERS,
     });
     if (!res.ok) return null;
@@ -130,7 +129,7 @@ async function resolveEmbed(embedUrl: string): Promise<{ url: string; subtitles:
     const sourceId = urlObj.pathname.split('/').pop() ?? '';
     const base = embedUrl.split(sourceId)[0];
 
-    const res = await __tatakai_fetch__(`${base}getSources?id=${sourceId}`, {
+    const res = await fetchResponse(`${base}getSources?id=${sourceId}`, {
       headers: { Referer: embedUrl },
     });
     if (!res.ok) return [];

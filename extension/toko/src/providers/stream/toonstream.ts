@@ -6,21 +6,20 @@ import { normalizeQuality } from '../../utils/quality.js';
 import { buildSearchQueries } from '../../utils/titleNorm.js';
 import type { StreamProvider, SourceOptions, SourceResult } from '../../types.js';
 
-declare const __tatakai_fetch__: (url: string, init?: RequestInit) => Promise<Response>;
-declare const __tatakai_parse_html__: (html: string) => any;
+import { fetchResponse, loadHtml } from '../../utils/http.js';
 
 const BASE = 'https://toon-stream.site';
 
 async function search(titles: string[]): Promise<{ slug: string } | null> {
   for (const title of buildSearchQueries(titles)) {
     try {
-      const res = await __tatakai_fetch__(
+      const res = await fetchResponse(
         `${BASE}/?s=${encodeURIComponent(title)}`,
         { headers: { Referer: `${BASE}/` } },
       );
       if (!res.ok) continue;
       const html = await res.text();
-      const $ = __tatakai_parse_html__(html);
+      const $ = loadHtml(html);
       let slug: string | null = null;
       $.find('a[href*="/anime/"], a[href*="/series/"]').each((_: number, el: any) => {
         if (slug) return;
@@ -36,10 +35,10 @@ async function search(titles: string[]): Promise<{ slug: string } | null> {
 
 async function getEpisodeUrl(slug: string, epNumber: number): Promise<string | null> {
   try {
-    const res = await __tatakai_fetch__(`${BASE}/${slug}/`, { headers: { Referer: `${BASE}/` } });
+    const res = await fetchResponse(`${BASE}/${slug}/`, { headers: { Referer: `${BASE}/` } });
     if (!res.ok) return null;
     const html = await res.text();
-    const $ = __tatakai_parse_html__(html);
+    const $ = loadHtml(html);
     let epUrl: string | null = null;
     $.find(`a[href*="episode-${epNumber}"], a[href*="ep-${epNumber}"]`).each((_: number, el: any) => {
       if (epUrl) return;
@@ -52,7 +51,7 @@ async function getEpisodeUrl(slug: string, epNumber: number): Promise<string | n
 
 async function extractSources(pageUrl: string): Promise<SourceResult[]> {
   try {
-    const res = await __tatakai_fetch__(pageUrl, { headers: { Referer: `${BASE}/` } });
+    const res = await fetchResponse(pageUrl, { headers: { Referer: `${BASE}/` } });
     if (!res.ok) return [];
     const html = await res.text();
     const sources: SourceResult[] = [];

@@ -6,8 +6,7 @@ import { normalizeQuality, detectSourceType } from '../../utils/quality.js';
 import { buildSearchQueries } from '../../utils/titleNorm.js';
 import type { StreamProvider, SourceOptions, SourceResult } from '../../types.js';
 
-declare const __tatakai_fetch__: (url: string, init?: RequestInit) => Promise<Response>;
-declare const __tatakai_parse_html__: (html: string) => any;
+import { fetchResponse, loadHtml } from '../../utils/http.js';
 
 const BASE_URL = 'https://www.desidubanime.me';
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -23,7 +22,7 @@ async function findSources(titles: string[], epNumber: number): Promise<SourceRe
       
       // 1. WP REST API Search
       try {
-        const apiRes = await __tatakai_fetch__(
+        const apiRes = await fetchResponse(
           `${BASE_URL}/wp-json/wp/v2/anime?search=${encodeURIComponent(query)}&per_page=10`,
           { headers: { 'User-Agent': UA } },
         );
@@ -37,13 +36,13 @@ async function findSources(titles: string[], epNumber: number): Promise<SourceRe
 
       // 2. HTML fallback search
       if (!animeSlug) {
-        const searchRes = await __tatakai_fetch__(
+        const searchRes = await fetchResponse(
           `${BASE_URL}/?s=${encodeURIComponent(query)}`,
           { headers: { 'User-Agent': UA } },
         );
         if (searchRes.ok) {
           const searchHtml = await searchRes.text();
-          const $ = __tatakai_parse_html__(searchHtml);
+          const $ = loadHtml(searchHtml);
           $.find("a[href*='/anime/'], a[href*='/series/']").each((_: number, el: any) => {
             if (animeSlug) return;
             const href: string = el.attr?.('href') ?? '';
@@ -57,10 +56,10 @@ async function findSources(titles: string[], epNumber: number): Promise<SourceRe
 
       // 3. Fetch watch page
       const watchUrl = `${BASE_URL}/watch/${animeSlug}-episode-${epNumber}/`;
-      const watchRes = await __tatakai_fetch__(watchUrl, { headers: { 'User-Agent': UA } });
+      const watchRes = await fetchResponse(watchUrl, { headers: { 'User-Agent': UA } });
       if (!watchRes.ok) continue;
       const watchHtml = await watchRes.text();
-      const $ = __tatakai_parse_html__(watchHtml);
+      const $ = loadHtml(watchHtml);
 
       const results: SourceResult[] = [];
 
@@ -90,7 +89,7 @@ async function findSources(titles: string[], epNumber: number): Promise<SourceRe
           headers: { Referer: `${BASE_URL}/`, 'User-Agent': UA },
           subtitles: [],
           audioLanguage: isDub ? 'Hindi/Dub' : 'Japanese/Sub',
-          sourceType: isHls ? 'hls' : (finalUrl.includes('.mp4') ? 'mp4' : 'embed'),
+          sourceType: isHls ? 'hls' : (finalUrl.includes('.mp4') ? 'mp4' : 'custom'),
         });
       });
 

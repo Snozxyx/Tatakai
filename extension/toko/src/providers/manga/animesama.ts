@@ -5,8 +5,7 @@
 
 import type { MangaProvider, MangaChapterEntry, MangaChapterParams, MangaPageEntry } from '../../types.js';
 
-declare const __tatakai_fetch__: (url: string, init?: RequestInit) => Promise<Response>;
-declare const __tatakai_parse_html__: (html: string) => any;
+import { fetchResponse, loadHtml } from '../../utils/http.js';
 
 const PROVIDER_NAME = 'animesama';
 const BASE_URL = 'https://anime-sama.fr';
@@ -18,13 +17,13 @@ const provider: MangaProvider = {
     const q = encodeURIComponent(params.title ?? '');
 
     let res: Response;
-    try { res = await __tatakai_fetch__(`${BASE_URL}/catalogue/?search=${q}&type=manga`); } catch { return []; }
+    try { res = await fetchResponse(`${BASE_URL}/catalogue/?search=${q}&type=manga`); } catch { return []; }
     if (!res.ok) return [];
 
     let html: string;
     try { html = await res.text(); } catch { return []; }
 
-    const $ = __tatakai_parse_html__(html);
+    const $ = loadHtml(html);
     const results: MangaChapterEntry[] = [];
     let idx = 0;
 
@@ -58,13 +57,13 @@ const provider: MangaProvider = {
     const url = href.startsWith('http') ? href : `${BASE_URL}${href}`;
 
     let res: Response;
-    try { res = await __tatakai_fetch__(url); } catch { return []; }
+    try { res = await fetchResponse(url); } catch { return []; }
     if (!res.ok) return [];
 
     let html: string;
     try { html = await res.text(); } catch { return []; }
 
-    const $ = __tatakai_parse_html__(html);
+    const $ = loadHtml(html);
     const pages: MangaPageEntry[] = [];
 
     $.find('img[src*="cdn"], img[src*="manga"], .reader-img img, #reader img').each((i: number, el: any) => {

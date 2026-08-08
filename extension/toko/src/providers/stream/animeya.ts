@@ -12,8 +12,7 @@ import { normalizeQuality } from '../../utils/quality.js';
 import { buildSearchQueries } from '../../utils/titleNorm.js';
 import type { StreamProvider, SourceOptions, SourceResult, SubtitleTrack } from '../../types.js';
 
-declare const __tatakai_fetch__: (url: string, init?: RequestInit) => Promise<Response>;
-declare const __tatakai_parse_html__: (html: string) => any;
+import { fetchResponse, loadHtml } from '../../utils/http.js';
 
 const BASE_URL = 'https://animeya.cc';
 const VIDNEST_BASE = 'https://vidnest.fun/animepahe';
@@ -34,7 +33,7 @@ async function tryVidNestDirect(anilistId: number, episode: number): Promise<Sou
     for (const variant of variants) {
       const embedUrl = `${VIDNEST_BASE}/${anilistId}/${episode}/${variant}`;
       console.log('[Animeya.VidNest] Trying:', embedUrl);
-      const res = await __tatakai_fetch__(embedUrl, {
+      const res = await fetchResponse(embedUrl, {
         headers: { ...HEADERS, Referer: `${BASE_URL}/` },
       });
       
@@ -142,7 +141,7 @@ async function extractMp4UploadSources(watchUrl: string, episode: number): Promi
     const epUrl = `${watchUrl}?ep=${episode}`;
     
     console.log('[Animeya.mp4upload] Fetching episode page:', epUrl);
-    const res = await __tatakai_fetch__(epUrl, { headers: HEADERS });
+    const res = await fetchResponse(epUrl, { headers: HEADERS });
     if (!res.ok) {
       console.log('[Animeya.mp4upload] Episode page returned', res.status);
       return [];
@@ -150,7 +149,7 @@ async function extractMp4UploadSources(watchUrl: string, episode: number): Promi
     
     const html = await res.text();
     console.log('[Animeya.mp4upload] HTML length:', html.length);
-    const $ = __tatakai_parse_html__(html);
+    const $ = loadHtml(html);
     
     // Look for mp4upload iframes or video sources
     const sources: SourceResult[] = [];
@@ -168,7 +167,7 @@ async function extractMp4UploadSources(watchUrl: string, episode: number): Promi
           quality: normalizeQuality(''),
           headers: HEADERS,
           subtitles: [],
-          sourceType: 'embed' as any, // Will need resolution
+          sourceType: 'custom', // Embed URL — may need player-side resolution
         });
       }
     });

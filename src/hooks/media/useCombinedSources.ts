@@ -68,41 +68,80 @@ export function useCombinedSources(
             const localSources = Array.isArray((local as any)?.sources) ? (local as any).sources : [];
             if (localSources.length > 0) {
               const TOKO_EXT_ID = 'tatakai.extension.toko';
+              // Every Toko SourceResult carries a human label in `source`
+              // (e.g. "reanime", "animelok-bato", "animeblkom-blkom"). Use it
+              // as the provider identity so the Watch page groups each
+              // provider into its own server row.
+              const resolveProviderKey = (src: any): string =>
+                String(src.providerKey || src.providerName || src.server || src.source || 'toko').trim();
+              const resolveProviderName = (src: any): string =>
+                String(src.providerName || src.server || src.source || 'Toko').trim();
+              const DUB_LABELS: Record<string, string> = {
+                ar: 'Arabic', fr: 'French', de: 'German', pl: 'Polish',
+                zh: 'Chinese', es: 'Spanish', pt: 'Portuguese', it: 'Italian',
+                ko: 'Korean', hi: 'Hindi', ta: 'Tamil', te: 'Telugu',
+              };
+              const resolveLang = (src: any): string => {
+                const explicit = String(src.language || '').trim();
+                if (explicit) return explicit;
+                if (src.audioLanguage) {
+                  const code = String(src.audioLanguage).toLowerCase();
+                  if (code === 'ja') return 'Japanese';
+                  if (code === 'en') return 'English';
+                  return DUB_LABELS[code] || code.toUpperCase();
+                }
+                return category || '';
+              };
+              const resolveIsDub = (src: any, lang: string): boolean => {
+                if (typeof src.isDub === 'boolean') return src.isDub;
+                if (src.audioLanguage && src.audioLanguage !== 'ja') return true;
+                return /dub/i.test(lang) || category === 'dub';
+              };
+              const isEmbedSource = (src: any): boolean => {
+                if (typeof src.isEmbed === 'boolean') return src.isEmbed;
+                const t = String(src.sourceType || '');
+                if (t === 'hls' || t === 'mp4') return false;
+                return !/\.m3u8($|[?#/])/i.test(String(src.url || ''));
+              };
+
               const providerServers: EpisodeServer[] = localSources.map((src: any, idx: number) => {
-                const isToko = (src.providerKey || src.providerName) === TOKO_EXT_ID;
-                const resolvedName = isToko
-                  ? (src.providerName || 'Toko')
-                  : String(src.providerName || src.provider || "Local runtime");
+                const key = resolveProviderKey(src);
+                const name = resolveProviderName(src);
+                const lang = resolveLang(src);
                 return {
                   serverId: idx,
-                  serverName: String(src.providerKey || src.providerName || src.provider || `local-${idx}`),
-                  providerKey: String(src.providerKey || src.providerName || `local-${idx}`),
-                  providerName: resolvedName,
-                  displayName: resolvedName,
+                  serverName: key,
+                  providerKey: key,
+                  providerName: name,
+                  displayName: name,
                   isProviderServer: true,
-                  language: category,
-                  isDub: category === "dub",
-                  isEmbed: !!src.isEmbed,
-                  hasM3U8: !!src.isM3U8,
+                  language: lang,
+                  langCode: src.audioLanguage ? String(src.audioLanguage) : undefined,
+                  isDub: resolveIsDub(src, lang),
+                  isEmbed: isEmbedSource(src),
+                  hasM3U8: !!src.isM3U8 || src.sourceType === 'hls' || /\.m3u8/i.test(String(src.url || '')),
                 };
               });
 
               const localResult: StreamingData = {
                 headers: { Referer: "", "User-Agent": "" },
                 sources: localSources.map((src: any) => {
-                  const isToko = String(src.providerKey || '') === TOKO_EXT_ID;
+                  const key = resolveProviderKey(src);
+                  const name = resolveProviderName(src);
+                  const lang = resolveLang(src);
                   return {
                     url: String(src.url || ""),
-                    isM3U8: !!src.isM3U8,
+                    isM3U8: !!src.isM3U8 || (src.sourceType === 'hls') || /\.m3u8/i.test(String(src.url || '')),
                     quality: src.quality ? String(src.quality) : "auto",
-                    language: category,
-                    isDub: category === "dub",
-                    providerName: isToko ? (src.providerName || 'Toko') : (src.providerName ? String(src.providerName) : "Local runtime"),
-                    providerKey: src.providerKey ? String(src.providerKey) : "local-runtime",
-                    server: src.providerKey ? String(src.providerKey) : "local-runtime",
+                    language: lang,
+                    langCode: src.audioLanguage ? String(src.audioLanguage) : undefined,
+                    isDub: resolveIsDub(src, lang),
+                    isEmbed: isEmbedSource(src),
+                    providerName: name,
+                    providerKey: key,
+                    server: key,
                   };
-                }),
-                subtitles: [],
+                }),                subtitles: [],
                 tracks: [],
                 providerServers,
                 anilistID: typeof knownAnilistId === "number" ? knownAnilistId : Number(knownAnilistId) || null,

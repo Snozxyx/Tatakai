@@ -6,8 +6,7 @@ import { normalizeQuality } from '../../utils/quality.js';
 import { buildSearchQueries } from '../../utils/titleNorm.js';
 import type { StreamProvider, SourceOptions, SourceResult } from '../../types.js';
 
-declare const __tatakai_fetch__: (url: string, init?: RequestInit) => Promise<Response>;
-declare const __tatakai_parse_html__: (html: string) => any;
+import { fetchResponse, loadHtml } from '../../utils/http.js';
 
 const BASE = 'https://hindidubbed.in';
 
@@ -19,13 +18,13 @@ const HEADERS = {
 async function findSources(titles: string[], epNumber: number): Promise<SourceResult[]> {
   for (const title of buildSearchQueries(titles)) {
     try {
-      const searchRes = await __tatakai_fetch__(
+      const searchRes = await fetchResponse(
         `${BASE}/?s=${encodeURIComponent(title)}`,
         { headers: HEADERS },
       );
       if (!searchRes.ok) continue;
       const html = await searchRes.text();
-      const $ = __tatakai_parse_html__(html);
+      const $ = loadHtml(html);
 
       let animeUrl: string | null = null;
       $.find('article a, .post-title a, h2 a, h3 a, .entry-title a').each((_: number, el: any) => {
@@ -37,10 +36,10 @@ async function findSources(titles: string[], epNumber: number): Promise<SourceRe
       });
       if (!animeUrl) continue;
 
-      const animeRes = await __tatakai_fetch__(animeUrl, { headers: HEADERS });
+      const animeRes = await fetchResponse(animeUrl, { headers: HEADERS });
       if (!animeRes.ok) continue;
       const animeHtml = await animeRes.text();
-      const $a = __tatakai_parse_html__(animeHtml);
+      const $a = loadHtml(animeHtml);
 
       let epUrl: string | null = null;
       $a.find(`a[href*="episode-${epNumber}"], a[href*="ep-${epNumber}"]`).each((_: number, el: any) => {
@@ -50,7 +49,7 @@ async function findSources(titles: string[], epNumber: number): Promise<SourceRe
       });
       if (!epUrl) continue;
 
-      const epRes = await __tatakai_fetch__(epUrl, { headers: HEADERS });
+      const epRes = await fetchResponse(epUrl, { headers: HEADERS });
       if (!epRes.ok) continue;
       const epHtml = await epRes.text();
 
