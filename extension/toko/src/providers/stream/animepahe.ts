@@ -32,12 +32,15 @@ interface AnimePaheSource {
   audio: string;
 }
 
-function headersFor(base: string): Record<string, string> {
+function headersFor(base: string, path = '/'): Record<string, string> {
   return {
     Cookie: '__ddg1_=;__ddg2_=;av=1',
-    Referer: `${base}/`,
+    Referer: `${base}${path}`,
+    Origin: base,
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
     Accept: 'application/json, text/plain, */*',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'X-Requested-With': 'XMLHttpRequest',
   };
 }
 
@@ -49,7 +52,7 @@ function headersFor(base: string): Record<string, string> {
 async function apiGetJson<T>(path: string): Promise<T | null> {
   for (const base of BASE_URLS) {
     try {
-      const res = await __tatakai_fetch__(`${base}${path}`, { headers: headersFor(base) });
+      const res = await __tatakai_fetch__(`${base}${path}`, { headers: headersFor(base, path.split('?')[0]) });
       if (!res.ok) continue;
       const text = await res.text();
       if (!text) continue;
@@ -81,10 +84,33 @@ async function getEpisodes(animeSession: string, page = 1): Promise<AnimePaheEpi
 }
 
 async function getEpisodeSources(animeSession: string, epSession: string): Promise<AnimePaheSource[]> {
-  const data = await apiGetJson<{ data?: AnimePaheSource[] }>(
-    `/api?m=links&id=${animeSession}&session=${epSession}&p=kwik`,
-  );
-  return data?.data ?? [];
+  // The legacy m=links endpoint now requires a numeric anime id and returns
+  // "not enough arguments" when given a session UUID. The /play/{anime}/{ep}
+  // page renders the Kwik buttons server-side, so scrape the embed URLs from
+  // there instead.
+  for (const base of BASE_URLS) {
+    try {
+      const res = await __tatakai_fetch__(`${base}/play/${animeSession}/${epSession}`, {
+        headers: headersFor(base, `/anime/${animeSession}`),
+      });
+      if (!res.ok) continue;
+      const html = await res.text();
+      // Play page links look like <a class="..." href="https://kwik.cx/e/...">
+      // or data-src attributes pointing at kwik/pahewin embeds.
+      const sources: AnimePaheSource[] = [];
+      const seen = new Set<string>();
+      const re = /https?:\/\/(kwik\.[a-z]+|pahe\.win|kwik\.cx)\/e\/[A-Za-z0-9_-]+/gi;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(html))) {
+        const u = m[0];
+        if (seen.has(u)) continue;
+        seen.add(u);
+        sources.push({ kwik: u, quality: 'auto', audio: 'japanese' });
+      }
+      if (sources.length > 0) return sources;
+    } catch { /* try next mirror */ }
+  }
+  return [];
 }
 
 // ── Kwik JS Unpacker ─────────────────────────────────────────────────────────
