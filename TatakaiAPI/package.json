@@ -1,0 +1,17 @@
+{
+  "name": "tatakai-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tatakai local API server — wraps the Toko extension bundle for scraping/mapping and serves /api/v3/toko/* routes.",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  }
+}
