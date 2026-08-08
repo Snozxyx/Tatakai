@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Background } from '@/components/layout/Background';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -11,17 +11,21 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, List, Sparkles, AlertTriangle } from 'lucide-react';
+import { Loader2, List, Sparkles, AlertTriangle, RefreshCw, Clock } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTheme } from '@/hooks/useTheme';
-import { useContentSafetySettings } from '@/hooks/useContentSafetySettings';
-import { useUpdateProfilePrivacy } from '@/hooks/useProfileFeatures';
-import { useClearAllWatchHistory } from '@/hooks/useWatchHistory';
+import { useTheme } from '@/hooks/ui/useTheme';
+import { useContentSafetySettings } from '@/hooks/user/useContentSafetySettings';
+import { useUpdateProfilePrivacy } from '@/hooks/user/useProfileFeatures';
+import { useClearAllWatchHistory } from '@/hooks/user/useWatchHistory';
+import { contentGraph, toAnimeCard } from '@/core';
+import { useTranslation } from 'react-i18next';
+import { supportedLanguages, type SupportedLanguageCode } from '@/lib/i18n';
+import { clearLocalTorrentSessionHistory, getLocalTorrentSessionHistoryEnabled, setLocalTorrentSessionHistoryEnabled } from '@/lib/localStorage';
 import {
   getMalAuthUrl,
   fetchMalUserList,
@@ -44,9 +48,13 @@ import {
 } from '@/lib/externalIntegrations';
 import { toast } from 'sonner';
 import { cn } from "@/lib/utils";
+import { FeatureFlag, useFeatureFlag, toggleFlag } from '@/core/feature-flags';
 import {
-  ArrowLeft, Palette, Film, Monitor, Info, Link2, Eye, EyeOff, Globe, CheckCircle, ExternalLink, Shield, History, Trash2, Search, Bell, MessageCircle, Laptop
+  ArrowLeft, Palette, Film, Monitor, Info, Link2, Eye, EyeOff, Globe, CheckCircle, ExternalLink, Shield, History, Trash2, Search, Bell, MessageCircle, Laptop, Puzzle
 } from 'lucide-react';
+import { TorrentSessionHistory } from '@/components/settings/TorrentSessionHistory';
+import { SyncPreviewModal } from '@/components/integrations/SyncPreviewModal';
+import { useIntegrationSync, type Integration, type MediaType, type SyncProposalItem } from '@/hooks/user/useIntegrationSync';
 
 type PreferredMangaLanguage = 'auto' | 'jp' | 'en' | 'kr' | 'zh';
 type ImportMediaType = 'anime' | 'manga';
@@ -240,17 +248,14 @@ const FALLBACK_CHANGELOG = [
 ];
 
 import { DesktopSettings } from '@/components/settings/DesktopSettings';
-import { MobileSettings } from '@/components/settings/MobileSettings';
-import { useIsNativeApp } from '@/hooks/useIsNativeApp';
-import { Capacitor } from '@capacitor/core';
+import { useIsNativeApp } from '@/hooks/ui/useIsNativeApp';
 
 export default function SettingsPage() {
   const [searchParams] = useSearchParams();
   const isNative = useIsNativeApp();
-  const isMobile = Capacitor.isNativePlatform();
   const requestedTab = searchParams.get('tab');
 
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile, isAdmin } = useAuth();
   const { themes, theme, setTheme, reduceMotion, setReduceMotion, highContrast, setHighContrast } = useTheme();
   const { settings: contentSafetySettings, updateSettings: updateContentSafetySettings } = useContentSafetySettings();
   const updatePrivacy = useUpdateProfilePrivacy();
@@ -278,6 +283,15 @@ export default function SettingsPage() {
   const [manualSearchResults, setManualSearchResults] = useState<any[]>([]);
   const [isManualSearching, setIsManualSearching] = useState(false);
   const [malAutoDelete, setMalAutoDelete] = useState(false);
+  const [optimizeTorrentStorage, setOptimizeTorrentStorage] = useState(() => {
+    try {
+      const raw = localStorage.getItem('tatakai_optimize_torrent_storage_v1');
+      return raw == null ? true : raw === 'true';
+    } catch {
+      return true;
+    }
+  });
+  const [keepTorrentSessionHistory, setKeepTorrentSessionHistory] = useState(() => getLocalTorrentSessionHistoryEnabled());
   const [malSyncTarget, setMalSyncTarget] = useState<ImportMediaType>('anime');
 
   // AniList State
@@ -286,8 +300,20 @@ export default function SettingsPage() {
   const [aniListSyncTarget, setAniListSyncTarget] = useState<ImportMediaType>('anime');
   const [importSource, setImportSource] = useState<'mal' | 'anilist'>('mal');
   const [importMediaType, setImportMediaType] = useState<ImportMediaType>('anime');
+
+  // Smart Sync (approval-modal) State
+  const integrationSync = useIntegrationSync();
+  const [syncModalOpen, setSyncModalOpen] = useState(false);
+  const [syncModalIntegration, setSyncModalIntegration] = useState<Integration>('mal');
+  const [syncModalMediaType, setSyncModalMediaType] = useState<MediaType>('anime');
   const [preferredTitleLanguage, setPreferredTitleLanguage] = useState<'romaji' | 'english' | 'native'>('romaji');
   const [preferredMangaLanguage, setPreferredMangaLanguage] = useState<PreferredMangaLanguage>('auto');
+  const { i18n } = useTranslation();
+  const [uiLanguage, setUiLanguageState] = useState<SupportedLanguageCode>('en');
+  const ffContentGraph = useFeatureFlag(FeatureFlag.CONTENT_GRAPH);
+  const ffVirtualGrid = useFeatureFlag(FeatureFlag.VIRTUAL_GRID);
+  const ffBlurhashImages = useFeatureFlag(FeatureFlag.BLURHASH_IMAGES);
+  const ffTatakaiRuntime = useFeatureFlag(FeatureFlag.TATAKAI_RUNTIME);
   const [isResetting, setIsResetting] = useState(false);
 
   useEffect(() => {
@@ -298,6 +324,21 @@ export default function SettingsPage() {
       setPreferredMangaLanguage(normalizePreferredMangaLanguage((profile as any).preferred_manga_language));
     }
   }, [profile]);
+
+  const handleUiLanguageChange = async (value: SupportedLanguageCode) => {
+    setUiLanguageState(value);
+    try {
+      localStorage.setItem('tatakai:lang', value);
+    } catch {
+      // ignore storage errors
+    }
+
+    try {
+      await i18n.changeLanguage(value);
+    } catch {
+      // ignore: fallbackLng handles display
+    }
+  };
 
   const handleTitleLanguageChange = async (value: 'romaji' | 'english' | 'native') => {
     if (!user?.id) {
@@ -368,6 +409,29 @@ export default function SettingsPage() {
     }
   };
 
+  const handleOptimizeTorrentStorageChange = (enabled: boolean) => {
+    setOptimizeTorrentStorage(enabled);
+    try {
+      localStorage.setItem('tatakai_optimize_torrent_storage_v1', String(enabled));
+      (window as any).tatakaiRuntime?.updateTorrentSettings?.({
+        autoFreeSpace: enabled,
+        cleanupOnPlaybackEnd: enabled,
+      });
+      toast.success(enabled ? 'Optimize storage enabled' : 'Optimize storage disabled');
+    } catch {
+      toast.error('Failed to save optimize storage setting');
+    }
+  };
+
+  const handleKeepTorrentSessionHistoryChange = (enabled: boolean) => {
+    setKeepTorrentSessionHistory(enabled);
+    setLocalTorrentSessionHistoryEnabled(enabled);
+    if (!enabled) {
+      clearLocalTorrentSessionHistory();
+    }
+    toast.success(enabled ? 'Torrent session history enabled' : 'Torrent session history cleared');
+  };
+
   const handlePrivacyChange = async (value: boolean) => {
     setIsPublic(value);
     try {
@@ -423,7 +487,7 @@ export default function SettingsPage() {
         const malTitle = item.node.title;
 
         const mappedId = existingMalIds.get(malId);
-        const targetId = mappedId || `mal-${malId}`;
+        const targetId = mappedId || `mal:${malId}`;
         const confidence: 'exact' | 'new' = mappedId ? 'exact' : 'new';
 
         processedItems.push({
@@ -575,7 +639,7 @@ export default function SettingsPage() {
     setIsManualSearching(true);
     try {
       if (importMediaType === 'manga') {
-        const { searchManga } = await import('@/services/manga.service');
+        const { searchManga } = await import('@/core/content/manga-client');
         const results = await searchManga(query, 1, 10, { mode: 'search', provider: 'all' });
         const mappedResults = (results?.results || [])
           .map((row: any) => {
@@ -599,9 +663,8 @@ export default function SettingsPage() {
 
         setManualSearchResults(mappedResults);
       } else {
-        const { searchAnime } = await import('@/lib/api');
-        const results = await searchAnime(query);
-        setManualSearchResults(results?.animes || []);
+        const results = await contentGraph.search({ query, page: 1, perPage: 10 });
+        setManualSearchResults((results?.media || []).map(toAnimeCard));
       }
     } catch (e) {
       console.warn('Manual search failed:', e);
@@ -874,7 +937,7 @@ export default function SettingsPage() {
         let confidence: 'exact' | 'new' = targetId ? 'exact' : 'new';
 
         if (!targetId) {
-          targetId = malId ? `mal-${malId}` : `anilist-${anilistId}`;
+          targetId = malId ? `mal:${malId}` : `anilist:${anilistId}`;
           confidence = 'new';
         }
 
@@ -1181,6 +1244,43 @@ export default function SettingsPage() {
   const hasMAL = !!profile?.mal_access_token;
   const hasAniList = !!profile?.anilist_access_token;
 
+  /**
+   * Opens the Smart Sync modal: fetches the diff first, then shows it for user approval.
+   */
+  const handleOpenSmartSync = useCallback(async (integration: Integration, mediaType: MediaType) => {
+    setSyncModalIntegration(integration);
+    setSyncModalMediaType(mediaType);
+    setSyncModalOpen(true);
+    await integrationSync.loadPreview(integration, mediaType);
+  }, [integrationSync]);
+
+  /**
+   * Called when the user confirms selected items in the SyncPreviewModal.
+   */
+  const handleApplySyncModal = useCallback(async (selectedItems: SyncProposalItem[]) => {
+    const result = await integrationSync.applySync(syncModalIntegration, selectedItems);
+    if (result.success) {
+      toast.success(`Sync applied successfully — ${selectedItems.length} change${selectedItems.length !== 1 ? 's' : ''} applied.`);
+      setSyncModalOpen(false);
+    } else {
+      toast.error(`Sync failed: ${result.error}`);
+    }
+  }, [integrationSync, syncModalIntegration]);
+
+  /** Format a last-sync ISO date for display. */
+  const formatLastSync = (isoDate: string | null): string => {
+    if (!isoDate) return 'Never';
+    const d = new Date(isoDate);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return 'Just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h ago`;
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  };
+
 
 
 
@@ -1222,6 +1322,10 @@ export default function SettingsPage() {
                 App
               </TabsTrigger>
             )}
+            <TabsTrigger value="extensions" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Puzzle className="w-4 h-4" />
+              Extensions
+            </TabsTrigger>
             <TabsTrigger value="player" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Film className="w-4 h-4" />
               Video Player
@@ -1254,18 +1358,79 @@ export default function SettingsPage() {
           </TabsContent>
 
           {/* Desktop Tab */}
-          {!isMobile && (
-            <TabsContent value="desktop">
+          <TabsContent value="desktop">
+            <div className="space-y-4">
               <DesktopSettings />
-            </TabsContent>
-          )}
 
-          {/* Mobile Tab */}
-          {isMobile && (
-            <TabsContent value="desktop">
-              <MobileSettings />
-            </TabsContent>
-          )}
+              <GlassPanel className="p-5 border-white/5 bg-white/[0.03]">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">Torrent Storage</p>
+                    <h3 className="text-lg font-bold">Free torrent space automatically</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      When enabled, Tatakai removes temporary torrent data after usage and lets the torrent engine trim old cache with your custom rules.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={optimizeTorrentStorage}
+                    onCheckedChange={handleOptimizeTorrentStorageChange}
+                  />
+                </div>
+              </GlassPanel>
+
+              <GlassPanel className="p-5 border-white/5 bg-white/[0.03]">
+                <div className="flex items-center justify-between gap-4 mb-4">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">Session History</p>
+                    <h3 className="text-lg font-bold">Keep previous torrent sessions</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      Save recent torrent imports so you can review what was played, see blocked sessions, and reopen active sessions after a restart.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={keepTorrentSessionHistory}
+                    onCheckedChange={handleKeepTorrentSessionHistoryChange}
+                  />
+                </div>
+
+                <TorrentSessionHistory />
+              </GlassPanel>
+            </div>
+          </TabsContent>
+
+          {/* Extensions Tab */}
+          <TabsContent value="extensions">
+            <GlassPanel className="p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+                  <Puzzle className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="font-display text-xl font-semibold">Extension Hub</h2>
+                  <p className="text-sm text-muted-foreground">Curated extensions to enhance your experience</p>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <p className="text-muted-foreground">
+                  Extensions add new sources, features, and customization options to Tatakai.
+                </p>
+                
+                <Button asChild className="w-full sm:w-auto">
+                  <a href="/extensions">
+                    Open Extension Hub
+                  </a>
+                </Button>
+                
+                <div className="pt-4 mt-4 border-t border-border/50">
+                  <p className="text-xs text-muted-foreground">
+                    <Shield className="inline-block w-3 h-3 mr-1" />
+                    Only verified, curated extensions from the Tatakai team are allowed to run.
+                  </p>
+                </div>
+              </div>
+            </GlassPanel>
+          </TabsContent>
 
           {/* Video Player Tab */}
           <TabsContent value="player">
@@ -1286,6 +1451,67 @@ export default function SettingsPage() {
                 Display Settings
               </h2>
               <div className="space-y-6">
+                    {/* <div>
+                      <p className="font-medium">Interface Language</p>
+                      <p className="text-sm text-muted-foreground">Language for UI text</p>
+                    </div>
+                    <Select
+                      value={uiLanguage}
+                      onValueChange={(value: any) => handleUiLanguageChange(value as SupportedLanguageCode)}
+                    >
+                      <SelectTrigger className="w-[140px] bg-background/50 border-white/10">
+                        <SelectValue placeholder="Select language" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {supportedLanguages.map((lang) => (
+                          <SelectItem key={lang.code} value={lang.code}>
+                            {lang.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select> */}
+                {isAdmin && (
+                  <div className="flex flex-col gap-3 p-4 rounded-xl bg-muted/30 border border-white/10">
+                    <div>
+                      <p className="font-medium">Feature Flags (Admin)</p>
+                      <p className="text-sm text-muted-foreground">Override via localStorage</p>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-sm">Content Graph</p>
+                          <p className="text-xs text-muted-foreground">Use AniList/Jikan content graph APIs</p>
+                        </div>
+                        <Switch checked={ffContentGraph} onCheckedChange={(checked) => toggleFlag(FeatureFlag.CONTENT_GRAPH, checked)} />
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-sm">Virtual Grid</p>
+                          <p className="text-xs text-muted-foreground">Render large browse lists with virtualization</p>
+                        </div>
+                        <Switch checked={ffVirtualGrid} onCheckedChange={(checked) => toggleFlag(FeatureFlag.VIRTUAL_GRID, checked)} />
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-sm">BlurHash Covers</p>
+                          <p className="text-xs text-muted-foreground">Use BlurHash placeholders for posters</p>
+                        </div>
+                        <Switch checked={ffBlurhashImages} onCheckedChange={(checked) => toggleFlag(FeatureFlag.BLURHASH_IMAGES, checked)} />
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-sm">Tatakai Runtime</p>
+                          <p className="text-xs text-muted-foreground">Reserved for local runtime bridge</p>
+                        </div>
+                        <Switch checked={ffTatakaiRuntime} onCheckedChange={(checked) => toggleFlag(FeatureFlag.TATAKAI_RUNTIME, checked)} />
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="flex flex-col gap-3 p-4 rounded-xl bg-muted/30">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1674,10 +1900,15 @@ export default function SettingsPage() {
 
                     {hasMAL && (
                       <div className="relative mt-5 pt-5 border-t border-white/5 space-y-4">
+                        {/* Sync target toggle */}
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                            Sync target
-                          </p>
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Sync target</p>
+                            <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                              <Clock className="w-3 h-3" />
+                              Last synced: {formatLastSync(integrationSync.getLastSyncedAt('mal', malSyncTarget))}
+                            </p>
+                          </div>
                           <div className="inline-flex rounded-xl border border-[#2E51A2]/25 bg-[#2E51A2]/5 p-1 gap-1 w-full sm:w-auto">
                             <button
                               type="button"
@@ -1706,16 +1937,31 @@ export default function SettingsPage() {
                           </div>
                         </div>
 
+                        {/* Smart Sync button (approval-modal flow) */}
+                        <Button
+                          className="w-full gap-2 bg-[#2E51A2] hover:bg-[#2E51A2]/90 text-white shadow-md shadow-[#2E51A2]/20"
+                          onClick={() => handleOpenSmartSync('mal', malSyncTarget)}
+                          disabled={integrationSync.isLoadingPreview}
+                        >
+                          {integrationSync.isLoadingPreview && syncModalIntegration === 'mal' ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-4 h-4" />
+                          )}
+                          Smart Sync {malSyncTarget === 'manga' ? 'Manga' : 'Anime'} with MAL
+                        </Button>
+
+                        {/* Legacy manual import/export buttons */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           <Button
-                            variant="default"
+                            variant="outline"
                             size="sm"
                             onClick={handleImportFromMalByMediaType}
                             disabled={isImporting}
-                            className="gap-2 bg-[#2E51A2] hover:bg-[#2E51A2]/90 text-white shadow-md shadow-[#2E51A2]/20 active:scale-95 transition-all"
+                            className="gap-2 border-[#2E51A2]/30 text-[#2E51A2] hover:bg-[#2E51A2]/5 transition-all"
                           >
                             {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <List className="w-4 h-4" />}
-                            {malSyncTarget === 'manga' ? 'Sync Manga from MAL' : 'Sync Anime from MAL'}
+                            {malSyncTarget === 'manga' ? 'Import Manga from MAL' : 'Import Anime from MAL'}
                           </Button>
                           <Button
                             variant="outline"
@@ -1731,27 +1977,8 @@ export default function SettingsPage() {
 
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <CheckCircle className="w-3.5 h-3.5 text-green-500" />
-                          Background auto-sync is active. Any changes you make in Tatakai will be reflected on MAL instantly.
+                          Auto-sync is active. Episode / chapter updates push to MAL in the background.
                         </div>
-
-                        {/* <div className="mt-4 p-4 rounded-xl bg-destructive/5 border border-destructive/20 border-dashed">
-                          <div className="flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 rounded-lg bg-destructive/10">
-                                <AlertTriangle className="w-5 h-5 text-destructive" />
-                              </div>
-                              <div>
-                                <p className="font-bold text-[10px] text-destructive uppercase tracking-widest mb-0.5">Dangerous Setting</p>
-                                <p className="font-semibold text-sm">Sync Watchlist Deletions</p>
-                                <p className="text-xs text-muted-foreground leading-relaxed">If you remove an anime from your Tatakai watchlist, it will be automatically <span className="text-destructive font-bold uppercase underline">deleted</span> from your MyAnimeList account.</p>
-                              </div>
-                            </div>
-                            <Switch
-                              checked={malAutoDelete}
-                              onCheckedChange={handleMalAutoDeleteChange}
-                            />
-                          </div>
-                        </div> */}
                       </div>
                     )}
                   </div>
@@ -1806,10 +2033,15 @@ export default function SettingsPage() {
 
                     {hasAniList && (
                       <div className="relative mt-5 pt-5 border-t border-white/5 space-y-4">
+                        {/* Sync target toggle */}
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                            Sync target
-                          </p>
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Sync target</p>
+                            <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                              <Clock className="w-3 h-3" />
+                              Last synced: {formatLastSync(integrationSync.getLastSyncedAt('anilist', aniListSyncTarget))}
+                            </p>
+                          </div>
                           <div className="inline-flex rounded-xl border border-[#02A9FF]/25 bg-[#02A9FF]/5 p-1 gap-1 w-full sm:w-auto">
                             <button
                               type="button"
@@ -1838,16 +2070,31 @@ export default function SettingsPage() {
                           </div>
                         </div>
 
+                        {/* Smart Sync button (approval-modal flow) */}
+                        <Button
+                          className="w-full gap-2 bg-[#02A9FF] hover:bg-[#02A9FF]/90 text-white shadow-md shadow-[#02A9FF]/20"
+                          onClick={() => handleOpenSmartSync('anilist', aniListSyncTarget)}
+                          disabled={integrationSync.isLoadingPreview}
+                        >
+                          {integrationSync.isLoadingPreview && syncModalIntegration === 'anilist' ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-4 h-4" />
+                          )}
+                          Smart Sync {aniListSyncTarget === 'manga' ? 'Manga' : 'Anime'} with AniList
+                        </Button>
+
+                        {/* Legacy manual import/export buttons */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           <Button
-                            variant="default"
+                            variant="outline"
                             size="sm"
                             onClick={handleImportFromAniListByMediaType}
                             disabled={isAniListImporting}
-                            className="gap-2 bg-[#02A9FF] hover:bg-[#02A9FF]/90 text-white shadow-md shadow-[#02A9FF]/20 active:scale-95 transition-all"
+                            className="gap-2 border-[#02A9FF]/30 text-[#02A9FF] hover:bg-[#02A9FF]/5 transition-all"
                           >
                             {isAniListImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <List className="w-4 h-4" />}
-                            {aniListSyncTarget === 'manga' ? 'Sync Manga from AniList' : 'Sync Anime from AniList'}
+                            {aniListSyncTarget === 'manga' ? 'Import Manga from AniList' : 'Import Anime from AniList'}
                           </Button>
                           <Button
                             variant="outline"
@@ -1863,7 +2110,7 @@ export default function SettingsPage() {
 
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <CheckCircle className="w-3.5 h-3.5 text-green-500" />
-                          Background auto-sync is active. Chapter and episode updates are pushed while you watch/read.
+                          Auto-sync is active. Chapter and episode updates push to AniList while you watch/read.
                         </div>
                       </div>
                     )}
@@ -2157,6 +2404,18 @@ export default function SettingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Smart Sync approval modal — always shown with manual confirmation required */}
+      <SyncPreviewModal
+        isOpen={syncModalOpen}
+        onClose={() => setSyncModalOpen(false)}
+        onApply={handleApplySyncModal}
+        items={integrationSync.previewItems}
+        integration={syncModalIntegration}
+        mediaType={syncModalMediaType}
+        isLoading={integrationSync.isLoadingPreview}
+        isApplying={integrationSync.isApplying}
+      />
     </div>
   );
 }

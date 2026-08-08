@@ -10,26 +10,26 @@ import { Input } from '@/components/ui/input';
 // import { StatusVideoBackground } from '@/components/layout/StatusVideoBackground';
 import { TierListCard } from '@/components/tierlist/TierListCard';
 import { PlaylistCard } from '@/components/playlist/PlaylistCard';
-import { usePublicTierLists } from '@/hooks/useTierLists';
+import { usePublicTierLists } from '@/hooks/user/useTierLists';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Playlist, usePlaylistItems } from '@/hooks/usePlaylist';
+import { Playlist, usePlaylistItems } from '@/hooks/user/usePlaylist';
 import { getProxiedImageUrl } from '@/lib/api';
-import { usePublicWatchRooms } from '@/hooks/useWatchRoom';
+import { usePublicWatchRooms } from '@/hooks/media/useWatchRoom';
 import { WatchRoomCard } from '@/pages/watch/IsshoNiPage';
 import {
   Users, Layers, Music2, Search, TrendingUp, Clock,
   Heart, ChevronRight, Sparkles, Globe, Play, MessageSquare, ArrowUp, ArrowDown, Eye, MessageCircle, Radio, Trophy
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useForumPosts, useCommunityStats, type ForumPost } from '@/hooks/useForum';
+import { useForumPosts, useCommunityStats, type ForumPost } from '@/hooks/community/useForum';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Menu, X } from 'lucide-react';
 import { Leaderboard } from '@/components/community/Leaderboard';
-import { useIsNativeApp } from '@/hooks/useIsNativeApp';
+import { useIsNativeApp } from '@/hooks/ui/useIsNativeApp';
 
 // Hook to fetch public playlists from all users
 function usePublicPlaylists() {
@@ -816,3 +816,4 @@ export default function CommunityPage() {
     </div>
   );
 }
+

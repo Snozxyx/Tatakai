@@ -1,7 +1,7 @@
 import { Star, BookOpen } from "lucide-react";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import { UnifiedMediaCardProps } from "@/components/UnifiedMediaCard";
-import { getProxiedImageUrl } from "@/lib/api";
+import { getHighQualityImage } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 
@@ -17,6 +17,11 @@ export function MangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
 
   const allSpotlights = spotlights.length > 0 ? spotlights.slice(0, 5) : [spotlight];
   const activeSpotlight = allSpotlights[currentIndex] || spotlight;
+  if (!activeSpotlight) return null;
+  const spotlightName = String(activeSpotlight.name || "Untitled");
+  const spotlightPoster = String(activeSpotlight.poster || "");
+  const spotlightType = activeSpotlight.type || "Manga";
+  const spotlightStatus = activeSpotlight.status || "Ongoing";
 
   useEffect(() => {
     if (allSpotlights.length <= 1) return;
@@ -41,7 +46,7 @@ export function MangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
       <div className="lg:hidden relative">
         <div className="absolute inset-0 h-[400px] overflow-hidden">
           <img
-            src={getProxiedImageUrl(activeSpotlight.poster)}
+            src={getHighQualityImage(spotlightPoster)}
             alt=""
             className="w-full h-full object-cover scale-105 brightness-50"
           />
@@ -57,8 +62,8 @@ export function MangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
             <div className="w-32 flex-shrink-0">
               <GlassPanel className="overflow-hidden rounded-xl">
                 <img
-                  src={getProxiedImageUrl(activeSpotlight.poster)}
-                  alt={activeSpotlight.name}
+                  src={getHighQualityImage(spotlightPoster)}
+                  alt={spotlightName}
                   className="w-full aspect-[3/4] object-cover"
                 />
               </GlassPanel>
@@ -71,14 +76,14 @@ export function MangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
               </div>
 
               <h1 className="font-display text-xl font-black tracking-tight leading-tight gradient-text mb-2 line-clamp-2">
-                {activeSpotlight.name}
+                {spotlightName}
               </h1>
 
               <div className="text-xs text-muted-foreground">
-                {activeSpotlight.type || "Manga"} •{" "}
+                {spotlightType} •{" "}
                 {activeSpotlight.chapters
                   ? `${activeSpotlight.chapters} Chapters`
-                  : activeSpotlight.status || "Ongoing"}
+                  : spotlightStatus}
               </div>
             </div>
           </div>
@@ -127,21 +132,21 @@ export function MangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
           </div>
 
           <h1 className="font-display text-5xl md:text-7xl font-black tracking-tighter leading-[0.9] gradient-text">
-            {activeSpotlight.name.split(" ").slice(0, 3).join(" ")}
-            {activeSpotlight.name.split(" ").length > 3 && (
+            {spotlightName.split(" ").slice(0, 3).join(" ")}
+            {spotlightName.split(" ").length > 3 && (
               <>
                 <br />
-                <span className="text-foreground/60">{activeSpotlight.name.split(" ").slice(3).join(" ")}</span>
+                <span className="text-foreground/60">{spotlightName.split(" ").slice(3).join(" ")}</span>
               </>
             )}
           </h1>
 
           <div className="flex flex-wrap gap-3">
             <span className="px-4 py-1.5 rounded-lg border border-border bg-muted/50 text-sm font-medium hover:bg-muted cursor-default transition-colors">
-              {activeSpotlight.type || "Manga"}
+              {spotlightType}
             </span>
             <span className="px-4 py-1.5 rounded-lg border border-border bg-muted/50 text-sm font-medium hover:bg-muted cursor-default transition-colors">
-              {activeSpotlight.status || "Ongoing"}
+              {spotlightStatus}
             </span>
             {activeSpotlight.chapters && (
               <span className="px-4 py-1.5 rounded-lg border border-border bg-muted/50 text-sm font-medium hover:bg-muted cursor-default transition-colors">
@@ -190,8 +195,8 @@ export function MangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
         >
           <div className="relative aspect-[16/9] w-full rounded-[2.5rem] overflow-hidden group">
             <img
-              src={getProxiedImageUrl(activeSpotlight.poster)}
-              alt={activeSpotlight.name}
+              src={getHighQualityImage(spotlightPoster)}
+              alt={spotlightName}
               className="absolute inset-0 w-full h-full object-cover transition-transform duration-[2s] ease-out group-hover:scale-105"
             />
             <div className="absolute inset-0 bg-gradient-to-r from-background via-background/20 to-transparent" />
@@ -202,8 +207,8 @@ export function MangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
 
           <div className="absolute -right-6 -bottom-6 w-48 aspect-[3/4] rounded-2xl overflow-hidden shadow-2xl border-4 border-background rotate-[-6deg] group-hover:rotate-0 transition-transform duration-500">
             <img
-              src={getProxiedImageUrl(activeSpotlight.poster)}
-              alt={activeSpotlight.name}
+              src={getHighQualityImage(spotlightPoster)}
+              alt={spotlightName}
               className="w-full h-full object-cover"
             />
           </div>

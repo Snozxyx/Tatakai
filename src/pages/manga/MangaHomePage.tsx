@@ -5,14 +5,14 @@ import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { Header } from "@/components/layout/Header";
-import { useIsNativeApp } from "@/hooks/useIsNativeApp";
+import { useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
 import { cn } from "@/lib/utils";
-import { searchManga } from "@/services/manga.service";
+import { searchManga } from "@/core/content/manga-client";
 import type { MangaSearchItem, MangaSearchResult } from "@/types/manga";
 import { UnifiedMediaCard, UnifiedMediaCardProps } from "@/components/UnifiedMediaCard";
 import { CardSkeleton } from "@/components/ui/skeleton-custom";
 import { GlassPanel } from "@/components/ui/GlassPanel";
-import { useContentSafetySettings } from "@/hooks/useContentSafetySettings";
+import { useContentSafetySettings } from "@/hooks/user/useContentSafetySettings";
 import { inferMangaAdultFlag } from "@/lib/contentSafety";
 import { MangaHeroSection } from "@/components/manga/MangaHeroSection";
 import { MangaTrendingGrid } from "@/components/manga/MangaTrendingGrid";
@@ -21,16 +21,8 @@ import { IndexMangaShowcase } from "@/components/manga/IndexMangaShowcase";
 import { LastReadMangaSection } from "@/components/manga/LastReadMangaSection";
 import { MangaGenreSlider } from "@/components/manga/MangaGenreSlider";
 import { MangaDiscoveryQuickFilters } from "@/components/manga/MangaDiscoveryQuickFilters";
-import { CuratedMangaSections } from "@/components/manga/CuratedMangaSections";
+import { MangaDiscoveryLane } from "@/components/manga/MangaDiscoveryLane";
 
-const TRENDING_QUERIES = ["Solo Leveling", "Jujutsu Kaisen", "Blue Lock", "Oshi no Ko", "Lookism"];
-const RECOMMENDED_QUERIES = ["Frieren", "Blue Box", "Dandadan", "Sakamoto Days", "Kaiju No. 8"];
-
-function getDayOfYear(value: Date) {
-  const start = new Date(value.getFullYear(), 0, 0);
-  const diff = value.getTime() - start.getTime();
-  return Math.floor(diff / 86400000);
-}
 
 function toUnifiedMangaCard(
   manga: MangaSearchItem,
@@ -38,7 +30,7 @@ function toUnifiedMangaCard(
 ): UnifiedMediaCardProps["item"] | null {
   const displayTitle =
     manga.canonicalTitle || manga.title?.english || manga.title?.romaji || manga.title?.native;
-  const id = manga.anilistId || manga.malId || manga.id;
+  const id = manga.id || (manga.anilistId ? `anilist:${manga.anilistId}` : manga.malId ? `mal:${manga.malId}` : "");
   if (!id || !displayTitle) return null;
 
   return {
@@ -75,31 +67,28 @@ export default function MangaHomePage() {
   const navigate = useNavigate();
   const isNative = useIsNativeApp();
   const { settings: contentSafetySettings, updateSettings: updateContentSafetySettings } = useContentSafetySettings();
-
-  const daySeed = useMemo(() => getDayOfYear(new Date()), []);
   const canShowAdultEverywhere = contentSafetySettings.showAdultEverywhere;
-
-  const activeTrendingQuery = useMemo(() => TRENDING_QUERIES[(daySeed) % TRENDING_QUERIES.length], [daySeed]);
-  const activeRecommendedQuery = useMemo(() => RECOMMENDED_QUERIES[(daySeed * 3) % RECOMMENDED_QUERIES.length], [daySeed]);
 
   const queries = useQueries({
     queries: [
       {
-        queryKey: ["manga-home-recommended", activeRecommendedQuery],
-        queryFn: (): Promise<MangaSearchResult> => searchManga(activeRecommendedQuery, 1, 10),
+        queryKey: ["manga-home-recommended"],
+        queryFn: (): Promise<MangaSearchResult> =>
+          searchManga("", 1, 12, { mode: "recommendation", sort: "SCORE_DESC" }),
         staleTime: 5 * 60 * 1000,
       },
       {
-        queryKey: ["manga-home-trending", activeTrendingQuery],
-        queryFn: (): Promise<MangaSearchResult> => searchManga(activeTrendingQuery, 1, 10),
+        queryKey: ["manga-home-trending"],
+        queryFn: (): Promise<MangaSearchResult> =>
+          searchManga("", 1, 12, { mode: "popular", sort: "TRENDING_DESC" }),
         staleTime: 5 * 60 * 1000,
       },
       {
         queryKey: ["manga-home-adult-section-latest", canShowAdultEverywhere],
         queryFn: (): Promise<MangaSearchResult> =>
           searchManga("", 1, 24, {
-            provider: "atsu",
             mode: "latest",
+            sort: "UPDATED_AT_DESC",
             adult: true,
             requiresQuery: false,
           }),
@@ -110,8 +99,8 @@ export default function MangaHomePage() {
         queryKey: ["manga-home-adult-section-explore", canShowAdultEverywhere],
         queryFn: (): Promise<MangaSearchResult> =>
           searchManga("", 1, 24, {
-            provider: "atsu",
             mode: "explore",
+            sort: "POPULARITY_DESC",
             adult: true,
             requiresQuery: false,
           }),
@@ -172,10 +161,43 @@ export default function MangaHomePage() {
         <Header />
 
         {isInitialLoading ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-24">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <CardSkeleton key={i} />
-            ))}
+          <div className="space-y-12 mt-6 animate-pulse">
+            {/* Hero Banner Skeleton */}
+            <div className="relative w-full aspect-[21/9] md:aspect-[21/7] rounded-3xl bg-muted/40 overflow-hidden border border-white/5 flex items-end p-6 md:p-10">
+              <div className="space-y-4 max-w-xl">
+                <div className="w-28 h-6 bg-white/10 rounded-full" />
+                <div className="w-3/4 h-10 md:h-14 bg-white/15 rounded-2xl" />
+                <div className="w-1/2 h-4 bg-white/10 rounded-lg" />
+                <div className="w-36 h-12 bg-white/20 rounded-full mt-4" />
+              </div>
+            </div>
+
+            {/* Quick Filters Skeleton */}
+            <div className="flex items-center gap-3 overflow-hidden py-2">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="w-28 h-10 bg-muted/40 rounded-xl flex-shrink-0" />
+              ))}
+            </div>
+
+            {/* First Grid Row Skeleton */}
+            <div>
+              <div className="w-48 h-7 bg-muted/50 rounded-lg mb-4" />
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <CardSkeleton key={`row1-${i}`} />
+                ))}
+              </div>
+            </div>
+
+            {/* Second Grid Row Skeleton */}
+            <div>
+              <div className="w-56 h-7 bg-muted/50 rounded-lg mb-4" />
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <CardSkeleton key={`row2-${i}`} />
+                ))}
+              </div>
+            </div>
           </div>
         ) : (
           <>
@@ -188,13 +210,17 @@ export default function MangaHomePage() {
 
             <LastReadMangaSection />
 
+            {/* Discovery Lane Section */}
+            {trendingCards.length > 0 && (
+              <MangaDiscoveryLane items={[...trendingCards, ...spotlightCards]} />
+            )}
+
             <IndexMangaShowcase />
 
             <MangaGenreSlider />
 
             <MangaDiscoveryQuickFilters />
 
-            <CuratedMangaSections />
 
             <section className="mb-12 md:mb-16">
               <div className="relative overflow-hidden rounded-3xl border border-rose-500/30">

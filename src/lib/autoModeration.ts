@@ -33,7 +33,6 @@ const WHITELIST_DOMAINS = [
   'i.imgur.com',
   'tenor.com',
   'giphy.com',
-  'example.com',
 ];
 
 // Whitelisted phrases that shouldn't be flagged
@@ -44,7 +43,7 @@ const WHITELIST = [
   'follow this',
 ];
 
-import { logAdminAction } from '@/hooks/useAdminLogs';
+import { logAdminAction } from '@/hooks/admin/useAdminLogs';
 
 /**
  * Check content against moderation rules
@@ -159,3 +158,4 @@ export function getViolationMessage(violations: ModerationViolation[]): string {
 
   return 'Your content was modified to comply with community guidelines.';
 }
+

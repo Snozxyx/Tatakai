@@ -4,7 +4,7 @@ import { X, Download, Smartphone, Monitor, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useIsNativeApp } from '@/hooks/useIsNativeApp';
+import { useIsNativeApp } from '@/hooks/ui/useIsNativeApp';
 
 export const AppDownloadPopup = () => {
     const [isOpen, setIsOpen] = useState(false);
@@ -106,3 +106,4 @@ export const AppDownloadPopup = () => {
         document.body
     );
 };
+

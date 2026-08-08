@@ -4,8 +4,8 @@ import {
   useEpisodeServers,
   useEpisodes,
   useAnimeInfo,
-} from "@/hooks/useAnimeData";
-import { useCombinedSourcesWithRefetch } from "@/hooks/useCombinedSources";
+} from "@/hooks/api/useAnimeData";
+import { useCombinedSourcesWithRefetch } from "@/hooks/media/useCombinedSources";
 import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
@@ -33,17 +33,25 @@ import {
   Users,
   TrendingUp,
   CircleCheck,
+  Download,
+  Upload,
+  HardDrive,
+  Wifi,
+  LockKeyhole,
 } from "lucide-react";
-import { useVideoSettings } from "@/hooks/useVideoSettings";
-import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from "@/hooks/useIsNativeApp";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useVideoSettings } from "@/hooks/media/useVideoSettings";
+import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from "@/hooks/ui/useIsNativeApp";
+import { useIsMobile } from "@/hooks/ui/use-mobile";
 import { buildUniqueSimpleNameMap, getFriendlyServerName, getSimpleServerDisplayName } from "@/lib/serverNames";
 import { updateLocalContinueWatching, getLocalContinueWatching } from "@/lib/localStorage";
+import { getLocalTorrentSessionHistory, updateLocalTorrentSessionHistory, upsertLocalTorrentSessionHistory } from "@/lib/localStorage";
 import { useAuth } from "@/contexts/AuthContext";
-import { useUpdateWatchHistory } from '@/hooks/useWatchHistory';
-import { useViewTracker, useAnimeViewCount, formatViewCount } from '@/hooks/useViews';
-import { useWatchTracking } from '@/hooks/useAnalytics';
+import { useUpdateWatchHistory } from '@/hooks/user/useWatchHistory';
+import { useViewTracker, useAnimeViewCount, formatViewCount } from '@/hooks/user/useViews';
+import { useWatchTracking } from '@/hooks/api/useAnalytics';
 import { getProxiedVideoUrl } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { clearDiscordRpc } from "@/lib/discordRpc";
 import { ReportModal } from "@/components/ui/ReportModal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { EpisodeComments } from "@/components/video/EpisodeComments";
@@ -51,10 +59,15 @@ import { ReviewPopup } from "@/components/ui/ReviewPopup";
 import { Button } from "@/components/ui/button";
 import { MarketplaceSubmitModal } from "@/components/ui/MarketplaceSubmitModal";
 import { MarketplaceModal } from "@/components/ui/MarketplaceModal";
+import { SourceLanguageTabs } from "@/components/watch/SourceLanguageTabs";
+import { SourceTypeBadge } from "@/components/watch/SourceTypeBadge";
+import { normalizeWatchLanguageKey } from "@/lib/languageUtils";
+import { toast } from "sonner";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchEpisodeServers, fetchStreamingSources, fetchTatakaiEpisodeSources, trackEvent } from "@/lib/api";
-import { markProviderSourcesExpired } from "@/services/provider.service";
+import { trackEvent } from "@/lib/api";
+import { fetchCombinedSources } from "@/lib/api/api-client";
+import { markProviderSourcesExpired } from "@/core/content/provider-orchestrator";
 import {
   buildDubSubtitles,
   clearCachedCombinedSourcesByEpisodeAndCategory,
@@ -75,6 +88,41 @@ import {
   sortServersByHealth,
   DubQualityProfile,
 } from "@/lib/watch/sourceIntelligence";
+
+function toLocalFileUrl(filePath?: string): string {
+  if (!filePath) return '';
+  if (/^(https?:|blob:|data:)/i.test(filePath)) return filePath;
+  // Already a tatakai-media:// URL — return as-is
+  if (filePath.startsWith('tatakai-media://')) return filePath;
+  // Already a file:// URL — convert to tatakai-media:// for Electron renderer safety
+  if (filePath.startsWith('file://')) {
+    const isElectron = typeof window !== 'undefined' && !!(window as any).electron;
+    if (!isElectron) return filePath;
+    // Extract path from file:// and rebuild as tatakai-media://
+    const rawPath = filePath.replace(/^file:\/\/\//i, '').replace(/^file:\/\//i, '');
+    const decoded = rawPath.replace(/ /g, '%20');
+    return `tatakai-media:///${decoded}`;
+  }
+  // Raw Windows/Unix absolute path
+  const normalized = filePath.replace(/\\/g, '/');
+  const encoded = normalized.replace(/ /g, '%20');
+  const isElectron = typeof window !== 'undefined' && !!(window as any).electron;
+  if (isElectron) {
+    // Use tatakai-media:// protocol which bypasses webSecurity for local files
+    return /^[A-Za-z]:\//.test(normalized)
+      ? `tatakai-media:///${encoded}`
+      : `tatakai-media://${encoded}`;
+  }
+  return /^[A-Za-z]:\//.test(normalized)
+    ? `file:///${encoded}`
+    : normalized.startsWith('/') ? `file://${encoded}` : `file:///${encoded}`;
+}
+
+function joinLocalPath(root: string, child?: string): string {
+  if (!child) return root;
+  const separator = root.includes('\\') ? '\\' : '/';
+  return `${root.replace(/[\\/]+$/g, '')}${separator}${String(child).replace(/^[\\/]+/g, '')}`;
+}
 
 export default function WatchPage() {
   const { episodeId } = useParams<{ episodeId: string }>();
@@ -122,6 +170,381 @@ export default function WatchPage() {
     }
   }, [location.search]);
 
+  const torrentSessionId = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('sessionId') || '';
+  }, [location.search]);
+
+  const optimizeTorrentStorage = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('tatakai_optimize_torrent_storage_v1');
+      return raw == null ? true : raw === 'true';
+    } catch {
+      return true;
+    }
+  }, []);
+
+  const [torrentPlaybackSource, setTorrentPlaybackSource] = useState<null | {
+    id: string;
+    url: string;
+    mode: 'torrent';
+    quality?: string;
+    sourceType?: string;
+    providerName?: string;
+    providerKey?: string;
+    isEmbed?: boolean;
+    isM3U8?: boolean;
+  }>(null);
+  const [torrentPlaybackLoading, setTorrentPlaybackLoading] = useState(false);
+  const [torrentPlaybackError, setTorrentPlaybackError] = useState<string | null>(null);
+  const [torrentLiveStats, setTorrentLiveStats] = useState<any | null>(null);
+  const [torrentRetryTrigger, setTorrentRetryTrigger] = useState(0);
+  const [autoRepairCount, setAutoRepairCount] = useState(0);
+  const torrentCompletionHandledRef = useRef(false);
+  const lastPlaybackTimeRef = useRef(0);
+
+  const formatTorrentRate = useCallback((value?: number) => {
+    if (!Number.isFinite(value || 0) || (value || 0) <= 0) return '0 KB/s';
+    const kb = (value || 0) / 1024;
+    if (kb < 1024) return `${kb.toFixed(kb >= 100 ? 0 : 1)} KB/s`;
+    const mb = kb / 1024;
+    return `${mb.toFixed(mb >= 100 ? 0 : 1)} MB/s`;
+  }, []);
+
+  const formatTorrentBytes = useCallback((value?: number) => {
+    const bytes = Number(value || 0);
+    if (!Number.isFinite(bytes) || bytes <= 0) return '0 MB';
+    const mb = bytes / 1024 / 1024;
+    if (mb < 1024) return `${mb.toFixed(mb >= 100 ? 0 : 1)} MB`;
+    const gb = mb / 1024;
+    return `${gb.toFixed(gb >= 100 ? 0 : 1)} GB`;
+  }, []);
+
+  const torrentProgressPercent = useMemo(() => {
+    const raw = Number(torrentLiveStats?.progress ?? 0);
+    if (!Number.isFinite(raw)) return 0;
+    return Math.max(0, Math.min(100, raw));
+  }, [torrentLiveStats?.progress]);
+
+  const torrentVerified = Boolean(torrentSessionId && torrentLiveStats?.done === true && torrentLiveStats?.verified !== false);
+  const torrentTimelineLocked = Boolean(torrentSessionId && !torrentVerified);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      if (!isDesktop || !torrentSessionId || !(window as any).tatakaiRuntime?.getTorrentStreamUrl) {
+        setTorrentPlaybackSource(null);
+        setTorrentPlaybackLoading(false);
+        setTorrentPlaybackError(null);
+        setTorrentLiveStats(null);
+        return;
+      }
+
+      setTorrentPlaybackLoading(true);
+      setTorrentPlaybackError(null);
+
+      try {
+        const stream = await (window as any).tatakaiRuntime.getTorrentStreamUrl(torrentSessionId);
+        if (cancelled) return;
+
+        if (!stream?.success || !stream.url) {
+          // If metadata is still resolving, we don't set a hard error yet
+          if (stream?.error === 'metadata_not_ready') {
+            setTorrentPlaybackError('Resolving torrent metadata...');
+          } else if (stream?.error === 'session_not_found') {
+            // Session might be lost (app restart), try to recover from history
+            const history = getLocalTorrentSessionHistory();
+            const session = history.find(s => s.sessionId === torrentSessionId);
+            const sessionStopped = Boolean(session && session.status !== 'active');
+
+            if (sessionStopped) {
+              setTorrentPlaybackError('Torrent session stopped.');
+              return;
+            }
+
+            if (session?.infoHash && (window as any).tatakaiRuntime?.startTorrentSession) {
+              setTorrentPlaybackError('Reconnecting to torrent session...');
+              try {
+                const restart = await (window as any).tatakaiRuntime.startTorrentSession(session.infoHash, {
+                  fileIndex: session.fileIndex,
+                  autoSelectLargest: session.fileIndex == null
+                });
+                if (restart?.sessionId && restart.sessionId !== torrentSessionId) {
+                  const params = new URLSearchParams(location.search);
+                  params.set('sessionId', restart.sessionId);
+                  navigate(`${location.pathname}?${params.toString()}`, { replace: true });
+                }
+
+                if (restart?.success) {
+                  setTorrentRetryTrigger(prev => prev + 1);
+                  return;
+                }
+
+                if (
+                  restart?.retryable ||
+                  restart?.error === 'metadata_timeout' ||
+                  restart?.error === 'metadata_files_pending' ||
+                  restart?.error === 'metadata_pending'
+                ) {
+                  setTorrentPlaybackError('Resolving torrent metadata...');
+                  setTimeout(() => {
+                    if (!cancelled) setTorrentRetryTrigger(prev => prev + 1);
+                  }, 2500);
+                  return;
+                }
+              } catch (e) {
+                console.error('Failed to auto-restart torrent session:', e);
+              }
+            }
+
+            setTorrentPlaybackError('Connecting to torrent session...');
+            setTimeout(() => {
+              if (!cancelled) setTorrentRetryTrigger(prev => prev + 1);
+            }, 1500);
+          } else if (stream?.error === 'prebuffer_timeout') {
+            // Prebuffer timed out, but we might have SOME data. The bridge handles this 
+            // but if it still fails, we show a specific message.
+            setTorrentPlaybackError('Buffering taking longer than expected. Please wait...');
+            setTimeout(() => {
+              if (!cancelled) setTorrentRetryTrigger(prev => prev + 1);
+            }, 2000);
+          } else if (stream?.error === 'transcode_not_ready') {
+            // Stream-bridge polls internally for up to 45s, so this should be rare.
+            // If it still appears, wait a bit longer before retrying.
+            setTorrentPlaybackError('Preparing video stream...');
+            setTimeout(() => {
+              if (!cancelled) setTorrentRetryTrigger(prev => prev + 1);
+            }, 3000);
+          } else if (stream?.error === 'transcode_timeout') {
+            // ffmpeg took over 45s to produce a manifest — retry once.
+            setTorrentPlaybackError('Stream preparation timed out. Retrying...');
+            setTimeout(() => {
+              if (!cancelled) setTorrentRetryTrigger(prev => prev + 1);
+            }, 3000);
+          } else {
+            // Generic failure - might be transient (e.g. tracker delay), retry up to 5 times
+            if (autoRepairCount < 8) {
+              setAutoRepairCount(prev => prev + 1);
+              setTorrentPlaybackError(`Stream connection failed (${stream?.error || 'unknown'}). Retrying...`);
+              setTimeout(() => {
+                if (!cancelled) setTorrentRetryTrigger(prev => prev + 1);
+              }, 1500);
+              return;
+            }
+            setTorrentPlaybackError(String(stream?.error || 'Failed to resolve torrent stream'));
+          }
+          return;
+        }
+
+        const streamUrl = String(stream.url);
+        if (Number.isFinite(Number(stream.fileIndex))) {
+          (window as any).currentFileIndex = Number(stream.fileIndex);
+        }
+        setTorrentPlaybackSource({
+          id: torrentSessionId,
+          url: streamUrl,
+          mode: 'torrent',
+          sourceType: 'torrent',
+          providerName: 'Torrent session',
+          providerKey: 'torrent-session',
+          isEmbed: false,
+          // When the runtime returns a remuxed HLS manifest, let the player auto-detect HLS.
+          // Mode detection also checks `url.includes('.m3u8')`, but this keeps it explicit.
+          isM3U8: Boolean((stream as any).isM3U8),
+        });
+        setTorrentLiveStats((current: any) => ({
+          ...(current || {}),
+          sessionId: torrentSessionId,
+          name: stream.name || current?.name,
+          fileName: stream.name || current?.fileName,
+          fileIndex: stream.fileIndex ?? current?.fileIndex,
+          infoHash: stream.infoHash || current?.infoHash,
+          rawUrl: (stream as any).rawUrl || current?.rawUrl,
+        }));
+      } catch (err: any) {
+        if (!cancelled) {
+          // Automatic Auto-Repair attempt for 'Failed to resolve'
+          if (autoRepairCount < 3 && (err?.message?.includes('resolve') || err?.message?.includes('timeout'))) {
+            setAutoRepairCount(prev => prev + 1);
+            setTorrentPlaybackError(`Stream unstable. Auto-repair attempt ${autoRepairCount + 1}/3...`);
+            setTimeout(() => {
+              if (!cancelled) setTorrentRetryTrigger(prev => prev + 1);
+            }, 1500);
+            return;
+          }
+
+          setTorrentPlaybackError(err?.message || 'Failed to resolve torrent stream');
+          setTorrentLiveStats((current: any) => ({
+            ...(current || {}),
+            sessionId: torrentSessionId,
+            error: err?.message || 'Failed to resolve torrent stream',
+          }));
+        }
+      } finally {
+        if (!cancelled) {
+          setTorrentPlaybackLoading(false);
+        }
+      }
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isDesktop, torrentSessionId, torrentRetryTrigger]);
+
+  useEffect(() => {
+    if (!isDesktop || !torrentSessionId || !(window as any).tatakaiRuntime) {
+      return;
+    }
+
+    let cancelled = false;
+    const runtime = (window as any).tatakaiRuntime;
+
+    // Listen for metadata-ready event to retry stream resolution
+    const stopMetadataReady = runtime.onTorrentMetadataReady?.((data: any) => {
+      if (data?.sessionId === torrentSessionId) {
+        setTorrentRetryTrigger(prev => prev + 1);
+        toast.success('Torrent metadata resolved! Starting stream...');
+      }
+    });
+
+    const refreshTorrentStats = async () => {
+      try {
+        const stats = await runtime.getTorrentStats?.(torrentSessionId);
+        if (!cancelled && stats?.success) {
+          setTorrentLiveStats((current: any) => ({
+            ...(current || {}),
+            ...stats,
+            sessionId: torrentSessionId,
+          }));
+        }
+      } catch {
+        // ignore transient polling failures
+      }
+    };
+
+    const stopProgress = runtime.onTorrentProgress?.((stats: any) => {
+      if (cancelled || stats?.sessionId !== torrentSessionId) return;
+      setTorrentLiveStats((current: any) => ({
+        ...(current || {}),
+        ...stats,
+        sessionId: torrentSessionId,
+      }));
+
+      if (stats?.availability === 'no_peers') {
+        setTorrentPlaybackError(stats.availabilityMessage || 'No peers or seeders found. Try another torrent release.');
+        return;
+      }
+
+      const transcodeStatus = String(stats?.transcode?.status || '').toLowerCase();
+      const transcodePercent = stats?.transcode?.percent;
+      if (transcodeStatus === 'running') {
+        const pctText = Number.isFinite(transcodePercent) ? ` (${Math.max(0, Math.min(99, Math.round(transcodePercent)))}%)` : '';
+        setTorrentPlaybackError(`Preparing multi-audio stream${pctText}...`);
+      } else if (transcodeStatus === 'ready') {
+        setTorrentPlaybackError((current: string | null) => (
+          current && current.toLowerCase().includes('preparing multi-audio stream') ? null : current
+        ));
+      } else if (transcodeStatus === 'error') {
+        setTorrentPlaybackError('Multi-audio stream preparation failed. Retrying...');
+      }
+    });
+
+    void refreshTorrentStats();
+    const interval = window.setInterval(refreshTorrentStats, 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      stopProgress?.();
+      stopMetadataReady?.();
+    };
+  }, [isDesktop, torrentSessionId]);
+
+  useEffect(() => {
+    if (!torrentSessionId) return;
+
+    const handleTorrentServiceRestarted = () => {
+      setTorrentPlaybackSource(null);
+      setTorrentLiveStats((current: any) => ({
+        ...(current || {}),
+        done: false,
+        verified: false,
+      }));
+      setTorrentPlaybackError('Torrent service restarted. Reconnecting...');
+      setTorrentRetryTrigger(prev => prev + 1);
+    };
+
+    window.addEventListener('tatakai-torrent-service-restarted', handleTorrentServiceRestarted);
+    return () => window.removeEventListener('tatakai-torrent-service-restarted', handleTorrentServiceRestarted);
+  }, [torrentSessionId]);
+
+  // ── Torrent completion → disconnect peers without stopping session ──────
+  // When the torrent finishes downloading, we disconnect from the swarm
+  // (disconnect peers) to stop upload/download activity. We keep the session
+  // alive so the local HTTP stream server can continue serving the file,
+  // which avoids Electron webSecurity blocking direct file:// protocol URLs.
+  useEffect(() => {
+    if (!isDesktop || !torrentSessionId) return;
+    if (!torrentLiveStats?.done) {
+      // Reset the completion flag when torrent is not done (e.g. new session)
+      torrentCompletionHandledRef.current = false;
+      return;
+    }
+    if (torrentCompletionHandledRef.current) return;
+    torrentCompletionHandledRef.current = true;
+
+    const runtime = (window as any).tatakaiRuntime;
+
+    const handleTorrentCompleted = async () => {
+      try {
+        console.log('[WatchPage] Torrent complete — disconnecting peers to stop swarm activity');
+
+        // Disconnect all peers from the completed torrent to save bandwidth
+        try {
+          if (runtime?.disconnectTorrentPeers) {
+            await runtime.disconnectTorrentPeers(torrentSessionId);
+            console.log('[WatchPage] Torrent peers disconnected after completion.');
+          } else {
+            console.warn('[WatchPage] disconnectTorrentPeers method not available on runtime.');
+          }
+        } catch (err: any) {
+          console.warn('[WatchPage] Failed to disconnect torrent peers:', err?.message);
+        }
+
+        // Clear any torrent error (e.g. buffering messages)
+        setTorrentPlaybackError(null);
+
+        // Update session history
+        try {
+          updateLocalTorrentSessionHistory(torrentSessionId, {
+            status: 'completed',
+            progress: 100,
+            endedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        } catch { /* ignore */ }
+
+        // Re-fetch stream URL so the player switches from HLS to the direct
+        // WebTorrent HTTP URL. The direct URL supports range requests, giving
+        // the player full native seeking capability without HLS limitations.
+        // Small delay to let the session manager recognize the completed state.
+        setTimeout(() => {
+          setTorrentRetryTrigger(prev => prev + 1);
+        }, 500);
+
+        toast.success('Download complete — playing from local file');
+      } catch (err: any) {
+        console.error('[WatchPage] Failed to handle torrent completion:', err);
+      }
+    };
+
+    void handleTorrentCompleted();
+  }, [isDesktop, torrentSessionId, torrentLiveStats?.done]);
+
   // Parse the episode ID properly - extract the actual episode ID
   const decodedEpisodeId = useMemo(() => {
     if (!episodeId) return "";
@@ -155,7 +578,7 @@ export default function WatchPage() {
   });
   const [selectedProviderServerKey, setSelectedProviderServerKey] = useState<string | null>(null);
   const [preferredServerName, setPreferredServerName] = useState<string | null>(() => {
-    const storedPreferred = getPreferredServer(animeId, "sub");
+    const storedPreferred = getPreferredServer(animeId);
     if (storedPreferred) return storedPreferred;
     // Check if there's a saved server preference from continue watching
     const savedHistory = getLocalContinueWatching();
@@ -172,12 +595,13 @@ export default function WatchPage() {
   const [offlineSubtitles, setOfflineSubtitles] = useState<Array<{ lang: string; url: string; label?: string }>>([]);
   const [dubProfile, setDubProfile] = useState<DubQualityProfile>(() => {
     try {
-      return (localStorage.getItem("watch-dub-quality-profile") as DubQualityProfile) || "stability";
+      return (localStorage.getItem("watch-dub-quality-profile") as DubQualityProfile) || "balanced";
     } catch {
-      return "stability";
+      return "balanced";
     }
   });
   const [showSourceDebug, setShowSourceDebug] = useState(false);
+  const [activeSourceLanguage, setActiveSourceLanguage] = useState("all");
   const [refererRetryIndex, setRefererRetryIndex] = useState(0);
   const [sourceReady, setSourceReady] = useState(true);
   const [sourcePreflightError, setSourcePreflightError] = useState<string | null>(null);
@@ -186,7 +610,7 @@ export default function WatchPage() {
   const [lockedSourceUrl, setLockedSourceUrl] = useState<string | null>(null);
   const [blockedSourceUrls, setBlockedSourceUrls] = useState<Record<string, number>>({});
   const [committedPlaybackSource, setCommittedPlaybackSource] = useState<any | null>(null);
-  const [committedPlaybackHeaders, setCommittedPlaybackHeaders] = useState<Record<string, string> | null>(null);
+  const [committedPlaybackHeaders, setCommittedPlaybackHeaders] = useState<{ Referer?: string; "User-Agent"?: string;[key: string]: string | undefined } | null>(null);
   const previousProviderCountRef = useRef<number | null>(null);
   const selectedServerNameRef = useRef<string | null>(null);
   const pendingPlaybackCommitRef = useRef(true);
@@ -199,9 +623,48 @@ export default function WatchPage() {
   }, [isDeveloperMode, showSourceDebug]);
 
   const { data: serversData, isLoading: loadingServers } =
-    useEpisodeServers(decodedEpisodeId);
-  const { data: animeData } = useAnimeInfo(animeId);
-  const { data: episodesData } = useEpisodes(animeId);
+    useEpisodeServers(isOfflineMode ? '' : decodedEpisodeId);
+  const isGenericTorrent = animeId.startsWith('torrent-') || animeId.startsWith('generic-');
+  // Also skip API calls for offline/imported local episode IDs
+  const isLocalOfflineEpisode = isOfflineMode || animeId.startsWith('local-') || animeId.startsWith('auto-') || animeId.startsWith('imported-');
+  const skipApiCalls = isGenericTorrent || isLocalOfflineEpisode;
+
+  // Load data - skip if it's a generic torrent or local offline episode to avoid unnecessary API calls
+  const { data: animeData } = useAnimeInfo(!skipApiCalls ? animeId : '');
+  const { data: episodesData } = useEpisodes(!skipApiCalls ? animeId : '');
+
+  // Update torrent session history
+  useEffect(() => {
+    if (torrentSessionId && torrentLiveStats?.name) {
+      const history = getLocalTorrentSessionHistory();
+      const existing = history.find((entry) => entry.sessionId === torrentSessionId);
+      const infoHash = torrentLiveStats.infoHash || existing?.infoHash;
+
+      const payload = {
+        infoHash,
+        torrentName: torrentLiveStats.name,
+        animeId,
+        animeName: animeData?.info?.name,
+        animePoster: animeData?.info?.poster,
+        episodeId: decodedEpisodeId,
+        fileName: torrentLiveStats.fileName || torrentLiveStats.name,
+        fileIndex: torrentLiveStats.fileIndex,
+        status: 'active' as const,
+        progress: torrentLiveStats.progress,
+        seeders: torrentLiveStats.seeders,
+        leechers: torrentLiveStats.leechers,
+      };
+
+      if (existing) {
+        updateLocalTorrentSessionHistory(torrentSessionId, payload);
+      } else {
+        upsertLocalTorrentSessionHistory({
+          sessionId: torrentSessionId,
+          ...payload,
+        });
+      }
+    }
+  }, [torrentSessionId, torrentLiveStats, animeData, animeId, decodedEpisodeId]);
 
   // View tracking
   const { data: viewCount } = useAnimeViewCount(animeId);
@@ -221,10 +684,27 @@ export default function WatchPage() {
     if (isOfflineMode && offlinePath) {
       const loadOfflineContent = async () => {
         try {
-          // In Offline mode, we need to read the manifest.json from the path
-          // Since we are in the frontend, we use Electron IPC
-          const response = await fetch(`file://${offlinePath}/manifest.json`);
-          const manifest = await response.json();
+          let manifest: any = null;
+          const electronBridge = (window as any).electron;
+          if (electronBridge?.getOfflineLibrary) {
+            const library = await electronBridge.getOfflineLibrary();
+            const entry = Array.isArray(library)
+              ? library.find((item: any) => String(item.path || '') === offlinePath)
+              : null;
+            if (entry) {
+              manifest = {
+                animeName: entry.name,
+                poster: entry.poster,
+                episodes: Array.isArray(entry.episodes) ? entry.episodes : [],
+              };
+            }
+          }
+
+          if (!manifest) {
+            const manifestUrl = toLocalFileUrl(joinLocalPath(offlinePath, 'manifest.json'));
+            const response = await fetch(manifestUrl);
+            manifest = await response.json();
+          }
           setOfflineManifest(manifest);
 
           // Try to find episode by ID first
@@ -249,23 +729,59 @@ export default function WatchPage() {
 
           if (ep) {
             console.log(`Loading offline episode: ${ep.id || ep.number} from ${offlinePath}/${ep.file}`);
+
+            // For Electron: convert local file path to HTTP stream URL via IPC.
+            // This enables Chromium to play MKV/AVI files with proper range request support.
+            let sourceUrl = toLocalFileUrl(joinLocalPath(offlinePath, ep.file));
+            const electronBridge = (window as any).electron;
+            if (electronBridge?.streamLocalFile) {
+              try {
+                const result = await electronBridge.streamLocalFile(sourceUrl);
+                if (result?.success && result.url) {
+                  sourceUrl = result.url;
+                  console.log(`[WatchPage] Streaming via HTTP: ${sourceUrl}`);
+                }
+              } catch (streamErr) {
+                console.warn('[WatchPage] streamLocalFile failed, falling back to direct URL:', streamErr);
+              }
+            }
+
             setOfflineSources([{
-              url: `file://${offlinePath}/${ep.file}`,
+              url: sourceUrl,
               isM3U8: false,
               quality: 'Downloaded'
             }]);
 
             // Load subtitles if available in manifest
             if (ep.subtitles && Array.isArray(ep.subtitles)) {
-              const subs = ep.subtitles.map((sub: any) => ({
-                lang: sub.lang,
-                label: sub.label || sub.lang,
-                url: `file://${offlinePath}/${sub.file}`
+              const subs = await Promise.all(ep.subtitles.map(async (sub: any) => {
+                const localSubPath = toLocalFileUrl(joinLocalPath(offlinePath, sub.file || sub.url));
+                let subUrl = localSubPath;
+
+                // For Electron: read subtitle file as data: URL via IPC
+                // data: URLs work reliably with <track> elements (no CORS issues)
+                const electronBridge = (window as any).electron;
+                if (electronBridge?.invoke) {
+                  try {
+                    const result = await electronBridge.invoke('media:read-local-file', localSubPath);
+                    if (result?.success && result.url) {
+                      subUrl = result.url;
+                    }
+                  } catch {
+                    // Fall back to HTTP stream URL
+                    if (electronBridge?.streamLocalFile) {
+                      try {
+                        const streamResult = await electronBridge.streamLocalFile(localSubPath);
+                        if (streamResult?.success && streamResult.url) subUrl = streamResult.url;
+                      } catch { /* keep original */ }
+                    }
+                  }
+                }
+                return { lang: sub.lang, label: sub.label || sub.lang, url: subUrl };
               }));
-              setOfflineSubtitles(subs);
-              console.log('Loaded offline subtitles:', subs);
+              setOfflineSubtitles(subs.filter((sub: any) => sub.url));
+              console.log('Loaded offline subtitles:', subs.length);
             } else {
-              // No subtitles available
               setOfflineSubtitles([]);
             }
           } else {
@@ -294,9 +810,9 @@ export default function WatchPage() {
 
   // Watch time analytics tracking
   const watchMetadata = useMemo(() => ({
-    animeName: animeData?.anime?.info?.name,
-    animePoster: animeData?.anime?.info?.poster,
-    genres: animeData?.anime?.moreInfo?.genres,
+    animeName: animeData?.info.name,
+    animePoster: animeData?.info.poster,
+    genres: animeData?.moreInfo.genres,
   }), [animeData]);
 
   useWatchTracking(animeId, decodedEpisodeId, watchMetadata);
@@ -346,6 +862,17 @@ export default function WatchPage() {
     };
   }, []);
 
+  const [refreshTrigger, setRefreshCounter] = useState(0);
+
+  const handleManualRefresh = useCallback(() => {
+    setFailedServers(new Set());
+    setRefreshCounter(prev => prev + 1);
+    setTorrentRetryTrigger(prev => prev + 1);
+    queryClient.invalidateQueries({ queryKey: ["servers", decodedEpisodeId] });
+    queryClient.invalidateQueries({ queryKey: ["sources", decodedEpisodeId] });
+    toast.success("Refreshing sources...");
+  }, [decodedEpisodeId, queryClient]);
+
   const availableServers = useMemo(() => {
     const rawServers = (category === "sub" ? serversData?.sub : serversData?.dub) || [];
     const dedupedServers = rawServers.filter((server, index, array) => {
@@ -354,7 +881,7 @@ export default function WatchPage() {
       return index === array.findIndex((candidate) => String(candidate.serverName || "").trim().toLowerCase() === normalized);
     });
 
-    const sorted = sortServersByHealth(dedupedServers, category, category === "dub" ? dubProfile : "stability");
+    const sorted = sortServersByHealth(dedupedServers);
     const pinServerFirst = (servers: typeof sorted, targetName: string) => {
       const target = String(targetName || "").trim().toLowerCase();
       if (!target) return servers;
@@ -452,7 +979,7 @@ export default function WatchPage() {
   useEffect(() => {
     if (availableServers.length > 0 && selectedServerIndex === -1) {
       const isEligible = (serverName: string) => {
-        const key = comboFailureKey(animeId, decodedEpisodeId, serverName, category);
+        const key = comboFailureKey(decodedEpisodeId, serverName, category);
         return !shouldAutoSkipSource(key);
       };
 
@@ -557,18 +1084,50 @@ export default function WatchPage() {
     return currentEpisodeIndex < (list?.length ?? 0) - 1 ? list?.[currentEpisodeIndex + 1] : null;
   }, [isOfflineMode, offlineManifest, episodesData, currentEpisodeIndex]);
 
+  // Keep combined source query stable so manual server selection doesn't trigger full refetch.
+  const combinedSourceServer = "hd-1";
+
   useEffect(() => {
     if (isOfflineMode || !nextEpisode?.episodeId) return;
     queryClient.prefetchQuery({
-      queryKey: ["servers", nextEpisode.episodeId],
-      queryFn: () => fetchEpisodeServers(nextEpisode.episodeId),
+      queryKey: [
+        "combined-sources",
+        nextEpisode.episodeId,
+        animeData?.info.name,
+        nextEpisode.number,
+        combinedSourceServer,
+        category,
+        user?.id,
+        (animeData as any)?.anilistID || animeData?.moreInfo.anilistId || null,
+        (animeData as any)?.malID || animeData?.moreInfo.malId || null,
+      ],
+      queryFn: () =>
+        fetchCombinedSources(
+          nextEpisode.episodeId,
+          animeData?.info.name,
+          nextEpisode.number,
+          combinedSourceServer,
+          category,
+          user?.id,
+          (animeData as any)?.anilistID || animeData?.moreInfo.anilistId || null,
+          (animeData as any)?.malID || animeData?.moreInfo.malId || null
+        ),
       staleTime: 2 * 60 * 1000,
     });
-  }, [isOfflineMode, nextEpisode?.episodeId, queryClient]);
+  }, [
+    animeData?.info.name,
+    animeData?.moreInfo.anilistId,
+    animeData?.moreInfo.malId,
+    category,
+    combinedSourceServer,
+    isOfflineMode,
+    nextEpisode?.episodeId,
+    nextEpisode?.number,
+    queryClient,
+    user?.id,
+  ]);
 
-  const discordDetails = animeData?.anime?.info?.name ?? null;
-  // Keep combined source query stable so manual server selection doesn't trigger full refetch.
-  const combinedSourceServer = "hd-1";
+  const discordDetails = animeData?.info.name ?? null;
 
   const {
     data: sourcesData,
@@ -578,13 +1137,13 @@ export default function WatchPage() {
     refetch: refetchSources,
   } = useCombinedSourcesWithRefetch(
     decodedEpisodeId,
-    animeData?.anime.info.name,
+    animeData?.info.name,
     currentEpisode?.number,
     combinedSourceServer,
     category,
     user?.id,
-    (animeData as any)?.anilistID || animeData?.anime?.moreInfo?.anilistId || null,
-    (animeData as any)?.malID || animeData?.anime?.moreInfo?.malId || null
+    (animeData as any)?.anilistID || animeData?.moreInfo.anilistId || null,
+    (animeData as any)?.malID || animeData?.moreInfo.malId || null
   );
 
   const { data: fastStartData, isLoading: loadingFastStart } = useQuery({
@@ -603,16 +1162,18 @@ export default function WatchPage() {
         outro: null,
       };
       try {
-        return await fetchStreamingSources(decodedEpisodeId, currentServer?.serverName || "hd-1", category, {
-          animeName: animeData?.anime?.info?.name,
-          anilistId: animeData?.anime?.moreInfo?.anilistId || null,
-        });
+        return await fetchCombinedSources(
+          decodedEpisodeId,
+          animeData?.info.name,
+          currentEpisode?.number,
+          currentServer?.serverName || "hd-1",
+          category,
+          user?.id,
+          (animeData as any)?.anilistID || animeData?.moreInfo.anilistId || null,
+          (animeData as any)?.malID || animeData?.moreInfo.malId || null
+        );
       } catch {
-        try {
-          return await fetchTatakaiEpisodeSources(decodedEpisodeId, currentServer?.serverName || "hd-1", category);
-        } catch {
-          return empty;
-        }
+        return empty;
       }
     },
   });
@@ -771,13 +1332,18 @@ export default function WatchPage() {
         outro: null,
       };
       try {
-        return await fetchStreamingSources(decodedEpisodeId, combinedSourceServer, "sub");
+        return await fetchCombinedSources(
+          decodedEpisodeId,
+          animeData?.info.name,
+          currentEpisode?.number,
+          combinedSourceServer,
+          "sub",
+          user?.id,
+          (animeData as any)?.anilistID || animeData?.moreInfo.anilistId || null,
+          (animeData as any)?.malID || animeData?.moreInfo.malId || null
+        );
       } catch {
-        try {
-          return await fetchTatakaiEpisodeSources(decodedEpisodeId, combinedSourceServer, "sub");
-        } catch {
-          return empty;
-        }
+        return empty;
       }
     },
   });
@@ -838,12 +1404,28 @@ export default function WatchPage() {
       });
     }
 
-    // Filter out thumbnails and only keep actual subtitle languages
-    return subs.filter(sub =>
-      sub.lang &&
-      sub.lang.toLowerCase() !== 'thumbnails' &&
-      !sub.url?.includes('thumbnails')
-    );
+    const languageRank = (sub: { lang?: string; label?: string }) => {
+      const value = `${sub.lang || ''} ${sub.label || ''}`.toLowerCase();
+      if (value.includes('english') || value.includes('eng') || value.trim() === 'en') return 0;
+      if (value.includes('japanese') || value.includes('jpn') || value.trim() === 'ja') return 1;
+      if (value.includes('hindi') || value.includes('hin') || value.trim() === 'hi') return 2;
+      return 10;
+    };
+
+    const seen = new Set<string>();
+    return subs
+      .filter(sub =>
+        sub.lang &&
+        sub.lang.toLowerCase() !== 'thumbnails' &&
+        !sub.url?.includes('thumbnails')
+      )
+      .filter((sub) => {
+        const key = `${String(sub.lang || '').toLowerCase()}|${String(sub.url || '').trim().toLowerCase()}`;
+        if (!String(sub.url || '').trim() || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .sort((left, right) => languageRank(left) - languageRank(right));
   }, [sourceDataForPlayback, subSourcesData, category]);
 
   // Select the appropriate source to play
@@ -881,10 +1463,10 @@ export default function WatchPage() {
       const candidatePool = isKoroServer
         ? visibleSources
         : visibleSources.filter((source) => {
-            const providerKey = String(source.providerKey || "").trim().toLowerCase();
-            const providerName = String(source.providerName || "").trim().toLowerCase();
-            return providerKey !== "justanime" && !providerName.includes("koro");
-          });
+          const providerKey = String(source.providerKey || "").trim().toLowerCase();
+          const providerName = String(source.providerName || "").trim().toLowerCase();
+          return providerKey !== "justanime" && !providerName.includes("koro");
+        });
       return selectSourceForServer(candidatePool, serverName, category);
     }
 
@@ -922,7 +1504,11 @@ export default function WatchPage() {
     setLockedSourceUrl(null);
   }, [lockedSourceUrl, isPlaybackSourceBlocked]);
 
-  const playbackHeaders = useMemo(() => {
+  const playbackHeaders = useMemo<{ Referer?: string; "User-Agent"?: string;[key: string]: string | undefined }>(() => {
+    if (torrentPlaybackSource) {
+      return {};
+    }
+
     const baseHeaders: { Referer?: string; "User-Agent"?: string } = (sourceDataForPlayback?.headers || {}) as { Referer?: string; "User-Agent"?: string };
     const variants = getRefererVariants(baseHeaders?.Referer);
     const chosenReferer = variants[Math.min(refererRetryIndex, Math.max(0, variants.length - 1))];
@@ -932,11 +1518,19 @@ export default function WatchPage() {
       Referer: chosenReferer || baseHeaders?.Referer,
       "User-Agent": baseHeaders?.["User-Agent"],
     };
-  }, [sourceDataForPlayback?.headers?.Referer, sourceDataForPlayback?.headers?.["User-Agent"], refererRetryIndex]);
+  }, [sourceDataForPlayback?.headers?.Referer, sourceDataForPlayback?.headers?.["User-Agent"], refererRetryIndex, torrentPlaybackSource]);
 
   const playbackCandidateSource = useMemo(() => {
-    return resolvedSelectedSource || null;
-  }, [resolvedSelectedSource]);
+    return torrentPlaybackSource || resolvedSelectedSource || null;
+  }, [torrentPlaybackSource, resolvedSelectedSource]);
+
+  const playbackSources = useMemo(() => {
+    if (torrentPlaybackSource) {
+      return [torrentPlaybackSource];
+    }
+
+    return visibleSources;
+  }, [torrentPlaybackSource, visibleSources]);
 
   useEffect(() => {
     if (!playbackCandidateSource) {
@@ -956,12 +1550,13 @@ export default function WatchPage() {
 
   const activePlaybackSource = committedPlaybackSource || playbackCandidateSource;
   const activePlaybackHeaders = committedPlaybackHeaders || playbackHeaders;
+  const playbackLoading = torrentPlaybackLoading || !playbackCandidateSource || !sourceReady;
 
   useEffect(() => {
     let cancelled = false;
 
     const runPreflight = async () => {
-      if (!activePlaybackSource || isOfflineMode || activePlaybackSource.isEmbed) {
+      if (!activePlaybackSource || isOfflineMode || activePlaybackSource.isEmbed || activePlaybackSource.sourceType === 'torrent') {
         setSourceReady(true);
         setSourcePreflightError(null);
         return;
@@ -1020,7 +1615,26 @@ export default function WatchPage() {
 
   // Separate Marketplace sources
   const marketplaceSources = useMemo(() => {
-    return visibleSources.filter(s => s.langCode?.startsWith('marketplace-'));
+    return visibleSources
+      .filter(s => s.langCode?.startsWith('marketplace-'))
+      .map((source: any) => {
+        const meta = (source?.metadata && typeof source.metadata === 'object') ? source.metadata : {};
+        return {
+          ...source,
+          sourceType: source.sourceType || meta.sourceType || (source.magnetLink || meta.magnet_link ? 'magnet' : undefined),
+          magnetLink: source.magnetLink || meta.magnet_link,
+          torrentFileUrl: source.torrentFileUrl || meta.torrent_file_url,
+          externalUrl: source.externalUrl || meta.external_url,
+          streamUrl: source.streamUrl || meta.stream_url || source.url,
+          quality: source.quality || meta.quality,
+          codec: source.codec || meta.codec,
+          audio: source.audio || meta.audio,
+          subtitleType: source.subtitleType || meta.subtitleType,
+          episodeRange: source.episodeRange || meta.episodeRange,
+          releaseGroup: source.releaseGroup || meta.releaseGroup,
+          notes: source.notes || meta.notes,
+        };
+      });
   }, [visibleSources]);
 
   const officialServerNameSet = useMemo(() => {
@@ -1148,13 +1762,30 @@ export default function WatchPage() {
     return buildUniqueSimpleNameMap(keys, fallbackByKey);
   }, [availableServers, languageGroups]);
 
+  // Language-tab filter — when activeSourceLanguage is not 'all', only show sources
+  // whose normalized language key matches the selected tab. This is a display-only
+  // filter and never affects the underlying source selection state.
+  const filteredLanguageGroups = useMemo<Record<string, any[]>>(() => {
+    if (activeSourceLanguage === "all") return languageGroups;
+    const filtered: Record<string, any[]> = {};
+    Object.entries(languageGroups).forEach(([lang, sources]) => {
+      const filteredSources = sources.filter(
+        (src) =>
+          normalizeWatchLanguageKey(src.language || src.audioLanguage || "") ===
+          activeSourceLanguage,
+      );
+      if (filteredSources.length > 0) filtered[lang] = filteredSources;
+    });
+    return filtered;
+  }, [languageGroups, activeSourceLanguage]);
+
   const isVerifiedProvider = (providerKey?: string, serverName?: string) => {
     const key = String(providerKey || '').toLowerCase();
     const name = String(serverName || '').toLowerCase();
-    
+
     // Strictly limited to official HiAnime/Tatakai servers only
     const verified = ['hianime', 'tatakaiapi'];
-    
+
     return verified.includes(key);
   };
 
@@ -1191,19 +1822,19 @@ export default function WatchPage() {
           console.debug('[WatchPage] Saving watch history with IDs:', {
             animeId,
             episodeId: decodedEpisodeId,
-            malID: sourcesData?.malID || animeData?.anime?.moreInfo?.malId,
-            anilistID: sourcesData?.anilistID || animeData?.anime?.moreInfo?.anilistId,
+            malID: sourcesData?.malID || animeData?.moreInfo.malId,
+            anilistID: sourcesData?.anilistID || animeData?.moreInfo.anilistId,
           });
           await updateWatchHistory.mutateAsync({
             animeId,
-            animeName: animeData.anime.info.name,
-            animePoster: animeData.anime.info.poster,
+            animeName: animeData?.info.name || 'Unknown Anime',
+            animePoster: animeData?.info.poster || '',
             episodeId: decodedEpisodeId,
             episodeNumber: currentEpisode.number,
             progressSeconds: 0,
             durationSeconds: 0,
-            malId: sourcesData?.malID || animeData?.anime?.moreInfo?.malId || null,
-            anilistId: sourcesData?.anilistID || animeData?.anime?.moreInfo?.anilistId || null,
+            malId: sourcesData?.malID || animeData?.moreInfo.malId || null,
+            anilistId: sourcesData?.anilistID || animeData?.moreInfo.anilistId || null,
             isLastEpisode: !nextEpisode,
           });
         } catch (e) {
@@ -1213,8 +1844,8 @@ export default function WatchPage() {
       } else {
         updateLocalContinueWatching({
           animeId,
-          animeName: animeData.anime.info.name,
-          animePoster: animeData.anime.info.poster,
+          animeName: animeData?.info.name || 'Unknown Anime',
+          animePoster: animeData?.info.poster || '',
           episodeId: decodedEpisodeId,
           episodeNumber: currentEpisode.number,
           progressSeconds: 0,
@@ -1226,29 +1857,12 @@ export default function WatchPage() {
     return () => clearTimeout(timeout);
   }, [user, animeData, currentEpisode, animeId, decodedEpisodeId, updateWatchHistory, sourcesData]);
 
-  // Update Discord RPC
+  // Discord RPC is driven by VideoPlayer (elapsed/status). Clear on leave.
   useEffect(() => {
-    if (isNative && (window as any).electron && animeData) {
-      const details = `Watching ${animeData.anime.info.name}`;
-      const state = `Episode ${currentEpisode?.number || '...'}`;
-
-      const extra: any = {
-        startTime: new Date(),
-        smallImageKey: 'play_icon',
-        smallImageText: 'Playing'
-      };
-
-      // If we have duration, we can show end time
-      // But we don't have it easily here without the player ref
-      // We'll update it from the Player component instead for better accuracy
-
-      (window as any).electron.updateRPC({
-        details,
-        state,
-        extra
-      });
-    }
-  }, [isNative, animeData, currentEpisode]);
+    return () => {
+      if (isNative) clearDiscordRpc();
+    };
+  }, [isNative]);
 
   // Auto-switch to next working server on error
   const errorThrottleRef = useRef(0);
@@ -1520,6 +2134,10 @@ export default function WatchPage() {
     forceRefreshLockUntilRef.current = now + 3000;
     forceRefreshInFlightRef.current = true;
 
+    setFailedServers(new Set());
+    setTorrentRetryTrigger(prev => prev + 1);
+    toast.success("Refreshing servers...");
+
     try {
       clearCachedCombinedSourcesByEpisodeAndCategory(decodedEpisodeId, category);
       await queryClient.invalidateQueries({
@@ -1553,7 +2171,7 @@ export default function WatchPage() {
       to: nextCategory,
     });
 
-    logPlaybackTelemetry({
+    logPlaybackTelemetry("category_switch", {
       type: "category_switch",
       animeId,
       episodeId: decodedEpisodeId,
@@ -1572,29 +2190,33 @@ export default function WatchPage() {
 
   // Progress update callback for VideoPlayer - must be defined outside JSX
   const handleProgressUpdate = useCallback((progressSeconds: number, durationSeconds: number, completed?: boolean) => {
+    // Track playback time for seamless torrent completion source switch
+    if (Number.isFinite(progressSeconds) && progressSeconds > 0) {
+      lastPlaybackTimeRef.current = progressSeconds;
+    }
     if (!animeData || !currentEpisode) return;
     try {
       if (user) {
         // Use mutateAsync to avoid triggering re-renders during render
         updateWatchHistory.mutateAsync({
           animeId,
-          animeName: animeData.anime.info.name,
-          animePoster: animeData.anime.info.poster,
+          animeName: animeData.info.name,
+          animePoster: animeData.info.poster,
           episodeId: decodedEpisodeId,
           episodeNumber: currentEpisode.number,
           progressSeconds: progressSeconds,
           durationSeconds: durationSeconds,
           completed: !!completed,
-          malId: sourcesData?.malID || animeData?.anime?.moreInfo?.malId || null,
-          anilistId: sourcesData?.anilistID || animeData?.anime?.moreInfo?.anilistId || null,
+          malId: sourcesData?.malID || animeData?.moreInfo.malId || null,
+          anilistId: sourcesData?.anilistID || animeData?.moreInfo.anilistId || null,
           isLastEpisode: !nextEpisode,
         }).catch(e => console.warn('Failed to save progress to DB:', e));
       }
       // Always save to localStorage (for server preference and as backup)
       updateLocalContinueWatching({
         animeId,
-        animeName: animeData.anime.info.name,
-        animePoster: animeData.anime.info.poster,
+        animeName: animeData.info.name,
+        animePoster: animeData?.info.poster || '',
         episodeId: decodedEpisodeId,
         episodeNumber: currentEpisode.number,
         progressSeconds: progressSeconds,
@@ -1622,18 +2244,55 @@ export default function WatchPage() {
     }
   };
 
-  // Reset failed servers when category changes - also reset to find hd-1 again
+  // Background session management
   useEffect(() => {
-    if (failoverTimeoutRef.current !== null) {
-      window.clearTimeout(failoverTimeoutRef.current);
-      failoverTimeoutRef.current = null;
-    }
-    setFailedServers(new Set());
-    selectRegularServer(-1); // Reset to let auto-select logic find hd-1
-    setSelectedProviderServerKey(null);
-    setRefererRetryIndex(0);
-    setPreferredServerName(getPreferredServer(animeId, category));
-  }, [category, animeId]);
+    if (!torrentSessionId || !isDesktop) return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // If there's an active torrent, prompt the user
+      const pref = localStorage.getItem('tatakai_torrent_bg_behavior') || 'prompt';
+      if (pref === 'keep') return;
+      if (pref === 'stop') {
+        (window as any).tatakaiRuntime?.stopTorrentSession?.(torrentSessionId);
+        updateLocalTorrentSessionHistory(torrentSessionId, {
+          status: 'stopped',
+          endedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        return;
+      }
+
+      e.preventDefault();
+      e.returnValue = 'You have an active torrent session. Do you want to keep it running in the background?';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [torrentSessionId, isDesktop]);
+
+  // Handle navigation within the app
+  useEffect(() => {
+    if (!torrentSessionId || !isDesktop) return;
+
+    return () => {
+      // This runs when the component unmounts (navigation away)
+      const pref = localStorage.getItem('tatakai_torrent_bg_behavior') || 'prompt';
+      if (pref === 'keep') return;
+      if (pref === 'stop') {
+        (window as any).tatakaiRuntime?.stopTorrentSession?.(torrentSessionId);
+        updateLocalTorrentSessionHistory(torrentSessionId, {
+          status: 'stopped',
+          endedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        return;
+      }
+
+      // If prompt, we can't easily show a standard confirm here because it's async and navigation is already happening
+      // For now, we'll default to 'keep' but notify the user
+      toast.info('Torrent session is running in the background. You can stop it from the Home page or Settings.');
+    };
+  }, [torrentSessionId, isDesktop]);
 
   useEffect(() => {
     setRefererRetryIndex(0);
@@ -1641,7 +2300,7 @@ export default function WatchPage() {
 
   useEffect(() => {
     if (!sourceReady || !currentServer) return;
-    const comboKey = comboFailureKey(animeId, decodedEpisodeId, currentServer.serverName, category);
+    const comboKey = comboFailureKey(decodedEpisodeId, currentServer.serverName, category);
     clearSourceFailure(comboKey);
   }, [sourceReady, currentServer?.serverName, animeId, decodedEpisodeId, category]);
 
@@ -1649,6 +2308,21 @@ export default function WatchPage() {
     if (settings.autoNextEpisode && nextEpisode?.episodeId) {
       handleEpisodeChange(nextEpisode.episodeId);
       return;
+    }
+
+    if (isDesktop && torrentSessionId && (window as any).tatakaiRuntime?.stopTorrentSession) {
+      const keepCompletedFile = Boolean(torrentLiveStats?.done || torrentProgressPercent >= 100);
+      const destroyStore = Boolean(optimizeTorrentStorage && !keepCompletedFile);
+      void (window as any).tatakaiRuntime.stopTorrentSession(torrentSessionId, { destroyStore }).catch(() => { });
+    }
+
+    if (torrentSessionId) {
+      updateLocalTorrentSessionHistory(torrentSessionId, {
+        status: 'completed',
+        endedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        progress: 100,
+      });
     }
 
     setShowReviewPopup(true);
@@ -1659,7 +2333,10 @@ export default function WatchPage() {
       <Background />
       <Sidebar />
 
-      <main className="relative z-10 pl-4 md:pl-32 pr-4 md:pr-6 py-4 md:py-6 max-w-[1800px] mx-auto pb-24 md:pb-6">
+      <main className={cn(
+        "relative z-10 pr-4 md:pr-6 py-4 md:py-6 max-w-[1800px] mx-auto pb-24 md:pb-6",
+        isDesktop ? "pl-4 md:pl-6" : "pl-4 md:pl-32"
+      )}>
         {/* Header */}
         <div className="flex items-center justify-between gap-2 mb-4 md:mb-6">
           <button
@@ -1673,7 +2350,7 @@ export default function WatchPage() {
           {animeData && (
             <div className="flex-1 min-w-0 text-right flex flex-col items-end gap-2">
               <span className="font-medium text-foreground text-sm md:text-base truncate block">
-                {animeData?.anime.info.name || offlineManifest?.animeName}
+                {animeData?.info.name || offlineManifest?.animeName}
               </span>
               <div className="flex items-center gap-4">
                 {viewCount !== undefined && viewCount > 0 && (
@@ -1688,83 +2365,102 @@ export default function WatchPage() {
         </div>
 
         {/* Main Content - Stack on mobile, grid on desktop */}
-        <div className="flex flex-col xl:grid xl:grid-cols-12 gap-4 md:gap-6">
+        <div className={cn(
+          "flex flex-col gap-4 md:gap-6",
+          !isGenericTorrent && "xl:grid xl:grid-cols-12"
+        )}>
           {/* Video Player Column */}
-          <div className="xl:col-span-9 space-y-4 md:space-y-6">
-            {/* Video Player */}
+          <div className={cn(
+            "space-y-4 md:space-y-6",
+            !isGenericTorrent ? "xl:col-span-9" : "w-full"
+          )}>
+            {/* Torrent status moved to sticky banner (see TorrentStickyBanner) */}
+
             <div className="rounded-xl md:rounded-2xl overflow-hidden border border-border/30 bg-card/60">
 
               {/* Render EmbedPlayer for embed sources */}
               {activePlaybackSource?.isEmbed ? (
                 <EmbedPlayer
                   url={activePlaybackSource.url}
-                  poster={animeData?.anime.info.poster}
+                  poster={animeData?.info.poster}
                   language={activePlaybackSource.language}
                   onError={handleVideoError}
                 />
               ) : isMobileApp ? (
                 <MobileVideoPlayer
-                  sources={
-                    isOfflineMode
-                      ? offlineSources
-                      : (activePlaybackSource && !activePlaybackSource.isEmbed
-                        ? [activePlaybackSource]
-                        : (sourceDataForPlayback?.sources || []))
-                  }
+                  sources={isOfflineMode ? offlineSources : playbackSources}
                   subtitles={isOfflineMode ? offlineSubtitles : normalizedSubtitles}
                   headers={activePlaybackHeaders}
-                  poster={animeData?.anime.info.poster || (isOfflineMode ? `file://${offlinePath}/poster.jpg` : undefined)}
+                  poster={animeData?.info.poster || (isOfflineMode ? toLocalFileUrl(joinLocalPath(offlinePath, 'poster.jpg')) : undefined)}
                   onError={handleVideoError}
                   onServerSwitch={handleServerSwitch}
                   onRetryCurrentServer={handleRetryCurrentServer}
-                  isLoading={!isOfflineMode && loadingSources && loadingFastStart && !(sourceDataForPlayback?.sources?.length)}
+                  isLoading={isOfflineMode ? false : playbackLoading}
                   serverName={activeServerDisplayName}
-                  malId={sourcesData?.malID || animeData?.anime?.moreInfo?.malId}
-                  episodeNumber={serversData?.episodeNo || currentEpisode?.number || (isOfflineMode ? offlineManifest?.episodes.find((e: any) => e.id === decodedEpisodeId)?.number : undefined)}
+                  malId={sourcesData?.malID || animeData?.moreInfo.malId}
+                  episodeNumber={currentEpisode?.number || (isOfflineMode ? offlineManifest?.episodes.find((e: any) => e.id === decodedEpisodeId)?.number : undefined)}
                   introWindow={sourceDataForPlayback?.intro || null}
                   outroWindow={sourceDataForPlayback?.outro || null}
                   initialSeekSeconds={initialSeekSeconds}
                   onProgressUpdate={handleProgressUpdate}
                   animeId={animeId}
-                  animeName={animeData?.anime.info.name || (isOfflineMode ? offlineManifest?.animeName : '')}
-                  animePoster={animeData?.anime.info.poster || (isOfflineMode ? `file://${offlinePath}/poster.jpg` : undefined)}
+                  animeName={animeData?.info.name || (isOfflineMode ? offlineManifest?.animeName : '')}
+                  animePoster={animeData?.info.poster || (isOfflineMode ? toLocalFileUrl(joinLocalPath(offlinePath, 'poster.jpg')) : undefined)}
                   episodeTitle={currentEpisode?.title || (isOfflineMode ? offlineManifest?.episodes.find((e: any) => e.id === decodedEpisodeId)?.title : undefined)}
                   episodeId={decodedEpisodeId}
                   onEpisodeEnd={handleEpisodeEnd}
                   onBack={() => navigate(-1)}
+                  hideTimelineUi={Boolean(torrentSessionId && !torrentVerified)}
                   isOffline={isOfflineMode}
                 />
               ) : (
                 <VideoPlayer
-                  sources={
-                    isOfflineMode
-                      ? offlineSources
-                      : (activePlaybackSource && !activePlaybackSource.isEmbed
-                        ? [activePlaybackSource]
-                        : (sourceDataForPlayback?.sources || []))
-                  }
+                  sources={isOfflineMode ? offlineSources : playbackSources}
                   subtitles={isOfflineMode ? offlineSubtitles : normalizedSubtitles}
                   headers={activePlaybackHeaders}
-                  poster={animeData?.anime.info.poster || (isOfflineMode ? `file://${offlinePath}/poster.jpg` : undefined)}
+                  poster={animeData?.info.poster || (isOfflineMode ? toLocalFileUrl(joinLocalPath(offlinePath, 'poster.jpg')) : undefined)}
                   onError={handleVideoError}
                   onServerSwitch={handleServerSwitch}
                   onRetryCurrentServer={handleRetryCurrentServer}
-                  isLoading={!isOfflineMode && loadingSources && loadingFastStart && !(sourceDataForPlayback?.sources?.length)}
+                  isLoading={isOfflineMode ? false : playbackLoading}
                   serverName={activeServerDisplayName}
-                  malId={sourcesData?.malID || animeData?.anime?.moreInfo?.malId}
-                  episodeNumber={serversData?.episodeNo || currentEpisode?.number || (isOfflineMode ? offlineManifest?.episodes.find((e: any) => e.id === decodedEpisodeId)?.number : undefined)}
+                  malId={sourcesData?.malID || animeData?.moreInfo.malId}
+                  episodeNumber={currentEpisode?.number || (isOfflineMode ? offlineManifest?.episodes.find((e: any) => e.id === decodedEpisodeId)?.number : undefined)}
                   introWindow={sourceDataForPlayback?.intro || null}
                   outroWindow={sourceDataForPlayback?.outro || null}
                   initialSeekSeconds={initialSeekSeconds}
                   viewCount={viewCount}
                   onProgressUpdate={handleProgressUpdate}
                   animeId={animeId}
-                  animeName={animeData?.anime.info.name || (isOfflineMode ? offlineManifest?.animeName : '')}
-                  animePoster={animeData?.anime.info.poster || (isOfflineMode ? `file://${offlinePath}/poster.jpg` : undefined)}
+                  animeName={animeData?.info.name || (isOfflineMode ? offlineManifest?.animeName : '')}
+                  animePoster={animeData?.info.poster || (isOfflineMode ? toLocalFileUrl(joinLocalPath(offlinePath, 'poster.jpg')) : undefined)}
                   episodeTitle={currentEpisode?.title || (isOfflineMode ? offlineManifest?.episodes.find((e: any) => e.id === decodedEpisodeId)?.title : undefined)}
                   episodeId={decodedEpisodeId}
                   onEpisodeEnd={handleEpisodeEnd}
+                  isTimelineLocked={torrentTimelineLocked}
+                  timelineLockReason="Torrent seeking unlocks after the file has fully downloaded and verified."
+                  hideTimelineUi={Boolean(torrentSessionId && !torrentVerified)}
                   isOffline={isOfflineMode}
+                  torrentStats={torrentLiveStats || undefined}
+                  torrentSessionId={torrentSessionId || undefined}
+                  onTorrentRepair={async () => {
+                    try {
+                      await (window as any).tatakaiRuntime?.reannounceTorrent?.(torrentSessionId);
+                      toast.success('Repair requested');
+                    } catch (e) {
+                      toast.error('Repair failed');
+                    }
+                  }}
+                  onTorrentStop={async () => {
+                    try {
+                      await (window as any).tatakaiRuntime?.stopTorrentSession?.(torrentSessionId, { removeData: false });
+                      toast.success('Torrent stopped');
+                      setTorrentLiveStats(null);
+                      setTorrentPlaybackSource(null);
+                    } catch (e) {
+                      toast.error('Failed to stop torrent');
+                    }
+                  }}
                 />
               )}
             </div>
@@ -1773,55 +2469,60 @@ export default function WatchPage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
                 <h1 className="font-display text-lg md:text-2xl font-bold">
-                  Episode {currentEpisode?.number || serversData?.episodeNo || (isOfflineMode ? offlineManifest?.episodes.find((e: any) => e.id === decodedEpisodeId)?.number : "?")}
+                  {isGenericTorrent
+                    ? (torrentLiveStats?.name || 'Torrent Content')
+                    : `Episode ${currentEpisode?.number || (isOfflineMode ? offlineManifest?.episodes.find((e: any) => e.id === decodedEpisodeId)?.number : "?")}`
+                  }
                 </h1>
-                {currentEpisode?.title && (
+                {!isGenericTorrent && currentEpisode?.title && (
                   <p className="text-muted-foreground text-sm mt-1 line-clamp-1">
                     {currentEpisode.title}
                   </p>
                 )}
               </div>
 
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                {/* Secondary Actions */}
-                <div className="flex items-center gap-1 mr-2 px-2 border-r border-white/10">
-                  <button
-                    onClick={() => setIsReportModalOpen(true)}
-                    className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                    title="Report issue"
-                  >
-                    <Flag className="w-4 h-4" />
-                  </button>
-                </div>
-
+              {!isGenericTorrent && (
                 <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <button
-                    onClick={() =>
-                      prevEpisode && handleEpisodeChange(prevEpisode.episodeId)
-                    }
-                    disabled={!prevEpisode}
-                    className="flex-1 sm:flex-none h-10 px-3 md:px-4 rounded-xl bg-muted hover:bg-muted/80 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all text-sm"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                    <span>Prev</span>
-                  </button>
+                  {/* Secondary Actions */}
+                  <div className="flex items-center gap-1 mr-2 px-2 border-r border-white/10">
+                    <button
+                      onClick={() => setIsReportModalOpen(true)}
+                      className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                      title="Report issue"
+                    >
+                      <Flag className="w-4 h-4" />
+                    </button>
+                  </div>
 
-                  <button
-                    onClick={() =>
-                      nextEpisode && handleEpisodeChange(nextEpisode.episodeId)
-                    }
-                    disabled={!nextEpisode}
-                    className="flex-1 sm:flex-none h-10 px-3 md:px-4 rounded-xl bg-primary hover:bg-primary/80 text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all text-sm"
-                  >
-                    <span>Next</span>
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <button
+                      onClick={() =>
+                        prevEpisode && handleEpisodeChange(prevEpisode.episodeId)
+                      }
+                      disabled={!prevEpisode}
+                      className="flex-1 sm:flex-none h-10 px-3 md:px-4 rounded-xl bg-muted hover:bg-muted/80 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all text-sm"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      <span>Prev</span>
+                    </button>
+
+                    <button
+                      onClick={() =>
+                        nextEpisode && handleEpisodeChange(nextEpisode.episodeId)
+                      }
+                      disabled={!nextEpisode}
+                      className="flex-1 sm:flex-none h-10 px-3 md:px-4 rounded-xl bg-primary hover:bg-primary/80 text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all text-sm"
+                    >
+                      <span>Next</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
-            {/* Server & Category Selection - Hide in offline mode */}
-            {!isOfflineMode && (
+            {/* Server & Category Selection - Hide in offline mode or generic torrent */}
+            {!isOfflineMode && !isGenericTorrent && (
               <GlassPanel className="p-4 md:p-5">
                 <div className="flex flex-col gap-4 md:gap-6">
                   {/* Category Toggle */}
@@ -1933,12 +2634,12 @@ export default function WatchPage() {
                               if (!server.isProviderServer && serverLabel === 'TatakaiAPI' && availableServers.length > 1) return null;
 
                               const serverSource = visibleSources.length
-                                ? selectSourceForServer(visibleSources, server.serverName, category)
+                                ? selectSourceForServer(visibleSources, server.serverName)
                                 : null;
                               const nextEstimate = getNextEpisodeEstimate(serverSource);
-                              const comboKey = comboFailureKey(animeId, decodedEpisodeId, server.serverName, category);
+                              const comboKey = comboFailureKey(decodedEpisodeId, server.serverName, category);
                               const failCount = getSourceFailureCount(comboKey);
-                              const healthScore = getSourceHealthScore(server.serverName, category);
+                              const healthScore = getSourceHealthScore(server.serverName);
                               const workingState = failCount >= 2 || failedServers.has(server.serverName) ? "Not working" : "Working";
                               const serverDescription = `${workingState} • Health ${healthScore}/100 • Fails ${failCount} • Source ${server.serverName}${serverSource?.url ? ` • ${getUrlHost(serverSource.url)}` : ""}`;
 
@@ -1953,7 +2654,7 @@ export default function WatchPage() {
                                           setSelectedProviderServerKey(null);
                                           setPreferredServerName(null);
                                           setFailedServers(new Set());
-                                          setPreferredServer(animeId, category, server.serverName);
+                                          setPreferredServer(server.serverName);
                                           setRefererRetryIndex(0);
                                         }}
                                         title={serverDescription}
@@ -2020,7 +2721,18 @@ export default function WatchPage() {
                         </div>
 
                         {/* Language Groups (Categorized External Sources) */}
-                        {Object.entries(languageGroups).map(([lang, sources]) => (
+                        <SourceLanguageTabs
+                          sources={visibleSources.filter(
+                            (src) =>
+                              !isOfficialSource(src) &&
+                              !!src.providerName &&
+                              src.providerName !== "TatakaiAPI" &&
+                              !src.langCode?.startsWith("marketplace-"),
+                          )}
+                          activeLanguage={activeSourceLanguage}
+                          onLanguageChange={setActiveSourceLanguage}
+                        />
+                        {Object.entries(filteredLanguageGroups).map(([lang, sources]) => (
                           <div key={lang} className="flex flex-col gap-2">
                             <div className="text-xs text-muted-foreground font-medium flex items-center gap-2">
                               <div className="w-1.5 h-1.5 rounded-full bg-primary" />
@@ -2034,9 +2746,9 @@ export default function WatchPage() {
                                 const nextEstimate = getNextEpisodeEstimate(source);
                                 const label = getSimpleSourceLabel(source, `${lang}-${sIdx}`);
                                 const sourceServerName = source.server || source.providerKey || source.langCode || source.providerName || `source-${sIdx}`;
-                                const sourceComboKey = comboFailureKey(animeId, decodedEpisodeId, sourceServerName, category);
+                                const sourceComboKey = comboFailureKey(decodedEpisodeId, sourceServerName, category);
                                 const failCount = getSourceFailureCount(sourceComboKey);
-                                const healthScore = getSourceHealthScore(sourceServerName, category);
+                                const healthScore = getSourceHealthScore(sourceServerName);
                                 const workingState = failCount >= 2 ? "Not working" : "Working";
                                 const hoverInfo = `${workingState} • Health ${healthScore}/100 • Fails ${failCount} • Source ${sourceServerName} • ${getUrlHost(source.url)}`;
 
@@ -2061,13 +2773,17 @@ export default function WatchPage() {
                                         >
                                           {source.isEmbed ? <Globe className="w-3 h-3" /> : <Server className="w-3 h-3 text-muted-foreground" />}
                                           {label}
+                                          <SourceTypeBadge
+                                            isM3U8={source.isM3U8}
+                                            isEmbed={source.isEmbed}
+                                            sourceType={source.sourceType}
+                                          />
                                           {isVerifiedProvider(source.providerKey, source.server || source.providerName) && (
                                             <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-primary/20 text-[9px] font-bold text-primary border border-primary/30 ml-auto animate-in fade-in slide-in-from-right-2">
                                               <CircleCheck className="w-2.5 h-2.5" />
                                               <span>VERIFIED</span>
                                             </div>
                                           )}
-                                          {source.isM3U8 && <span className="text-[10px] opacity-60 font-mono tracking-tighter">HLS</span>}
                                         </button>
                                       </TooltipTrigger>
                                       <TooltipContent side="top" className="max-w-xs bg-background/95 backdrop-blur-xl border-white/10 shadow-2xl">
@@ -2105,7 +2821,7 @@ export default function WatchPage() {
                               No available servers found for this episode.
                             </p>
                             <button
-                                onClick={handleForceRefreshSources}
+                              onClick={handleForceRefreshSources}
                               className="mt-3 text-xs bg-primary/10 hover:bg-primary/20 text-primary px-3 py-1.5 rounded-lg font-bold transition-all"
                             >
                               Try Fetching Again
@@ -2132,121 +2848,123 @@ export default function WatchPage() {
           </div>
 
           {/* Sidebar - Episode List */}
-          <div className="xl:col-span-3">
-            <GlassPanel className="p-4 md:p-5 max-h-[400px] xl:max-h-[700px] flex flex-col">
-              <div className="flex items-center gap-3 mb-3 md:mb-4">
-                <ListVideo className="w-5 h-5 text-primary" />
-                <h3 className="font-display text-base md:text-lg font-semibold">Episodes</h3>
-                <span className="ml-auto text-xs md:text-sm text-muted-foreground">
-                  {episodesData?.totalEpisodes || 0}
-                </span>
-              </div>
+          {!isGenericTorrent && (
+            <div className="xl:col-span-3">
+              <GlassPanel className="p-4 md:p-5 max-h-[400px] xl:max-h-[700px] flex flex-col">
+                <div className="flex items-center gap-3 mb-3 md:mb-4">
+                  <ListVideo className="w-5 h-5 text-primary" />
+                  <h3 className="font-display text-base md:text-lg font-semibold">Episodes</h3>
+                  <span className="ml-auto text-xs md:text-sm text-muted-foreground">
+                    {episodesData?.totalEpisodes || 0}
+                  </span>
+                </div>
 
-              {/* Episode Range Selector for 50+ episodes */}
-              {(episodesData?.totalEpisodes || 0) > 50 && (
-                <div className="mb-3 space-y-2">
-                  {/* Episode search */}
-                  <div className="relative">
-                    <input
-                      type="number"
-                      placeholder="Jump to episode..."
-                      min={1}
-                      max={episodesData?.totalEpisodes}
-                      className="w-full h-8 px-3 rounded-lg bg-muted/50 border border-border text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          const target = e.target as HTMLInputElement;
-                          const epNum = parseInt(target.value);
-                          if (epNum && episodesData) {
-                            const ep = episodesData.episodes.find(ep => ep.number === epNum);
-                            if (ep) {
-                              handleEpisodeChange(ep.episodeId);
-                              target.value = '';
+                {/* Episode Range Selector for 50+ episodes */}
+                {(episodesData?.totalEpisodes || 0) > 50 && (
+                  <div className="mb-3 space-y-2">
+                    {/* Episode search */}
+                    <div className="relative">
+                      <input
+                        type="number"
+                        placeholder="Jump to episode..."
+                        min={1}
+                        max={episodesData?.totalEpisodes}
+                        className="w-full h-8 px-3 rounded-lg bg-muted/50 border border-border text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            const target = e.target as HTMLInputElement;
+                            const epNum = parseInt(target.value);
+                            if (epNum && episodesData) {
+                              const ep = episodesData.episodes.find(ep => ep.number === epNum);
+                              if (ep) {
+                                handleEpisodeChange(ep.episodeId);
+                                target.value = '';
+                              }
                             }
                           }
+                        }}
+                      />
+                    </div>
+                    {/* Range buttons */}
+                    <div className="flex flex-wrap gap-1">
+                      {Array.from({ length: Math.ceil((episodesData?.totalEpisodes || 0) / 50) }).map((_, idx) => {
+                        const start = idx * 50 + 1;
+                        const end = Math.min((idx + 1) * 50, episodesData?.totalEpisodes || 0);
+                        const currentEp = currentEpisode?.number || 1;
+                        const isActive = currentEp >= start && currentEp <= end;
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => {
+                              // Scroll to range
+                              const container = document.getElementById('episode-list-container');
+                              const firstEpInRange = episodesData?.episodes.find(ep => ep.number === start);
+                              if (container && firstEpInRange) {
+                                const epEl = document.getElementById(`ep-${firstEpInRange.episodeId}`);
+                                epEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                              }
+                            }}
+                            className={`px-2 py-1 text-xs rounded ${isActive
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-muted/50 hover:bg-muted'
+                              }`}
+                          >
+                            {start}-{end}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div id="episode-list-container" className="flex-1 overflow-y-auto space-y-1.5 md:space-y-2 pr-2 scrollbar-thin">
+                  {(isOfflineMode ? offlineManifest?.episodes : episodesData?.episodes)?.map((ep: any) => (
+                    <button
+                      key={ep.episodeId || ep.id}
+                      id={`ep-${ep.episodeId || ep.id}`}
+                      onClick={() => {
+                        if (isOfflineMode) {
+                          navigate(`/watch/${encodeURIComponent(ep.id)}?offline=true&path=${encodeURIComponent(offlinePath)}`);
+                        } else {
+                          handleEpisodeChange(ep.episodeId);
                         }
                       }}
-                    />
-                  </div>
-                  {/* Range buttons */}
-                  <div className="flex flex-wrap gap-1">
-                    {Array.from({ length: Math.ceil((episodesData?.totalEpisodes || 0) / 50) }).map((_, idx) => {
-                      const start = idx * 50 + 1;
-                      const end = Math.min((idx + 1) * 50, episodesData?.totalEpisodes || 0);
-                      const currentEp = currentEpisode?.number || 1;
-                      const isActive = currentEp >= start && currentEp <= end;
-                      return (
-                        <button
-                          key={idx}
-                          onClick={() => {
-                            // Scroll to range
-                            const container = document.getElementById('episode-list-container');
-                            const firstEpInRange = episodesData?.episodes.find(ep => ep.number === start);
-                            if (container && firstEpInRange) {
-                              const epEl = document.getElementById(`ep-${firstEpInRange.episodeId}`);
-                              epEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                            }
-                          }}
-                          className={`px-2 py-1 text-xs rounded ${isActive
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted/50 hover:bg-muted'
-                            }`}
-                        >
-                          {start}-{end}
-                        </button>
-                      );
-                    })}
-                  </div>
+                      className={`w-full text-left p-2.5 md:p-3 rounded-xl transition-all text-sm ${(ep.episodeId || ep.id) === decodedEpisodeId
+                        ? "bg-primary text-primary-foreground"
+                        : ep.isFiller
+                          ? "bg-orange/10 border border-orange/30 hover:bg-orange/20"
+                          : "bg-muted/50 hover:bg-muted"
+                        }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold">EP {ep.number}</span>
+                        {ep.isFiller && (
+                          <span className="text-xs px-1.5 py-0.5 rounded-full bg-orange/20 text-orange">
+                            Filler
+                          </span>
+                        )}
+                        {(ep.episodeId || ep.id) === decodedEpisodeId && (
+                          <span className="text-xs">▶</span>
+                        )}
+                      </div>
+                      {(ep.title || ep.name) && (
+                        <p className="text-xs mt-1 opacity-80 line-clamp-1">
+                          {ep.title || ep.name}
+                        </p>
+                      )}
+                    </button>
+                  ))}
                 </div>
-              )}
-
-              <div id="episode-list-container" className="flex-1 overflow-y-auto space-y-1.5 md:space-y-2 pr-2 scrollbar-thin">
-                {(isOfflineMode ? offlineManifest?.episodes : episodesData?.episodes)?.map((ep: any) => (
-                  <button
-                    key={ep.episodeId || ep.id}
-                    id={`ep-${ep.episodeId || ep.id}`}
-                    onClick={() => {
-                      if (isOfflineMode) {
-                        navigate(`/watch/${encodeURIComponent(ep.id)}?offline=true&path=${encodeURIComponent(offlinePath)}`);
-                      } else {
-                        handleEpisodeChange(ep.episodeId);
-                      }
-                    }}
-                    className={`w-full text-left p-2.5 md:p-3 rounded-xl transition-all text-sm ${(ep.episodeId || ep.id) === decodedEpisodeId
-                      ? "bg-primary text-primary-foreground"
-                      : ep.isFiller
-                        ? "bg-orange/10 border border-orange/30 hover:bg-orange/20"
-                        : "bg-muted/50 hover:bg-muted"
-                      }`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-bold">EP {ep.number}</span>
-                      {ep.isFiller && (
-                        <span className="text-xs px-1.5 py-0.5 rounded-full bg-orange/20 text-orange">
-                          Filler
-                        </span>
-                      )}
-                      {(ep.episodeId || ep.id) === decodedEpisodeId && (
-                        <span className="text-xs">▶</span>
-                      )}
-                    </div>
-                    {(ep.title || ep.name) && (
-                      <p className="text-xs mt-1 opacity-80 line-clamp-1">
-                        {ep.title || ep.name}
-                      </p>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </GlassPanel>
-          </div>
+              </GlassPanel>
+            </div>
+          )}
 
           {/* Episode Comments - aligned with video column */}
           <div className="xl:col-span-9">
             <EpisodeComments
               animeId={animeId}
               episodeId={decodedEpisodeId}
-              animeName={animeData?.anime.info.name}
+              animeName={animeData?.info.name}
             />
           </div>
         </div>
@@ -2262,7 +2980,7 @@ export default function WatchPage() {
             isOpen={showReviewPopup}
             onClose={() => setShowReviewPopup(false)}
             animeId={animeId}
-            animeName={animeData?.anime.info.name || (isOfflineMode ? offlineManifest?.animeName : '')}
+            animeName={animeData?.info.name || (isOfflineMode ? offlineManifest?.animeName : '')}
             userId={user?.id}
           />
         )
@@ -2273,33 +2991,20 @@ export default function WatchPage() {
         onClose={() => setIsReportModalOpen(false)}
         targetType="server"
         targetId={decodedEpisodeId || animeId || "unknown"}
-        targetName={`${animeData?.anime.info.name || (isOfflineMode ? offlineManifest?.animeName : '')}${serversData?.episodeNo ? ` - Ep ${serversData.episodeNo}` : ''}`}
+        targetName={`${animeData?.info.name || (isOfflineMode ? offlineManifest?.animeName : '')}`}
       />
 
       <MarketplaceSubmitModal
         isOpen={isMarketplaceModalOpen}
         onClose={() => setIsMarketplaceModalOpen(false)}
         animeId={animeId || ""}
-        animeName={animeData?.anime.info.name || (isOfflineMode ? offlineManifest?.animeName : '') || ""}
-        episodeNumber={serversData?.episodeNo || currentEpisode?.number}
+        animeName={animeData?.info.name || (isOfflineMode ? offlineManifest?.animeName : '') || ""}
+        episodeNumber={currentEpisode?.number}
       />
 
       <MarketplaceModal
         isOpen={isMarketplaceListVisible}
         onClose={() => setIsMarketplaceListVisible(false)}
-        sources={marketplaceSources}
-        animeName={animeData?.anime.info.name || (isOfflineMode ? offlineManifest?.animeName : '') || ""}
-        episodeNumber={serversData?.episodeNo || currentEpisode?.number || 1}
-        onSelectSource={(source) => {
-          selectRegularServer(-4);
-          setSelectedLangCode(source.langCode);
-          setPreferredServerName(source.providerName || null);
-          setFailedServers(new Set());
-        }}
-        onOpenSubmit={() => {
-          setIsMarketplaceListVisible(false);
-          setIsMarketplaceModalOpen(true);
-        }}
       />
 
       {/* Redirect Warning Popup */}

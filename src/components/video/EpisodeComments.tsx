@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useComments, useAddComment, useDeleteComment, useLikeComment } from '@/hooks/useComments';
+import { useComments, useAddComment, useDeleteComment, useLikeComment } from '@/hooks/community/useComments';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { GlassPanel } from '@/components/ui/GlassPanel';
@@ -387,3 +387,4 @@ export function EpisodeComments({ animeId, episodeId, animeName }: EpisodeCommen
     </div>
   );
 }
+

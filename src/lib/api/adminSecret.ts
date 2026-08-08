@@ -54,6 +54,10 @@ function resolveRequestUrl(input: RequestInfo | URL): URL | null {
 }
 
 function shouldAttachAdminSecret(requestUrl: URL, backendOrigins: Set<string>): boolean {
+  if (requestUrl.hostname === "raw.githubusercontent.com" || requestUrl.hostname === "raw.github.com") {
+    return false;
+  }
+
   if (backendOrigins.has(requestUrl.origin)) return true;
 
   if (typeof window !== "undefined" && requestUrl.origin === window.location.origin) {
@@ -93,9 +97,9 @@ export function withAdminSecretHeader(
 ): Record<string, string> {
   if (!ADMIN_API_SECRET) return { ...headers };
 
+  // X-Admin-Secret header injection disabled
   return {
     ...headers,
-    "X-Admin-Secret": ADMIN_API_SECRET,
   };
 }
 
@@ -120,9 +124,10 @@ export function installGlobalAdminSecretFetchPatch(): void {
       init?.headers
     );
 
-    if (!headers.has("X-Admin-Secret")) {
-      headers.set("X-Admin-Secret", ADMIN_API_SECRET);
-    }
+    // X-Admin-Secret header injection disabled
+    // if (!headers.has("X-Admin-Secret")) {
+    //   headers.set("X-Admin-Secret", ADMIN_API_SECRET);
+    // }
 
     if (input instanceof Request) {
       const patchedRequest = new Request(input, {

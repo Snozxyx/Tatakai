@@ -1,23 +1,18 @@
 import { useMemo } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { ArrowRight, BookOpen, Flame, SlidersHorizontal } from "lucide-react";
-import { searchManga } from "@/services/manga.service";
+import { ArrowRight, Flame } from "lucide-react";
+import { searchManga } from "@/core/content/manga-client";
 import type { MangaSearchItem, MangaSearchResult } from "@/types/manga";
 import { UnifiedMediaCard, type UnifiedMediaCardProps } from "@/components/UnifiedMediaCard";
 import { CardSkeleton } from "@/components/ui/skeleton-custom";
 import { GlassPanel } from "@/components/ui/GlassPanel";
-import { useContentSafetySettings } from "@/hooks/useContentSafetySettings";
+import { useContentSafetySettings } from "@/hooks/user/useContentSafetySettings";
 import { inferMangaAdultFlag } from "@/lib/contentSafety";
 
 const SHOWCASE_QUERIES = [
-  "One Piece",
   "Solo Leveling",
   "Blue Box",
-  "Omniscient Reader",
-  "Dandadan",
-  "Kingdom",
-  "villainess manga",
 ];
 
 function toMangaCard(item: MangaSearchItem): UnifiedMediaCardProps["item"] | null {
@@ -85,82 +80,59 @@ export function IndexMangaShowcase() {
 
   const isLoading = showcaseQueries.some((queryState) => queryState.isLoading) && showcaseCards.length === 0;
 
+  // Reusable classes to hide scrollbar but keep scroll functionality
+  const scrollContainerStyles = "flex gap-4 overflow-x-auto pb-6 pt-2 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]";
+  
+  // Reusable classes for card width to ensure they look good on all screens
+  const cardWidthStyles = "w-[140px] md:w-[180px] lg:w-[220px] flex-shrink-0 snap-start";
+
   return (
-    <section className="mb-12">
-      <div className="mb-4 flex items-end justify-between gap-3">
-        <div>
-          <h2 className="text-xl md:text-2xl font-black flex items-center gap-2">
-            <BookOpen className="w-5 h-5 text-primary" />
-            Manga Picks Tonight
-          </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Banner highlights plus fast manga cards you can open and read immediately.
-          </p>
+    <section className="mb-12 overflow-hidden">
+      {/* Section header */}
+      <div className="mb-6 flex items-end justify-between gap-3 pr-4">
+        <div className="flex items-center gap-3">
+          <div>
+            <h3 className="font-display text-2xl font-semibold tracking-tight flex items-center gap-2">
+              <Flame className="w-5 h-5 text-orange-500" />
+              Trending Manga
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5 ml-7">
+              Handpicked titles — open and read immediately.
+            </p>
+          </div>
         </div>
         <Link
           to="/manga"
-          className="text-xs font-bold uppercase tracking-wider text-primary hover:underline"
+          className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-primary hover:text-primary/80 transition-colors group"
         >
-          Open Manga Hub
+          Open Hub
+          <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
         </Link>
       </div>
 
-      {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-        <GlassPanel className="p-5 border border-primary/25 bg-primary/10">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-[11px] uppercase tracking-wider font-bold text-primary">Fast Reading Flow</p>
-              <h3 className="mt-2 text-lg font-black">Jump from card to chapter in seconds</h3>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Pick a manga, choose your source, and continue in the upgraded premium reader.
-              </p>
-            </div>
-            <Flame className="w-5 h-5 text-primary" />
-          </div>
-          <Link
-            to="/manga"
-            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:brightness-110"
-          >
-            Start Reading
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-        </GlassPanel>
-
-        <GlassPanel className="p-5 border border-white/10">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground">Cross-Media Filters</p>
-              <h3 className="mt-2 text-lg font-black">Power filters live in unified search</h3>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Filter anime and manga together by type, status, provider, rating, and advanced metadata.
-              </p>
-            </div>
-            <SlidersHorizontal className="w-5 h-5 text-primary" />
-          </div>
-          <Link
-            to="/search"
-            className="mt-4 inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm font-bold hover:bg-white/10"
-          >
-            Open Search Filters
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-        </GlassPanel>
-      </div> */}
-
       {isLoading ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-10 gap-4">
+        <div className={scrollContainerStyles}>
           {Array.from({ length: 10 }).map((_, index) => (
-            <CardSkeleton key={index} />
+             <div key={index} className={cardWidthStyles}>
+               {/* Fixed height ensures skeleton matches the future card sizes roughly */}
+               <div className="h-[200px] md:h-[260px] lg:h-[310px] w-full">
+                 <CardSkeleton className="w-full h-full" />
+               </div>
+             </div>
           ))}
         </div>
       ) : showcaseCards.length > 0 ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-10 gap-4">
+        <div className={scrollContainerStyles}>
           {showcaseCards.map((item) => (
-            <UnifiedMediaCard key={`index-manga-${item.id}`} item={item} />
+            <div key={`index-manga-${item.id}`} className={cardWidthStyles}>
+              <UnifiedMediaCard item={item} />
+            </div>
           ))}
+          {/* Optional: Add a spacer at the end so the last card doesn't hug the screen edge */}
+          <div className="w-4 flex-shrink-0" aria-hidden="true" />
         </div>
       ) : (
-        <GlassPanel className="p-5 border border-white/10">
+        <GlassPanel className="p-5 border border-white/10 mr-4">
           <p className="text-sm text-muted-foreground">Manga cards are loading. Please check again shortly.</p>
         </GlassPanel>
       )}

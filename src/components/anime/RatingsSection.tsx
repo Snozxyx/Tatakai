@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useAnimeRatingStats, useUserRating, useRateAnime, useDeleteRating } from '@/hooks/useRatings';
+import { useAnimeRatingStats, useUserRating, useRateAnime, useDeleteRating } from '@/hooks/user/useRatings';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Star, Loader2, Trash2 } from 'lucide-react';
@@ -179,3 +179,4 @@ export function RatingsSection({ animeId }: RatingsSectionProps) {
     </div>
   );
 }
+

@@ -1,4 +1,4 @@
-import { useAdminLogs, useDeleteAdminLogs } from "@/hooks/useAdminLogs";
+import { useAdminLogs, useDeleteAdminLogs } from "@/hooks/admin/useAdminLogs";
 import { formatDistanceToNow } from "date-fns";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -90,3 +90,4 @@ export function ModerationLogs() {
         </div>
     );
 }
+

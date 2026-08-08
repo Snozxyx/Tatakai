@@ -1,194 +1,264 @@
-import { useMemo } from "react";
-import { useQueries } from "@tanstack/react-query";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { EyeOff, Flame, Sparkles } from "lucide-react";
-import { getProxiedImageUrl } from "@/lib/api";
-import { useContentSafetySettings } from "@/hooks/useContentSafetySettings";
-import { searchManga } from "@/services/manga.service";
-import type { MangaSearchItem } from "@/types/manga";
-
-const BASE_GENRES = [
-  "action",
-  "romance",
-  "fantasy",
-  "thriller",
-  "horror",
-  "comedy",
-  "adventure",
-  "mystery",
-  "drama",
-  "historical",
-  "isekai",
-  "sports",
-];
+import { EyeOff, Sparkles, Compass, ArrowRight, Flame} from "lucide-react";
+import { useContentSafetySettings } from "@/hooks/user/useContentSafetySettings";
 
 const HENTAI_GENRE = "hentai";
 
-const GENRE_ACCENTS: Record<string, string> = {
-  action: "from-orange-500/45 via-rose-500/35 to-black/80",
-  romance: "from-pink-500/45 via-rose-500/30 to-black/80",
-  fantasy: "from-cyan-500/40 via-blue-500/35 to-black/80",
-  thriller: "from-zinc-400/25 via-zinc-700/45 to-black/85",
-  horror: "from-red-700/50 via-red-900/35 to-black/90",
-  comedy: "from-yellow-400/40 via-orange-500/30 to-black/80",
-  adventure: "from-emerald-500/40 via-teal-500/30 to-black/80",
-  mystery: "from-indigo-500/40 via-slate-600/35 to-black/85",
-  drama: "from-fuchsia-500/40 via-rose-500/30 to-black/80",
-  historical: "from-amber-500/40 via-orange-700/30 to-black/80",
-  isekai: "from-sky-500/40 via-indigo-500/30 to-black/80",
-  sports: "from-lime-500/35 via-emerald-600/30 to-black/80",
-  hentai: "from-rose-500/45 via-red-600/35 to-black/90",
+interface GenreConfig {
+  genre: string;
+  label: string;
+  poster: string;
+  accent: string;
+  glowColor: string;
+  textColor: string;
+  tag?: string;
+  isAdult?: boolean;
+}
+
+const BASE_GENRES: GenreConfig[] = [
+  {
+    genre: "action",
+    label: "Action",
+    poster: "https://cdn.atsu.moe/static/posters/PpYZrYu1LUs0GVYT.jpg",
+    accent: "from-amber-600/60 via-orange-700/30 to-black/80",
+    glowColor: "shadow-amber-500/30",
+    textColor: "text-amber-300",
+  },
+  {
+    genre: "fantasy",
+    label: "Fantasy",
+    poster: "https://cdn.atsu.moe/static/posters/N3HO30V76uWZV9iG.jpg",
+    accent: "from-cyan-600/60 via-blue-700/30 to-black/80",
+    glowColor: "shadow-cyan-500/30",
+    textColor: "text-cyan-300",
+  },
+  {
+    genre: "romance",
+    label: "Romance",
+    poster: "https://cdn.atsu.moe/static/posters/LOSrlEEmNxpdYVMq.jpg",
+    accent: "from-rose-500/60 via-pink-700/30 to-black/80",
+    glowColor: "shadow-rose-500/30",
+    textColor: "text-rose-300",
+  },
+  {
+    genre: "comedy",
+    label: "Comedy",
+    poster: "https://cdn.atsu.moe/static/posters/rGVzeEHgpwXHagMM.png",
+    accent: "from-yellow-500/60 via-amber-700/30 to-black/80",
+    glowColor: "shadow-yellow-400/30",
+    textColor: "text-yellow-300",
+  },
+  {
+    genre: "drama",
+    label: "Drama",
+    poster: "https://cdn.atsu.moe/static/posters/smyw3jl9NabpSky6.jpg",
+    accent: "from-fuchsia-500/60 via-purple-700/30 to-black/80",
+    glowColor: "shadow-fuchsia-500/30",
+    textColor: "text-fuchsia-300",
+  },
+  {
+    genre: "adventure",
+    label: "Adventure",
+    poster: "https://cdn.atsu.moe/static/posters/N3HO30V76uWZV9iG.jpg",
+    accent: "from-emerald-500/60 via-teal-700/30 to-black/80",
+    glowColor: "shadow-emerald-500/30",
+    textColor: "text-emerald-300",
+  },
+  {
+    genre: "historical",
+    label: "Historical",
+    poster: "https://cdn.atsu.moe/static/posters/PpYZrYu1LUs0GVYT.jpg",
+    accent: "from-stone-500/60 via-amber-900/30 to-black/80",
+    glowColor: "shadow-stone-400/30",
+    textColor: "text-stone-300",
+  },
+  {
+    genre: "isekai",
+    label: "Isekai",
+    poster: "https://cdn.atsu.moe/static/posters/LOSrlEEmNxpdYVMq.jpg",
+    accent: "from-sky-500/60 via-indigo-700/30 to-black/80",
+    glowColor: "shadow-sky-400/30",
+    textColor: "text-sky-300",
+  },
+];
+
+const HENTAI_CONFIG: GenreConfig = {
+  genre: "hentai",
+  label: "18+ / Hentai",
+  poster:
+    "https://media.discordapp.net/attachments/1403660216687398996/1532009365295333456/10800.jpg?ex=6a6b4a68&is=6a69f8e8&hm=b93d31b07ff122ffed575c37ff7e0dc8a99dee20ef7bd757965c60995cb6078c&=&format=webp&width=1070&height=675",
+  accent: "from-rose-700/70 via-red-900/40 to-black/90",
+  glowColor: "shadow-rose-600/50",
+  textColor: "text-rose-300",
+  tag: "18+",
+  isAdult: true,
 };
 
-function getDaySeed() {
-  const now = new Date();
-  return now.getUTCDate() + (now.getUTCMonth() + 1) * 31;
-}
+function TiltGlassCard({
+  config,
+  onClick,
+  isLarge = false,
+}: {
+  config: GenreConfig;
+  onClick: () => void;
+  isLarge?: boolean;
+}) {
+  const cardRef = useRef<HTMLButtonElement>(null);
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const [isHovered, setIsHovered] = useState(false);
 
-function pickPoster(items: MangaSearchItem[], seed: number, offset: number): string {
-  if (!Array.isArray(items) || items.length === 0) return "";
-  const index = (seed + offset * 7) % items.length;
-  return String(items[index]?.poster || "");
-}
+  function handleMouseMove(e: React.MouseEvent<HTMLButtonElement>) {
+    const el = cardRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = (e.clientX - cx) / (rect.width / 2);
+    const dy = (e.clientY - cy) / (rect.height / 2);
+    setTilt({ x: dy * -10, y: dx * 10 });
+  }
 
-function formatGenreLabel(genre: string): string {
-  return genre.replace(/-/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
+  function handleMouseLeave() {
+    setTilt({ x: 0, y: 0 });
+    setIsHovered(false);
+  }
 
-function getGenreAccent(genre: string): string {
-  return GENRE_ACCENTS[genre] || "from-primary/40 via-primary/20 to-black/80";
+  return (
+    <button
+      ref={cardRef}
+      type="button"
+      onClick={onClick}
+      onMouseMove={handleMouseMove}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={handleMouseLeave}
+      style={{
+        transform: `perspective(900px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) scale(${isHovered ? 1.025 : 1})`,
+        transition: isHovered
+          ? "transform 0.1s ease-out"
+          : "transform 0.45s cubic-bezier(0.23, 1, 0.32, 1)",
+      }}
+      className={`relative w-full rounded-2xl overflow-hidden text-left
+        border border-white/10 shadow-xl 
+        focus:outline-none focus:ring-2 focus:ring-white/30
+        ${isLarge ? "row-span-2" : ""}`}
+    >
+      {/* Background Poster */}
+      <img
+        src={config.poster}
+        alt={config.label}
+        className="absolute inset-0 w-full h-full object-cover"
+        loading="lazy"
+      />
+
+      {/* Gradient overlay */}
+      <div className={`absolute inset-0 bg-gradient-to-t ${config.accent} opacity-90`} />
+
+      {/* Tilt glass sheen */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: `linear-gradient(${130 + tilt.y * 3}deg, rgba(255,255,255,0.14) 0%, transparent 45%, rgba(255,255,255,0.04) 100%)`,
+          transition: isHovered ? "none" : "background 0.45s ease",
+        }}
+      />
+
+      {/* Frosted top strip */}
+      <div
+        className="absolute inset-x-0 top-0 h-1/3 pointer-events-none"
+        style={{
+          background: "linear-gradient(180deg, rgba(255,255,255,0.07) 0%, transparent 100%)",
+        }}
+      />
+
+      {/* Badge top-left */}
+      <div className="absolute top-3 left-3 z-10">
+        {config.isAdult ? (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-600/85 border border-rose-400/40 text-[10px] font-black uppercase tracking-wider text-white backdrop-blur-sm">
+            🔞 18+
+          </span>
+        ) : (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-black/40 border border-white/15 text-[10px] font-bold uppercase tracking-wider text-white/75 backdrop-blur-sm">
+            Genre
+          </span>
+        )}
+      </div>
+
+      {/* Bottom frosted label */}
+      <div className="absolute inset-x-0 bottom-0 z-10">
+        <div
+          className="p-4 flex items-end justify-between"
+          style={{
+            background:
+              "linear-gradient(0deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.45) 55%, transparent 100%)",
+            backdropFilter: "blur(10px)",
+            WebkitBackdropFilter: "blur(10px)",
+          }}
+        >
+          <div>
+            <h3
+              className={`font-extrabold capitalize leading-tight drop-shadow-md ${config.textColor} ${isLarge ? "text-2xl md:text-3xl" : "text-base md:text-lg"}`}
+            >
+              {config.label}
+            </h3>
+            {isLarge && (
+              <p className="text-xs text-white/50 font-medium mt-1">Tap to explore lane</p>
+            )}
+          </div>
+          <div
+            className={`flex items-center justify-center w-8 h-8 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm transition-all duration-300 flex-shrink-0 ${isHovered ? "opacity-100 translate-x-0" : "opacity-0 translate-x-2"}`}
+          >
+            <ArrowRight className="w-3.5 h-3.5 text-white" />
+          </div>
+        </div>
+      </div>
+    </button>
+  );
 }
 
 export function MangaGenreSlider() {
   const navigate = useNavigate();
   const { settings: contentSafetySettings } = useContentSafetySettings();
-  const daySeed = useMemo(() => getDaySeed(), []);
   const canShowAdultEverywhere = contentSafetySettings.showAdultEverywhere;
 
   const genres = useMemo(
-    () => (canShowAdultEverywhere ? [...BASE_GENRES, HENTAI_GENRE] : BASE_GENRES),
+    () => (canShowAdultEverywhere ? [...BASE_GENRES, HENTAI_CONFIG] : BASE_GENRES),
     [canShowAdultEverywhere],
   );
 
-  const genreQueries = useQueries({
-    queries: genres.map((genre) => ({
-      queryKey: ["manga-genre-slider", genre],
-      staleTime: 10 * 60 * 1000,
-      queryFn: async () => {
-        const isAdultGenre = genre === HENTAI_GENRE;
-        const genrePayload = await searchManga("", 1, 12, {
-          mode: "genre",
-          provider: isAdultGenre ? "atsu" : "all",
-          genre,
-          adult: isAdultGenre,
-          requiresQuery: false,
-        });
-
-        const genreRows = Array.isArray(genrePayload?.results) ? genrePayload.results : [];
-        if (genreRows.length > 0) return genreRows;
-
-        const fallback = await searchManga(`${genre} manga`, 1, 12, {
-          mode: isAdultGenre ? "genre" : "search",
-          provider: isAdultGenre ? "atsu" : "all",
-          genre: isAdultGenre ? genre : undefined,
-          adult: isAdultGenre,
-          requiresQuery: !isAdultGenre,
-        });
-
-        return Array.isArray(fallback?.results) ? fallback.results : [];
-      },
-    })),
-  });
-
-  const cards = useMemo(() => {
-    return genres.map((genre, index) => {
-      const rows = Array.isArray(genreQueries[index]?.data) ? genreQueries[index]?.data || [] : [];
-      return {
-        genre,
-        poster: pickPoster(rows, daySeed, index),
-        accentPoster: pickPoster(rows, daySeed + 3, index + 1),
-        count: rows.length,
-      };
-    });
-  }, [genres, genreQueries, daySeed]);
-
   return (
-    <section className="mb-14">
-      <div className="relative mb-6 overflow-hidden rounded-[2rem] border border-white/5 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/[0.08] via-background to-background p-6 md:p-8 shadow-2xl backdrop-blur-xl">
-        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-primary/20 blur-[100px]" />
-        <div className="absolute -left-20 -bottom-20 h-64 w-64 rounded-full bg-purple-500/10 blur-[100px]" />
-        
-        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1.5">
-            <h2 className="font-display text-3xl md:text-4xl font-black tracking-tight flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <Sparkles className="w-5 h-5" />
-              </span>
-              Manga Genre Hub
-            </h2>
-            <p className="text-sm md:text-base text-muted-foreground/80 max-w-2xl font-medium">
-              Curated moodboard lanes with rotating covers. Tap any genre to open its full catalog.
-            </p>
-          </div>
-          <div className="flex items-center self-start md:self-auto rounded-full border border-white/10 bg-white/5 px-4 py-1.5 backdrop-blur-md">
-            <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-foreground/80">
-              Daily Moodboard
-            </span>
-          </div>
+    <section className="mb-16 relative">
+         <div className="flex items-center gap-3 mb-8">
+        <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center border border-primary/30">
+          <Flame className="w-5 h-5 text-primary" />
         </div>
-
-        {!canShowAdultEverywhere && (
-          <button
-            type="button"
-            onClick={() => navigate("/settings?tab=privacy#mature-content-controls")}
-            className="group relative mt-6 inline-flex items-center gap-2 overflow-hidden rounded-xl border border-rose-500/20 bg-gradient-to-r from-rose-500/10 to-transparent px-4 py-2.5 text-xs font-bold text-rose-300 hover:border-rose-500/30 transition-all duration-300 hover:shadow-[0_0_20px_-5px_rgba(244,63,94,0.3)]"
-          >
-            <EyeOff className="w-4 h-4 transition-transform group-hover:scale-110" />
-            <span>Hentai is hidden by your content safety settings</span>
-          </button>
-        )}
+        <h2 className="text-2xl lg:text-3xl font-bold font-display tracking-tight">Manga Genres</h2>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 md:gap-5 pb-2">
-        {cards.map((card) => (
-          <button
-            key={card.genre}
-            type="button"
-            onClick={() => navigate(`/manga/genre/${encodeURIComponent(card.genre)}${card.genre === HENTAI_GENRE ? "?adult=1" : ""}`)}
-            className={`group relative w-full aspect-[4/5] rounded-[2rem] overflow-hidden border border-white/10 bg-gradient-to-br ${getGenreAccent(card.genre)} text-left shadow-xl hover:shadow-[0_10px_45px_-18px_rgba(0,0,0,0.7)] transition-shadow duration-300`}
-          >
-            {card.poster ? (
-              <img
-                src={getProxiedImageUrl(card.poster)}
-                alt={card.genre}
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-              />
-            ) : (
-              <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-white/0" />
-            )}
-
-            {card.accentPoster ? (
-              <img
-                src={getProxiedImageUrl(card.accentPoster)}
-                alt={`${card.genre} alt`}
-                className="absolute right-4 top-4 h-24 w-16 rounded-lg border border-white/20 object-cover shadow-xl rotate-6 opacity-85 group-hover:rotate-0 transition-transform duration-500"
-              />
-            ) : null}
-
-            <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/45 to-transparent" />
-
-            <div className="absolute left-4 top-4 flex items-center gap-1.5 rounded-full border border-white/20 bg-black/45 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-white/95 backdrop-blur-sm">
-              {card.genre === HENTAI_GENRE ? <Flame className="w-3.5 h-3.5 text-rose-300" /> : null}
-              {card.genre === HENTAI_GENRE ? "18+" : "Genre"}
-            </div>
-
-            <div className="absolute inset-x-0 bottom-0 p-5 md:p-6">
-              <h3 className="text-xl md:text-2xl font-black text-white capitalize leading-tight drop-shadow-md">{formatGenreLabel(card.genre)}</h3>
-              <p className="text-xs md:text-sm font-medium text-white/80 mt-1.5">
-                {card.count > 0 ? `${card.count}+ picks` : "Explore now"}
-              </p>
-            </div>
-          </button>
+      {/* ── Bento Grid ─────────────────────────────────────────────
+          Layout (3 cols):
+          [LARGE row-span-2] [card] [card]
+          [LARGE cont.     ] [card] [card]
+          [card] [card] [card]
+          ───────────────────────────────────────────────────────── */}
+      <div
+        className="grid gap-3 md:gap-4"
+        style={{
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gridAutoRows: "clamp(160px, 20vw, 240px)",
+        }}
+      >
+        {genres.map((config, index) => (
+          <TiltGlassCard
+            key={config.genre}
+            config={config}
+            isLarge={index === 0}
+            onClick={() =>
+              navigate(
+                `/manga/genre/${encodeURIComponent(config.genre)}${config.genre === HENTAI_GENRE ? "?adult=1" : ""}`,
+              )
+            }
+          />
         ))}
       </div>
     </section>

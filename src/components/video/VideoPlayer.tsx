@@ -10,7 +10,6 @@ import {
 
   VolumeX,
 
-  Maximize,
 
   Minimize,
 
@@ -27,28 +26,73 @@ import {
   FastForward,
   Eye,
   List,
+ Maximize,
   Sparkles,
   AlertTriangle,
-  CheckCircle2,
-  Download,
-  DownloadCloud,
   PictureInPicture2,
   Camera,
+  Type,
+  Mic,
+  MonitorPlay,
+  RotateCcw,
+  Lock,
 } from "lucide-react";
 
 import Hls from "hls.js";
 
 import { toast } from "sonner";
 
-import { useVideoSettings } from "@/hooks/useVideoSettings";
-import { useIsNativeApp } from "@/hooks/useIsNativeApp";
-import { useDownload } from "@/hooks/useDownload";
+import { useVideoSettings } from "@/hooks/media/useVideoSettings";
+import { useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
+import { updateDiscordRpc } from "@/lib/discordRpc";
 
 import { VideoSettingsPanel } from "./VideoSettingsPanel";
 
-import { useAniskip } from "@/hooks/useAniskip";
+import { useAniskip } from "@/hooks/media/useAniskip";
+import { fetchViaChain } from "@/core/network/proxyChain";
+import { 
+  resolvePlayableStream, 
+  buildProxyCandidateUrls,
+  buildRefererCandidatesForStream,
+  buildProxyBaseCandidates,
+  resolveSingleStreamProxyBase,
+  isMokoProxyUrl,
+  isLoopbackProxyUrl
+} from "@/core/player/stream-resolver";
 
-import { getProxiedImageUrl, getProxiedVideoUrl, getProxiedSubtitleUrl, trackEvent } from "@/lib/api";
+import { getProxiedImageUrl, getProxiedVideoUrl, getProxiedSubtitleUrl, readProxyQuerySnapshot, trackEvent } from "@/lib/api";
+import { formatTime } from "@/core/player/time-utils";
+import {
+  buildSubtitleFetchCandidates,
+  getSubtitleSelectionKey,
+  normalizeSubtitleToVtt,
+  parseVttCues,
+} from "@/core/player/subtitle-utils";
+import { playbackEventBus, PlayerEvents } from "@/core/player/PlaybackEventBus";
+import { sourceAdapterRegistry } from "@/core/player/SourceAdapterRegistry";
+import { Seekbar } from "./controls/Seekbar";
+import { SubtitleMemory } from "@/core/player/subtitle-memory";
+import { DubTracker } from "@/core/content/dub-tracker";
+import { TorrentStatusPanel } from "@/components/torrent/TorrentStatusPanel";
+
+const SIZE_OPTIONS = [
+  { value: 'small', label: 'S' },
+  { value: 'medium', label: 'M' },
+  { value: 'large', label: 'L' },
+  { value: 'xlarge', label: 'XL' },
+] as const;
+
+const FONT_OPTIONS = [
+  { value: 'default', label: 'Default' },
+  { value: 'serif', label: 'Serif' },
+  { value: 'mono', label: 'Mono' },
+] as const;
+
+const BG_OPTIONS = [
+  { value: 'none', label: 'None' },
+  { value: 'semi', label: 'Semi' },
+  { value: 'solid', label: 'Solid' },
+] as const;
 
 // Helper function to convert local file paths to file:// URLs
 function convertFileSrc(filePath: string): string {
@@ -72,214 +116,8 @@ function looksLikeHlsManifest(payload: string): boolean {
   );
 }
 
-function readProxyQuerySnapshot(candidateUrl: string): { streamUrl?: string; referer?: string; userAgent?: string; password?: string } {
-  try {
-    const resolved = new URL(candidateUrl, window.location.origin);
-    const streamUrl = resolved.searchParams.get('url') || undefined;
-    const referer = resolved.searchParams.get('referer') || undefined;
-    const userAgent = resolved.searchParams.get('userAgent') || undefined;
-    const password = resolved.searchParams.get('password') || undefined;
-    return { streamUrl, referer, userAgent, password };
-  } catch {
-    return {};
-  }
-}
-
-const REMOTE_NODE_STREAM_PROXY = 'https://hoko.tatakai.me/api/v1/streamingProxy';
-const DEFAULT_STREAM_PROXY_PATH = '/api/v1/streamingProxy';
-const LEGACY_STREAM_PROXY_PATHS = [
-  '/api/v2/hianime/proxy/m3u8-streaming-proxy',
-  '/api/proxy/m3u8-streaming-proxy',
-];
-const STREAM_PROXY_PASSWORD = String(
-  import.meta.env.VITE_STREAM_PROXY_PASSWORD || import.meta.env.VITE_PROXY_PASSWORD || ''
-).trim();
-
-function isLoopbackProxyUrl(value: string): boolean {
-  try {
-    const parsed = new URL(value);
-    return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
-  } catch {
-    return false;
-  }
-}
-
-function isMokoProxyUrl(value: string): boolean {
-  try {
-    const parsed = new URL(value);
-    return /(^|\.)moko\.tatakai\.me$/i.test(parsed.hostname);
-  } catch {
-    return /(^|\.)moko\.tatakai\.me/i.test(value);
-  }
-}
-
-function resolveSingleStreamProxyBase(): string {
-  const explicitProxyBase = String(
-    import.meta.env.VITE_SINGLE_STREAM_PROXY_URL ||
-      import.meta.env.VITE_STREAM_PROXY_URL ||
-      import.meta.env.VITE_PROXY_DEV_URL ||
-      ''
-  ).trim();
-
-  if (explicitProxyBase && !isLoopbackProxyUrl(explicitProxyBase)) {
-    return explicitProxyBase.replace(/\/$/, '');
-  }
-
-  return REMOTE_NODE_STREAM_PROXY;
-}
-
-function buildProxyBaseCandidates(): string[] {
-  const candidates: string[] = [];
-  const add = (value?: string) => {
-    const normalized = String(value || '').trim().replace(/\/$/, '');
-    if (!normalized) return;
-    if (isMokoProxyUrl(normalized)) return;
-    if (!candidates.includes(normalized)) candidates.push(normalized);
-  };
-
-  add(resolveSingleStreamProxyBase());
-
-  if (typeof window !== 'undefined') {
-    add(`${window.location.origin}${DEFAULT_STREAM_PROXY_PATH}`);
-    LEGACY_STREAM_PROXY_PATHS.forEach((legacyPath) => {
-      add(`${window.location.origin}${legacyPath}`);
-    });
-  }
-
-  return candidates;
-}
-
-function buildRefererCandidatesForStream(streamUrl: string, primaryReferer?: string): string[] {
-  const candidates: string[] = [];
-  const add = (value?: string) => {
-    const raw = String(value || '').trim();
-    if (!raw) return;
-    try {
-      const normalized = new URL(raw).href;
-      if (!candidates.includes(normalized)) candidates.push(normalized);
-    } catch {
-      // Ignore invalid referer values.
-    }
-  };
-
-  add(primaryReferer);
-
-  try {
-    const host = String(new URL(streamUrl).hostname || '').toLowerCase();
-    if (host.includes('watching.onl')) {
-      add('https://rabbitstream.net/');
-      add('https://dokicloud.one/');
-      add('https://hianime.to/');
-      add('https://aniwatchtv.to/');
-      add('https://megacloud.blog/');
-      add('https://megacloud.club/');
-      add('https://megacloud.tv/');
-    }
-
-    if (host.includes('owocdn') || host.includes('kwik') || host.includes('kwics')) {
-      add('https://kwik.cx/');
-      add('https://kwik.si/');
-    }
-  } catch {
-    // Ignore malformed stream URL.
-  }
-
-  return candidates.slice(0, 8);
-}
-
-function buildProxyCandidateUrls(
-  streamUrl: string,
-  referer?: string,
-  userAgent?: string,
-  preferredUrl?: string,
-  proxyPassword?: string,
-): string[] {
-  if (!/^https?:/i.test(streamUrl)) {
-    return preferredUrl ? [preferredUrl] : [streamUrl];
-  }
-
-  const candidates: string[] = [];
-  const addCandidate = (value?: string) => {
-    const normalized = String(value || '').trim();
-    if (!normalized) return;
-    if (!candidates.includes(normalized)) candidates.push(normalized);
-  };
-
-  addCandidate(preferredUrl);
-
-  const proxyBases = buildProxyBaseCandidates();
-  const refererCandidates = buildRefererCandidatesForStream(streamUrl, referer);
-  const preservedPassword = preferredUrl ? readProxyQuerySnapshot(preferredUrl).password : '';
-  const resolvedProxyPassword = String(proxyPassword || STREAM_PROXY_PASSWORD || preservedPassword || '').trim();
-
-  for (const proxyBase of proxyBases) {
-    if (refererCandidates.length === 0) {
-      const params = new URLSearchParams({ url: streamUrl, type: 'video' });
-      if (userAgent) params.set('userAgent', userAgent);
-      if (resolvedProxyPassword) params.set('password', resolvedProxyPassword);
-      addCandidate(`${proxyBase}${proxyBase.includes('?') ? '&' : '?'}${params.toString()}`);
-      continue;
-    }
-
-    for (const refererCandidate of refererCandidates) {
-      const params = new URLSearchParams({ url: streamUrl, type: 'video', referer: refererCandidate });
-      if (userAgent) params.set('userAgent', userAgent);
-      if (resolvedProxyPassword) params.set('password', resolvedProxyPassword);
-      addCandidate(`${proxyBase}${proxyBase.includes('?') ? '&' : '?'}${params.toString()}`);
-    }
-
-    const noRefererParams = new URLSearchParams({ url: streamUrl, type: 'video' });
-    if (userAgent) noRefererParams.set('userAgent', userAgent);
-    if (resolvedProxyPassword) noRefererParams.set('password', resolvedProxyPassword);
-    addCandidate(`${proxyBase}${proxyBase.includes('?') ? '&' : '?'}${noRefererParams.toString()}`);
-  }
-
-  return candidates.slice(0, 16);
-}
-
-function getSubtitleSelectionKey(subtitle: { lang: string; url: string; label?: string }, index: number): string {
-  const baseKey = subtitle.url || subtitle.label || subtitle.lang || `subtitle-${index}`;
-  return `${subtitle.lang === 'custom' ? 'custom' : 'sub'}:${baseKey}`;
-}
-
-function normalizeSubtitleToVtt(rawText: string): string {
-  const text = String(rawText || '');
-  const trimmed = text.trim();
-  if (!trimmed) return '';
-
-  if (trimmed.startsWith('WEBVTT')) {
-    return text;
-  }
-
-  if (/^<!doctype html/i.test(trimmed) || /^<html/i.test(trimmed)) {
-    return '';
-  }
-
-  if (trimmed.includes('-->')) {
-    const withNormalizedTimestamps = text.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
-    return withNormalizedTimestamps.includes('WEBVTT')
-      ? withNormalizedTimestamps
-      : `WEBVTT\n\n${withNormalizedTimestamps}`;
-  }
-
-  return `WEBVTT\n\n00:00:00.000 --> 99:59:59.000\n${text}`;
-}
-
-function buildSubtitleFetchCandidates(subtitleUrl: string, referer?: string, offline?: boolean): string[] {
-  const candidates: string[] = [];
-  const addCandidate = (value?: string) => {
-    const normalized = String(value || '').trim();
-    if (!normalized) return;
-    if (!candidates.includes(normalized)) candidates.push(normalized);
-  };
-
-  addCandidate(subtitleUrl);
-  if (!offline) {
-    addCandidate(getProxiedSubtitleUrl(subtitleUrl, referer));
-  }
-
-  return candidates;
-}
+// Proxy logic moved to @/core/player/stream-resolver.ts
+// Subtitle helpers moved to @/core/player/subtitle-utils.ts
 
 function toTrackLanguageCode(lang?: string): string {
   const value = String(lang || '').trim().toLowerCase();
@@ -294,6 +132,153 @@ function toTrackLanguageCode(lang?: string): string {
   return 'en';
 }
 
+const LANGUAGE_DISPLAY_NAMES: Record<string, string> = {
+  en: 'English',
+  ja: 'Japanese',
+  es: 'Spanish',
+  fr: 'French',
+  de: 'German',
+  pt: 'Portuguese',
+  ar: 'Arabic',
+  hi: 'Hindi',
+  it: 'Italian',
+  ru: 'Russian',
+  ko: 'Korean',
+  zh: 'Chinese',
+  und: 'Unknown',
+};
+
+function normalizeTrackLanguage(lang?: string): string {
+  const value = String(lang || '').trim().toLowerCase().replace('_', '-');
+  if (!value) return 'und';
+  if (value === 'en' || value.startsWith('eng') || value.includes('english')) return 'en';
+  if (value === 'ja' || value.startsWith('jpn') || value.includes('japanese')) return 'ja';
+  if (value === 'es' || value.startsWith('spa') || value.includes('spanish') || value.includes('espanol')) return 'es';
+  if (value === 'fr' || value.startsWith('fra') || value.startsWith('fre') || value.includes('french')) return 'fr';
+  if (value === 'de' || value.startsWith('deu') || value.startsWith('ger') || value.includes('german')) return 'de';
+  if (value === 'pt' || value.startsWith('por') || value.includes('portuguese')) return 'pt';
+  if (value === 'ar' || value.startsWith('ara') || value.includes('arabic')) return 'ar';
+  if (value === 'hi' || value.startsWith('hin') || value.includes('hindi')) return 'hi';
+  if (value === 'it' || value.startsWith('ita') || value.includes('italian')) return 'it';
+  if (value === 'ru' || value.startsWith('rus') || value.includes('russian')) return 'ru';
+  if (value === 'ko' || value.startsWith('kor') || value.includes('korean')) return 'ko';
+  if (value === 'zh' || value.startsWith('zho') || value.startsWith('chi') || value.includes('chinese')) return 'zh';
+  if (value.length >= 2) return value.slice(0, 2);
+  return 'und';
+}
+
+function getLanguageDisplayName(lang?: string): string {
+  const code = normalizeTrackLanguage(lang);
+  return LANGUAGE_DISPLAY_NAMES[code] || code.toUpperCase();
+}
+
+function isGenericTrackTitle(title: string): boolean {
+  const normalized = String(title || '').trim().toLowerCase();
+  return (
+    !normalized ||
+    normalized === 'default' ||
+    normalized === 'unknown' ||
+    normalized === 'und' ||
+    normalized === 'cr' ||
+    /^((audio|subtitle|video)\s+track\s+\d+)$/i.test(normalized)
+  );
+}
+
+function formatMediaTrackLabel(track: { language?: string; title?: string }): string {
+  const langName = getLanguageDisplayName(track.language);
+  const rawTitle = String(track.title || '').trim();
+  const normalizedTitle = rawTitle.toLowerCase();
+  const normalizedLang = String(track.language || '').trim().toLowerCase();
+
+  if (
+    isGenericTrackTitle(rawTitle) ||
+    normalizedTitle === normalizedLang ||
+    normalizedTitle === langName.toLowerCase()
+  ) {
+    return langName;
+  }
+
+  return `${langName} (${rawTitle})`;
+}
+
+function getSubtitleDisplayKey(track: { lang?: string; label?: string }): string {
+  const langKey = normalizeTrackLanguage(track.lang || track.label || '');
+  const label = String(track.label || getLanguageDisplayName(langKey)).trim().toLowerCase().replace(/\s+/g, ' ');
+  return `${langKey}|${label}`;
+}
+
+function dedupeInternalSubtitleTracks(tracks: Array<{ id: number; label: string; lang: string; default?: boolean }>) {
+  const seen = new Set<string>();
+  const deduped: Array<{ id: number; label: string; lang: string; default?: boolean }> = [];
+
+  for (const track of tracks) {
+    const key = getSubtitleDisplayKey(track);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(track);
+  }
+  return deduped;
+}
+
+function doesSubtitleTrackMatchPreference(track: Pick<TextTrack, 'language' | 'label'>, preference: string): boolean {
+  const normalizedPreference = String(preference || '').trim().toLowerCase();
+  const language = normalizeTrackLanguage(track.language);
+  const label = String(track.label || '').toLowerCase();
+
+  if (normalizedPreference === 'english') return language === 'en' || label.includes('english') || label.includes('eng');
+  if (normalizedPreference === 'spanish') return language === 'es' || label.includes('spanish') || label.includes('espanol');
+  if (normalizedPreference === 'french') return language === 'fr' || label.includes('french');
+  if (normalizedPreference === 'german') return language === 'de' || label.includes('german');
+  if (normalizedPreference === 'japanese') return language === 'ja' || label.includes('japanese');
+  if (normalizedPreference === 'portuguese') return language === 'pt' || label.includes('portuguese');
+  if (normalizedPreference === 'arabic') return language === 'ar' || label.includes('arabic');
+  if (normalizedPreference === 'hindi') return language === 'hi' || label.includes('hindi');
+  if (normalizedPreference.length === 2) return language === normalizedPreference;
+
+  return label.includes(normalizedPreference);
+}
+
+function getPreferredInternalSubtitleTrack(
+  tracks: Array<{ id: number; lang: string; default?: boolean }>,
+  subtitlePreference: string,
+): { id: number; lang: string; default?: boolean } | null {
+  if (!tracks.length) return null;
+  const normalizedPreference = String(subtitlePreference || '').trim().toLowerCase();
+
+  const matchByLanguage = (expected: string) =>
+    tracks.find((track) => normalizeTrackLanguage(track.lang) === expected);
+
+  if (normalizedPreference === 'auto' || normalizedPreference === 'english') {
+    return matchByLanguage('en') || tracks.find((track) => track.default) || tracks[0];
+  }
+
+  const languageCodeByPreference: Record<string, string> = {
+    spanish: 'es',
+    french: 'fr',
+    german: 'de',
+    japanese: 'ja',
+    portuguese: 'pt',
+    arabic: 'ar',
+    hindi: 'hi',
+  };
+
+  const expectedCode = languageCodeByPreference[normalizedPreference] || normalizedPreference;
+  return matchByLanguage(expectedCode) || matchByLanguage('en') || tracks.find((track) => track.default) || tracks[0];
+}
+
+function isTransientTorrentStartupError(message: string): boolean {
+  const normalized = String(message || '').toLowerCase();
+  return (
+    normalized.includes('demuxer_error_could_not_open') ||
+    normalized.includes('open context failed') ||
+    normalized.includes('invalid data found when processing input') ||
+    normalized.includes('end of file') ||
+    normalized.includes('read error') ||
+    normalized.includes('duplicate element') ||
+    normalized.includes('could not open')
+  );
+}
+
 function parseQualityScore(quality?: string): number | null {
   const normalized = String(quality || '').toLowerCase();
   const match = normalized.match(/(\d{3,4})\s*p?/);
@@ -303,7 +288,7 @@ function parseQualityScore(quality?: string): number | null {
 }
 
 function selectPreferredSource(
-  sources: Array<{ url: string; isM3U8: boolean; quality?: string }>,
+  sources: Array<{ url: string; isM3U8: boolean; quality?: string; sourceType?: string }>,
   preferredQuality: 'auto' | '1080p' | '720p' | '480p' | '360p',
 ) {
   if (!sources.length) return undefined;
@@ -316,7 +301,7 @@ function selectPreferredSource(
 
   const candidates = sources
     .map((source) => ({ source, score: parseQualityScore(source.quality) }))
-    .filter((entry): entry is { source: { url: string; isM3U8: boolean; quality?: string }; score: number } => entry.score != null)
+    .filter((entry): entry is { source: { url: string; isM3U8: boolean; quality?: string; sourceType?: string }; score: number } => entry.score != null)
     .sort((left, right) => {
       const distanceDiff = Math.abs(left.score - preferredScore) - Math.abs(right.score - preferredScore);
       if (distanceDiff !== 0) return distanceDiff;
@@ -328,179 +313,124 @@ function selectPreferredSource(
   return sources.find((source) => String(source.quality || '').toLowerCase() === preferredQuality) || sources[0];
 }
 
-
-
 interface VideoPlayerProps {
-
-  sources: Array<{ url: string; isM3U8: boolean; quality?: string }>;
-
+  sources: Array<{ url: string; isM3U8: boolean; quality?: string; sourceType?: string }>;
   subtitles?: Array<{ lang: string; url: string; label?: string }>;
-
   headers?: { Referer?: string; "User-Agent"?: string };
-
   poster?: string;
-
   onError?: (context?: { statusCode?: number; reason?: string }) => void;
-
   onServerSwitch?: () => void;
-
   onRetryCurrentServer?: () => void;
-
   isLoading?: boolean;
-
   serverName?: string;
-
   onEpisodeEnd?: () => void;
-
   malId?: number | null;
-
   episodeNumber?: number;
-
   introWindow?: { start: number; end: number } | null;
-
   outroWindow?: { start: number; end: number } | null;
-
   initialSeekSeconds?: number;
-
   viewCount?: number;
-
   isLive?: boolean;
-
+  isTimelineLocked?: boolean;
+  timelineLockReason?: string;
+  hideTimelineUi?: boolean;
+  torrentStats?: {
+    progress: number;
+    downloadSpeed: number;
+    uploadSpeed: number;
+    numPeers: number;
+    seeders: number | null;
+    leechers: number | null;
+    eta: number | null;
+    done: boolean;
+    verified: boolean;
+    startedAt?: number;
+    name?: string;
+    infoHash?: string;
+    storage?: any;
+  };
+  torrentSessionId?: string;
+  onTorrentRepair?: () => void;
+  onTorrentStop?: () => void;
 }
 
-
-
-// Replaced by centralized functions in api.ts
-
-
-
-function formatTime(seconds: number): string {
-
+function formatTimeLocal(seconds: number): string {
   if (isNaN(seconds) || !isFinite(seconds)) return "0:00";
-
   const mins = Math.floor(seconds / 60);
-
   const secs = Math.floor(seconds % 60);
-
   return `${mins}:${secs.toString().padStart(2, "0")}`;
-
 }
-
-
 
 export function VideoPlayer({
-
   sources,
-
   subtitles = [],
-
   headers,
-
   poster,
-
   onError,
-
   onServerSwitch,
-
   onRetryCurrentServer,
-
   isLoading = false,
-
   serverName,
-
   onEpisodeEnd,
-
   malId,
-
   episodeNumber,
-
   introWindow,
-
   outroWindow,
-
   viewCount,
-
-  // optional progress callback provided by parent (watch page)
-
   onProgressUpdate,
-
   animeId,
-
   animeName,
-
   animePoster,
-
   episodeId,
-
   initialSeekSeconds,
-
   externalRef,
-
   onPlay,
-
   onPause,
-
   isLive,
-
+  isTimelineLocked = false,
+  timelineLockReason = 'Seeking unlocks after the torrent has fully downloaded and verified.',
+  hideTimelineUi = false,
   episodeTitle,
-
-  isOffline
-
+  isOffline,
+  torrentStats,
+  torrentSessionId,
+  onTorrentRepair,
+  onTorrentStop,
 }: VideoPlayerProps & {
-
   onProgressUpdate?: (progressSeconds: number, durationSeconds?: number, completed?: boolean) => void;
-
   animeId?: string;
-
   animeName?: string;
-
   animePoster?: string;
-
   episodeId?: string;
-
   initialSeekSeconds?: number;
-
   externalRef?: React.MutableRefObject<HTMLVideoElement | null>;
-
   onPlay?: () => void;
-
   onPause?: () => void;
-
   isLive?: boolean;
-
   episodeTitle?: string;
-
   isOffline?: boolean;
-
 }) {
-
   const videoRef = useRef<HTMLVideoElement>(null);
 
-
-
   // Sync external ref
-
   useEffect(() => {
-
     if (externalRef) {
-
       externalRef.current = videoRef.current;
-
     }
-
   }, [externalRef]);
 
-
-
   const containerRef = useRef<HTMLDivElement>(null);
+  const controlsOverlayRef = useRef<HTMLDivElement>(null);
 
   const hlsRef = useRef<Hls | null>(null);
 
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-
-
-  const { settings } = useVideoSettings();
+  const { settings, updateSetting } = useVideoSettings();
+  const currentSource = useMemo(
+    () => selectPreferredSource(sources, settings.defaultQuality),
+    [sources, settings.defaultQuality],
+  );
 
   const { skipTimes, fetchSkipTimes, getSkipLabel } = useAniskip();
 
@@ -545,6 +475,10 @@ export function VideoPlayer({
   const [isPlaying, setIsPlaying] = useState(false);
 
   const [currentTime, setCurrentTime] = useState(0);
+  const currentTimeRef = useRef(0);
+  useEffect(() => {
+    currentTimeRef.current = currentTime;
+  }, [currentTime]);
 
   const [duration, setDuration] = useState(0);
 
@@ -553,6 +487,7 @@ export function VideoPlayer({
   const lastSavedProgressRef = useRef<number>(0);
 
   const progressIntervalRef = useRef<number | null>(null);
+  const torrentPlaybackUpdateRef = useRef(0);
 
   const PROGRESS_SAVE_INTERVAL = 15; // seconds
 
@@ -562,6 +497,8 @@ export function VideoPlayer({
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPiP, setIsPiP] = useState(false);
+  const autoPiPDismissedRef = useRef(false);
+  const pipRequestInFlightRef = useRef(false);
 
   const [showControls, setShowControls] = useState(true);
 
@@ -581,19 +518,93 @@ export function VideoPlayer({
   const [isMobile, setIsMobile] = useState(false);
 
   const [currentSubtitle, setCurrentSubtitle] = useState<string>(settings.subtitleLanguage);
+  const [currentSecondarySubtitle, setCurrentSecondarySubtitle] = useState<string>(settings.secondarySubtitleLanguage || 'off');
+  const [secondarySubtitleCues, setSecondarySubtitleCues] = useState<Array<{ start: number; end: number; text: string }>>([]);
+  const [audioTracks, setAudioTracks] = useState<Array<{ id: number; label: string; lang: string; default?: boolean }>>([]);
+  const [currentAudioTrack, setCurrentAudioTrack] = useState<number>(0);
+  const [extractedAudioUrls, setExtractedAudioUrls] = useState<Record<number, string>>({});
+  const [activeExtractedAudioTrack, setActiveExtractedAudioTrack] = useState<number | null>(null);
+  const [internalSubtitles, setInternalSubtitles] = useState<Array<{ id: number; label: string; lang: string; default?: boolean }>>([]);
 
   const [showSubtitleMenu, setShowSubtitleMenu] = useState(false);
-  const [customSubtitles, setCustomSubtitles] = useState<Array<{ lang: string; url: string; label: string }>>([]);
+  const [showAudioMenu, setShowAudioMenu] = useState(false);
+  const [customSubtitles, setCustomSubtitles] = useState<Array<{ lang: string; url: string; label: string; internalTrackId?: number }>>([]);
   const [subtitleBlobs, setSubtitleBlobs] = useState<Record<string, string>>({});
   const [activeSkip, setActiveSkip] = useState<any>(null);
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
-  const [downloads, setDownloads] = useState<Record<string, any>>({});
-  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const [hoverTime, setHoverTime] = useState<number>(0);
   const [showHoverTime, setShowHoverTime] = useState(false);
   const [hoverPercent, setHoverPercent] = useState(0);
   const isNative = useIsNativeApp();
-  const { startDownload, downloadStates } = useDownload();
+  const [externalPlayerPath, setExternalPlayerPath] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isNative && (window as any).tatakaiRuntime?.getExternalPlayerPref) {
+      (window as any).tatakaiRuntime.getExternalPlayerPref().then((pref: any) => {
+        if (pref?.executablePath) {
+          setExternalPlayerPath(pref.executablePath);
+        }
+      });
+    }
+  }, [isNative]);
+
+  const handleRefresh = useCallback(() => {
+    if (!videoRef.current) return;
+    
+    const wasPlaying = !videoRef.current.paused;
+    const currentTimeSnapshot = videoRef.current.currentTime;
+    
+    toast.info('Refreshing video stream...');
+    
+    // Reload the video element
+    videoRef.current.load();
+    
+    // Attempt to restore time after metadata loads
+    const onLoaded = () => {
+      if (videoRef.current) {
+        videoRef.current.currentTime = currentTimeSnapshot;
+        if (wasPlaying) {
+          void videoRef.current.play().catch(() => {});
+        }
+      }
+      videoRef.current?.removeEventListener('loadedmetadata', onLoaded);
+    };
+    
+    videoRef.current.addEventListener('loadedmetadata', onLoaded);
+  }, []);
+
+  const handleLaunchExternal = useCallback(async () => {
+    if (!isNative || !externalPlayerPath || !currentSource?.url) return;
+
+    try {
+      const rt = (window as any).tatakaiRuntime;
+      const res = await rt.launchExternalPlayer({
+        executablePath: externalPlayerPath,
+        streamUrl: currentSource.url,
+        options: {
+          startTime: currentTimeRef.current,
+          title: `${animeName || 'Tatakai'} - ${episodeNumber ? `Episode ${episodeNumber}` : ''} ${episodeTitle || ''}`.trim()
+        }
+      });
+
+      if (res.success) {
+        toast.success(`Launched ${res.player || 'external player'}`);
+        if (isPlaying) videoRef.current?.pause();
+      } else {
+        toast.error(res.error || 'Failed to launch external player');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error launching external player');
+    }
+  }, [isNative, externalPlayerPath, currentSource?.url, animeName, episodeNumber, episodeTitle, isPlaying]);
+
+  useEffect(() => {
+    if (currentSource?.url && settings.alwaysUseExternalPlayer && externalPlayerPath && isNative) {
+      handleLaunchExternal();
+    }
+  }, [currentSource?.url, settings.alwaysUseExternalPlayer, externalPlayerPath, isNative]);
+
+  const externalAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const handleCustomSubtitleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -607,7 +618,7 @@ export function VideoPlayer({
     };
 
     setCustomSubtitles(prev => [...prev, newSub]);
-    setCurrentSubtitle(getSubtitleSelectionKey(newSub, customSubtitles.length));
+    setCurrentSubtitle(getSubtitleSelectionKey(newSub, subtitles.length + customSubtitles.length));
 
     // Also add to blobs map immediately so it renders
     setSubtitleBlobs(prev => ({ ...prev, [url]: url }));
@@ -623,13 +634,6 @@ export function VideoPlayer({
 
 
 
-  const currentSource = useMemo(
-    () => selectPreferredSource(sources, settings.defaultQuality),
-    [sources, settings.defaultQuality],
-  );
-
-
-
   const initialSeekDoneRef = useRef(false);
 
   const manifestFallbackRef = useRef(false);
@@ -642,8 +646,62 @@ export function VideoPlayer({
   const manualRetryLockUntilRef = useRef(0);
   const subtitleApplyStateRef = useRef<{ lang: string; selectedIndex: number; trackCount: number } | null>(null);
   const subtitleTrackSignatureRef = useRef<string>('');
+  const extractedSubtitleCacheRef = useRef<Record<string, string>>({});
+  const extractedSubtitlePromiseRef = useRef<
+    Map<string, Promise<{ usableUrl: string; extractedUrl: string; rawUrl: string } | null>>
+  >(new Map());
+  const autoLoadedInternalSubtitleRef = useRef<string>('');
+  const allRenderedSubtitles = useMemo(
+    () => [...subtitles, ...customSubtitles],
+    [subtitles, customSubtitles],
+  );
+  const internalSubtitleDisplayKeys = useMemo(
+    () => new Set(internalSubtitles.map(getSubtitleDisplayKey)),
+    [internalSubtitles],
+  );
+  const visibleSubtitleOptions = useMemo(
+    () => {
+      const seen = new Set(internalSubtitleDisplayKeys);
+      return allRenderedSubtitles
+        .map((sub, index) => ({ sub, index }))
+        .filter(({ sub }) => {
+          if ((sub as { internalTrackId?: number }).internalTrackId != null) return false;
+          const key = getSubtitleDisplayKey(sub);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+    },
+    [allRenderedSubtitles, internalSubtitleDisplayKeys],
+  );
+  const currentInternalSubtitleTrackId = useMemo(() => {
+    const index = allRenderedSubtitles.findIndex(
+      (sub, subtitleIndex) => getSubtitleSelectionKey(sub, subtitleIndex) === currentSubtitle,
+    );
+    const internalTrackId = index >= 0
+      ? (allRenderedSubtitles[index] as { internalTrackId?: number } | undefined)?.internalTrackId
+      : undefined;
+    return typeof internalTrackId === 'number' ? internalTrackId : null;
+  }, [allRenderedSubtitles, currentSubtitle]);
+  const torrentStartupGraceUntilRef = useRef(0);
+  const deferredProbeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timelineSeekingLocked = Boolean(isTimelineLocked && !isLive);
+  const timelineUiHidden = Boolean(hideTimelineUi && !isLive);
+  const timelineSeekingLockedRef = useRef(timelineSeekingLocked);
+  const timelineLockReasonRef = useRef(timelineLockReason);
 
   const initialSeekRef = useRef(initialSeekSeconds);
+
+  useEffect(() => {
+    timelineSeekingLockedRef.current = timelineSeekingLocked;
+    timelineLockReasonRef.current = timelineLockReason;
+  }, [timelineSeekingLocked, timelineLockReason]);
+
+  const showTimelineLockHint = useCallback(() => {
+    toast.info(timelineLockReasonRef.current || 'Seeking is temporarily locked.', {
+      id: 'torrent-timeline-locked',
+    });
+  }, []);
 
 
 
@@ -687,111 +745,126 @@ export function VideoPlayer({
     }
   }, [settings.volume]);
 
-  // Sync with Discord RPC
+  // Sync with Discord RPC (single source of truth for watch activity)
   const lastRpcUpdateRef = useRef(0);
   useEffect(() => {
-    if (isNative && (window as any).electron && animeName) {
-      const now = Date.now();
-      if (now - lastRpcUpdateRef.current < 5000) return; // Throttle 5s
-      lastRpcUpdateRef.current = now;
+    if (!isNative || !animeName) return;
+    const now = Date.now();
+    if (now - lastRpcUpdateRef.current < 5000) return;
+    lastRpcUpdateRef.current = now;
 
-      const extra: any = {
-        startTime: isPlaying ? new Date(Date.now() - currentTime * 1000) : undefined,
-        endTime: isPlaying && duration > 0 ? new Date(Date.now() + (duration - currentTime) * 1000) : undefined,
-        smallImageKey: isPlaying ? 'play_icon' : 'pause_icon',
-        smallImageText: isPlaying ? 'Playing' : 'Paused'
-      };
+    const episodeLabel = episodeNumber
+      ? `Episode ${episodeNumber}`
+      : 'Watching';
 
-      (window as any).electron.updateRPC({
-        details: `Watching ${animeName}`,
-        state: `Episode ${episodeNumber || '...'}`,
-        extra
-      });
-    }
+    updateDiscordRpc(`Watching ${animeName}`, episodeLabel, {
+      startTime: isPlaying ? new Date(Date.now() - currentTime * 1000) : undefined,
+      endTime: isPlaying && duration > 0 ? new Date(Date.now() + (duration - currentTime) * 1000) : undefined,
+      smallImageKey: isPlaying ? 'play_icon' : 'pause_icon',
+      smallImageText: isPlaying ? 'Playing' : 'Paused',
+    });
   }, [isNative, isPlaying, animeName, episodeNumber, currentTime, duration]);
 
 
 
   const handleSubtitleChange = useCallback((lang: string) => {
-
     const video = videoRef.current;
-
     if (!video) return;
 
-
-
     const tracks = video.textTracks;
-
-    const orderedSubtitles = [...subtitles, ...customSubtitles];
+    const orderedSubtitles = allRenderedSubtitles;
     const selectedKey = lang.trim();
     const selectedKeyLower = selectedKey.toLowerCase();
 
-    const englishIndex = (() => {
-      for (let i = 0; i < tracks.length; i++) {
-        const track = tracks[i];
-        const trackLang = String(track.language || '').toLowerCase();
-        const trackLabel = String(track.label || '').toLowerCase();
-        if (trackLang === 'en' || trackLang.includes('eng') || trackLabel.includes('english')) return i;
-      }
-      return -1;
-    })();
+    // 1. Initially disable all tracks to clear any duplicate/orphaned subtitles
+    for (let i = 0; i < tracks.length; i++) {
+      tracks[i].mode = 'disabled';
+    }
+
+    if (lang === 'off') {
+      subtitleApplyStateRef.current = { lang, selectedIndex: -1, trackCount: tracks.length };
+      setCurrentSubtitle('off');
+      return;
+    }
 
     let selectedIndex = -1;
+    const trackElements = video.querySelectorAll('track');
 
-    if (lang === 'auto') {
-      selectedIndex = englishIndex >= 0 ? englishIndex : (tracks.length > 0 ? 0 : -1);
-    } else if (lang !== 'off') {
-      for (let i = 0; i < tracks.length; i++) {
-        const mappedSubtitle = orderedSubtitles[i];
-        const mappedKey = mappedSubtitle ? getSubtitleSelectionKey(mappedSubtitle, i).toLowerCase() : '';
-        if (mappedKey === selectedKeyLower) {
-          selectedIndex = i;
-          break;
-        }
-      }
+    // 2. Try to match tracks by their DOM element src attribute
+    if (trackElements.length > 0) {
+      for (let i = 0; i < trackElements.length; i++) {
+        const trackElement = trackElements[i] as HTMLTrackElement;
+        const track = trackElement.track;
+        if (!track) continue;
 
-      if (selectedIndex < 0) {
-        for (let i = 0; i < tracks.length; i++) {
-          const track = tracks[i];
-          const trackLang = String(track.language || '').toLowerCase();
-          const trackLabel = String(track.label || '').toLowerCase();
-          if (trackLang === selectedKeyLower || trackLabel === selectedKeyLower) {
-            selectedIndex = i;
-            break;
+        const trackSrc = trackElement.getAttribute('src') || '';
+        const subIndex = orderedSubtitles.findIndex((s, idx) => {
+          const subUrl = String(s.url || '').trim();
+          if (!subUrl) return false;
+          // Match by raw attribute source, resolved source, or blob/proxied source
+          const blobUrl = subtitleBlobs[subUrl];
+          return trackSrc === subUrl || trackElement.src === subUrl || trackSrc === blobUrl || trackElement.src === blobUrl;
+        });
+
+        if (subIndex >= 0) {
+          const sub = orderedSubtitles[subIndex];
+          const subtitleSelectionKey = getSubtitleSelectionKey(sub, subIndex).toLowerCase();
+          
+          let isMatch = false;
+          if (selectedKeyLower === 'auto' || selectedKeyLower === 'english') {
+            isMatch = doesSubtitleTrackMatchPreference(track, 'english');
+          } else {
+            isMatch = subtitleSelectionKey === selectedKeyLower;
+          }
+
+          if (isMatch) {
+            track.mode = 'showing';
+            selectedIndex = subIndex;
+            // Break only if we are matching a specific selection (for auto/english, let it select)
+            if (selectedKeyLower !== 'auto' && selectedKeyLower !== 'english') {
+              break;
+            }
           }
         }
       }
     }
 
-    let currentShowingIndex = -1;
-    for (let i = 0; i < tracks.length; i++) {
-      if (tracks[i].mode === 'showing') {
-        currentShowingIndex = i;
-        break;
+    // 3. Fallback to index/label matching if DOM tracks aren't fully resolved yet
+    if (selectedIndex < 0) {
+      const englishIndex = (() => {
+        for (let i = 0; i < tracks.length; i++) {
+          const track = tracks[i];
+          if (doesSubtitleTrackMatchPreference(track, 'english')) return i;
+        }
+        return -1;
+      })();
+
+      if (lang === 'auto') {
+        selectedIndex = englishIndex >= 0 ? englishIndex : (tracks.length > 0 ? 0 : -1);
+      } else {
+        for (let i = 0; i < tracks.length; i++) {
+          const mappedSubtitle = orderedSubtitles[i];
+          const mappedKey = mappedSubtitle ? getSubtitleSelectionKey(mappedSubtitle, i).toLowerCase() : '';
+          if (mappedKey === selectedKeyLower) {
+            selectedIndex = i;
+            break;
+          }
+        }
+
+        if (selectedIndex < 0) {
+          for (let i = 0; i < tracks.length; i++) {
+            const track = tracks[i];
+            if (doesSubtitleTrackMatchPreference(track, selectedKeyLower)) {
+              selectedIndex = i;
+              break;
+            }
+          }
+        }
       }
-    }
 
-    const previousApply = subtitleApplyStateRef.current;
-    const alreadyApplied =
-      !!previousApply &&
-      previousApply.lang === lang &&
-      previousApply.selectedIndex === selectedIndex &&
-      previousApply.trackCount === tracks.length &&
-      currentShowingIndex === selectedIndex;
-
-    if (alreadyApplied) {
-      setCurrentSubtitle((prev) => (prev === lang ? prev : lang));
-      return;
-    }
-
-
-
-    for (let i = 0; i < tracks.length; i++) {
-
-      const track = tracks[i];
-
-      track.mode = i === selectedIndex ? 'showing' : 'disabled';
-
+      if (selectedIndex >= 0 && selectedIndex < tracks.length) {
+        tracks[selectedIndex].mode = 'showing';
+      }
     }
 
     subtitleApplyStateRef.current = {
@@ -801,8 +874,7 @@ export function VideoPlayer({
     };
 
     setCurrentSubtitle((prev) => (prev === lang ? prev : lang));
-
-  }, [subtitles, customSubtitles]);
+  }, [allRenderedSubtitles, subtitleBlobs]);
 
 
 
@@ -812,16 +884,26 @@ export function VideoPlayer({
 
   }, [settings.subtitleLanguage, handleSubtitleChange]);
 
+  useEffect(() => {
+    setCurrentSecondarySubtitle(String(settings.secondarySubtitleLanguage || 'off'));
+  }, [settings.secondarySubtitleLanguage]);
+
 
 
   // Create a key from subtitle metadata to detect source changes.
-  const subtitleKey = subtitles
+  const subtitleKey = [...(subtitles || []), ...(customSubtitles || [])]
     ?.map((s) => `${String(s.url || '').trim()}|${String(s.lang || '').trim()}|${String(s.label || '').trim()}`)
     .join('|') ?? '';
   const subtitleReferer = headers?.Referer || '';
   const subtitleUserAgent = headers?.["User-Agent"] || '';
   const playbackReferer = headers?.Referer || '';
   const playbackUserAgent = headers?.["User-Agent"] || '';
+  const sourceKey = currentSource?.url || '';
+
+  useEffect(() => {
+    subtitleApplyStateRef.current = null;
+    subtitleTrackSignatureRef.current = '';
+  }, [subtitleKey, sourceKey]);
 
 
 
@@ -830,15 +912,11 @@ export function VideoPlayer({
   // Also clear old blobs when subtitles change (e.g., switching between sub/dub).
 
   useEffect(() => {
-
-    if (!subtitles || subtitles.length === 0) {
-
+    const allSubs = [...(subtitles || []), ...(customSubtitles || [])];
+    if (allSubs.length === 0) {
       // Clear blobs if no subtitles
-
       setSubtitleBlobs({});
-
       return;
-
     }
 
 
@@ -857,7 +935,7 @@ export function VideoPlayer({
     (async () => {
 
 
-      for (const sub of subtitles) {
+      for (const sub of allSubs) {
 
         if (!mounted) break;
 
@@ -873,16 +951,32 @@ export function VideoPlayer({
             continue;
           }
 
+          // Handle local file:// URLs by converting to data URLs via IPC
+          if (subtitleSourceUrl.startsWith('file://')) {
+            try {
+              const fileResult = await (window as any).tatakaiRuntime?.readLocalFile?.(subtitleSourceUrl);
+              if (fileResult?.success && fileResult?.url) {
+                if (mounted) {
+                  setSubtitleBlobs(prev => ({ ...prev, [subtitleSourceUrl]: fileResult.url }));
+                }
+                continue;
+              }
+            } catch (err) {
+              console.warn('Failed to read local subtitle file:', subtitleSourceUrl, err);
+            }
+          }
+
           const fetchCandidates = buildSubtitleFetchCandidates(
             subtitleSourceUrl,
             subtitleReferer,
-            Boolean(isOffline)
+            Boolean(isOffline),
+            (url, referer) => getProxiedSubtitleUrl(url, referer)
           );
 
           let normalizedText = '';
           for (const candidateUrl of fetchCandidates) {
             try {
-              const response = await fetch(candidateUrl, {
+              const response = await fetchViaChain(candidateUrl, {
                 headers: {
                   Accept: 'text/vtt, text/plain, */*',
                 },
@@ -938,6 +1032,49 @@ export function VideoPlayer({
 
   }, [subtitleKey, subtitleReferer, subtitleUserAgent, isOffline]);
 
+  // Secondary subtitle overlay (dual subs): parse cues from the selected subtitle.
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      const selection = String(currentSecondarySubtitle || '').trim();
+      if (!selection || selection === 'off') {
+        setSecondarySubtitleCues([]);
+        return;
+      }
+
+      const allSubs = [...(subtitles || []), ...(customSubtitles || [])];
+      const matchedIndex = allSubs.findIndex((sub, idx) => getSubtitleSelectionKey(sub as any, idx) === selection);
+      const sub = matchedIndex >= 0 ? allSubs[matchedIndex] : null;
+      const sourceUrl = sub?.url ? String(sub.url).trim() : '';
+      if (!sourceUrl) {
+        setSecondarySubtitleCues([]);
+        return;
+      }
+
+      const resolvedUrl = subtitleBlobs[sourceUrl] || sourceUrl;
+
+      try {
+        const res = await fetch(resolvedUrl);
+        if (!res.ok) {
+          if (!cancelled) setSecondarySubtitleCues([]);
+          return;
+        }
+        const text = await res.text();
+        const vtt = normalizeSubtitleToVtt(text);
+        const cues = parseVttCues(vtt);
+        if (!cancelled) setSecondarySubtitleCues(cues);
+      } catch {
+        if (!cancelled) setSecondarySubtitleCues([]);
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentSecondarySubtitle, subtitles, customSubtitles, subtitleBlobs]);
+
 
 
   // Apply subtitle setting when subtitle blobs are loaded
@@ -960,7 +1097,7 @@ export function VideoPlayer({
       const signature = Array.from({ length: tracks.length }, (_, index) => {
         const track = tracks[index];
         return `${track.language}|${track.label}|${track.kind}`;
-      }).join('||');
+      }).join('||') + `||select:${currentSubtitle}`;
 
       if (!signature || signature === subtitleTrackSignatureRef.current) return;
       subtitleTrackSignatureRef.current = signature;
@@ -1045,7 +1182,7 @@ export function VideoPlayer({
         const signature = Array.from({ length: tracks.length }, (_, index) => {
           const track = tracks[index];
           return `${track.language}|${track.label}|${track.kind}`;
-        }).join('||');
+        }).join('||') + `||select:${currentSubtitle}`;
 
         if (!signature || signature === subtitleTrackSignatureRef.current) return;
 
@@ -1102,6 +1239,11 @@ export function VideoPlayer({
 
   const handleSkip = useCallback(() => {
 
+    if (timelineSeekingLockedRef.current) {
+      showTimelineLockHint();
+      return;
+    }
+
     if (activeSkip && videoRef.current) {
 
       videoRef.current.currentTime = activeSkip.interval.endTime;
@@ -1110,7 +1252,7 @@ export function VideoPlayer({
 
     }
 
-  }, [activeSkip]);
+  }, [activeSkip, showTimelineLockHint]);
 
 
 
@@ -1130,7 +1272,6 @@ export function VideoPlayer({
 
 
 
-  const sourceKey = currentSource?.url || '';
   const autoSkippedWindowRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -1139,6 +1280,7 @@ export function VideoPlayer({
 
   useEffect(() => {
     if (!settings.autoSkipIntro || !activeSkip || !videoRef.current) return;
+    if (timelineSeekingLockedRef.current) return;
     if (activeSkip.skipType !== 'op' && activeSkip.skipType !== 'mixed-op' && activeSkip.skipType !== 'recap') {
       return;
     }
@@ -1149,750 +1291,755 @@ export function VideoPlayer({
     videoRef.current.currentTime = activeSkip.interval.endTime;
     autoSkippedWindowRef.current = windowKey;
     setActiveSkip(null);
-  }, [activeSkip, settings.autoSkipIntro]);
+  }, [activeSkip, settings.autoSkipIntro, timelineSeekingLocked]);
 
 
 
   const loadVideo = useCallback(
-
-    () => {
-
+    async () => {
       if (!currentSource?.url || !videoRef.current) return;
 
-
-
       setVideoError(null);
-
       setIsBuffering(true);
-      manifestFallbackRef.current = false;
-      manifestRetryRef.current = 0;
-      lastProgressAtRef.current = Date.now();
-      lastObservedTimeRef.current = 0;
 
-
-
-      // Clear any existing progress saver when loading a new source
-
-      if (progressIntervalRef.current !== null) {
-
-        clearInterval(progressIntervalRef.current as number);
-
-        progressIntervalRef.current = null;
-
-      }
-
-
-
-      // Check if we have a local download for this episode
-      const downloadId = `${animeId}-${episodeNumber}`;
-      const download = downloads[downloadId];
-
-      let videoUrl = currentSource.url;
-
-      // Only check download status if NOT in offline mode
-      // If isOffline is true, we trust the source passed to us (which is the local file)
-      if (!isOffline && download?.status === 'completed' && download.localUri) {
-        videoUrl = convertFileSrc(download.localUri);
-      } else if (currentSource.url.startsWith('file:') || currentSource.url.match(/^[a-zA-Z]:\\/)) {
-        // Verify if it's already a raw path passed from elsewhere
-        videoUrl = convertFileSrc(currentSource.url);
-      }
-
-      const isM3U8 = !isOffline && (currentSource.isM3U8 || videoUrl.includes(".m3u8") || videoUrl.includes("playlist.m3u8")) && !videoUrl.endsWith('.mp4');
-      const referer = playbackReferer || undefined;
-      // Fallback to browser UA if not provided by source (crucial for Cloudflare bypass)
-      const userAgent = playbackUserAgent || navigator.userAgent;
-
-      // Use our backend proxy if not local and not already proxied
-      // CRITICAL FIX: Do not proxy local assets (asset:// or asset.localhost)
-      const isLocal = videoUrl.startsWith('asset://') || videoUrl.includes('asset.localhost') || videoUrl.startsWith('http://asset.localhost');
-
-      // If offline/local, strictly use the provided URL without proxy
-      // Also ensure we handle encoded spaces correctly for local files
-      const proxiedUrl = (isLocal || isOffline)
-        ? videoUrl
-        : (videoUrl.startsWith('http') ? getProxiedVideoUrl(videoUrl, referer, userAgent) : videoUrl);
-
-      const proxySnapshot = readProxyQuerySnapshot(proxiedUrl);
-      const sourceSnapshot = readProxyQuerySnapshot(videoUrl);
-      const originalStreamUrl = proxySnapshot.streamUrl || sourceSnapshot.streamUrl || videoUrl;
-      const effectiveReferer = proxySnapshot.referer || sourceSnapshot.referer || referer;
-      const effectiveUserAgent = proxySnapshot.userAgent || sourceSnapshot.userAgent || userAgent;
-      const effectiveProxyPassword = proxySnapshot.password || sourceSnapshot.password || STREAM_PROXY_PASSWORD;
-      const proxyCandidates = isM3U8
-        ? buildProxyCandidateUrls(
-            originalStreamUrl,
-            effectiveReferer,
-            effectiveUserAgent,
-            proxiedUrl,
-            effectiveProxyPassword,
-          )
-        : [proxiedUrl];
-      let activeProxyIndex = Math.max(0, proxyCandidates.findIndex((candidate) => candidate === proxiedUrl));
-      let activePlaybackUrl = proxyCandidates[activeProxyIndex] || proxiedUrl;
-      const attemptedProxyIndexes = new Set<number>([activeProxyIndex]);
-      let proxySwitchInProgress = false;
-      let proxySwitchCount = 0;
-
-      console.log('Loading video:', { original: videoUrl, final: activePlaybackUrl, isLocal, isOffline, proxyCandidates: proxyCandidates.length });
-
-      trackEvent('video_initialize', { animeName, episodeNumber, sourceType: isM3U8 ? 'hls' : 'file' });
-
-      if (isM3U8 && Hls.isSupported()) {
-        const hls = new Hls({
-          xhrSetup: (xhr, url) => {
-            // If it's a local asset, no headers needed, or specific handling
-            if (url.startsWith('asset://') || url.startsWith('http://asset.localhost')) {
-              return;
-            }
-            xhr.timeout = 30000;
-          },
-          enableWorker: true,
-          lowLatencyMode: true,
-          backBufferLength: 90,
-
-          // FastStream-inspired optimization for aggressive buffering:
-          maxBufferLength: 300,             // pre-buffer up to 5 minutes
-          maxMaxBufferLength: 1200,         // absolute max 20 mins buffer
-          maxBufferSize: 500 * 1000 * 1000, // 500 MB max size
-          maxBufferHole: 0.5,
-          highBufferWatchdogPeriod: 2,
-          nudgeOffset: 0.1,
-          nudgeMaxRetry: 5,
-          maxFragLookUpTolerance: 0.25,
-          appendErrorMaxRetry: 4,
-          fragLoadingMaxRetry: 1,
-          manifestLoadingMaxRetry: 0,
-          levelLoadingMaxRetry: 1,
-          startFragPrefetch: true,          // parallelize fragment loading
-        });
-
-        const trySwitchProxyCandidate = async (context?: { statusCode?: number }) => {
-          if (proxyCandidates.length <= 1) return false;
-
-          if (proxySwitchInProgress) return false;
-
-          const statusCode = Number(context?.statusCode || 0);
-          const maxSwitches = statusCode === 403 || statusCode === 410 ? 1 : 3;
-          if (proxySwitchCount >= maxSwitches) return false;
-
-          proxySwitchInProgress = true;
-
-          try {
-            for (let candidateIndex = activeProxyIndex + 1; candidateIndex < proxyCandidates.length; candidateIndex += 1) {
-              if (attemptedProxyIndexes.has(candidateIndex)) continue;
-
-              const candidateUrl = proxyCandidates[candidateIndex];
-              attemptedProxyIndexes.add(candidateIndex);
-              proxySwitchCount += 1;
-
-              activeProxyIndex = candidateIndex;
-              activePlaybackUrl = candidateUrl;
-              manifestFallbackRef.current = false;
-              manifestRetryRef.current = 0;
-              audioCodecSwapAttemptedRef.current = false;
-
-              setVideoError(null);
-              setIsBuffering(true);
-
-              try {
-                hls.stopLoad();
-              } catch {
-                // noop
-              }
-
-              hls.loadSource(candidateUrl);
-              hls.startLoad();
-              toast.success(`Switched proxy route (${candidateIndex + 1}/${proxyCandidates.length})`, { id: 'proxy-failover' });
-              return true;
-            }
-
-            return false;
-          } finally {
-            proxySwitchInProgress = false;
-          }
-        };
-
-
-
-        // Start periodic progress saver when HLS is attached
-
-        if (progressIntervalRef.current === null) {
-
-          progressIntervalRef.current = window.setInterval(() => {
-
-            const time = Math.floor(videoRef.current?.currentTime || 0);
-
-            const dur = Math.floor(videoRef.current?.duration || 0) || undefined;
-
-            if (onProgressUpdate && time !== lastSavedProgressRef.current && Math.abs(time - lastSavedProgressRef.current) >= PROGRESS_SAVE_INTERVAL) {
-
-              onProgressUpdate(time, dur, false);
-
-              setLastSavedProgress(time);
-
-              lastSavedProgressRef.current = time;
-
-            }
-
-          }, PROGRESS_SAVE_INTERVAL * 1000);
-
-        }
-
-
-
-
-
-        hls.loadSource(activePlaybackUrl);
-    audioCodecSwapAttemptedRef.current = false;
-
-        hls.attachMedia(videoRef.current);
-
-
-
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-
-          console.log('HLS manifest parsed successfully');
-          manifestRetryRef.current = 0;
-          manifestFallbackRef.current = false;
-          audioCodecSwapAttemptedRef.current = false;
-          mediaErrorBurstRef.current = { windowStart: 0, count: 0, escalatedAt: 0 };
-
-          setIsBuffering(false);
-
-          if (settings.autoplay) {
-            videoRef.current?.play().catch(() => { });
-          }
-
-
-
-          // Once manifest parsed, fetch skip times using known duration
-
-          const length = videoRef.current?.duration;
-
-          if (!hasTatakaiSkipWindowsRef.current && malId && episodeNumber) {
-
-            fetchSkipTimes(malId, episodeNumber, isFinite(length) && length > 0 ? Math.floor(length) : undefined);
-
-          }
-
-
-
-          // Ensure subtitle selection is applied after tracks are available
-
-          if (currentSubtitle && currentSubtitle !== 'off') {
-
-            handleSubtitleChange(currentSubtitle);
-
-          }
-
-          // Rewrite relative URLs to proxied upstream URLs to preserve CORS
-
-          // Apply initial seek for native HLS / loadedmetadata
-
-          if (initialSeekRef.current !== undefined && !initialSeekDoneRef.current) {
-
-            try {
-
-              const seekTo = Math.max(0, Math.min(initialSeekRef.current, Math.floor(videoRef.current?.duration || initialSeekRef.current)));
-
-              if (videoRef.current) videoRef.current.currentTime = seekTo;
-
-              initialSeekDoneRef.current = true;
-
-            } catch (e) {
-
-              console.warn('Failed initial seek:', e);
-
-            }
-
-          }
-
-        });
-
-
-
-        hls.on(Hls.Events.ERROR, async (_, data) => {
-
-          console.error('HLS error:', data.type, data.details);
-          const responseCode = Number((data as any)?.response?.code || (data as any)?.response?.status || 0);
-          const detailText = String(data.details || '').toLowerCase();
-          const isCodecBufferError =
-            data.type === Hls.ErrorTypes.MEDIA_ERROR &&
-            (
-              detailText.includes('bufferappenderror') ||
-              detailText.includes('bufferaddcodecerror') ||
-              detailText.includes('bufferstallederror') ||
-              detailText.includes('fragparsingerror') ||
-              detailText.includes('buffernudgeonstall')
-            );
-
-          if (isCodecBufferError) {
-            if (!audioCodecSwapAttemptedRef.current) {
-              audioCodecSwapAttemptedRef.current = true;
-              try {
-                hls.swapAudioCodec();
-              } catch {
-                // noop
-              }
-
-              hls.recoverMediaError();
-              return;
-            }
-
-            const now = Date.now();
-            const burst = mediaErrorBurstRef.current;
-            const isSevereCodecError =
-              detailText.includes('bufferaddcodecerror') ||
-              detailText.includes('fragparsingerror');
-
-            if (!burst.windowStart || now - burst.windowStart > 7000) {
-              burst.windowStart = now;
-              burst.count = 0;
-            }
-
-            burst.count += 1;
-
-            // Avoid infinite recover loops for broken HLS segment/codec pipelines.
-            const burstThreshold = isSevereCodecError ? 2 : 3;
-            if (burst.count >= burstThreshold && now - burst.escalatedAt > 3500) {
-              burst.escalatedAt = now;
-
-              const switchedProxy = await trySwitchProxyCandidate({ statusCode: responseCode });
-              if (switchedProxy) {
-                burst.windowStart = now;
-                burst.count = 0;
-                return;
-              }
-
-              setVideoError('HLS decode failed repeatedly. Auto-switching source...');
-              if (onError) onError({ statusCode: responseCode || undefined, reason: 'hls-buffer-codec-loop' });
-              hls.stopLoad();
-              return;
-            }
-          }
-
-          if (data.response?.code === 0 || data.details === 'manifestLoadError') {
-            toast.error("Playback blocked? Try disabling 'Tracking Prevention' or switching servers.", { duration: 5000, id: 'tracking-prevention' });
-          }
-
-
-
-          // Try client-side manifest fetch fallback for manifestLoadError
-
-          if (data.type === Hls.ErrorTypes.NETWORK_ERROR && data.details && String(data.details).toLowerCase().includes('manifest') && !manifestFallbackRef.current) {
-
-            if ([403, 410, 502, 503, 504].includes(responseCode)) {
-              const switchedProxy = await trySwitchProxyCandidate({ statusCode: responseCode });
-              if (switchedProxy) {
-                return;
-              }
-
-              if (responseCode === 403) {
-                setVideoError('Stream forbidden (403). Auto-switching server in 3 seconds...');
-              } else if (responseCode === 410) {
-                setVideoError('Stream expired (410). Refreshing source and switching server...');
-              } else {
-                setVideoError('Manifest blocked or invalid. Auto-switching server in 3 seconds...');
-              }
-              if (onError) onError({ statusCode: responseCode, reason: 'manifest-network-error' });
-              hls.stopLoad();
-              return;
-            }
-
-            manifestFallbackRef.current = true;
-
-            try {
-
-              console.log('Attempting client-side manifest fetch fallback for', activePlaybackUrl);
-
-              const res = await fetch(activePlaybackUrl, { redirect: 'follow', cache: 'no-store' });
-
-              const text = await res.text().catch(() => '');
-
-              if (res.status === 403) {
-                setVideoError('Stream forbidden (403). Auto-switching server in 3 seconds...');
-                if (onError) onError({ statusCode: res.status, reason: 'manifest-fetch-forbidden' });
-                hls.stopLoad();
-                return;
-              }
-
-
-
-              // Check if we got a valid manifest
-
-              if (!res.ok || !looksLikeHlsManifest(text)) {
-
-                console.warn('Manifest fallback returned invalid content');
-
-                const switchedProxy = await trySwitchProxyCandidate({ statusCode: res.status });
-                if (switchedProxy) {
-                  return;
-                }
-
-                setVideoError('Manifest blocked or invalid. Auto-switching server in 3 seconds...');
-                if (onError) onError({ statusCode: res.status, reason: 'manifest-fetch-invalid' });
-                hls.stopLoad();
-                return;
-
-              }
-
-            } catch (e) {
-
-              console.warn('Client-side manifest fetch fallback failed:', e);
-
-              const switchedProxy = await trySwitchProxyCandidate();
-              if (switchedProxy) {
-                return;
-              }
-
-              setVideoError('Manifest fetch failed. Auto-switching server in 3 seconds...');
-              if (onError) onError({ statusCode: responseCode || undefined, reason: 'manifest-fetch-error' });
-              hls.stopLoad();
-              return;
-
-            }
-
-          }
-
-
-
-          if (data.fatal) {
-            const isForbiddenResponse = responseCode === 403;
-
-            if (isForbiddenResponse) {
-              const switchedProxy = await trySwitchProxyCandidate({ statusCode: responseCode });
-              if (switchedProxy) {
-                retryCountRef.current = 0;
-                setRetryCount(0);
-                return;
-              }
-
-              setVideoError('Stream forbidden (403). Auto-switching server in 3 seconds...');
-              if (onError) onError({ statusCode: responseCode, reason: 'fatal-forbidden' });
-              hls.stopLoad();
-              return;
-            }
-
-            if (responseCode === 410) {
-              const switchedProxy = await trySwitchProxyCandidate({ statusCode: responseCode });
-              if (switchedProxy) {
-                return;
-              }
-
-              setVideoError('Stream expired (410). Refreshing source and switching server...');
-              if (onError) onError({ statusCode: responseCode, reason: 'fatal-gone' });
-              hls.stopLoad();
-              return;
-            }
-
-            // Surface manifest parsing problems explicitly so we can switch servers
-
-            if (data.details && String(data.details).toLowerCase().includes('manifest')) {
-
-              const switchedProxy = await trySwitchProxyCandidate({ statusCode: responseCode });
-              if (switchedProxy) {
-                return;
-              }
-
-              setVideoError('Manifest blocked or invalid. Auto-switching server in 3 seconds...');
-              if (onError) onError({ statusCode: responseCode || undefined, reason: 'fatal-manifest' });
-              hls.stopLoad();
-              return;
-
-            }
-
-
-
-            switch (data.type) {
-
-              case Hls.ErrorTypes.NETWORK_ERROR:
-
-                console.error('Network error - attempting recovery');
-
-                if (retryCountRef.current < 2) {
-
-                  setRetryCount(prev => {
-                    const next = prev + 1;
-                    retryCountRef.current = next;
-                    return next;
-                  });
-
-                  hls.startLoad();
-
-                } else {
-
-                  const switchedProxy = await trySwitchProxyCandidate({ statusCode: responseCode });
-                  if (switchedProxy) {
-                    retryCountRef.current = 0;
-                    setRetryCount(0);
-                    return;
-                  }
-
-                  setVideoError("Network error. Auto-switching server in 3 seconds...");
-
-                  if (onError) onError({ statusCode: responseCode || undefined, reason: 'fatal-network' });
-
-                }
-
-                break;
-
-              case Hls.ErrorTypes.MEDIA_ERROR:
-
-                console.error('Media error - attempting recovery');
-
-                if (isCodecBufferError) {
-                  const switchedProxy = await trySwitchProxyCandidate({ statusCode: responseCode });
-                  if (switchedProxy) {
-                    retryCountRef.current = 0;
-                    setRetryCount(0);
-                    return;
-                  }
-
-                  setVideoError('Media decode failed. Auto-switching source in 3 seconds...');
-                  if (onError) onError({ statusCode: responseCode || undefined, reason: 'fatal-media-buffer' });
-                  hls.stopLoad();
-                  return;
-                }
-
-                hls.recoverMediaError();
-
-                break;
-
-              default:
-
-                setVideoError("Failed to load video");
-
-                if (onError) onError({ statusCode: responseCode || undefined, reason: 'fatal-generic' });
-
-                break;
-
-            }
-
-          }
-
-        });
-
-
-
-        hlsRef.current = hls;
-
-      } else if (
-
-        videoRef.current.canPlayType("application/vnd.apple.mpegurl")
-
-      ) {
-
-        // Safari native HLS support
-
-        videoRef.current.src = proxiedUrl;
-
-        videoRef.current.addEventListener("loadedmetadata", () => {
-
-          setIsBuffering(false);
-
-          // Fetch skip times now that duration is available
-
-          const length = videoRef.current?.duration;
-
-          if (!hasTatakaiSkipWindowsRef.current && malId && episodeNumber) {
-
-            fetchSkipTimes(malId, episodeNumber, isFinite(length) && length > 0 ? Math.floor(length) : undefined);
-
-          }
-
-          // Ensure subtitle selection is applied
-
-          if (currentSubtitle && currentSubtitle !== 'off') {
-
-            handleSubtitleChange(currentSubtitle);
-
-          }
-
-
-
-          // Apply initial seek for native HLS / loadedmetadata
-
-          if (initialSeekRef.current !== undefined && !initialSeekDoneRef.current) {
-
-            try {
-
-              const seekTo = Math.max(0, Math.min(initialSeekRef.current, Math.floor(videoRef.current?.duration || initialSeekRef.current)));
-
-              if (videoRef.current) videoRef.current.currentTime = seekTo;
-
-              initialSeekDoneRef.current = true;
-
-            } catch (e) {
-
-              console.warn('Failed initial seek:', e);
-
-            }
-
-          }
-
-
-
-          if (settings.autoplay) {
-            videoRef.current?.play().catch(() => { });
-          }
-
-        });
-
-
-
-        // Ensure periodic saver for native HLS/native playback
-
-        if (progressIntervalRef.current === null) {
-
-          progressIntervalRef.current = window.setInterval(() => {
-
-            const time = Math.floor(videoRef.current?.currentTime || 0);
-
-            const dur = Math.floor(videoRef.current?.duration || 0) || undefined;
-
-            if (onProgressUpdate && time !== lastSavedProgressRef.current && Math.abs(time - lastSavedProgressRef.current) >= PROGRESS_SAVE_INTERVAL) {
-
-              onProgressUpdate(time, dur, false);
-
-              setLastSavedProgress(time);
-
-              lastSavedProgressRef.current = time;
-
-            }
-
-          }, PROGRESS_SAVE_INTERVAL * 1000);
-
-        }
-
+      let mode: 'hls' | 'direct' | 'torrent' | 'offline' | 'debrid' = 'direct';
+      if (isOffline) {
+        mode = 'offline';
       } else {
+        const url = String(currentSource.url || '');
+        const isHlsStream = Boolean(currentSource.isM3U8 || url.includes('.m3u8'));
+        const isPlayableHttpOrFile = url.startsWith('http://') || url.startsWith('https://') || url.startsWith('file://');
 
-        // Direct playback for non-HLS
-
-        videoRef.current.src = proxiedUrl;
-
-        setIsBuffering(false);
-
-
-
-        // Apply initial seek for direct playback if needed
-
-        if (initialSeekRef.current !== undefined && !initialSeekDoneRef.current) {
-
-          try {
-
-            const seekTo = Math.max(0, Math.min(initialSeekRef.current, Math.floor(videoRef.current?.duration || initialSeekRef.current)));
-
-            if (videoRef.current && videoRef.current.readyState >= 1) {
-
-              videoRef.current.currentTime = seekTo;
-
-              initialSeekDoneRef.current = true;
-
-            } else {
-
-              // Wait for loadedmetadata to set the time
-
-              const once = () => {
-
-                try {
-
-                  videoRef.current!.currentTime = seekTo;
-
-                } catch (e) {
-
-                  console.warn('Failed initial seek on metadata:', e);
-
-                }
-
-                initialSeekDoneRef.current = true;
-
-                videoRef.current?.removeEventListener('loadedmetadata', once);
-
-              };
-
-              videoRef.current.addEventListener('loadedmetadata', once);
-
-            }
-
-          } catch (e) {
-
-            console.warn('Failed initial seek:', e);
-
-          }
-
+        if (currentSource.sourceType === 'torrent') {
+          mode = isHlsStream ? 'hls' : (isPlayableHttpOrFile ? 'direct' : 'torrent');
+        } else if (url.startsWith('magnet:')) {
+          mode = 'debrid';
+        } else if (isHlsStream) {
+          mode = 'hls';
         }
-
-        if (settings.autoplay) {
-          const playDirectSource = () => {
-            videoRef.current?.play().catch(() => { });
-            videoRef.current?.removeEventListener('loadedmetadata', playDirectSource);
-          };
-
-          if (videoRef.current.readyState >= 1) {
-            videoRef.current.play().catch(() => { });
-          } else {
-            videoRef.current.addEventListener('loadedmetadata', playDirectSource);
-          }
-        }
-
-
-
-        // Also start periodic saver
-
-        if (progressIntervalRef.current === null) {
-
-          progressIntervalRef.current = window.setInterval(() => {
-
-            const time = Math.floor(videoRef.current?.currentTime || 0);
-
-            const dur = Math.floor(videoRef.current?.duration || 0) || undefined;
-
-            if (onProgressUpdate && time !== lastSavedProgressRef.current && Math.abs(time - lastSavedProgressRef.current) >= PROGRESS_SAVE_INTERVAL) {
-
-              onProgressUpdate(time, dur, false);
-
-              setLastSavedProgress(time);
-
-              lastSavedProgressRef.current = time;
-
-            }
-
-          }, PROGRESS_SAVE_INTERVAL * 1000);
-
-        }
-
       }
 
+      if (deferredProbeTimerRef.current) {
+        clearTimeout(deferredProbeTimerRef.current);
+        deferredProbeTimerRef.current = null;
+      }
+      torrentStartupGraceUntilRef.current = mode === 'torrent' ? Date.now() + 15000 : 0;
+      
+      try {
+        // If initial seek was already performed (e.g. switching from HLS to direct
+        // URL after torrent completion), use the current playback position to avoid
+        // jumping back to the initial seek time.
+        const seekTime = initialSeekDoneRef.current
+          ? (videoRef.current?.currentTime || initialSeekRef.current)
+          : initialSeekRef.current;
+
+        await sourceAdapterRegistry.switchTo({
+          source: {
+            id: currentSource.url,
+            url: currentSource.url,
+            mode: mode
+          },
+          videoElement: videoRef.current,
+          startTime: seekTime,
+          autoPlay: settings.autoplay
+        });
+
+        initialSeekDoneRef.current = true;
+      } catch (err: any) {
+        setVideoError(err.message || 'Failed to load video');
+        setIsBuffering(false);
+      }
     },
-
-    [sourceKey, isOffline, playbackReferer, playbackUserAgent, settings.autoplay]
-
+    [currentSource?.url, currentSource?.isM3U8, currentSource?.sourceType, isOffline, settings.autoplay]
   );
 
-
-
   useEffect(() => {
-
     loadVideo();
+  }, [currentSource?.url, currentSource?.isM3U8, currentSource?.sourceType, isOffline, settings.autoplay]);
 
+  const probeInProgressRef = useRef(false);
 
+  const triggerMediaProbe = useCallback(async () => {
+    const url = currentSource?.url;
+    if (!url || !isNative || !(window as any).tatakaiRuntime?.probeMedia || probeInProgressRef.current) return;
 
-    return () => {
+    // Skip probing local file:// URLs — ffprobe is not bundled and cannot read
+    // local files directly from the renderer. Only probe http:// torrent stream URLs.
+    if (url.startsWith('file://') || url.startsWith('data:') || url.startsWith('blob:')) return;
 
-      if (hlsRef.current) {
+    // Only probe if it's likely an MKV or local file or torrent.
+    // For torrent HLS remux, we still want to probe the underlying raw MKV URL
+    // (provided by the runtime via `torrentStats.rawUrl`) to list internal tracks.
+    const isM3U8 = url.includes('.m3u8') || currentSource?.isM3U8;
+    const torrentRawUrl = (torrentStats as any)?.rawUrl;
+    const allowTorrentProbeThroughHls = Boolean(
+      isM3U8 &&
+      currentSource?.sourceType === 'torrent' &&
+      typeof torrentRawUrl === 'string' &&
+      torrentRawUrl.startsWith('http'),
+    );
+    if (isM3U8 && !allowTorrentProbeThroughHls) return;
 
-        hlsRef.current.destroy();
-
-        hlsRef.current = null;
-
+    const isTorrentSource = url.startsWith('magnet:') || url.length === 40 || currentSource?.sourceType === 'torrent';
+    if (isTorrentSource && Date.now() < torrentStartupGraceUntilRef.current) {
+      const delayMs = Math.max(1000, torrentStartupGraceUntilRef.current - Date.now() + 250);
+      if (deferredProbeTimerRef.current) {
+        clearTimeout(deferredProbeTimerRef.current);
       }
+      deferredProbeTimerRef.current = setTimeout(() => {
+        deferredProbeTimerRef.current = null;
+        void triggerMediaProbe();
+      }, delayMs);
+      return;
+    }
 
+    if (isTorrentSource) {
+      const sessionId = new URLSearchParams(window.location.search).get('sessionId');
+      if (!sessionId) return;
+    }
+
+    probeInProgressRef.current = true;
+    
+    let attempts = 0;
+    const maxAttempts = isTorrentSource ? 2 : 3;
+
+    const tryProbe = async () => {
+      try {
+        let probeUrl = allowTorrentProbeThroughHls ? String(torrentRawUrl) : url;
+        let result: { success?: boolean; tracks?: Array<any>; error?: string } | undefined;
+        
+        if (isTorrentSource) {
+           const sessionId = new URLSearchParams(window.location.search).get('sessionId');
+           const isTorrentComplete = Boolean(torrentStats?.done || torrentStats?.verified);
+
+           if (isTorrentComplete) {
+             // Torrent is complete — prefer local file path for fastest probing
+             if (sessionId && (window as any).tatakaiRuntime?.getTorrentFilePath) {
+               const pathRes = await (window as any).tatakaiRuntime.getTorrentFilePath(sessionId);
+               if (pathRes?.success && pathRes?.path) {
+                 probeUrl = pathRes.path;
+               }
+             }
+           } else {
+             // Torrent still downloading — use WebTorrent HTTP URL (supports range requests)
+             // instead of the sparse local file which ffprobe can't read reliably
+             const rawUrl = (torrentStats as any)?.rawUrl;
+             if (typeof rawUrl === 'string' && rawUrl.startsWith('http')) {
+               probeUrl = rawUrl;
+             } else if (videoRef.current?.src?.startsWith('http')) {
+               probeUrl = videoRef.current.src;
+             }
+           }
+
+           // Only require prebuffer when probing a local file path.
+           // When using the WebTorrent HTTP URL, the server handles on-demand
+           // piece fetching, so no prebuffer is needed.
+           const isHttpProbe = probeUrl.startsWith('http://') || probeUrl.startsWith('https://');
+           if (!isHttpProbe && sessionId && (window as any).tatakaiRuntime?.ensureTorrentPrebuffer) {
+             const fileIndex = (window as any).currentFileIndex ?? undefined;
+             const prebuffer = await (window as any).tatakaiRuntime.ensureTorrentPrebuffer(sessionId, fileIndex, {
+               requireMetadataTail: false,
+             });
+             if (!prebuffer?.success) {
+               console.warn(`[VideoPlayer] Skipping media probe until torrent is ready: ${prebuffer?.error || 'prebuffer pending'}`);
+               return false;
+             }
+           }
+
+           console.log(`[VideoPlayer] Probing media: ${probeUrl} (attempt ${attempts + 1})`);
+           result = await (window as any).tatakaiRuntime.probeMedia(probeUrl);
+        } else {
+          result = await (window as any).tatakaiRuntime.probeMedia(probeUrl);
+        }
+        
+        if (result?.success) {
+          if (result.tracks && result.tracks.length > 0) {
+            console.log(`[VideoPlayer] Found tracks:`, result.tracks);
+            const audio = result.tracks
+              .filter((t: any) => t.type === 'audio')
+              .map((t: any) => ({
+                id: t.index,
+                label: formatMediaTrackLabel(t),
+                lang: normalizeTrackLanguage(t.language),
+                default: !!t.default,
+              }));
+             
+            const subs = result.tracks
+              .filter((t: any) => t.type === 'subtitle')
+              .map((t: any) => ({
+                id: t.index,
+                label: formatMediaTrackLabel(t),
+                lang: normalizeTrackLanguage(t.language),
+                default: !!t.default,
+              }));
+
+            const dedupedSubs = dedupeInternalSubtitleTracks(subs);
+
+            setAudioTracks(audio);
+            setInternalSubtitles(dedupedSubs);
+            
+            if (audio.length > 0 || dedupedSubs.length > 0) {
+              console.log(`[VideoPlayer] Successfully detected ${audio.length} audio tracks and ${dedupedSubs.length} internal subtitles.`);
+              toast.success(`Detected ${audio.length} audio tracks & ${dedupedSubs.length} subtitles`, { 
+                id: 'probe-success',
+                duration: 2000 
+              });
+            }
+
+            if (audio.length > 0) {
+              const defaultAudio = audio.find((t: any) => t.default) || audio[0];
+              setCurrentAudioTrack(defaultAudio.id);
+            }
+          } else {
+            console.warn(`[VideoPlayer] Probe successful but no tracks found in: ${probeUrl}`);
+          }
+          return true;
+        } else {
+          console.warn(`[VideoPlayer] Probe attempt ${attempts + 1} failed for ${probeUrl}:`, result?.error);
+          return false;
+        }
+      } catch (err) {
+        console.error(`[VideoPlayer] Probe error on attempt ${attempts + 1}:`, err);
+        return false;
+      }
     };
 
-  }, [loadVideo]);
+    while (attempts < maxAttempts) {
+      const success = await tryProbe();
+      if (success) break;
+      attempts++;
+      if (attempts < maxAttempts) {
+        await new Promise(r => setTimeout(r, isTorrentSource ? 4000 : 1200));
+      }
+    }
+    
+    probeInProgressRef.current = false;
+  }, [currentSource?.url, currentSource?.isM3U8, currentSource?.sourceType, isNative, (torrentStats as any)?.rawUrl]);
 
+  // Probe media for internal tracks (MKV support)
+  useEffect(() => {
+    setAudioTracks([]);
+    setInternalSubtitles([]);
+    extractedSubtitleCacheRef.current = {};
+    extractedSubtitlePromiseRef.current.clear();
+    autoLoadedInternalSubtitleRef.current = '';
+    if (deferredProbeTimerRef.current) {
+      clearTimeout(deferredProbeTimerRef.current);
+      deferredProbeTimerRef.current = null;
+    }
+    probeInProgressRef.current = false;
+    triggerMediaProbe();
+  }, [triggerMediaProbe, window.location.search]);
 
+  // Retry media probe when torrent status changes and we haven't found tracks yet
+  useEffect(() => {
+    const isTorrentSource = currentSource?.sourceType === 'torrent' || currentSource?.url?.startsWith('magnet:') || currentSource?.url?.length === 40;
+    if (!isTorrentSource || !isNative) return;
+
+    // If we already have tracks, no need to probe again
+    if (internalSubtitles.length > 0 || audioTracks.length > 0) return;
+
+    // Only probe if we have a valid rawUrl and some peers or progress
+    const rawUrl = (torrentStats as any)?.rawUrl;
+    const hasConnection = (torrentStats?.numPeers ?? 0) > 0 || (torrentStats?.progress ?? 0) > 0 || torrentStats?.done;
+    if (typeof rawUrl === 'string' && rawUrl.startsWith('http') && hasConnection) {
+      console.log('[VideoPlayer] Retrying media probe due to torrent status update...');
+      void triggerMediaProbe();
+    }
+  }, [
+    currentSource?.url,
+    torrentStats?.done,
+    torrentStats?.progress,
+    torrentStats?.numPeers,
+    (torrentStats as any)?.rawUrl,
+    internalSubtitles.length,
+    audioTracks.length,
+    triggerMediaProbe
+  ]);
+
+  useEffect(() => {
+    return () => {
+      if (deferredProbeTimerRef.current) {
+        clearTimeout(deferredProbeTimerRef.current);
+        deferredProbeTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleAudioTrackChange = useCallback((trackId: number) => {
+    if (!videoRef.current || !isNative) return;
+    const video = videoRef.current as any;
+
+    void (async () => {
+      const runtime = (window as any).tatakaiRuntime;
+      const sessionId = new URLSearchParams(window.location.search).get('sessionId');
+      const isTorrentSource = Boolean(sessionId && (currentSource?.sourceType === 'torrent' || currentSource?.url?.startsWith('magnet:')));
+
+      // Torrent playback should always request a fresh stream for the selected audio
+      // track. The media element's native audioTracks API uses its own zero-based track
+      // indexes and can silently disable all tracks when fed probe stream indexes.
+      if (isTorrentSource && runtime?.getTorrentStreamUrl) {
+        try {
+          const currentTimeSnapshot = Number.isFinite(video.currentTime) ? video.currentTime : 0;
+          const wasPaused = video.paused;
+          const playbackRate = video.playbackRate || 1;
+
+          toast.loading('Switching dub audio (reloading stream)...');
+
+          const stream = await runtime.getTorrentStreamUrl(sessionId, (window as any).currentFileIndex ?? undefined, { audioTrackIndex: trackId });
+          toast.dismiss();
+
+          if (!stream?.success || !stream.url) {
+            toast.error(stream?.error || 'Failed to request audio-switched stream');
+            return;
+          }
+
+          setActiveExtractedAudioTrack(null);
+          setCurrentAudioTrack(trackId);
+
+          const onLoadedMetadata = () => {
+            try {
+              if (Number.isFinite(currentTimeSnapshot) && currentTimeSnapshot > 0) {
+                video.currentTime = currentTimeSnapshot;
+              }
+              video.playbackRate = playbackRate;
+              video.muted = false;
+              handleSubtitleChange(currentSubtitle);
+              if (!wasPaused) {
+                void video.play().catch(() => {});
+              }
+            } catch {
+              // Ignore transient seek/play errors while the stream stabilizes.
+            } finally {
+              video.removeEventListener('loadedmetadata', onLoadedMetadata);
+            }
+          };
+
+          video.addEventListener('loadedmetadata', onLoadedMetadata);
+          video.src = stream.url;
+          video.load();
+
+          toast.success('Dub audio switched');
+          return;
+        } catch (err: any) {
+          toast.dismiss();
+          toast.error(err?.message || 'Error switching dub audio');
+          return;
+        }
+      }
+
+      // In Electron, we can try to switch audio tracks via the video element if enabled
+      // but a more reliable way for MKV is often not available via standard JS.
+      // However, if we enabled experimental features, video.audioTracks might work.
+      if (video.audioTracks) {
+        for (let i = 0; i < video.audioTracks.length; i++) {
+          video.audioTracks[i].enabled = (i === trackId);
+        }
+        setActiveExtractedAudioTrack(null);
+        setCurrentAudioTrack(trackId);
+      } else {
+      void (async () => {
+        try {
+          const runtime = (window as any).tatakaiRuntime;
+          // If we're playing a torrent session, prefer requesting a new transcode
+          // stream that maps the selected audio track, avoiding external extraction.
+          const sessionId = new URLSearchParams(window.location.search).get('sessionId');
+          const fileIndex = (window as any).currentFileIndex ?? undefined;
+
+          if (sessionId && runtime?.getTorrentStreamUrl) {
+            toast.loading('Switching dub audio (reloading stream)...');
+            // Request a new transcode stream with the selected audio track
+            const stream = await runtime.getTorrentStreamUrl(sessionId, fileIndex, { audioTrackIndex: trackId });
+            toast.dismiss();
+            if (stream?.success && stream?.url) {
+              // Clear any active extracted external audio
+              setActiveExtractedAudioTrack(null);
+              setExtractedAudioUrls((prev) => {
+                const copy = { ...prev };
+                return copy;
+              });
+              // Update video src to the new stream URL
+              try {
+                if (videoRef.current) {
+                  videoRef.current.src = stream.url;
+                  videoRef.current.load();
+                  setCurrentAudioTrack(trackId);
+                  toast.success('Dub audio switched');
+                }
+              } catch (e) {
+                toast.error('Failed to switch audio stream');
+              }
+            } else {
+              toast.error(stream?.error || 'Failed to request audio-switched stream');
+            }
+            return;
+          }
+
+          // Fallback: use extractAudioTrack when not a torrent stream
+          if (!runtime?.extractAudioTrack) {
+            toast.error('Audio extraction runtime unavailable');
+            return;
+          }
+
+          const existing = extractedAudioUrls[trackId];
+          if (existing) {
+            setCurrentAudioTrack(trackId);
+            setActiveExtractedAudioTrack(trackId);
+            toast.success('Dub audio switched');
+            return;
+          }
+
+          toast.loading('Extracting dub audio...');
+          let probeUrl = currentSource?.url || '';
+          if (videoRef.current?.src) probeUrl = videoRef.current.src;
+
+          // Prefer local torrent file path for reliable extraction while torrenting.
+          try {
+            if (sessionId && runtime?.getTorrentFilePath) {
+              const pathRes = await runtime.getTorrentFilePath(sessionId);
+              if (pathRes?.success && pathRes?.path) {
+                probeUrl = pathRes.path;
+              }
+            }
+          } catch {
+            // fallback to stream URL
+          }
+
+          const result = await runtime.extractAudioTrack(probeUrl, trackId);
+          toast.dismiss();
+
+          if (result?.success && result?.url) {
+            let extractedUrl = String(result.url || '').trim();
+            if (!/^https?:\/\//i.test(extractedUrl) && !extractedUrl.startsWith('file://') && /^[A-Za-z]:\\|\\\\/.test(extractedUrl)) {
+              extractedUrl = convertFileSrc(extractedUrl);
+            }
+
+            setExtractedAudioUrls(prev => ({ ...prev, [trackId]: extractedUrl }));
+            setCurrentAudioTrack(trackId);
+            setActiveExtractedAudioTrack(trackId);
+            toast.success('Dub audio loaded');
+          } else {
+            toast.error(result?.error || 'Failed to extract dub audio');
+          }
+        } catch (err: any) {
+          toast.dismiss();
+          toast.error(err?.message || 'Error extracting dub audio');
+        }
+      })();
+      }
+    })();
+  }, [isNative, currentSource?.url, currentSource?.sourceType, extractedAudioUrls, currentSubtitle, handleSubtitleChange]);
+
+  const handleInternalSubtitleChange = useCallback(async (trackId: number, options?: { silent?: boolean }): Promise<boolean> => {
+    if (!currentSource?.url || !isNative) return false;
+
+    const silent = options?.silent === true;
+    const toastId = `subtitle-extract-${trackId}`;
+    const trackLabel = internalSubtitles.find((subtitleTrack) => subtitleTrack.id === trackId)?.label || 'Internal Sub';
+    const cacheKey = `${sourceKey}:${trackId}`;
+
+    const activateSubtitleUrl = (subtitleUrl: string) => {
+      const normalizedUrl = String(subtitleUrl || '').trim();
+      if (!normalizedUrl) return;
+
+      const available = allRenderedSubtitles;
+      const existingIndex = available.findIndex((sub) => String(sub.url || '').trim() === normalizedUrl);
+
+      if (existingIndex >= 0) {
+        setCurrentSubtitle(getSubtitleSelectionKey(available[existingIndex], existingIndex));
+        return;
+      }
+
+      const newSub = {
+        lang: 'custom',
+        url: normalizedUrl,
+        label: trackLabel,
+        internalTrackId: trackId,
+      };
+
+      setSubtitleBlobs((prev) => ({ ...prev, [normalizedUrl]: normalizedUrl }));
+      setCustomSubtitles((prev) => {
+        const next = [...prev, newSub];
+        setCurrentSubtitle(getSubtitleSelectionKey(newSub, subtitles.length + next.length - 1));
+        return next;
+      });
+    };
+
+    const cachedSubtitle = extractedSubtitleCacheRef.current[cacheKey];
+    if (cachedSubtitle) {
+      activateSubtitleUrl(cachedSubtitle);
+      if (!silent) toast.success(`Subtitle loaded: ${trackLabel}`);
+      return true;
+    }
+
+    const inFlight = extractedSubtitlePromiseRef.current.get(cacheKey);
+    if (inFlight) {
+      const resolved = await inFlight;
+      if (resolved?.usableUrl) {
+        activateSubtitleUrl(resolved.usableUrl);
+        if (!silent) toast.success(`Subtitle loaded: ${trackLabel}`);
+        return true;
+      } else if (!silent) {
+        toast.error('Failed to extract subtitle');
+      }
+      return false;
+    }
+
+    try {
+      if (!silent) toast.loading('Extracting subtitle...', { id: toastId });
+      const runtime = (window as any).tatakaiRuntime;
+      const sessionId = new URLSearchParams(window.location.search).get('sessionId');
+      const fileIndex = (window as any).currentFileIndex ?? undefined;
+
+      const extractOnce = async () => {
+        let probeUrl = currentSource.url;
+        if (videoRef.current?.src) probeUrl = videoRef.current.src;
+
+        // For subtitle extraction, we always prefer the local file path if available.
+        // Running ffmpeg on the local sparse file reads zeros instantly for missing parts
+        // and extracts available subtitles without blocking on network download.
+        try {
+          if (sessionId && runtime?.getTorrentFilePath) {
+            const pathRes = await runtime.getTorrentFilePath(sessionId);
+            if (pathRes?.success && pathRes?.path) {
+              probeUrl = pathRes.path;
+            }
+          }
+        } catch {
+          // fallback to stream URL
+        }
+
+        if (sessionId && runtime?.ensureTorrentPrebuffer) {
+          try {
+            await runtime.ensureTorrentPrebuffer(sessionId, fileIndex, { requireMetadataTail: false });
+          } catch (err) {
+            console.warn('Subtitle prebuffer check failed:', err);
+          }
+        }
+
+        const result = await runtime?.extractSubtitle?.(probeUrl, trackId);
+        if (!result?.success || !result.url) return null;
+
+        const rawUrl = String(result.url || '').trim();
+        let extractedUrl = rawUrl;
+        if (!/^https?:\/\//i.test(extractedUrl) && !extractedUrl.startsWith('file://') && /^[A-Za-z]:\\|\\\\/.test(extractedUrl)) {
+          extractedUrl = convertFileSrc(extractedUrl);
+        }
+
+        let usableUrl = extractedUrl;
+        if (extractedUrl.startsWith('file://')) {
+          try {
+            const fileResult = await runtime?.readLocalFile?.(extractedUrl);
+            if (fileResult?.success && fileResult?.url) {
+              usableUrl = fileResult.url;
+            }
+          } catch (err) {
+            console.warn('Failed to convert file:// URL to data URL:', err);
+          }
+        }
+
+        return { usableUrl, extractedUrl, rawUrl };
+      };
+
+      const extractionPromise = (async () => {
+        let extraction = await extractOnce();
+        if (!extraction) {
+          await new Promise((resolve) => setTimeout(resolve, 600));
+          extraction = await extractOnce();
+        }
+        return extraction;
+      })();
+
+      extractedSubtitlePromiseRef.current.set(cacheKey, extractionPromise);
+      const extracted = await extractionPromise;
+      extractedSubtitlePromiseRef.current.delete(cacheKey);
+
+      if (extracted?.usableUrl) {
+        extractedSubtitleCacheRef.current[cacheKey] = extracted.usableUrl;
+        setSubtitleBlobs((prev) => ({
+          ...prev,
+          [extracted.rawUrl]: extracted.usableUrl,
+          [extracted.extractedUrl]: extracted.usableUrl,
+          [extracted.usableUrl]: extracted.usableUrl,
+        }));
+        activateSubtitleUrl(extracted.usableUrl);
+
+        if (!silent) {
+          toast.dismiss(toastId);
+          toast.success(`Subtitle loaded: ${trackLabel}`);
+        }
+        return true;
+      } else if (!silent) {
+        toast.dismiss(toastId);
+        toast.error('Failed to extract subtitle');
+      }
+      return false;
+    } catch (err) {
+      if (!silent) {
+        toast.dismiss(toastId);
+        toast.error('Error extracting subtitle');
+      }
+      return false;
+    } finally {
+      extractedSubtitlePromiseRef.current.delete(cacheKey);
+    }
+  }, [currentSource?.url, isNative, internalSubtitles, allRenderedSubtitles, subtitles.length, sourceKey]);
+
+  useEffect(() => {
+    if (!isNative || !currentSource?.url) return;
+    if (settings.subtitleLanguage === 'off') return;
+    if (subtitles.length > 0 || customSubtitles.length > 0) return;
+    if (internalSubtitles.length === 0) return;
+
+    const preferredTrack = getPreferredInternalSubtitleTrack(internalSubtitles, settings.subtitleLanguage);
+    if (!preferredTrack) return;
+
+    const autoLoadKey = `${sourceKey}:${preferredTrack.id}:${settings.subtitleLanguage}`;
+    if (autoLoadedInternalSubtitleRef.current === autoLoadKey) return;
+    autoLoadedInternalSubtitleRef.current = autoLoadKey;
+
+    void handleInternalSubtitleChange(preferredTrack.id, { silent: true }).then((success) => {
+      if (!success) {
+        // Clear reference to allow retrying on the next render/progress update
+        if (autoLoadedInternalSubtitleRef.current === autoLoadKey) {
+          autoLoadedInternalSubtitleRef.current = '';
+        }
+      }
+    });
+  }, [
+    isNative,
+    currentSource?.url,
+    settings.subtitleLanguage,
+    subtitles.length,
+    customSubtitles.length,
+    internalSubtitles,
+    sourceKey,
+    handleInternalSubtitleChange,
+  ]);
+
+  // Sync extracted external audio with video timeline for dub track fallback.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const audioUrl = activeExtractedAudioTrack != null ? extractedAudioUrls[activeExtractedAudioTrack] : undefined;
+    if (!audioUrl) {
+      if (externalAudioRef.current) {
+        externalAudioRef.current.pause();
+        externalAudioRef.current.src = '';
+      }
+      return;
+    }
+
+    const audio = externalAudioRef.current || new Audio();
+    externalAudioRef.current = audio;
+    audio.preload = 'auto';
+
+    if (audio.src !== audioUrl) {
+      audio.src = audioUrl;
+      audio.load();
+    }
+
+    const syncVolume = () => {
+      audio.volume = isMuted ? 0 : volume;
+      // Mute original audio when external dub track is active.
+      video.muted = true;
+    };
+
+    const syncTime = () => {
+      if (!Number.isFinite(video.currentTime)) return;
+      const drift = Math.abs((audio.currentTime || 0) - video.currentTime);
+      if (drift > 0.35) {
+        try {
+          audio.currentTime = video.currentTime;
+        } catch {
+          // Ignore transient seek errors while buffering.
+        }
+      }
+    };
+
+    const onPlay = () => {
+      syncVolume();
+      audio.playbackRate = video.playbackRate || 1;
+      syncTime();
+      void audio.play().catch(() => {});
+    };
+    const onPause = () => audio.pause();
+    const onSeeked = () => syncTime();
+    const onRateChange = () => {
+      audio.playbackRate = video.playbackRate || 1;
+    };
+
+    syncVolume();
+    if (!video.paused) onPlay();
+
+    video.addEventListener('play', onPlay);
+    video.addEventListener('pause', onPause);
+    video.addEventListener('seeked', onSeeked);
+    video.addEventListener('ratechange', onRateChange);
+
+    const driftTimer = window.setInterval(syncTime, 1000);
+
+    return () => {
+      video.removeEventListener('play', onPlay);
+      video.removeEventListener('pause', onPause);
+      video.removeEventListener('seeked', onSeeked);
+      video.removeEventListener('ratechange', onRateChange);
+      window.clearInterval(driftTimer);
+      // Restore video audio if no external extracted track is active.
+      if (activeExtractedAudioTrack == null) {
+        video.muted = isMuted;
+      }
+    };
+  }, [activeExtractedAudioTrack, extractedAudioUrls, isMuted, volume]);
+
+  // Handle progress updates in a separate effect to avoid reload loops
+  useEffect(() => {
+    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+    
+    progressIntervalRef.current = window.setInterval(() => {
+      if (videoRef.current && isPlaying) {
+        const time = videoRef.current.currentTime;
+        setCurrentTime(time);
+        if (progressCallbackRef.current) {
+          progressCallbackRef.current(time, videoRef.current.duration || 0);
+        }
+
+        const sessionId = new URLSearchParams(window.location.search).get('sessionId');
+        const isTorrentSource = Boolean(sessionId && (currentSource?.sourceType === 'torrent' || currentSource?.url?.startsWith('magnet:')));
+        if (isNative && isTorrentSource && (window as any).tatakaiRuntime?.updateTorrentPlayback) {
+          const now = Date.now();
+          if (now - torrentPlaybackUpdateRef.current >= 1500) {
+            torrentPlaybackUpdateRef.current = now;
+            (window as any).tatakaiRuntime.updateTorrentPlayback(
+              sessionId,
+              time,
+              videoRef.current.duration || 0,
+            );
+          }
+        }
+      }
+    }, 1000);
+
+    return () => {
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+    };
+  }, [isPlaying, isNative, currentSource?.url, currentSource?.sourceType]); // Only re-run when playing state changes
+
+  useEffect(() => {
+    const bus = playbackEventBus;
+    const unsubs = [
+      bus.on(PlayerEvents.PLAY, () => setIsPlaying(true)),
+      bus.on(PlayerEvents.PAUSE, () => setIsPlaying(false)),
+      bus.on(PlayerEvents.TIME_UPDATE, (t) => setCurrentTime(t)),
+      bus.on(PlayerEvents.DURATION_CHANGE, (d) => setDuration(d)),
+      bus.on(PlayerEvents.BUFFERING, (b) => setIsBuffering(b)),
+      bus.on(PlayerEvents.LOADED, () => setIsBuffering(false)),
+      bus.on(PlayerEvents.ERROR, (e) => setVideoError(String(e))),
+    ];
+
+    return () => unsubs.forEach(unsub => unsub());
+  }, []);
 
   // Video event handlers
 
@@ -1925,6 +2072,14 @@ export function VideoPlayer({
     const handlePlaying = () => {
       setIsBuffering(false);
       lastProgressAtRef.current = Date.now();
+      // Ensure loading state is cleared when video starts playing
+      if (isLoading) {
+         // We can't change props, but we can ensure our local buffering state is off
+      }
+      // Trigger media probe when video starts playing if tracks haven't been found yet
+      if (audioTracks.length === 0 && internalSubtitles.length === 0) {
+        triggerMediaProbe();
+      }
     };
 
     const handleProgress = () => {
@@ -1957,13 +2112,22 @@ export function VideoPlayer({
       let friendlyMessage: string | null = null;
       const eventMessageRaw = String(e?.message || e?.target?.error?.message || '').trim();
       const eventMessage = eventMessageRaw.toLowerCase();
+      const code = Number(err?.code || 0);
+      const rawMessage = String(err?.message || 'Unknown error');
+      const normalizedMessage = rawMessage.toLowerCase();
+      const compositeMessage = `${normalizedMessage} ${eventMessage}`;
+
+      // For torrents, suppress initial format/decode errors while the file is still buffering
+      const isTorrent = currentSource?.url?.startsWith('magnet:') || currentSource?.sourceType === 'torrent';
+      const inTorrentStartupGrace = isTorrent && Date.now() < torrentStartupGraceUntilRef.current;
+      if ((isTorrent && !initialSeekDoneRef.current) || (inTorrentStartupGrace && (code === 4 || isTransientTorrentStartupError(compositeMessage)))) {
+        console.warn('[VideoPlayer] Suppressing early torrent error:', eventMessage);
+        setIsBuffering(true);
+        return;
+      }
 
       if (err) {
         console.error('Video Error Code:', err.code, err.message);
-        const code = Number(err.code || 0);
-        const rawMessage = String(err.message || 'Unknown error');
-        const normalizedMessage = rawMessage.toLowerCase();
-        const compositeMessage = `${normalizedMessage} ${eventMessage}`;
 
         if (
           code === 4 &&
@@ -2036,11 +2200,21 @@ export function VideoPlayer({
 
     if (!isBuffering || !currentSource?.url) return;
 
+    // Skip timeout logic for torrents as they can be slow to start/buffer
+    // We handle this inside the timeout now to keep isBuffering consistent
+
     bufferingTimeoutRef.current = window.setTimeout(() => {
       const stalledMs = Date.now() - lastProgressAtRef.current;
       if (stalledMs >= 15000) {
-        setVideoError("Server timed out. Auto-switching server in 3 seconds...");
-        if (onError) onError({ reason: 'buffer-stall-timeout' });
+        // Only switch for non-torrent sources
+        const isTorrent = currentSource?.url?.startsWith('magnet:') || currentSource?.sourceType === 'torrent';
+        if (!isTorrent) {
+          setVideoError("Server timed out. Auto-switching server in 3 seconds...");
+          if (onError) onError({ reason: 'buffer-stall-timeout' });
+        } else {
+          // For torrents, just ensure buffering circle stays visible
+          setIsBuffering(true);
+        }
       }
     }, 16000);
 
@@ -2164,6 +2338,13 @@ export function VideoPlayer({
 
           e.preventDefault();
 
+          if (timelineSeekingLockedRef.current) {
+            toast.info(timelineLockReasonRef.current || 'Seeking is temporarily locked.', {
+              id: 'torrent-timeline-locked',
+            });
+            break;
+          }
+
           skip(-10);
 
           break;
@@ -2171,6 +2352,13 @@ export function VideoPlayer({
         case "arrowright":
 
           e.preventDefault();
+
+          if (timelineSeekingLockedRef.current) {
+            toast.info(timelineLockReasonRef.current || 'Seeking is temporarily locked.', {
+              id: 'torrent-timeline-locked',
+            });
+            break;
+          }
 
           skip(10);
 
@@ -2300,6 +2488,11 @@ export function VideoPlayer({
 
   const skip = (seconds: number) => {
 
+    if (timelineSeekingLockedRef.current) {
+      showTimelineLockHint();
+      return;
+    }
+
     if (videoRef.current) {
 
       videoRef.current.currentTime = Math.max(
@@ -2317,7 +2510,7 @@ export function VideoPlayer({
 
 
   const handleProgressBarHover = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (isLive) return;
+    if (isLive || timelineSeekingLocked) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const clientX = e.clientX;
     const percent = (clientX - rect.left) / rect.width;
@@ -2334,6 +2527,11 @@ export function VideoPlayer({
 
   const handleSeek = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
 
+    if (timelineSeekingLockedRef.current) {
+      showTimelineLockHint();
+      return;
+    }
+
     const rect = e.currentTarget.getBoundingClientRect();
 
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
@@ -2343,6 +2541,51 @@ export function VideoPlayer({
     const newTime = Math.max(0, Math.min(duration, percent * duration));
 
     if (videoRef.current) {
+
+      const sessionId = new URLSearchParams(window.location.search).get('sessionId');
+      const isTorrentSource = Boolean(sessionId && (currentSource?.sourceType === 'torrent' || currentSource?.url?.startsWith('magnet:')));
+
+      if (isTorrentSource && (window as any).tatakaiRuntime?.getTorrentStreamUrl) {
+        void (async () => {
+          try {
+            const runtime = (window as any).tatakaiRuntime;
+            const currentVideo = videoRef.current;
+            const wasPaused = currentVideo.paused;
+            const playbackRate = currentVideo.playbackRate || 1;
+
+            const stream = await runtime.getTorrentStreamUrl(sessionId, (window as any).currentFileIndex ?? undefined, {
+              audioTrackIndex: currentAudioTrack,
+              startTime: newTime,
+            });
+
+            if (!stream?.success || !stream.url) {
+              throw new Error(stream?.error || 'Failed to seek torrent stream');
+            }
+
+            const onLoadedMetadata = () => {
+              try {
+                currentVideo.playbackRate = playbackRate;
+                currentVideo.muted = false;
+                handleSubtitleChange(currentSubtitle);
+                if (!wasPaused) {
+                  void currentVideo.play().catch(() => {});
+                }
+              } finally {
+                currentVideo.removeEventListener('loadedmetadata', onLoadedMetadata);
+              }
+            };
+
+            currentVideo.addEventListener('loadedmetadata', onLoadedMetadata);
+            currentVideo.src = stream.url;
+            currentVideo.load();
+            setCurrentTime(newTime);
+          } catch (err) {
+            console.error('Torrent seek failed:', err);
+            toast.error('Could not seek torrent stream');
+          }
+        })();
+        return;
+      }
 
       videoRef.current.currentTime = newTime;
 
@@ -2408,12 +2651,17 @@ export function VideoPlayer({
     if (!videoRef.current) return;
     try {
       if (document.pictureInPictureElement) {
+        autoPiPDismissedRef.current = true;
         await document.exitPictureInPicture();
       } else if ((document as any).pictureInPictureEnabled !== false) {
+        autoPiPDismissedRef.current = false;
+        pipRequestInFlightRef.current = true;
         await videoRef.current.requestPictureInPicture();
       }
     } catch (e) {
       console.warn('PiP not supported', e);
+    } finally {
+      pipRequestInFlightRef.current = false;
     }
   };
 
@@ -2443,8 +2691,15 @@ export function VideoPlayer({
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    const onEnter = () => setIsPiP(true);
-    const onLeave = () => setIsPiP(false);
+    const onEnter = () => {
+      setIsPiP(true);
+    };
+    const onLeave = () => {
+      setIsPiP(false);
+      if (document.visibilityState === 'hidden' && !pipRequestInFlightRef.current) {
+        autoPiPDismissedRef.current = true;
+      }
+    };
     video.addEventListener('enterpictureinpicture', onEnter);
     video.addEventListener('leavepictureinpicture', onLeave);
     return () => {
@@ -2453,43 +2708,129 @@ export function VideoPlayer({
     };
   }, []);
 
+  useEffect(() => {
+    const canUsePiP = () => (
+      !isMobile &&
+      typeof document !== 'undefined' &&
+      'pictureInPictureEnabled' in document &&
+      (document as any).pictureInPictureEnabled !== false
+    );
+
+    const handleVisibilityChange = () => {
+      const video = videoRef.current;
+      if (!video || !canUsePiP()) return;
+
+      if (
+        document.visibilityState === 'hidden' &&
+        !video.paused &&
+        !video.ended &&
+        !document.pictureInPictureElement &&
+        !autoPiPDismissedRef.current
+      ) {
+        pipRequestInFlightRef.current = true;
+        video.requestPictureInPicture()
+          .catch(() => {
+            autoPiPDismissedRef.current = true;
+          })
+          .finally(() => {
+            pipRequestInFlightRef.current = false;
+          });
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleVisibilityChange);
+    };
+  }, [isMobile]);
+
   const toggleFullscreen = async () => {
+    const container = containerRef.current;
+    if (!container) return;
 
-    if (!containerRef.current) return;
-
-
+    const isElectron = typeof window !== 'undefined' && !!(window as any).electron?.setFullscreen;
 
     if (!isFullscreen) {
-
-      try {
-        if (containerRef.current.requestFullscreen) {
-          await containerRef.current.requestFullscreen();
-        } else if ((containerRef.current as any).webkitRequestFullscreen) {
-          await Promise.resolve((containerRef.current as any).webkitRequestFullscreen());
+      if (isElectron) {
+        // Use CSS class to make player fill the window,
+        // AND use OS fullscreen via IPC (hides taskbar, titlebar disappears via CSS)
+        container.classList.add('is-player-fullscreen');
+        setIsFullscreen(true);
+        try {
+          await (window as any).electron.setFullscreen(true);
+          // Signal global fullscreen — TitleBar and Sidebar will hide themselves
+          document.documentElement.classList.add('app-fullscreen');
+        } catch {
+          // CSS fullscreen still works even if IPC fails
         }
-      } catch {
-        // Ignore fullscreen API errors.
+      } else {
+        // Browser: use native Fullscreen API
+        try {
+          if (container.requestFullscreen) {
+            await container.requestFullscreen();
+          } else if ((container as any).webkitRequestFullscreen) {
+            await Promise.resolve((container as any).webkitRequestFullscreen());
+          } else {
+            container.classList.add('is-player-fullscreen');
+            setIsFullscreen(true);
+          }
+        } catch {
+          container.classList.add('is-player-fullscreen');
+          setIsFullscreen(true);
+        }
       }
 
       await lockLandscapeOnMobile();
 
     } else {
+      // Exit fullscreen
+      container.classList.remove('is-player-fullscreen');
+      setIsFullscreen(false);
 
-      try {
-        if (document.exitFullscreen) {
-          await document.exitFullscreen();
-        } else if ((document as any).webkitExitFullscreen) {
-          await Promise.resolve((document as any).webkitExitFullscreen());
+      if (isElectron) {
+        document.documentElement.classList.remove('app-fullscreen');
+        try {
+          await (window as any).electron.setFullscreen(false);
+        } catch {
+          // Ignore
         }
-      } catch {
-        // Ignore fullscreen API errors.
+      } else {
+        try {
+          if (document.fullscreenElement && document.exitFullscreen) {
+            await document.exitFullscreen();
+          } else if ((document as any).webkitFullscreenElement && (document as any).webkitExitFullscreen) {
+            await Promise.resolve((document as any).webkitExitFullscreen());
+          }
+        } catch {
+          // Ignore exit errors
+        }
       }
 
       unlockOrientationOnMobile();
-
     }
-
   };
+
+  // Keep native subtitle positioning aligned to the real control overlay height.
+  useEffect(() => {
+    const container = containerRef.current;
+    const overlay = controlsOverlayRef.current;
+    if (!container || !overlay) return;
+    if (typeof ResizeObserver === 'undefined') return;
+
+    const apply = () => {
+      const h = overlay.getBoundingClientRect().height;
+      if (Number.isFinite(h) && h > 0) {
+        container.style.setProperty('--tatakai-controls-height', `${Math.round(h)}px`);
+      }
+    };
+
+    apply();
+    const ro = new ResizeObserver(() => apply());
+    ro.observe(overlay);
+    return () => ro.disconnect();
+  }, []);
 
 
 
@@ -2500,20 +2841,53 @@ export function VideoPlayer({
       const activeFullscreen = !!document.fullscreenElement || !!(document as any).webkitFullscreenElement;
       setIsFullscreen(activeFullscreen);
       if (!activeFullscreen) {
+        // Also clear the CSS class fallback in case it was applied alongside or instead of the Fullscreen API.
+        containerRef.current?.classList.remove('is-player-fullscreen');
         unlockOrientationOnMobile();
       }
 
     };
 
+    // Handle Escape key for the CSS class fallback path (browser won't fire fullscreenchange in this case).
+    const handleKeyEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && containerRef.current?.classList.contains('is-player-fullscreen')) {
+        containerRef.current.classList.remove('is-player-fullscreen');
+        setIsFullscreen(false);
+        document.documentElement.classList.remove('app-fullscreen');
+        // Exit OS fullscreen in Electron too
+        const bridge = (window as any).electron;
+        if (bridge?.setFullscreen) {
+          void bridge.setFullscreen(false);
+        }
+        unlockOrientationOnMobile();
+      }
+    };
+
+    // Handle Electron fullscreen-changed event (e.g. user presses F11 or OS exits fullscreen)
+    const handleElectronFullscreenChange = (isFull: boolean) => {
+      if (!isFull && containerRef.current?.classList.contains('is-player-fullscreen')) {
+        containerRef.current.classList.remove('is-player-fullscreen');
+        document.documentElement.classList.remove('app-fullscreen');
+        setIsFullscreen(false);
+        unlockOrientationOnMobile();
+      }
+    };
+    const unsubFullscreen = (window as any).electron?.onFullscreenChanged?.(handleElectronFullscreenChange);
+
     document.addEventListener("fullscreenchange", handleFullscreenChange);
 
     document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+
+    document.addEventListener("keydown", handleKeyEscape);
 
     return () => {
 
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
 
       document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+
+      document.removeEventListener("keydown", handleKeyEscape);
+      unsubFullscreen?.();
 
     };
 
@@ -2542,6 +2916,14 @@ export function VideoPlayer({
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   const bufferedPercent = duration > 0 ? (buffered / duration) * 100 : 0;
+
+  const secondarySubtitleActiveText = useMemo(() => {
+    if (!currentSecondarySubtitle || currentSecondarySubtitle === 'off') return '';
+    if (!secondarySubtitleCues || secondarySubtitleCues.length === 0) return '';
+    const t = Number(currentTime || 0);
+    const active = secondarySubtitleCues.filter((cue) => t >= cue.start && t < cue.end);
+    return active.map((cue) => cue.text).join('\n').trim();
+  }, [currentSecondarySubtitle, secondarySubtitleCues, currentTime]);
 
 
 
@@ -2573,7 +2955,7 @@ export function VideoPlayer({
         onClick={togglePlay}
       >
 
-        {[...subtitles, ...customSubtitles].map((sub, idx) => {
+        {allRenderedSubtitles.map((sub, idx) => {
           const subtitleKey = getSubtitleSelectionKey(sub, idx);
           const subtitleSourceUrl = String(sub.url || '').trim();
           if (!subtitleSourceUrl) return null;
@@ -2601,6 +2983,43 @@ export function VideoPlayer({
 
       </video>
 
+      {torrentSessionId && torrentStats ? (
+        <TorrentStatusPanel
+          sessionId={torrentSessionId}
+          stats={torrentStats}
+          buffering={isBuffering}
+          onRepair={onTorrentRepair}
+          onStop={onTorrentStop}
+          onOpenFolder={async () => {
+            try {
+              const rt = (window as any).tatakaiRuntime;
+              const ep = (window as any).electron;
+              if (!rt?.getTorrentFilePath || !ep?.openPath) return;
+              const res = await rt.getTorrentFilePath(torrentSessionId);
+              if (res?.success && res?.path) {
+                await ep.openPath(res.path);
+              }
+            } catch {
+              // ignore
+            }
+          }}
+          className={
+            showControls
+              ? "opacity-100 translate-y-0 pointer-events-auto"
+              : "opacity-0 -translate-y-4 pointer-events-none"
+          }
+        />
+      ) : null}
+
+      {/* Secondary subtitle overlay (dual subs) */}
+      {secondarySubtitleActiveText ? (
+        <div className="pointer-events-none absolute inset-x-0 bottom-28 md:bottom-32 px-6 z-20 flex justify-center">
+          <div className="max-w-[92%] text-center text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-pre-line text-base md:text-lg font-semibold">
+            {secondarySubtitleActiveText}
+          </div>
+        </div>
+      ) : null}
+
 
 
       {/* View Counter Overlay - shows in top right */}
@@ -2623,7 +3042,7 @@ export function VideoPlayer({
 
       {/* Loading State */}
 
-      {(isLoading || isBuffering) && !videoError && (
+      {((isLoading && !isPlaying) || isBuffering) && !videoError && (
 
         <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm">
 
@@ -2709,6 +3128,14 @@ export function VideoPlayer({
 
               </button>
 
+              <button
+                onClick={() => window.location.reload()}
+                className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur-sm flex items-center justify-center gap-2 transition-all font-medium video-controls-btn"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Refresh Player
+              </button>
+
               {onServerSwitch && (
 
                 <button
@@ -2767,7 +3194,7 @@ export function VideoPlayer({
 
           onClick={handleSkip}
 
-          className="absolute bottom-24 md:bottom-28 right-4 md:right-6 px-5 py-3 md:px-6 md:py-3.5 rounded-xl bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-white font-bold flex items-center gap-2.5 shadow-2xl transition-all hover:scale-105 animate-in slide-in-from-right-5 z-20 skip-button-glow border border-white/20"
+          className={`absolute bottom-24 md:bottom-28 right-4 md:right-6 px-5 py-3 md:px-6 md:py-3.5 rounded-xl bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-white font-bold flex items-center gap-2.5 shadow-2xl transition-all animate-in slide-in-from-right-5 z-20 skip-button-glow border border-white/20 ${timelineSeekingLocked ? 'cursor-not-allowed opacity-60' : 'hover:scale-105'}`}
 
         >
 
@@ -2785,6 +3212,7 @@ export function VideoPlayer({
 
       <div
 
+        ref={controlsOverlayRef}
         className={`absolute inset-x-0 bottom-0 video-controls-gradient p-4 md:p-5 transition-all duration-300 ${showControls ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
 
           }`}
@@ -2792,16 +3220,16 @@ export function VideoPlayer({
       >
 
         {/* Progress Bar */}
-
+        {!timelineUiHidden && (
         <div
 
-          className={`relative h-1 md:h-1.5 bg-white/20 rounded-full group/progress mb-4 md:mb-5 video-progress-track ${isLive ? 'cursor-default pointer-events-none' : 'cursor-pointer'}`}
+          className={`relative h-1 md:h-1.5 bg-white/20 rounded-full group/progress mb-4 md:mb-5 video-progress-track ${isLive ? 'cursor-default pointer-events-none' : timelineSeekingLocked ? 'cursor-not-allowed opacity-85' : 'cursor-pointer'}`}
 
-          onClick={!isLive ? handleSeek : undefined}
+          onClick={!isLive ? (timelineSeekingLocked ? showTimelineLockHint : handleSeek) : undefined}
 
-          onTouchMove={!isLive ? handleSeek : undefined}
+          onTouchMove={!isLive && !timelineSeekingLocked ? handleSeek : undefined}
 
-          onMouseMove={!isLive ? handleProgressBarHover : undefined}
+          onMouseMove={!isLive && !timelineSeekingLocked ? handleProgressBarHover : undefined}
 
           onMouseLeave={!isLive ? handleProgressBarLeave : undefined}
 
@@ -2809,7 +3237,7 @@ export function VideoPlayer({
 
           {/* Hover Time Tooltip */}
 
-          {showHoverTime && !isLive && (
+          {showHoverTime && !isLive && !timelineSeekingLocked && (
 
             <div
 
@@ -2879,7 +3307,7 @@ export function VideoPlayer({
 
           {/* Thumb */}
 
-          {!isLive && (
+          {!isLive && !timelineSeekingLocked && (
 
             <div
 
@@ -2891,7 +3319,15 @@ export function VideoPlayer({
 
           )}
 
+          {timelineSeekingLocked && (
+            <div className="absolute right-0 bottom-full mb-2 hidden items-center gap-1.5 rounded-full border border-white/10 bg-black/80 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white/75 shadow-xl backdrop-blur-md sm:flex">
+              <Lock className="h-3 w-3 text-primary" />
+              <span>Seeking locked</span>
+            </div>
+          )}
+
         </div>
+        )}
 
 
 
@@ -2923,17 +3359,24 @@ export function VideoPlayer({
 
             </button>
 
+            <button
+              onClick={handleRefresh}
+              className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all video-controls-btn group"
+              title="Refresh stream"
+            >
+              <RotateCcw className="w-4 h-4 md:w-5 md:h-5 group-active:-rotate-180 transition-transform duration-500" />
+            </button>
 
-
-            {!isLive && (
+            {!isLive && !timelineUiHidden && (
 
               <>
 
                 <button
 
                   onClick={() => skip(-10)}
+                  disabled={timelineSeekingLocked}
 
-                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all hidden sm:flex video-controls-btn"
+                  className={`p-2 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all hidden sm:flex video-controls-btn ${timelineSeekingLocked ? 'cursor-not-allowed opacity-50 hover:bg-white/10' : ''}`}
 
                 >
 
@@ -2946,8 +3389,9 @@ export function VideoPlayer({
                 <button
 
                   onClick={() => skip(10)}
+                  disabled={timelineSeekingLocked}
 
-                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all hidden sm:flex video-controls-btn"
+                  className={`p-2 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all hidden sm:flex video-controls-btn ${timelineSeekingLocked ? 'cursor-not-allowed opacity-50 hover:bg-white/10' : ''}`}
 
                 >
 
@@ -3013,6 +3457,7 @@ export function VideoPlayer({
 
             {/* Time */}
 
+            {!timelineUiHidden && (
             <div className="flex items-center gap-1.5 ml-2 px-2.5 py-1.5 rounded-lg bg-white/10 backdrop-blur-sm">
 
               <span className="text-xs md:text-sm font-medium text-white/90">{formatTime(currentTime)}</span>
@@ -3022,6 +3467,7 @@ export function VideoPlayer({
               <span className="text-xs md:text-sm text-white/60">{formatTime(duration)}</span>
 
             </div>
+            )}
 
           </div>
 
@@ -3032,93 +3478,153 @@ export function VideoPlayer({
           <div className="flex items-center gap-1 md:gap-2">
 
             {/* Subtitle Selector */}
-
-            {subtitles.length > 0 && (
-
+            {(subtitles.length > 0 || customSubtitles.length > 0 || internalSubtitles.length > 0) && (
               <div className="relative">
-
                 <button
-
                   onClick={() => {
-
                     setShowSubtitleMenu(!showSubtitleMenu);
-
+                    setShowAudioMenu(false);
                     setShowSettings(false);
-
                   }}
-
                   className={`p-2 rounded-lg hover:bg-white/10 transition-colors pointer-events-auto ${currentSubtitle !== 'off' ? 'text-primary' : ''
-
                     }`}
-
+                  title="Subtitles"
                 >
-
                   <Subtitles className="w-4 h-4 md:w-5 md:h-5" />
-
                 </button>
 
-
-
                 {showSubtitleMenu && (
-
-                  <div className="absolute bottom-full right-0 mb-2 bg-background/95 backdrop-blur-sm border border-border rounded-xl p-2 min-w-[120px] md:min-w-[150px] max-h-[400px] overflow-y-auto pointer-events-auto">
-
-                    <div className="text-xs text-muted-foreground px-2 py-1 mb-1">
-
+                  <div className="absolute bottom-full right-0 mb-2 bg-background/95 backdrop-blur-md border border-border rounded-xl p-3 min-w-[180px] md:min-w-[220px] max-h-[450px] overflow-y-auto pointer-events-auto shadow-2xl">
+                    <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
                       Subtitles
-
                     </div>
-
-                    <button
-
-                      onClick={() => {
-
-                        handleSubtitleChange('off');
-
-                        setShowSubtitleMenu(false);
-
-                      }}
-
-                      className={`w-full px-3 py-1.5 text-left text-xs md:text-sm rounded-lg hover:bg-muted transition-colors ${currentSubtitle === 'off'
-
-                        ? "text-primary font-medium"
-
-                        : "text-foreground"
-
-                        }`}
-
-                    >
-
-                      Off
-
-                    </button>
-
-                    {/* Native Subtitles */}
-                    {[...subtitles, ...customSubtitles].map((sub, idx) => (
-                      (() => {
-                        const subtitleSelectionKey = getSubtitleSelectionKey(sub, idx);
-                        return (
+                    <div className="space-y-1 mb-3">
                       <button
-                        key={idx}
                         onClick={() => {
-                          handleSubtitleChange(subtitleSelectionKey);
+                          handleSubtitleChange('off');
                           setShowSubtitleMenu(false);
                         }}
-                        className={`w-full px-3 py-1.5 text-left text-xs md:text-sm rounded-lg hover:bg-muted transition-colors ${currentSubtitle === subtitleSelectionKey
-                          ? "text-primary font-medium"
+                        className={`w-full px-3 py-1.5 text-left text-xs md:text-sm rounded-lg hover:bg-muted transition-colors ${currentSubtitle === 'off'
+                          ? "text-primary font-medium bg-primary/10"
                           : "text-foreground"
                           }`}
                       >
-                        <span className="truncate block max-w-[120px]">{sub.label || sub.lang}</span>
+                        Off
                       </button>
+                      {internalSubtitles.length > 0 && (
+                        <div className="pt-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          Internal Tracks
+                        </div>
+                      )}
+                      {internalSubtitles.map((sub) => {
+                        const isSelected = currentInternalSubtitleTrackId === sub.id;
+                        return (
+                        <button
+                          key={sub.id}
+                          onClick={() => {
+                            void handleInternalSubtitleChange(sub.id);
+                            setShowSubtitleMenu(false);
+                          }}
+                          className={`w-full px-3 py-1.5 text-left text-xs md:text-sm rounded-lg hover:bg-muted transition-colors ${isSelected
+                            ? "text-primary font-medium bg-primary/10"
+                            : "text-foreground"
+                            }`}
+                        >
+                          <span className="truncate block max-w-[150px]">{sub.label || sub.lang}</span>
+                        </button>
                         );
-                      })()
-                    ))}
+                      })}
+                      {visibleSubtitleOptions.map(({ sub, index }) => {
+                        const subtitleSelectionKey = getSubtitleSelectionKey(sub, index);
+                        const isSelected = currentSubtitle === subtitleSelectionKey;
+                        return (
+                          <button
+                            key={subtitleSelectionKey}
+                            onClick={() => {
+                              handleSubtitleChange(subtitleSelectionKey);
+                              setShowSubtitleMenu(false);
+                            }}
+                            className={`w-full px-3 py-1.5 text-left text-xs md:text-sm rounded-lg hover:bg-muted transition-colors ${isSelected
+                              ? "text-primary font-medium bg-primary/10"
+                              : "text-foreground"
+                              }`}
+                          >
+                            <span className="truncate block max-w-[150px]">{sub.label || sub.lang}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
 
-                    <div className="h-px bg-border my-1" />
+                    <div className="h-px bg-border my-2" />
 
-                    <label className="w-full px-3 py-1.5 text-left text-xs md:text-sm rounded-lg hover:bg-muted transition-colors text-foreground flex items-center gap-2 cursor-pointer">
-                      <Upload className="w-3 h-3" />
+                    {/* Subtitle Style Options */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                        <Type className="w-3 h-3" />
+                        <span>Style Settings</span>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] text-muted-foreground">Size</span>
+                          <div className="flex gap-1">
+                            {SIZE_OPTIONS.map(opt => (
+                              <button
+                                key={opt.value}
+                                onClick={() => updateSetting('subtitleSize', opt.value)}
+                                className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-all ${settings.subtitleSize === opt.value
+                                  ? 'bg-primary border-primary text-primary-foreground'
+                                  : 'bg-muted/30 border-transparent text-muted-foreground hover:bg-muted/50'
+                                  }`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] text-muted-foreground">Font</span>
+                          <div className="flex gap-1">
+                            {FONT_OPTIONS.map(opt => (
+                              <button
+                                key={opt.value}
+                                onClick={() => updateSetting('subtitleFont', opt.value)}
+                                className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-all ${settings.subtitleFont === opt.value
+                                  ? 'bg-primary border-primary text-primary-foreground'
+                                  : 'bg-muted/30 border-transparent text-muted-foreground hover:bg-muted/50'
+                                  }`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] text-muted-foreground">BG</span>
+                          <div className="flex gap-1">
+                            {BG_OPTIONS.map(opt => (
+                              <button
+                                key={opt.value}
+                                onClick={() => updateSetting('subtitleBackground', opt.value)}
+                                className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-all ${settings.subtitleBackground === opt.value
+                                  ? 'bg-primary border-primary text-primary-foreground'
+                                  : 'bg-muted/30 border-transparent text-muted-foreground hover:bg-muted/50'
+                                  }`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="h-px bg-border my-2" />
+
+                    <label className="w-full px-3 py-1.5 text-left text-xs md:text-sm rounded-lg hover:bg-muted transition-colors text-foreground flex items-center gap-2 cursor-pointer group">
+                      <Upload className="w-3 h-3 group-hover:text-primary transition-colors" />
                       <span>Add Custom</span>
                       <input
                         type="file"
@@ -3127,79 +3633,86 @@ export function VideoPlayer({
                         onChange={handleCustomSubtitleUpload}
                       />
                     </label>
-
                   </div>
-
                 )}
-
               </div>
-
             )}
 
+            {/* Audio Selector (Multi-track) */}
+            {(audioTracks.length > 0) && (
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    setShowAudioMenu(!showAudioMenu);
+                    setShowSubtitleMenu(false);
+                    setShowSettings(false);
+                  }}
+                  className={`p-2 rounded-lg hover:bg-white/10 transition-colors pointer-events-auto ${audioTracks.length > 1 ? 'text-primary' : ''}`}
+                  title="Audio Tracks"
+                >
+                  <Mic className="w-4 h-4 md:w-5 md:h-5" />
+                </button>
 
+                {showAudioMenu && (
+                  <div className="absolute bottom-full right-0 mb-2 bg-background/95 backdrop-blur-sm border border-border rounded-xl p-3 min-w-[150px] md:min-w-[180px] max-h-[300px] overflow-y-auto pointer-events-auto shadow-2xl">
+                    <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
+                      Audio Tracks
+                    </div>
+                    <div className="space-y-1">
+                      {audioTracks.map((track) => (
+                        <button
+                          key={track.id}
+                          onClick={() => {
+                            handleAudioTrackChange(track.id);
+                            setShowAudioMenu(false);
+                          }}
+                          className={`w-full px-3 py-1.5 text-left text-xs md:text-sm rounded-lg hover:bg-muted transition-colors ${currentAudioTrack === track.id
+                            ? "text-primary font-medium bg-primary/10"
+                            : "text-foreground"
+                            }`}
+                        >
+                          <span className="truncate block">{track.label || `Track ${track.id}`} ({track.lang || 'und'})</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Speed Settings */}
-
             <div className="relative">
-
               <button
-
                 onClick={() => {
-
                   setShowSettings(!showSettings);
-
                   setShowSubtitleMenu(false);
-
+                  setShowAudioMenu(false);
                 }}
-
                 className="p-2 rounded-lg hover:bg-white/10 transition-colors"
-
+                title="Playback Speed"
               >
-
                 <Settings className="w-4 h-4 md:w-5 md:h-5" />
-
               </button>
 
-
-
               {showSettings && (
-
-                <div className="absolute bottom-full right-0 mb-2 bg-background/95 backdrop-blur-sm border border-border rounded-xl p-2 min-w-[100px] md:min-w-[120px]">
-
-                  <div className="text-xs text-muted-foreground px-2 py-1 mb-1">
-
+                <div className="absolute bottom-full right-0 mb-2 bg-background/95 backdrop-blur-sm border border-border rounded-xl p-2 min-w-[100px] md:min-w-[120px] shadow-2xl">
+                  <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-2 py-1 mb-1">
                     Speed
-
                   </div>
-
                   {[0.5, 0.75, 1, 1.25, 1.5, 2].map((rate) => (
-
                     <button
-
                       key={rate}
-
                       onClick={() => handlePlaybackRateChange(rate)}
-
                       className={`w-full px-3 py-1.5 text-left text-xs md:text-sm rounded-lg hover:bg-muted transition-colors ${playbackRate === rate
-
-                        ? "text-primary font-medium"
-
+                        ? "text-primary font-medium bg-primary/10"
                         : "text-foreground"
-
                         }`}
-
                     >
-
                       {rate}x
-
                     </button>
-
                   ))}
-
                 </div>
-
               )}
-
             </div>
 
 
@@ -3222,37 +3735,7 @@ export function VideoPlayer({
 
 
 
-            {/* Download Button (Native only, not in offline mode) */}
-            {isNative && !isOffline && serverName?.includes('Luffy') && episodeId && (
-              <div className="relative group/download">
-                <button
-                  onClick={async () => {
-                    await startDownload({
-                      episodeId: episodeId,
-                      animeName: animeName || '',
-                      episodeNumber: episodeNumber || 1,
-                      posterUrl: animePoster || poster || '',
-                    });
-                  }}
-                  disabled={downloadStates[episodeId]?.status === 'downloading'}
-                  className="p-2 rounded-lg hover:bg-white/10 transition-colors relative"
-                  title="Download Episode"
-                >
-                  {downloadStates[episodeId]?.status === 'completed' ? (
-                    <CheckCircle2 className="w-4 h-4 md:w-5 md:h-5 text-green-500" />
-                  ) : downloadStates[episodeId]?.status === 'downloading' ? (
-                    <div className="relative flex items-center justify-center">
-                      <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin text-primary" />
-                      <span className="absolute text-[6px] font-bold">
-                        {Math.round(downloadStates[episodeId]?.progress || 0)}
-                      </span>
-                    </div>
-                  ) : (
-                    <Download className="w-4 h-4 md:w-5 md:h-5" />
-                  )}
-                </button>
-              </div>
-            )}
+            {/* Download management removed during V6 rebuild (will be reintroduced with new core). */}
 
 
 
@@ -3264,6 +3747,17 @@ export function VideoPlayer({
                 title="Take Screenshot"
               >
                 <Camera className="w-4 h-4 md:w-5 md:h-5" />
+              </button>
+            )}
+
+            {/* External Player Button */}
+            {isNative && externalPlayerPath && (
+              <button
+                onClick={handleLaunchExternal}
+                className="p-2 rounded-lg hover:bg-white/10 transition-colors text-blue-400"
+                title="Play in External Player"
+              >
+                <MonitorPlay className="w-4 h-4 md:w-5 md:h-5" />
               </button>
             )}
 
@@ -3311,17 +3805,19 @@ export function VideoPlayer({
       {/* Settings Panel */}
 
       <VideoSettingsPanel
-
         isOpen={showSettingsPanel}
-
         onClose={() => setShowSettingsPanel(false)}
-
-        availableSubtitles={[...subtitles, ...customSubtitles].map((s, idx) => ({
-          lang: s.lang,
-          label: s.label || s.lang,
-          value: getSubtitleSelectionKey(s, idx),
+        availableSubtitles={visibleSubtitleOptions.map(({ sub, index }) => ({
+          lang: sub.lang,
+          label: sub.label || sub.lang,
+          value: getSubtitleSelectionKey(sub, index),
         }))}
-
+        audioTracks={audioTracks}
+        currentAudioTrack={currentAudioTrack}
+        onAudioTrackChange={handleAudioTrackChange}
+        internalSubtitles={internalSubtitles}
+        currentInternalSubtitleTrackId={currentInternalSubtitleTrackId}
+        onInternalSubtitleChange={handleInternalSubtitleChange}
       />
 
     </div >

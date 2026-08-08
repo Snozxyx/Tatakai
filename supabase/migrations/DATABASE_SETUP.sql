@@ -17,7 +17,11 @@ CREATE TABLE IF NOT EXISTS admin_logs (
 -- 2. Add columns to forum_posts
 ALTER TABLE forum_posts 
 ADD COLUMN IF NOT EXISTS image_url TEXT,
-ADD COLUMN IF NOT EXISTS is_approved BOOLEAN DEFAULT true;
+ADD COLUMN IF NOT EXISTS is_approved BOOLEAN DEFAULT true,
+ADD COLUMN IF NOT EXISTS magnet_link TEXT,
+ADD COLUMN IF NOT EXISTS external_url TEXT,
+ADD COLUMN IF NOT EXISTS language TEXT,
+ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}';
 
 -- 3. Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_admin_logs_user_id ON admin_logs(user_id);

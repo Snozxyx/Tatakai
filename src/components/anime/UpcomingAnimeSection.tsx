@@ -1,6 +1,6 @@
 import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import { GlassPanel } from "@/components/ui/GlassPanel";
-import { useUpcomingAnime, JikanAnime } from "@/hooks/useUpcomingAnime";
+import { useUpcomingAnime, JikanAnime } from "@/hooks/api/useUpcomingAnime";
 import { useRef } from "react";
 
 function UpcomingAnimeCard({ anime }: { anime: JikanAnime }) {
@@ -133,3 +133,4 @@ export function UpcomingAnimeSection() {
     </section>
   );
 }
+

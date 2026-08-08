@@ -1,0 +1,1400 @@
+{
+  "id": "naruto-20",
+  "anilistId": 20,
+  "animeTitle": "Naruto",
+  "episode": "1",
+  "title": "Enter: Naruto Uzumaki!",
+  "servers": [
+    {
+      "name": "bato",
+      "url": "https://af03.anvod.pro/media/a9tv/b6a/678d79aa92e377d59f929a6b/anixl-master.m3u8",
+      "language": "Japanese",
+      "tip": "Soft Sub",
+      "isM3U8": true
+    },
+    {
+      "name": "bato",
+      "url": "https://af03.anvod.pro/media/a9tv/d6a/678d79aa92e377d59f929a6d/anixl-master.m3u8",
+      "language": "English",
+      "tip": "Dub",
+      "isM3U8": true
+    },
+    {
+      "name": "Hindi",
+      "url": "https://short.icu/6q7BvdjlN",
+      "language": "Hindi",
+      "tip": "Abyess",
+      "isM3U8": false
+    },
+    {
+      "name": "Tamil",
+      "url": "https://short.icu/f-bzOAkpZ",
+      "language": "Tamil",
+      "tip": "Abyess",
+      "isM3U8": false
+    },
+    {
+      "name": "Telugu",
+      "url": "https://short.icu/5dRo9N8cf",
+      "language": "Telugu",
+      "tip": "Abyess",
+      "isM3U8": false
+    },
+    {
+      "name": "English",
+      "url": "https://short.icu/PCuDIGRqu",
+      "language": "English",
+      "tip": "Abyess",
+      "isM3U8": false
+    },
+    {
+      "name": "Japanese",
+      "url": "https://short.icu/EJLtjXjIY",
+      "language": "Japanese",
+      "tip": "Abyess",
+      "isM3U8": false
+    },
+    {
+      "name": "pahe",
+      "url": "https://vault-01.uwucdn.top/stream/01/11/41db5d4603e8ed1374f852d3300390d19686ed5fb636916df4063dabebef4036/uwu.m3u8",
+      "language": "Japanese",
+      "tip": "Hard sub",
+      "isM3U8": true
+    },
+    {
+      "name": "Multi",
+      "url": "https://as-cdn21.top/video/36660e59856b4de58a219bcf4e27eba3",
+      "language": "Hindi",
+      "tip": "Multi",
+      "isM3U8": false
+    }
+  ],
+  "subtitles": [
+    {
+      "label": "English",
+      "src": "https://af03.anvod.pro/media/a9tv/b6a/678d79aa92e377d59f929a6b/captions-000-eng-2.vtt"
+    }
+  ],
+  "episodes": [
+    {
+      "number": 1,
+      "title": "Enter: Naruto Uzumaki!",
+      "url": "https://animelok.live/watch/naruto-20?ep=1",
+      "isFiller": false
+    },
+    {
+      "number": 2,
+      "title": "My Name is Konohamaru!",
+      "url": "https://animelok.live/watch/naruto-20?ep=2",
+      "isFiller": false
+    },
+    {
+      "number": 3,
+      "title": "Sasuke and Sakura: Friends or Foes?",
+      "url": "https://animelok.live/watch/naruto-20?ep=3",
+      "isFiller": false
+    },
+    {
+      "number": 4,
+      "title": "Pass or Fail: Survival Test",
+      "url": "https://animelok.live/watch/naruto-20?ep=4",
+      "isFiller": false
+    },
+    {
+      "number": 5,
+      "title": "You Failed! Kakashi's Final Decision",
+      "url": "https://animelok.live/watch/naruto-20?ep=5",
+      "isFiller": false
+    },
+    {
+      "number": 6,
+      "title": "A Dangerous Mission! Journey to the Land of Waves!",
+      "url": "https://animelok.live/watch/naruto-20?ep=6",
+      "isFiller": false
+    },
+    {
+      "number": 7,
+      "title": "The Assassin of the Mist!",
+      "url": "https://animelok.live/watch/naruto-20?ep=7",
+      "isFiller": false
+    },
+    {
+      "number": 8,
+      "title": "The Oath of Pain",
+      "url": "https://animelok.live/watch/naruto-20?ep=8",
+      "isFiller": false
+    },
+    {
+      "number": 9,
+      "title": "Kakashi: Sharingan Warrior",
+      "url": "https://animelok.live/watch/naruto-20?ep=9",
+      "isFiller": false
+    },
+    {
+      "number": 10,
+      "title": "The Forest of Chakra",
+      "url": "https://animelok.live/watch/naruto-20?ep=10",
+      "isFiller": false
+    },
+    {
+      "number": 11,
+      "title": "The Land Where a Hero Once Lived",
+      "url": "https://animelok.live/watch/naruto-20?ep=11",
+      "isFiller": false
+    },
+    {
+      "number": 12,
+      "title": "Battle on the Bridge! Zabuza Returns!!",
+      "url": "https://animelok.live/watch/naruto-20?ep=12",
+      "isFiller": false
+    },
+    {
+      "number": 13,
+      "title": "Haku's Secret Jutsu: Crystal Ice Mirrors",
+      "url": "https://animelok.live/watch/naruto-20?ep=13",
+      "isFiller": false
+    },
+    {
+      "number": 14,
+      "title": "The Number One Hyperactive, Knucklehead Ninja Joins the Fight!!",
+      "url": "https://animelok.live/watch/naruto-20?ep=14",
+      "isFiller": false
+    },
+    {
+      "number": 15,
+      "title": "Zero Visibility: The Sharingan Shatters",
+      "url": "https://animelok.live/watch/naruto-20?ep=15",
+      "isFiller": false
+    },
+    {
+      "number": 16,
+      "title": "The Broken Seal",
+      "url": "https://animelok.live/watch/naruto-20?ep=16",
+      "isFiller": false
+    },
+    {
+      "number": 17,
+      "title": "White Past: Hidden Ambition",
+      "url": "https://animelok.live/watch/naruto-20?ep=17",
+      "isFiller": false
+    },
+    {
+      "number": 18,
+      "title": "The Weapons Known as Shinobi",
+      "url": "https://animelok.live/watch/naruto-20?ep=18",
+      "isFiller": false
+    },
+    {
+      "number": 19,
+      "title": "The Demon in the Snow",
+      "url": "https://animelok.live/watch/naruto-20?ep=19",
+      "isFiller": false
+    },
+    {
+      "number": 20,
+      "title": "A New Chapter Begins: The Chunin Exam!",
+      "url": "https://animelok.live/watch/naruto-20?ep=20",
+      "isFiller": false
+    },
+    {
+      "number": 21,
+      "title": "Identify Yourself: Powerful New Rivals",
+      "url": "https://animelok.live/watch/naruto-20?ep=21",
+      "isFiller": false
+    },
+    {
+      "number": 22,
+      "title": "Chunin Challenge: Rock Lee vs. Sasuke!",
+      "url": "https://animelok.live/watch/naruto-20?ep=22",
+      "isFiller": false
+    },
+    {
+      "number": 23,
+      "title": "Genin Takedown! All Nine Rookies Face Off!",
+      "url": "https://animelok.live/watch/naruto-20?ep=23",
+      "isFiller": false
+    },
+    {
+      "number": 24,
+      "title": "Start Your Engines: The Chunin Exam Begins!",
+      "url": "https://animelok.live/watch/naruto-20?ep=24",
+      "isFiller": false
+    },
+    {
+      "number": 25,
+      "title": "The Tenth Question: All or Nothing!",
+      "url": "https://animelok.live/watch/naruto-20?ep=25",
+      "isFiller": false
+    },
+    {
+      "number": 26,
+      "title": "Special Report: Live from the Forest of Death!",
+      "url": "https://animelok.live/watch/naruto-20?ep=26",
+      "isFiller": true
+    },
+    {
+      "number": 27,
+      "title": "The Chunin Exam Stage 2: The Forest of Death",
+      "url": "https://animelok.live/watch/naruto-20?ep=27",
+      "isFiller": false
+    },
+    {
+      "number": 28,
+      "title": "Eat or be Eaten: Panic in the Forest",
+      "url": "https://animelok.live/watch/naruto-20?ep=28",
+      "isFiller": false
+    },
+    {
+      "number": 29,
+      "title": "Naruto's Counterattack: Never Give In!",
+      "url": "https://animelok.live/watch/naruto-20?ep=29",
+      "isFiller": false
+    },
+    {
+      "number": 30,
+      "title": "The Sharingan Revived: Dragon-Flame Jutsu!",
+      "url": "https://animelok.live/watch/naruto-20?ep=30",
+      "isFiller": false
+    },
+    {
+      "number": 31,
+      "title": "Bushy Brow's Pledge: Undying Love and Protection!",
+      "url": "https://animelok.live/watch/naruto-20?ep=31",
+      "isFiller": false
+    },
+    {
+      "number": 32,
+      "title": "Sakura Blossoms!",
+      "url": "https://animelok.live/watch/naruto-20?ep=32",
+      "isFiller": false
+    },
+    {
+      "number": 33,
+      "title": "Battle Formation: Ino-Shika-Cho!",
+      "url": "https://animelok.live/watch/naruto-20?ep=33",
+      "isFiller": false
+    },
+    {
+      "number": 34,
+      "title": "Akamaru Trembles: Gaara's Cruel Strength!",
+      "url": "https://animelok.live/watch/naruto-20?ep=34",
+      "isFiller": false
+    },
+    {
+      "number": 35,
+      "title": "The Scroll's Secret: No Peeking Allowed",
+      "url": "https://animelok.live/watch/naruto-20?ep=35",
+      "isFiller": false
+    },
+    {
+      "number": 36,
+      "title": "Clone vs. Clone: Mine are Better than Yours!",
+      "url": "https://animelok.live/watch/naruto-20?ep=36",
+      "isFiller": false
+    },
+    {
+      "number": 37,
+      "title": "Surviving the Cut! The Rookie Nine Together Again!",
+      "url": "https://animelok.live/watch/naruto-20?ep=37",
+      "isFiller": false
+    },
+    {
+      "number": 38,
+      "title": "Narrowing the Field: Sudden Death Elimination!",
+      "url": "https://animelok.live/watch/naruto-20?ep=38",
+      "isFiller": false
+    },
+    {
+      "number": 39,
+      "title": "Bushy Brow's Jealousy: Lions Barrage Unleashed!",
+      "url": "https://animelok.live/watch/naruto-20?ep=39",
+      "isFiller": false
+    },
+    {
+      "number": 40,
+      "title": "Kakashi and Orochimaru: Face-to-Face!",
+      "url": "https://animelok.live/watch/naruto-20?ep=40",
+      "isFiller": false
+    },
+    {
+      "number": 41,
+      "title": "Kunoichi Rumble: The Rivals Get Serious!",
+      "url": "https://animelok.live/watch/naruto-20?ep=41",
+      "isFiller": false
+    },
+    {
+      "number": 42,
+      "title": "The Ultimate Battle: Cha!",
+      "url": "https://animelok.live/watch/naruto-20?ep=42",
+      "isFiller": false
+    },
+    {
+      "number": 43,
+      "title": "Killer Kunoichi and a Shaky Shikamaru",
+      "url": "https://animelok.live/watch/naruto-20?ep=43",
+      "isFiller": false
+    },
+    {
+      "number": 44,
+      "title": "Akamaru Unleashed! Who's Top Dog Now?",
+      "url": "https://animelok.live/watch/naruto-20?ep=44",
+      "isFiller": false
+    },
+    {
+      "number": 45,
+      "title": "Surprise Attack! Naruto's Secret Weapon!",
+      "url": "https://animelok.live/watch/naruto-20?ep=45",
+      "isFiller": false
+    },
+    {
+      "number": 46,
+      "title": "Byakugan Battle: Hinata Grows Bold!",
+      "url": "https://animelok.live/watch/naruto-20?ep=46",
+      "isFiller": false
+    },
+    {
+      "number": 47,
+      "title": "A Failure Stands Tall!",
+      "url": "https://animelok.live/watch/naruto-20?ep=47",
+      "isFiller": false
+    },
+    {
+      "number": 48,
+      "title": "Gaara vs. Rock Lee: The Power of Youth Explodes!",
+      "url": "https://animelok.live/watch/naruto-20?ep=48",
+      "isFiller": false
+    },
+    {
+      "number": 49,
+      "title": "Lee's Hidden Strength: Forbidden Secret Jutsu!",
+      "url": "https://animelok.live/watch/naruto-20?ep=49",
+      "isFiller": false
+    },
+    {
+      "number": 50,
+      "title": "The Fifth Gate: A Splendid Ninja is Born",
+      "url": "https://animelok.live/watch/naruto-20?ep=50",
+      "isFiller": false
+    },
+    {
+      "number": 51,
+      "title": "A Shadow in Darkness: Danger Approaches Sasuke",
+      "url": "https://animelok.live/watch/naruto-20?ep=51",
+      "isFiller": false
+    },
+    {
+      "number": 52,
+      "title": "Ebisu Returns: Naruto's Toughest Training Yet!",
+      "url": "https://animelok.live/watch/naruto-20?ep=52",
+      "isFiller": false
+    },
+    {
+      "number": 53,
+      "title": "Long Time No See: Jiraiya Returns!",
+      "url": "https://animelok.live/watch/naruto-20?ep=53",
+      "isFiller": false
+    },
+    {
+      "number": 54,
+      "title": "The Summoning Jutsu: Wisdom of the Toad Sage!",
+      "url": "https://animelok.live/watch/naruto-20?ep=54",
+      "isFiller": false
+    },
+    {
+      "number": 55,
+      "title": "A Feeling of Yearning, A Flower Full of Hope",
+      "url": "https://animelok.live/watch/naruto-20?ep=55",
+      "isFiller": false
+    },
+    {
+      "number": 56,
+      "title": "Live or Die: Risk it All to Win it All!",
+      "url": "https://animelok.live/watch/naruto-20?ep=56",
+      "isFiller": false
+    },
+    {
+      "number": 57,
+      "title": "He Flies! He Jumps! He Lurks! Chief Toad Appears!",
+      "url": "https://animelok.live/watch/naruto-20?ep=57",
+      "isFiller": false
+    },
+    {
+      "number": 58,
+      "title": "Hospital Besieged: The Evil Hand Revealed!",
+      "url": "https://animelok.live/watch/naruto-20?ep=58",
+      "isFiller": false
+    },
+    {
+      "number": 59,
+      "title": "The Final Rounds: Rush to the Battle Arena!",
+      "url": "https://animelok.live/watch/naruto-20?ep=59",
+      "isFiller": false
+    },
+    {
+      "number": 60,
+      "title": "Byakugan vs. Shadow Clone",
+      "url": "https://animelok.live/watch/naruto-20?ep=60",
+      "isFiller": false
+    },
+    {
+      "number": 61,
+      "title": "Ultimate Defense: Zero Blind Spot!",
+      "url": "https://animelok.live/watch/naruto-20?ep=61",
+      "isFiller": false
+    },
+    {
+      "number": 62,
+      "title": "A Failure's True Power",
+      "url": "https://animelok.live/watch/naruto-20?ep=62",
+      "isFiller": false
+    },
+    {
+      "number": 63,
+      "title": "Hit it or Quit it: The Final Rounds Get Complicated!",
+      "url": "https://animelok.live/watch/naruto-20?ep=63",
+      "isFiller": false
+    },
+    {
+      "number": 64,
+      "title": "Zero Motivation: The Guy with Cloud Envy!",
+      "url": "https://animelok.live/watch/naruto-20?ep=64",
+      "isFiller": false
+    },
+    {
+      "number": 65,
+      "title": "Dancing Leaf, Squirming Sand",
+      "url": "https://animelok.live/watch/naruto-20?ep=65",
+      "isFiller": false
+    },
+    {
+      "number": 66,
+      "title": "Bushy Brow's Jutsu: Sasuke Style!",
+      "url": "https://animelok.live/watch/naruto-20?ep=66",
+      "isFiller": false
+    },
+    {
+      "number": 67,
+      "title": "Late for the Show, But Ready to Go! The Ultimate Secret Technique is Born!",
+      "url": "https://animelok.live/watch/naruto-20?ep=67",
+      "isFiller": false
+    },
+    {
+      "number": 68,
+      "title": "Zero Hour! The Destruction of the Hidden Leaf Village Begins!",
+      "url": "https://animelok.live/watch/naruto-20?ep=68",
+      "isFiller": false
+    },
+    {
+      "number": 69,
+      "title": "Village in Distress: A New A-Ranked Mission!",
+      "url": "https://animelok.live/watch/naruto-20?ep=69",
+      "isFiller": false
+    },
+    {
+      "number": 70,
+      "title": "A Shirker's Call to Action: A Layabout No More!",
+      "url": "https://animelok.live/watch/naruto-20?ep=70",
+      "isFiller": false
+    },
+    {
+      "number": 71,
+      "title": "An Unrivaled Match: Hokage Battle Royale!",
+      "url": "https://animelok.live/watch/naruto-20?ep=71",
+      "isFiller": false
+    },
+    {
+      "number": 72,
+      "title": "A Mistake from the Past: A Face Revealed!",
+      "url": "https://animelok.live/watch/naruto-20?ep=72",
+      "isFiller": false
+    },
+    {
+      "number": 73,
+      "title": "Forbidden Secret Technique: Reaper Death Seal!",
+      "url": "https://animelok.live/watch/naruto-20?ep=73",
+      "isFiller": false
+    },
+    {
+      "number": 74,
+      "title": "Astonishing Truth! Gaara's Identity Emerges!",
+      "url": "https://animelok.live/watch/naruto-20?ep=74",
+      "isFiller": false
+    },
+    {
+      "number": 75,
+      "title": "Sasuke's Decision: Pushed to the Edge!",
+      "url": "https://animelok.live/watch/naruto-20?ep=75",
+      "isFiller": false
+    },
+    {
+      "number": 76,
+      "title": "Assassin of the Moonlit Night",
+      "url": "https://animelok.live/watch/naruto-20?ep=76",
+      "isFiller": false
+    },
+    {
+      "number": 77,
+      "title": "Light vs. Dark: The Two Faces of Gaara",
+      "url": "https://animelok.live/watch/naruto-20?ep=77",
+      "isFiller": false
+    },
+    {
+      "number": 78,
+      "title": "Naruto's Ninja Handbook",
+      "url": "https://animelok.live/watch/naruto-20?ep=78",
+      "isFiller": false
+    },
+    {
+      "number": 79,
+      "title": "Beyond the Limit of Darkness and Light",
+      "url": "https://animelok.live/watch/naruto-20?ep=79",
+      "isFiller": false
+    },
+    {
+      "number": 80,
+      "title": "The Third Hokage, Forever...",
+      "url": "https://animelok.live/watch/naruto-20?ep=80",
+      "isFiller": false
+    },
+    {
+      "number": 81,
+      "title": "Return of the Morning Mist",
+      "url": "https://animelok.live/watch/naruto-20?ep=81",
+      "isFiller": false
+    },
+    {
+      "number": 82,
+      "title": "Eye to Eye: Sharingan vs. Sharingan!",
+      "url": "https://animelok.live/watch/naruto-20?ep=82",
+      "isFiller": false
+    },
+    {
+      "number": 83,
+      "title": "Jiraiya: Naruto's Potential Disaster!",
+      "url": "https://animelok.live/watch/naruto-20?ep=83",
+      "isFiller": false
+    },
+    {
+      "number": 84,
+      "title": "Roar, Chidori! Brother vs. Brother!",
+      "url": "https://animelok.live/watch/naruto-20?ep=84",
+      "isFiller": false
+    },
+    {
+      "number": 85,
+      "title": "Hate Among the Uchihas: The Last of the Clan!",
+      "url": "https://animelok.live/watch/naruto-20?ep=85",
+      "isFiller": false
+    },
+    {
+      "number": 86,
+      "title": "A New Training Begins: I Will Be Strong!",
+      "url": "https://animelok.live/watch/naruto-20?ep=86",
+      "isFiller": false
+    },
+    {
+      "number": 87,
+      "title": "Keep on Training: Pop Goes the Water Balloon!",
+      "url": "https://animelok.live/watch/naruto-20?ep=87",
+      "isFiller": false
+    },
+    {
+      "number": 88,
+      "title": "Focal Point: The Mark of the Leaf",
+      "url": "https://animelok.live/watch/naruto-20?ep=88",
+      "isFiller": false
+    },
+    {
+      "number": 89,
+      "title": "An Impossible Choice: The Pain Within Tsunade's Heart",
+      "url": "https://animelok.live/watch/naruto-20?ep=89",
+      "isFiller": false
+    },
+    {
+      "number": 90,
+      "title": "Unforgivable! A Total Lack of Respect!",
+      "url": "https://animelok.live/watch/naruto-20?ep=90",
+      "isFiller": false
+    },
+    {
+      "number": 91,
+      "title": "Inheritence! The Necklace of Death!",
+      "url": "https://animelok.live/watch/naruto-20?ep=91",
+      "isFiller": false
+    },
+    {
+      "number": 92,
+      "title": "A Dubious Offer! Tsunade's Choice!",
+      "url": "https://animelok.live/watch/naruto-20?ep=92",
+      "isFiller": false
+    },
+    {
+      "number": 93,
+      "title": "Breakdown! The Deal is Off!",
+      "url": "https://animelok.live/watch/naruto-20?ep=93",
+      "isFiller": false
+    },
+    {
+      "number": 94,
+      "title": "Attack! Fury of the Rasengan!",
+      "url": "https://animelok.live/watch/naruto-20?ep=94",
+      "isFiller": false
+    },
+    {
+      "number": 95,
+      "title": "The Fifth Hokage! A Life on the Line!",
+      "url": "https://animelok.live/watch/naruto-20?ep=95",
+      "isFiller": false
+    },
+    {
+      "number": 96,
+      "title": "Deadlock! Sannin Showdown!",
+      "url": "https://animelok.live/watch/naruto-20?ep=96",
+      "isFiller": false
+    },
+    {
+      "number": 97,
+      "title": "Kidnapped! Naruto's Hot Spring Adventure!",
+      "url": "https://animelok.live/watch/naruto-20?ep=97",
+      "isFiller": true
+    },
+    {
+      "number": 98,
+      "title": "Tsunade's Warning: Ninja No More!",
+      "url": "https://animelok.live/watch/naruto-20?ep=98",
+      "isFiller": false
+    },
+    {
+      "number": 99,
+      "title": "The Will of Fire Still Burns!",
+      "url": "https://animelok.live/watch/naruto-20?ep=99",
+      "isFiller": false
+    },
+    {
+      "number": 100,
+      "title": "Sensei and Student: The Bond of the Shinobi",
+      "url": "https://animelok.live/watch/naruto-20?ep=100",
+      "isFiller": false
+    },
+    {
+      "number": 101,
+      "title": "Gotta See! Gotta Know! Kakashi-Sensei's True Face!",
+      "url": "https://animelok.live/watch/naruto-20?ep=101",
+      "isFiller": true
+    },
+    {
+      "number": 102,
+      "title": "Mission: Help an Old Friend in the Land of Tea",
+      "url": "https://animelok.live/watch/naruto-20?ep=102",
+      "isFiller": true
+    },
+    {
+      "number": 103,
+      "title": "The Race is on! Trouble on the High Seas!",
+      "url": "https://animelok.live/watch/naruto-20?ep=103",
+      "isFiller": true
+    },
+    {
+      "number": 104,
+      "title": "Run Idate Run! Nagi Island Awaits!",
+      "url": "https://animelok.live/watch/naruto-20?ep=104",
+      "isFiller": true
+    },
+    {
+      "number": 105,
+      "title": "A Fierce Battle of Rolling Thunder!",
+      "url": "https://animelok.live/watch/naruto-20?ep=105",
+      "isFiller": true
+    },
+    {
+      "number": 106,
+      "title": "The Last Leg: A Final Act of Desperation",
+      "url": "https://animelok.live/watch/naruto-20?ep=106",
+      "isFiller": true
+    },
+    {
+      "number": 107,
+      "title": "The Battle Begins: Naruto vs. Sasuke",
+      "url": "https://animelok.live/watch/naruto-20?ep=107",
+      "isFiller": false
+    },
+    {
+      "number": 108,
+      "title": "Bitter Rivals and Broken Bonds",
+      "url": "https://animelok.live/watch/naruto-20?ep=108",
+      "isFiller": false
+    },
+    {
+      "number": 109,
+      "title": "An Invitation from the Sound",
+      "url": "https://animelok.live/watch/naruto-20?ep=109",
+      "isFiller": false
+    },
+    {
+      "number": 110,
+      "title": "Formation! The Sasuke Retrieval Squad",
+      "url": "https://animelok.live/watch/naruto-20?ep=110",
+      "isFiller": false
+    },
+    {
+      "number": 111,
+      "title": "Sound vs. Leaf",
+      "url": "https://animelok.live/watch/naruto-20?ep=111",
+      "isFiller": false
+    },
+    {
+      "number": 112,
+      "title": "Squad Mutiny: Everything Falls Apart!",
+      "url": "https://animelok.live/watch/naruto-20?ep=112",
+      "isFiller": false
+    },
+    {
+      "number": 113,
+      "title": "Full Throttle Power! Choji, Ablaze!",
+      "url": "https://animelok.live/watch/naruto-20?ep=113",
+      "isFiller": false
+    },
+    {
+      "number": 114,
+      "title": "Good-bye Old Friend...! I'll Always Believe in You!",
+      "url": "https://animelok.live/watch/naruto-20?ep=114",
+      "isFiller": false
+    },
+    {
+      "number": 115,
+      "title": "Your Opponent Is Me!",
+      "url": "https://animelok.live/watch/naruto-20?ep=115",
+      "isFiller": false
+    },
+    {
+      "number": 116,
+      "title": "360 Degrees of Vision: The Byakugan's Blind Spot",
+      "url": "https://animelok.live/watch/naruto-20?ep=116",
+      "isFiller": false
+    },
+    {
+      "number": 117,
+      "title": "Losing is Not an Option!",
+      "url": "https://animelok.live/watch/naruto-20?ep=117",
+      "isFiller": false
+    },
+    {
+      "number": 118,
+      "title": "The Vessel Arrives Too Late",
+      "url": "https://animelok.live/watch/naruto-20?ep=118",
+      "isFiller": false
+    },
+    {
+      "number": 119,
+      "title": "Miscalculation: A New Enemy Appears!",
+      "url": "https://animelok.live/watch/naruto-20?ep=119",
+      "isFiller": false
+    },
+    {
+      "number": 120,
+      "title": "Roar and Howl! The Ultimate Tag Team",
+      "url": "https://animelok.live/watch/naruto-20?ep=120",
+      "isFiller": false
+    },
+    {
+      "number": 121,
+      "title": "To Each His Own Battle",
+      "url": "https://animelok.live/watch/naruto-20?ep=121",
+      "isFiller": false
+    },
+    {
+      "number": 122,
+      "title": "Fakeout: Shikamaru's Comeback!",
+      "url": "https://animelok.live/watch/naruto-20?ep=122",
+      "isFiller": false
+    },
+    {
+      "number": 123,
+      "title": "The Leaf's Handsome Devil!",
+      "url": "https://animelok.live/watch/naruto-20?ep=123",
+      "isFiller": false
+    },
+    {
+      "number": 124,
+      "title": "The Beast Within",
+      "url": "https://animelok.live/watch/naruto-20?ep=124",
+      "isFiller": false
+    },
+    {
+      "number": 125,
+      "title": "The Sand Shinobi: Allies of the Leaf",
+      "url": "https://animelok.live/watch/naruto-20?ep=125",
+      "isFiller": false
+    },
+    {
+      "number": 126,
+      "title": "Showdown: Gaara vs. Kimimaro!",
+      "url": "https://animelok.live/watch/naruto-20?ep=126",
+      "isFiller": false
+    },
+    {
+      "number": 127,
+      "title": "Vengeful Strike! The Bracken Dance",
+      "url": "https://animelok.live/watch/naruto-20?ep=127",
+      "isFiller": false
+    },
+    {
+      "number": 128,
+      "title": "A Cry on Deaf Ears",
+      "url": "https://animelok.live/watch/naruto-20?ep=128",
+      "isFiller": false
+    },
+    {
+      "number": 129,
+      "title": "Brothers: Distance Among the Uchiha",
+      "url": "https://animelok.live/watch/naruto-20?ep=129",
+      "isFiller": false
+    },
+    {
+      "number": 130,
+      "title": "Father and Son, the Broken Crest",
+      "url": "https://animelok.live/watch/naruto-20?ep=130",
+      "isFiller": false
+    },
+    {
+      "number": 131,
+      "title": "The Secrets of the Mangekyo Sharingan!",
+      "url": "https://animelok.live/watch/naruto-20?ep=131",
+      "isFiller": false
+    },
+    {
+      "number": 132,
+      "title": "For a Friend",
+      "url": "https://animelok.live/watch/naruto-20?ep=132",
+      "isFiller": false
+    },
+    {
+      "number": 133,
+      "title": "A Plea From a Friend",
+      "url": "https://animelok.live/watch/naruto-20?ep=133",
+      "isFiller": false
+    },
+    {
+      "number": 134,
+      "title": "The End of Tears",
+      "url": "https://animelok.live/watch/naruto-20?ep=134",
+      "isFiller": false
+    },
+    {
+      "number": 135,
+      "title": "The Promise That Could Not Be Kept",
+      "url": "https://animelok.live/watch/naruto-20?ep=135",
+      "isFiller": false
+    },
+    {
+      "number": 136,
+      "title": "Deep Cover!? A Super S-Ranked Mission!",
+      "url": "https://animelok.live/watch/naruto-20?ep=136",
+      "isFiller": true
+    },
+    {
+      "number": 137,
+      "title": "A Town of Outlaws, the Shadow of the Fuma Clan",
+      "url": "https://animelok.live/watch/naruto-20?ep=137",
+      "isFiller": true
+    },
+    {
+      "number": 138,
+      "title": "Pure Betrayal, and a Fleeting Plea!",
+      "url": "https://animelok.live/watch/naruto-20?ep=138",
+      "isFiller": true
+    },
+    {
+      "number": 139,
+      "title": "Pure Terror! The House of Orochimaru",
+      "url": "https://animelok.live/watch/naruto-20?ep=139",
+      "isFiller": true
+    },
+    {
+      "number": 140,
+      "title": "Two Heartbeats: Kabuto's Trap",
+      "url": "https://animelok.live/watch/naruto-20?ep=140",
+      "isFiller": true
+    },
+    {
+      "number": 141,
+      "title": "Sakura's Determination",
+      "url": "https://animelok.live/watch/naruto-20?ep=141",
+      "isFiller": false
+    },
+    {
+      "number": 142,
+      "title": "The Three Villains from the Maximum Security Prison",
+      "url": "https://animelok.live/watch/naruto-20?ep=142",
+      "isFiller": false
+    },
+    {
+      "number": 143,
+      "title": "Tonton! I'm Counting on You!",
+      "url": "https://animelok.live/watch/naruto-20?ep=143",
+      "isFiller": true
+    },
+    {
+      "number": 144,
+      "title": "A New Squad! Two People and a Dog?!",
+      "url": "https://animelok.live/watch/naruto-20?ep=144",
+      "isFiller": true
+    },
+    {
+      "number": 145,
+      "title": "A New Formation: Ino-Shika-Cho!",
+      "url": "https://animelok.live/watch/naruto-20?ep=145",
+      "isFiller": true
+    },
+    {
+      "number": 146,
+      "title": "Orochimaru's Shadow",
+      "url": "https://animelok.live/watch/naruto-20?ep=146",
+      "isFiller": true
+    },
+    {
+      "number": 147,
+      "title": "A Clash of Fate: You Can't Bring Me Down",
+      "url": "https://animelok.live/watch/naruto-20?ep=147",
+      "isFiller": true
+    },
+    {
+      "number": 148,
+      "title": "Search for the Rare Bikochu Beetle",
+      "url": "https://animelok.live/watch/naruto-20?ep=148",
+      "isFiller": true
+    },
+    {
+      "number": 149,
+      "title": "What's the Difference? Don't All Insects Look Alike?",
+      "url": "https://animelok.live/watch/naruto-20?ep=149",
+      "isFiller": true
+    },
+    {
+      "number": 150,
+      "title": "A Battle of Bugs: The Deceivers and the Deceived",
+      "url": "https://animelok.live/watch/naruto-20?ep=150",
+      "isFiller": true
+    },
+    {
+      "number": 151,
+      "title": "Blaze Away Byakugan: This Is My Ninja Way",
+      "url": "https://animelok.live/watch/naruto-20?ep=151",
+      "isFiller": true
+    },
+    {
+      "number": 152,
+      "title": "Funeral March for the Living",
+      "url": "https://animelok.live/watch/naruto-20?ep=152",
+      "isFiller": true
+    },
+    {
+      "number": 153,
+      "title": "A Lesson Learned: The Iron Fist of Love",
+      "url": "https://animelok.live/watch/naruto-20?ep=153",
+      "isFiller": true
+    },
+    {
+      "number": 154,
+      "title": "The Enemy of the Byakugan",
+      "url": "https://animelok.live/watch/naruto-20?ep=154",
+      "isFiller": true
+    },
+    {
+      "number": 155,
+      "title": "The Dark Creeping Clouds",
+      "url": "https://animelok.live/watch/naruto-20?ep=155",
+      "isFiller": true
+    },
+    {
+      "number": 156,
+      "title": "Raiga's Counterattack",
+      "url": "https://animelok.live/watch/naruto-20?ep=156",
+      "isFiller": true
+    },
+    {
+      "number": 157,
+      "title": "Run! The Curry of Life",
+      "url": "https://animelok.live/watch/naruto-20?ep=157",
+      "isFiller": true
+    },
+    {
+      "number": 158,
+      "title": "Follow My Lead! The Great Survival Challenge",
+      "url": "https://animelok.live/watch/naruto-20?ep=158",
+      "isFiller": true
+    },
+    {
+      "number": 159,
+      "title": "Bounty Hunter from the Wilderness",
+      "url": "https://animelok.live/watch/naruto-20?ep=159",
+      "isFiller": true
+    },
+    {
+      "number": 160,
+      "title": "Hunt or Be Hunted?! Showdown at the O.K. Temple!",
+      "url": "https://animelok.live/watch/naruto-20?ep=160",
+      "isFiller": true
+    },
+    {
+      "number": 161,
+      "title": "The Appearance of Strange Visitors",
+      "url": "https://animelok.live/watch/naruto-20?ep=161",
+      "isFiller": true
+    },
+    {
+      "number": 162,
+      "title": "The Cursed Warrior",
+      "url": "https://animelok.live/watch/naruto-20?ep=162",
+      "isFiller": true
+    },
+    {
+      "number": 163,
+      "title": "The Tactician's Intent",
+      "url": "https://animelok.live/watch/naruto-20?ep=163",
+      "isFiller": true
+    },
+    {
+      "number": 164,
+      "title": "Too Late for Help",
+      "url": "https://animelok.live/watch/naruto-20?ep=164",
+      "isFiller": true
+    },
+    {
+      "number": 165,
+      "title": "The Death of Naruto",
+      "url": "https://animelok.live/watch/naruto-20?ep=165",
+      "isFiller": true
+    },
+    {
+      "number": 166,
+      "title": "When Time Stands Still",
+      "url": "https://animelok.live/watch/naruto-20?ep=166",
+      "isFiller": true
+    },
+    {
+      "number": 167,
+      "title": "When Egrets Flap Their Wings",
+      "url": "https://animelok.live/watch/naruto-20?ep=167",
+      "isFiller": true
+    },
+    {
+      "number": 168,
+      "title": "Mix It, Stretch It, Boil It Up! Burn, Copper Pot, Burn!",
+      "url": "https://animelok.live/watch/naruto-20?ep=168",
+      "isFiller": true
+    },
+    {
+      "number": 169,
+      "title": "Remembrance: The Lost Page",
+      "url": "https://animelok.live/watch/naruto-20?ep=169",
+      "isFiller": true
+    },
+    {
+      "number": 170,
+      "title": "The Closed Door",
+      "url": "https://animelok.live/watch/naruto-20?ep=170",
+      "isFiller": true
+    },
+    {
+      "number": 171,
+      "title": "Infiltration: The Set-Up!",
+      "url": "https://animelok.live/watch/naruto-20?ep=171",
+      "isFiller": true
+    },
+    {
+      "number": 172,
+      "title": "Despair: A Fractured Heart",
+      "url": "https://animelok.live/watch/naruto-20?ep=172",
+      "isFiller": true
+    },
+    {
+      "number": 173,
+      "title": "The Battle at Sea: The Power Unleashed!",
+      "url": "https://animelok.live/watch/naruto-20?ep=173",
+      "isFiller": true
+    },
+    {
+      "number": 174,
+      "title": "Impossible! Celebrity Ninja Art - Money Style Jutsu!",
+      "url": "https://animelok.live/watch/naruto-20?ep=174",
+      "isFiller": true
+    },
+    {
+      "number": 175,
+      "title": "The Treasure Hunt is On!",
+      "url": "https://animelok.live/watch/naruto-20?ep=175",
+      "isFiller": true
+    },
+    {
+      "number": 176,
+      "title": "Run, Dodge, Zigzag! Chase or Be Chased!",
+      "url": "https://animelok.live/watch/naruto-20?ep=176",
+      "isFiller": true
+    },
+    {
+      "number": 177,
+      "title": "Please, Mr. Postman!",
+      "url": "https://animelok.live/watch/naruto-20?ep=177",
+      "isFiller": true
+    },
+    {
+      "number": 178,
+      "title": "Encounter! The Boy with a Star's Name",
+      "url": "https://animelok.live/watch/naruto-20?ep=178",
+      "isFiller": true
+    },
+    {
+      "number": 179,
+      "title": "The Remembered Lullaby",
+      "url": "https://animelok.live/watch/naruto-20?ep=179",
+      "isFiller": true
+    },
+    {
+      "number": 180,
+      "title": "Hidden Jutsu: The Price of The Ninja Art: Kujaku",
+      "url": "https://animelok.live/watch/naruto-20?ep=180",
+      "isFiller": true
+    },
+    {
+      "number": 181,
+      "title": "Hoshikage, The Buried Truth",
+      "url": "https://animelok.live/watch/naruto-20?ep=181",
+      "isFiller": true
+    },
+    {
+      "number": 182,
+      "title": "Reunion, The Remaining time",
+      "url": "https://animelok.live/watch/naruto-20?ep=182",
+      "isFiller": true
+    },
+    {
+      "number": 183,
+      "title": "The Star's Radiance",
+      "url": "https://animelok.live/watch/naruto-20?ep=183",
+      "isFiller": true
+    },
+    {
+      "number": 184,
+      "title": "Kiba's Long Day!",
+      "url": "https://animelok.live/watch/naruto-20?ep=184",
+      "isFiller": true
+    },
+    {
+      "number": 185,
+      "title": "A Legend from the Hidden Leaf: The Onbaa!",
+      "url": "https://animelok.live/watch/naruto-20?ep=185",
+      "isFiller": true
+    },
+    {
+      "number": 186,
+      "title": "Laughing Shino",
+      "url": "https://animelok.live/watch/naruto-20?ep=186",
+      "isFiller": true
+    },
+    {
+      "number": 187,
+      "title": "Open for Business! The Leaf Moving Service",
+      "url": "https://animelok.live/watch/naruto-20?ep=187",
+      "isFiller": true
+    },
+    {
+      "number": 188,
+      "title": "Mystery of the Targeted Merchants",
+      "url": "https://animelok.live/watch/naruto-20?ep=188",
+      "isFiller": true
+    },
+    {
+      "number": 189,
+      "title": "A Limitless Supply of Ninja Tools",
+      "url": "https://animelok.live/watch/naruto-20?ep=189",
+      "isFiller": true
+    },
+    {
+      "number": 190,
+      "title": "The Byakugan Sees the Blind Spot",
+      "url": "https://animelok.live/watch/naruto-20?ep=190",
+      "isFiller": true
+    },
+    {
+      "number": 191,
+      "title": "Forecast: Death! Cloudy with Chance of Sun",
+      "url": "https://animelok.live/watch/naruto-20?ep=191",
+      "isFiller": true
+    },
+    {
+      "number": 192,
+      "title": "Ino Screams! Chubby Paradise!",
+      "url": "https://animelok.live/watch/naruto-20?ep=192",
+      "isFiller": true
+    },
+    {
+      "number": 193,
+      "title": "Viva Dojo Challenge! Youth Is All About Passion!",
+      "url": "https://animelok.live/watch/naruto-20?ep=193",
+      "isFiller": true
+    },
+    {
+      "number": 194,
+      "title": "The Mysterious Curse of the Haunted Castle",
+      "url": "https://animelok.live/watch/naruto-20?ep=194",
+      "isFiller": true
+    },
+    {
+      "number": 195,
+      "title": "The Third Super-Beast!",
+      "url": "https://animelok.live/watch/naruto-20?ep=195",
+      "isFiller": true
+    },
+    {
+      "number": 196,
+      "title": "Hot-Blooded Confrontation: Student vs. Sensei",
+      "url": "https://animelok.live/watch/naruto-20?ep=196",
+      "isFiller": true
+    },
+    {
+      "number": 197,
+      "title": "Crisis! The Hidden Leaf 11 Gather!",
+      "url": "https://animelok.live/watch/naruto-20?ep=197",
+      "isFiller": true
+    },
+    {
+      "number": 198,
+      "title": "The ANBU Gives Up? Naruto's Recollection",
+      "url": "https://animelok.live/watch/naruto-20?ep=198",
+      "isFiller": true
+    },
+    {
+      "number": 199,
+      "title": "The Missed Target",
+      "url": "https://animelok.live/watch/naruto-20?ep=199",
+      "isFiller": true
+    },
+    {
+      "number": 200,
+      "title": "The Powerful Helper",
+      "url": "https://animelok.live/watch/naruto-20?ep=200",
+      "isFiller": true
+    },
+    {
+      "number": 201,
+      "title": "Multiple Traps! Countdown to Destruction",
+      "url": "https://animelok.live/watch/naruto-20?ep=201",
+      "isFiller": true
+    },
+    {
+      "number": 202,
+      "title": "The Top 5 Ninja Battles",
+      "url": "https://animelok.live/watch/naruto-20?ep=202",
+      "isFiller": true
+    },
+    {
+      "number": 203,
+      "title": "Kurenai's Decision, Squad 8 Left Behind",
+      "url": "https://animelok.live/watch/naruto-20?ep=203",
+      "isFiller": true
+    },
+    {
+      "number": 204,
+      "title": "Yakumo's Sealed Ability",
+      "url": "https://animelok.live/watch/naruto-20?ep=204",
+      "isFiller": true
+    },
+    {
+      "number": 205,
+      "title": "Kurenai's Top-Secret Mission: The Promise With the Third Hokage",
+      "url": "https://animelok.live/watch/naruto-20?ep=205",
+      "isFiller": true
+    },
+    {
+      "number": 206,
+      "title": "Genjutsu or Reality?",
+      "url": "https://animelok.live/watch/naruto-20?ep=206",
+      "isFiller": true
+    },
+    {
+      "number": 207,
+      "title": "The Supposed Sealed Ability",
+      "url": "https://animelok.live/watch/naruto-20?ep=207",
+      "isFiller": true
+    },
+    {
+      "number": 208,
+      "title": "The Weight of the Prized Artifact!",
+      "url": "https://animelok.live/watch/naruto-20?ep=208",
+      "isFiller": true
+    },
+    {
+      "number": 209,
+      "title": "The Enemy: Ninja Dropouts",
+      "url": "https://animelok.live/watch/naruto-20?ep=209",
+      "isFiller": true
+    },
+    {
+      "number": 210,
+      "title": "The Bewildering Forest",
+      "url": "https://animelok.live/watch/naruto-20?ep=210",
+      "isFiller": true
+    },
+    {
+      "number": 211,
+      "title": "Memory of Flames",
+      "url": "https://animelok.live/watch/naruto-20?ep=211",
+      "isFiller": true
+    },
+    {
+      "number": 212,
+      "title": "To Each His Own Path",
+      "url": "https://animelok.live/watch/naruto-20?ep=212",
+      "isFiller": true
+    },
+    {
+      "number": 213,
+      "title": "Vanished Memories",
+      "url": "https://animelok.live/watch/naruto-20?ep=213",
+      "isFiller": true
+    },
+    {
+      "number": 214,
+      "title": "Bringing Back Reality",
+      "url": "https://animelok.live/watch/naruto-20?ep=214",
+      "isFiller": true
+    },
+    {
+      "number": 215,
+      "title": "A Past to Be Erased",
+      "url": "https://animelok.live/watch/naruto-20?ep=215",
+      "isFiller": true
+    },
+    {
+      "number": 216,
+      "title": "The Targeted Shukaku",
+      "url": "https://animelok.live/watch/naruto-20?ep=216",
+      "isFiller": true
+    },
+    {
+      "number": 217,
+      "title": "Sand Alliance With The Leaf Shinobi",
+      "url": "https://animelok.live/watch/naruto-20?ep=217",
+      "isFiller": true
+    },
+    {
+      "number": 218,
+      "title": "The Counterattack!",
+      "url": "https://animelok.live/watch/naruto-20?ep=218",
+      "isFiller": true
+    },
+    {
+      "number": 219,
+      "title": "The Ultimate Weapon Reborn",
+      "url": "https://animelok.live/watch/naruto-20?ep=219",
+      "isFiller": true
+    },
+    {
+      "number": 220,
+      "title": "Departure",
+      "url": "https://animelok.live/watch/naruto-20?ep=220",
+      "isFiller": false
+    }
+  ]
+}

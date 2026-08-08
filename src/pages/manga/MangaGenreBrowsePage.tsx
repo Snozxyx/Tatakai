@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Compass, Loader2 } from "lucide-react";
+import { ArrowLeft, Compass, Loader2, Layers } from "lucide-react";
+import { MangaGenreSlider } from "@/components/manga/MangaGenreSlider";
 import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
@@ -11,10 +12,9 @@ import { Button } from "@/components/ui/button";
 import { CardSkeleton } from "@/components/ui/skeleton-custom";
 import { UnifiedMediaCard, type UnifiedMediaCardProps } from "@/components/UnifiedMediaCard";
 import { cn } from "@/lib/utils";
-import { useIsNativeApp } from "@/hooks/useIsNativeApp";
-import { useContentSafetySettings } from "@/hooks/useContentSafetySettings";
+import { useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
+import { useContentSafetySettings } from "@/hooks/user/useContentSafetySettings";
 import {
-  getAtsuFilters,
   getMangaFilterCounts,
   getMangaFilterSchema,
   parseMangaSearchProvider,
@@ -23,7 +23,7 @@ import {
   type MangaSearchProvider,
   type MangaSearchMode,
   type MangaSortOption,
-} from "@/services/manga.service";
+} from "@/core/content/manga-client";
 import type { MangaSearchItem, MangaSearchResult } from "@/types/manga";
 
 const BASE_GENRE_PRESETS = [
@@ -48,10 +48,6 @@ const HENTAI_GENRE = "hentai";
 const PROVIDER_OPTIONS: Array<{ value: MangaSearchProvider; label: string }> = [
   { value: "all", label: "All Providers" },
   { value: "mapped", label: "Mapped" },
-  { value: "atsu", label: "Atsu" },
-  { value: "mangafire", label: "MangaFire" },
-  { value: "mangaball", label: "MangaBall" },
-  { value: "allmanga", label: "AllManga" },
 ];
 
 const TYPE_OPTIONS = [
@@ -242,7 +238,7 @@ async function fetchGenreCatalogPage(
   const isAdultGenre = genre === HENTAI_GENRE;
   const statuses = mangaStatus !== "all" ? [mangaStatus] : undefined;
   const sortValue = sort !== "default" ? sort : undefined;
-  const effectiveProvider = isAdultGenre ? "atsu" : provider;
+  const effectiveProvider = provider;
 
   if (isAdultGenre && !canShowAdult) {
     return {
@@ -280,7 +276,7 @@ async function fetchGenreCatalogPage(
   }
 
   if (genre) {
-    const supportsGenreMode = provider === "all" || provider === "atsu" || provider === "mangafire" || provider === "allmanga";
+    const supportsGenreMode = (provider as string) === "all" || (provider as string) === "mangafire" || (provider as string) === "allmanga";
     if (supportsGenreMode) {
       const genreMode = await searchManga("", page, limit, {
         mode: "genre",
@@ -350,18 +346,6 @@ export default function MangaGenreBrowsePage() {
 
   const canShowAdultEverywhere = contentSafetySettings.showAdultEverywhere;
 
-  const { data: atsuFilterSchema } = useQuery({
-    queryKey: ["manga-discover-atsu-filters"],
-    queryFn: getAtsuFilters,
-    staleTime: 30 * 60 * 1000,
-  });
-
-  const { data: mangaFilterSchema } = useQuery({
-    queryKey: ["manga-discover-filter-schema"],
-    queryFn: getMangaFilterSchema,
-    staleTime: 30 * 60 * 1000,
-  });
-
   const normalizedRouteGenre = routeGenre ? decodeURIComponent(routeGenre).trim().toLowerCase() : "";
   const queryGenre = String(searchParams.get("genre") || "").trim().toLowerCase();
   const activeGenre = normalizedRouteGenre || queryGenre;
@@ -393,15 +377,7 @@ export default function MangaGenreBrowsePage() {
   });
 
   const genrePresets = useMemo(() => {
-    const fromSchema = Array.isArray(atsuFilterSchema?.genres)
-      ? atsuFilterSchema.genres
-          .map((genre) => String(genre?.slug || "").trim().toLowerCase())
-          .filter(Boolean)
-      : [];
-
-    const fallbackGenres = BASE_GENRE_PRESETS.map((genre) => String(genre).trim().toLowerCase()).filter(Boolean);
-    const merged = fromSchema.length > 0 ? fromSchema : fallbackGenres;
-    const unique = Array.from(new Set(merged));
+    const unique = [...BASE_GENRE_PRESETS].filter(Boolean);
 
     if (canShowAdultEverywhere && !unique.includes(HENTAI_GENRE)) {
       unique.push(HENTAI_GENRE);
@@ -412,20 +388,16 @@ export default function MangaGenreBrowsePage() {
       : unique.filter((genre) => genre !== HENTAI_GENRE);
 
     return ["", ...safeGenres];
-  }, [atsuFilterSchema, canShowAdultEverywhere]);
+  }, [canShowAdultEverywhere]);
 
   const availableSortOptions = useMemo(() => {
-    const schemaSorts = Array.isArray(mangaFilterSchema?.sorts)
-      ? mangaFilterSchema.sorts.filter((sort): sort is MangaSortOption => sort in SORT_LABELS)
-      : [];
-
-    const baseSorts = schemaSorts.length > 0 ? schemaSorts : (Object.keys(SORT_LABELS) as MangaSortOption[]);
+    const baseSorts = Object.keys(SORT_LABELS) as MangaSortOption[];
 
     return [
       { value: "default" as const, label: "Default Sort" },
       ...baseSorts.map((sort) => ({ value: sort, label: SORT_LABELS[sort] })),
     ];
-  }, [mangaFilterSchema]);
+  }, []);
 
   const facetCountLookup = useMemo(() => {
     const lookup = new Map<string, Map<string, number>>();
@@ -631,15 +603,17 @@ export default function MangaGenreBrowsePage() {
           <button
             type="button"
             onClick={() => navigate("/manga")}
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors group"
           >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Manga Home
+            <div className="w-7 h-7 rounded-full border border-white/10 bg-white/5 flex items-center justify-center group-hover:bg-white/10 transition-colors">
+              <ArrowLeft className="w-3.5 h-3.5" />
+            </div>
+            Manga Home
           </button>
 
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1 text-xs uppercase tracking-[0.12em] text-muted-foreground">
-            <Compass className="w-3.5 h-3.5" />
-            Genre and Provider Explorer
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground backdrop-blur-sm">
+            <Layers className="w-3.5 h-3.5" />
+            Genre Explorer
           </div>
         </div>
 
@@ -846,24 +820,34 @@ export default function MangaGenreBrowsePage() {
           </div>
         </GlassPanel>
 
+        {/* Tilt-Glass Genre Showcase — shown when no specific genre is active */}
+        {!activeGenre && (
+          <div className="mb-10">
+            <MangaGenreSlider />
+          </div>
+        )}
+
+        {/* Genre chip row */}
         <div className="mb-7 flex gap-2 overflow-x-auto no-scrollbar pb-2">
           {genrePresets.map((genre) => {
             const isActive = activeGenre === genre;
+            const isHentai = genre === "hentai";
             return (
               <button
                 key={`genre-chip-${genre || "all"}`}
                 type="button"
                 onClick={() => setParamAndNavigate({ feed: "auto", window: null, origin: null }, genre)}
                 className={cn(
-                  "px-3 py-1.5 rounded-full border text-xs uppercase tracking-wider whitespace-nowrap transition-colors",
+                  "inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full border text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all duration-200",
                   isActive
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "border-white/15 text-muted-foreground hover:text-foreground hover:border-white/30",
+                    ? isHentai
+                      ? "bg-rose-600 text-white border-rose-500 shadow-lg shadow-rose-500/20"
+                      : "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20"
+                    : "border-white/10 bg-white/5 text-muted-foreground hover:text-foreground hover:border-white/20 hover:bg-white/10",
                 )}
               >
-                {`${formatGenreLabel(genre)}${
-                  genre ? formatCount(genreCountMap.get(genre.toLowerCase())) : ""
-                }`}
+                {isHentai && <span className="text-[9px]">🔞</span>}
+                {`${formatGenreLabel(genre)}${genre ? formatCount(genreCountMap.get(genre.toLowerCase())) : ""}`}
               </button>
             );
           })}
@@ -931,3 +915,4 @@ export default function MangaGenreBrowsePage() {
     </div>
   );
 }
+

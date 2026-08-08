@@ -3,7 +3,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { AnimeCardWithPreview } from "@/components/anime/AnimeCardWithPreview";
 import { Skeleton } from "@/components/ui/skeleton-custom";
-import { useTrendingAnime, formatViewCount } from "@/hooks/useViews";
+import { useTrendingAnime, formatViewCount } from "@/hooks/user/useViews";
 import { fetchHome, TrendingAnime as ApiTrendingAnime, AnimeCard } from "@/lib/api";
 import { fetchAniListDiscover, fetchAniListMediaById, AniListMedia } from "@/lib/externalIntegrations";
 import { Flame, TrendingUp, Clock, Sparkles, Heart } from "lucide-react";
@@ -12,8 +12,12 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { useIsNativeApp } from "@/hooks/useIsNativeApp";
+import { useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
 import { cn } from "@/lib/utils";
+import { VirtualAnimeGrid } from "@/components/virtualized/VirtualAnimeGrid";
+import { FeatureFlag, useFeatureFlag } from "@/core/feature-flags";
+import { useScrollRestoration } from "@/hooks/ui/useScrollRestoration";
+import { MangaTrendingSection } from "@/components/manga/MangaTrendingSection";
 import {
   buildExternalAnimeRouteId,
   buildPreferredAnimeRouteId,
@@ -129,6 +133,8 @@ function TrendingHero({ anime, rank, views }: { anime: AnimeCard; rank: number; 
 export default function TrendingPage() {
   const [timeFrame, setTimeFrame] = useState<TimeFrame>('week');
   const [showExtendedDiscover, setShowExtendedDiscover] = useState(false);
+  const useVirtualGrid = useFeatureFlag(FeatureFlag.VIRTUAL_GRID);
+  useScrollRestoration('trending', { useWindow: true });
 
   // Use improved trending RPC with timeframe
   const { data: internalTrending, isLoading: loadingInternal } = useTrendingAnime(50, timeFrame);
@@ -218,7 +224,7 @@ export default function TrendingPage() {
 
   const resolveInternalTrendingCard = useCallback((entry: any): AnimeCard => {
     const rawEntryId = String(entry?.anime_id || '').trim();
-    const safeRawEntryId = /^(mal|anilist)-/i.test(rawEntryId) ? '' : rawEntryId;
+    const safeRawEntryId = /^(mal|anilist)[:-]/i.test(rawEntryId) ? '' : rawEntryId;
 
     const preferredRouteId = buildPreferredAnimeRouteId(
       {
@@ -270,7 +276,7 @@ export default function TrendingPage() {
         homeIdMappingIndex
       ) ||
       fallbackExternalId ||
-      `anilist-${media.id}`;
+      String(media.id);
 
     return {
       id: routeId,
@@ -420,13 +426,29 @@ export default function TrendingPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4"
+              className="space-y-8 animate-pulse"
             >
-              {Array.from({ length: 18 }).map((_, i) => (
-                <Skeleton key={i} className="aspect-[3/4] rounded-xl" />
-              ))}
+              {/* Hero Banner Skeleton */}
+              <div className="relative w-full aspect-[16/9] md:aspect-[21/9] rounded-2xl md:rounded-3xl bg-muted/40 overflow-hidden border border-white/5 flex items-end p-6 md:p-10">
+                <div className="space-y-4 max-w-xl">
+                  <div className="w-32 h-7 bg-orange-500/30 rounded-full" />
+                  <div className="w-4/5 h-10 md:h-16 bg-white/15 rounded-2xl" />
+                  <div className="flex gap-4 pt-2">
+                    <div className="w-32 h-12 bg-white/20 rounded-xl" />
+                    <div className="w-28 h-12 bg-white/10 rounded-xl" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Grid Skeleton */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
+                {Array.from({ length: 18 }).map((_, i) => (
+                  <Skeleton key={`trending-skel-${i}`} className="aspect-[3/4] rounded-2xl" />
+                ))}
+              </div>
             </motion.div>
           ) : (
+
             <motion.div
               key="content"
               initial={{ opacity: 0 }}
@@ -443,53 +465,69 @@ export default function TrendingPage() {
                 />
               ) : null}
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-4 gap-y-10 md:gap-x-6 md:gap-y-12">
-                {(hasInternalData ? internalTrending.slice(1) : apiTrending.slice(1)).map((t: any, index: number) => {
-                  const anime = hasInternalData
-                    ? resolveInternalTrendingCard(t)
-                    : trendingToCard(
-                      t,
-                      buildPreferredAnimeRouteId(t as any, homeIdMappingIndex) || t.id
-                    );
-                  const rank = index + 2;
+              {useVirtualGrid ? (
+                <VirtualAnimeGrid
+                  compact
+                  animes={
+                    hasInternalData
+                      ? internalTrending.slice(1).map((t: any) => resolveInternalTrendingCard(t))
+                      : apiTrending.slice(1).map((t: any) =>
+                        trendingToCard(
+                          t,
+                          buildPreferredAnimeRouteId(t as any, homeIdMappingIndex) || t.id
+                        )
+                      )
+                  }
+                />
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-4 gap-y-10 md:gap-x-6 md:gap-y-12">
+                  {(hasInternalData ? internalTrending.slice(1) : apiTrending.slice(1)).map((t: any, index: number) => {
+                    const anime = hasInternalData
+                      ? resolveInternalTrendingCard(t)
+                      : trendingToCard(
+                        t,
+                        buildPreferredAnimeRouteId(t as any, homeIdMappingIndex) || t.id
+                      );
+                    const rank = index + 2;
 
-                  return (
-                    <motion.div
-                      key={`${anime.id || 'anime'}-${index}`}
-                      layout
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="relative group"
-                    >
-                      {/* Premium Rank Badge */}
-                      <div className="absolute -top-4 -left-4 z-20 flex flex-col items-center">
-                        <div className="relative">
-                          <div className="absolute inset-0 bg-primary blur-md opacity-40 group-hover:opacity-100 transition-opacity" />
-                          <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-500 via-rose-500 to-pink-600 flex items-center justify-center text-white text-xl font-black shadow-xl ring-4 ring-background transform group-hover:-rotate-12 transition-transform duration-500">
-                            {rank}
+                    return (
+                      <motion.div
+                        key={`${anime.id || 'anime'}-${index}`}
+                        layout
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="relative group"
+                      >
+                        {/* Premium Rank Badge */}
+                        <div className="absolute -top-4 -left-4 z-20 flex flex-col items-center">
+                          <div className="relative">
+                            <div className="absolute inset-0 bg-primary blur-md opacity-40 group-hover:opacity-100 transition-opacity" />
+                            <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-500 via-rose-500 to-pink-600 flex items-center justify-center text-white text-xl font-black shadow-xl ring-4 ring-background transform group-hover:-rotate-12 transition-transform duration-500">
+                              {rank}
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="group-hover:translate-y-[-8px] transition-transform duration-500">
-                        <AnimeCardWithPreview anime={anime} />
+                        <div className="group-hover:translate-y-[-8px] transition-transform duration-500">
+                          <AnimeCardWithPreview anime={anime} />
 
-                        {hasInternalData && (
-                          <div className="mt-4 px-2 space-y-2 hidden md:block">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Pulse</span>
-                              <span className="text-[10px] font-bold text-orange-400">{formatViewCount(t.views_week || 0)}</span>
+                          {hasInternalData && (
+                            <div className="mt-4 px-2 space-y-2 hidden md:block">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Pulse</span>
+                                <span className="text-[10px] font-bold text-orange-400">{formatViewCount(t.views_week || 0)}</span>
+                              </div>
+                              <div className="h-[30px] w-full opacity-60 group-hover:opacity-100 transition-opacity">
+                                <Sparkline series={t.sparkline as any} />
+                              </div>
                             </div>
-                            <div className="h-[30px] w-full opacity-60 group-hover:opacity-100 transition-opacity">
-                              <Sparkline series={t.sparkline as any} />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              )}
 
               <div className="space-y-12">
                 <section>
@@ -548,6 +586,14 @@ export default function TrendingPage() {
                   )}
                 </section>
               </div>
+
+              {/* ── Manga & Manhwa Trending ───────────────────────────────── */}
+              <MangaTrendingSection
+                title="Trending Manga & Manhwa"
+                defaultTab="manga"
+                showTabs
+                limit={18}
+              />
             </motion.div>
           )}
         </AnimatePresence>
@@ -557,3 +603,4 @@ export default function TrendingPage() {
     </div >
   );
 }
+

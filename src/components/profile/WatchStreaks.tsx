@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { useWatchStreaks } from '@/hooks/useWatchStreaks';
+import { useWatchStreaks } from '@/hooks/user/useWatchStreaks';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { cn } from '@/lib/utils';
 import {
@@ -192,3 +192,4 @@ export function WatchStreaks({ isOwnProfile = false }: WatchStreaksProps) {
     </div>
   );
 }
+

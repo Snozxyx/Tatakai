@@ -4,8 +4,8 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
-import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from '@/hooks/useIsNativeApp';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from '@/hooks/ui/useIsNativeApp';
+import { useIsMobile } from '@/hooks/ui/use-mobile';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,12 +15,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { WatchStreaks } from '@/components/profile/WatchStreaks';
-import { useWatchlist } from '@/hooks/useWatchlist';
-import { useWatchHistory } from '@/hooks/useWatchHistory';
-import { usePublicProfile, usePublicWatchlist, usePublicWatchHistory } from '@/hooks/useProfileFeatures';
-import { useMangaReadlist, usePublicMangaReadlist, type MangaReadlistStatus } from '@/hooks/useMangaReadlist';
-import { useUserForumPosts } from '@/hooks/useForum';
-import { useFollow } from '@/hooks/useFollow';
+import { useWatchlist } from '@/hooks/user/useWatchlist';
+import { useWatchHistory } from '@/hooks/user/useWatchHistory';
+import { usePublicProfile, usePublicWatchlist, usePublicWatchHistory } from '@/hooks/user/useProfileFeatures';
+import { useMangaReadlist, usePublicMangaReadlist, type MangaReadlistStatus } from '@/hooks/user/useMangaReadlist';
+import { useUserForumPosts } from '@/hooks/community/useForum';
+import { useFollow } from '@/hooks/community/useFollow';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { getProxiedImageUrl } from '@/lib/api';
@@ -33,7 +33,7 @@ import {
   Play, Trash2, Clock, CheckCircle, Eye, Pause, XCircle, ArrowLeft, Camera, Shield, Sparkles, Globe, Lock, Share2, MessageSquare, AlertCircle, UserPlus, UserMinus, Bell, Check,
   ShieldCheck, Loader2, Flame, BookOpen
 } from 'lucide-react';
-import { useNotifications } from '@/hooks/useNotifications';
+import { useNotifications } from '@/hooks/community/useNotifications';
 import { motion } from 'framer-motion';
 import { RankBadge } from '@/components/ui/RankBadge';
 import { getRankNameStyle } from '@/lib/rankUtils';
@@ -1204,3 +1204,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+

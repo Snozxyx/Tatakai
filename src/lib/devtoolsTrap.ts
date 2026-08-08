@@ -165,5 +165,5 @@ export function isLikelyDevtoolsOpenByDebugger(thresholdMs = 160): boolean {
 }
 
 export function isLikelyDevtoolsOpen(): boolean {
-  return isLikelyDevtoolsOpenByViewport() || isLikelyDevtoolsOpenByDebugger();
+  return  isLikelyDevtoolsOpenByDebugger();
 }

@@ -37,7 +37,7 @@ import {
   useUpdatePlaylist,
   useDeletePlaylist,
   useRemoveFromPlaylist
-} from '@/hooks/usePlaylist';
+} from '@/hooks/user/usePlaylist';
 import {
   CollaboratorRole,
   useAddCollaborator,
@@ -45,12 +45,12 @@ import {
   usePlaylistCollaborators,
   useRemoveCollaborator,
   useUpdateCollaborator
-} from '@/hooks/usePlaylistCollaboration';
+} from '@/hooks/user/usePlaylistCollaboration';
 import {
   useAddPlaylistComment,
   useDeletePlaylistComment,
   usePlaylistComments
-} from '@/hooks/usePlaylistComments';
+} from '@/hooks/user/usePlaylistComments';
 import { useAuth } from '@/contexts/AuthContext';
 import { getProxiedImageUrl } from '@/lib/api';
 import { supabase } from '@/integrations/supabase/client';
@@ -1343,3 +1343,4 @@ export function PlaylistViewPage() {
     </div>
   );
 }
+

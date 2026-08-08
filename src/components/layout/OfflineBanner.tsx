@@ -1,18 +1,6 @@
-import { useEffect } from 'react';
-import { useOnline } from '@/hooks/useOnline';
-import { useToast } from '@/hooks/use-toast';
-
+// OfflineBanner — suppressed: OfflineGate renders a full-screen NoInternetPage
+// which already clearly communicates the offline state. A toast on top of that
+// page is redundant and obstructs the right-side content.
 export function OfflineBanner() {
-  const online = useOnline();
-  const { toast } = useToast();
-
-  useEffect(() => {
-    if (!online) {
-      toast({ title: 'You are offline', description: 'Some features may be limited. Use Retry or Open Downloads when back online.' });
-    }
-  }, [online, toast]);
-
-  if (online) return null;
-  // Full-page NoInternetPage (OfflineGate) handles offline UI; we only toast.
   return null;
 }

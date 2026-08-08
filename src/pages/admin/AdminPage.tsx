@@ -33,16 +33,30 @@ import { MarketplaceManager } from '@/components/admin/MarketplaceManager';
 import { RedirectManager } from '@/components/admin/RedirectManager';
 import { UserActivityLogs } from '@/components/admin/UserActivityLogs';
 import { AchievementManager } from '@/components/admin/AchievementManager';
+import { ExtensionManager } from '@/components/admin/ExtensionManager';
 import { ApiAdminPanel } from '@/components/admin/ApiAdminPanel';
-import { CuratedHomeManager } from '@/components/admin/CuratedHomeManager';
-import { useAdminMessages } from '@/hooks/useAdminMessages';
+// New panels — admin dashboard overhaul
+import { UserStatsPanel } from '@/components/admin/UserStatsPanel';
+import { ExtensionAnalyticsPanel } from '@/components/admin/ExtensionAnalyticsPanel';
+import { StreamingAnalyticsPanel } from '@/components/admin/StreamingAnalyticsPanel';
+import { PerformanceInsightsPanel } from '@/components/admin/PerformanceInsightsPanel';
+import { UpdateManagementPanel } from '@/components/admin/UpdateManagementPanel';
+import { CrashReportPanel } from '@/components/admin/CrashReportPanel';
+import { DeviceBanPanel } from '@/components/admin/DeviceBanPanel';
+import { IPBanPanel } from '@/components/admin/IPBanPanel';
+import { BanAuditLogPanel } from '@/components/admin/BanAuditLogPanel';
+import { BanTemplatesPanel } from '@/components/admin/BanTemplatesPanel';
+import { BulkBanToolbar } from '@/components/admin/BulkBanToolbar';
+import { LogViewerPanel } from '@/components/desktop/LogViewerPanel';
+import { useAdminMessages } from '@/hooks/admin/useAdminMessages';
 import { formatDistanceToNow } from 'date-fns';
 import { Link } from 'react-router-dom';
+import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 import {
   ArrowLeft, Shield, ShieldCheck, ShieldOff, ShieldAlert, Users, MessageSquare, Star, Search,
   Trash2, Ban, CheckCircle, AlertTriangle, BarChart3, Send,
   Settings, Power, Unlock, BellRing, Server, AlertCircle, Megaphone, History, Layers, FileText, Image, Radio, Menu, ChevronRight,
-  Globe, ShoppingBag, Lightbulb, Activity, ExternalLink
+  Globe, ShoppingBag, Lightbulb, Activity, ExternalLink,  
 } from 'lucide-react';
 
 const navItems = [
@@ -51,7 +65,6 @@ const navItems = [
   { value: 'suggestions', label: 'Suggestions', icon: Lightbulb, roles: ['admin', 'moderator'], badge: 'suggestions' },
   { value: 'pending', label: 'Forum Moderation', icon: MessageSquare, roles: ['admin', 'moderator'], badge: 'posts' },
   { value: 'submissions', label: 'Submissions', icon: Globe, roles: ['admin', 'moderator'], badge: 'posts' },
-  { value: 'curation', label: 'Home Curation', icon: Image, roles: ['admin', 'moderator'] },
   { value: 'languages', label: 'Languages', icon: Globe, roles: ['admin'] },
   { value: 'users', label: 'Users', icon: Users, roles: ['admin', 'moderator'] },
   { value: 'comments', label: 'Comments', icon: MessageSquare, roles: ['admin', 'moderator'] },
@@ -66,10 +79,20 @@ const navItems = [
   { value: 'api-admin', label: 'API Admin', icon: ExternalLink, roles: ['admin'] },
   { value: 'settings', label: 'System', icon: Settings, roles: ['admin'] },
   { value: 'achievements', label: 'Achievements', icon: Star, roles: ['admin', 'moderator'] },
+  { value: 'extensions', label: 'Extensions', icon: Star, roles: ['admin'] },
+  // Analytics expansion
+  { value: 'userstats', label: 'User Stats', icon: Activity, roles: ['admin', 'moderator'] },
+  { value: 'ext-analytics', label: 'Ext Analytics', icon: BarChart3, roles: ['admin'] },
+  { value: 'streaming', label: 'Streaming', icon: Radio, roles: ['admin'] },
+  { value: 'performance', label: 'Performance', icon: Activity, roles: ['admin'] },
+  // Ban management
+  { value: 'ban-management', label: 'Ban Management', icon: Ban, roles: ['admin'] },
+  { value: 'ban-audit', label: 'Ban Audit Log', icon: History, roles: ['admin', 'moderator'] },
 ];
 
 export default function AdminPage() {
   const navigate = useNavigate();
+  const isDesktopApp = useIsDesktopApp();
   const { isAdmin, isModerator, profile, isLoading } = useAuth();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
@@ -81,13 +104,20 @@ export default function AdminPage() {
   const [showBanModal, setShowBanModal] = useState(false);
   const [userToBan, setUserToBan] = useState<string | null>(null);
   const role = isAdmin ? 'admin' : isModerator ? 'moderator' : null;
-  const availableNavItems = navItems.filter(item => item.roles.includes(role as any));
+  const allNavItems = [
+    ...navItems,
+    ...(isAdmin ? [{ value: 'updates', label: 'Updates', icon: Shield, roles: ['admin'] as string[] }] : []),
+    ...(isAdmin && isDesktopApp ? [{ value: 'crashes', label: 'Crash Reports', icon: ShieldAlert, roles: ['admin'] as string[] }] : []),
+    ...(isDesktopApp ? [{ value: 'desktop-logs', label: 'Desktop Logs', icon: FileText, roles: ['admin', 'moderator'] as string[] }] : []),
+  ];
+  const availableNavItems = allNavItems.filter(item => item.roles.includes(role as string));
   const [activeTab, setActiveTab] = useState(availableNavItems[0]?.value || 'analytics');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [viewingActivityUserId, setViewingActivityUserId] = useState<string | null>(null);
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [broadcastTitle, setBroadcastTitle] = useState('');
+  const [selectedUsers, setSelectedUsers] = useState<{ id: string; display_name: string }[]>([]);
   const { deleteMessage } = useAdminMessages();
 
   const isStaff = isAdmin || isModerator;
@@ -400,7 +430,7 @@ export default function AdminPage() {
       <Background />
       <Sidebar />
 
-      <main className="relative z-10 pl-6 md:pl-32 pr-6 py-6 max-w-[1400px] mx-auto pb-24 md:pb-6">
+      <main className={`relative z-10 ${isDesktopApp ? 'pl-6' : 'pl-6 md:pl-32'} pr-6 py-6 max-w-[1400px] mx-auto pb-24 md:pb-6`}>
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <button
@@ -568,14 +598,51 @@ export default function AdminPage() {
               <LanguageManager />
             </TabsContent>
 
-            {/* Home Curation Tab */}
-            <TabsContent value="curation">
-              <CuratedHomeManager />
-            </TabsContent>
-
             {/* Achievements Tab */}
             <TabsContent value="achievements">
               <AchievementManager />
+            </TabsContent>
+
+            {/* Extensions Tab */}
+            <TabsContent value="extensions">
+              <ExtensionManager />
+            </TabsContent>
+
+            {/* Analytics expansion tabs */}
+            <TabsContent value="userstats">
+              <UserStatsPanel />
+            </TabsContent>
+            <TabsContent value="ext-analytics">
+              <ExtensionAnalyticsPanel />
+            </TabsContent>
+            <TabsContent value="streaming">
+              <StreamingAnalyticsPanel />
+            </TabsContent>
+            <TabsContent value="performance">
+              <PerformanceInsightsPanel />
+            </TabsContent>
+
+            {/* Electron-gated tabs */}
+            <TabsContent value="updates">
+              <UpdateManagementPanel />
+            </TabsContent>
+            <TabsContent value="crashes">
+              <CrashReportPanel />
+            </TabsContent>
+            <TabsContent value="desktop-logs">
+              <LogViewerPanel />
+            </TabsContent>
+
+            {/* Ban management tabs */}
+            <TabsContent value="ban-management">
+              <div className="space-y-10">
+                <DeviceBanPanel />
+                <IPBanPanel />
+                <BanTemplatesPanel />
+              </div>
+            </TabsContent>
+            <TabsContent value="ban-audit">
+              <BanAuditLogPanel />
             </TabsContent>
 
             {/* Users Tab */}
@@ -606,6 +673,15 @@ export default function AdminPage() {
                   </div>
                 </div>
 
+                {/* Bulk ban toolbar */}
+                <BulkBanToolbar
+                  selectedUsers={selectedUsers}
+                  onComplete={() => {
+                    setSelectedUsers([]);
+                    queryClient.invalidateQueries({ queryKey: ['admin_users'] });
+                  }}
+                />
+
                 {loadingUsers ? (
                   <div className="text-center py-12 text-muted-foreground">Loading...</div>
                 ) : (
@@ -613,6 +689,17 @@ export default function AdminPage() {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-border/50">
+                          <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground w-10">
+                            <input type="checkbox" className="rounded border-white/20"
+                              checked={selectedUsers.length > 0 && selectedUsers.length === filteredUsers?.length}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedUsers((filteredUsers ?? []).map((u: any) => ({ id: u.user_id, display_name: u.display_name || u.username || 'Unknown' })));
+                                } else {
+                                  setSelectedUsers([]);
+                                }
+                              }} />
+                          </th>
                           <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">User</th>
                           <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Username</th>
                           <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
@@ -623,6 +710,17 @@ export default function AdminPage() {
                       <tbody>
                         {filteredUsers?.map((user: any) => (
                           <tr key={user.id} className={`border-b border-border/30 hover:bg-muted/30 transition-colors ${user.is_banned ? 'opacity-60' : ''}`}>
+                            <td className="py-3 px-4">
+                              <input type="checkbox" className="rounded border-white/20"
+                                checked={selectedUsers.some(s => s.id === user.user_id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedUsers(prev => [...prev, { id: user.user_id, display_name: user.display_name || user.username || 'Unknown' }]);
+                                  } else {
+                                    setSelectedUsers(prev => prev.filter(s => s.id !== user.user_id));
+                                  }
+                                }} />
+                            </td>
                             <td className="py-3 px-4">
                               <div className="flex items-center gap-3">
                                 <Link to={`/@${user.username || user.id}`} className="block group shrink-0">
@@ -1246,3 +1344,4 @@ export default function AdminPage() {
     </div >
   );
 }
+

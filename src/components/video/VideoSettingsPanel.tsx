@@ -1,13 +1,19 @@
 import { Settings, X, RotateCcw, Volume2, Subtitles, Gauge, PlayCircle, Type } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
-import { useVideoSettings, VideoSettings } from '@/hooks/useVideoSettings';
+import { useVideoSettings, VideoSettings } from '@/hooks/media/useVideoSettings';
 
 interface VideoSettingsPanelProps {
   isOpen: boolean;
   onClose: () => void;
   embedded?: boolean;
   availableSubtitles?: Array<{ lang: string; label: string; value: string }>;
+  audioTracks?: Array<{ id: number; label: string; lang: string }>;
+  currentAudioTrack?: number;
+  onAudioTrackChange?: (id: number) => void;
+  internalSubtitles?: Array<{ id: number; label: string; lang: string }>;
+  currentInternalSubtitleTrackId?: number | null;
+  onInternalSubtitleChange?: (id: number) => void;
 }
 
 const DEFAULT_SUBTITLE_OPTIONS = [
@@ -44,7 +50,18 @@ const BG_OPTIONS: { value: VideoSettings['subtitleBackground']; label: string }[
   { value: 'solid', label: 'Solid' },
 ];
 
-export function VideoSettingsPanel({ isOpen, onClose, embedded = false, availableSubtitles }: VideoSettingsPanelProps) {
+export function VideoSettingsPanel({ 
+  isOpen, 
+  onClose, 
+  embedded = false, 
+  availableSubtitles,
+  audioTracks = [],
+  currentAudioTrack,
+  onAudioTrackChange,
+  internalSubtitles = [],
+  currentInternalSubtitleTrackId = null,
+  onInternalSubtitleChange
+}: VideoSettingsPanelProps) {
   const { settings, updateSetting, resetSettings } = useVideoSettings();
 
   if (!isOpen && !embedded) return null;
@@ -125,6 +142,90 @@ export function VideoSettingsPanel({ isOpen, onClose, embedded = false, availabl
               })()}
             </div>
           </section>
+
+          {/* Secondary Subtitles (dual subs) */}
+          <section className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Subtitles className="w-4 h-4 text-primary" />
+              <h3 className="text-sm font-medium">Secondary Subtitles</h3>
+              <span className="ml-auto text-[11px] text-muted-foreground">Dual subtitles</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {(() => {
+                const seen = new Set();
+                const options = [
+                  ...DEFAULT_SUBTITLE_OPTIONS,
+                  ...(availableSubtitles || []),
+                ].filter(opt => {
+                  if (seen.has(opt.value)) return false;
+                  seen.add(opt.value);
+                  return true;
+                });
+
+                return options.map(option => (
+                  <button
+                    key={option.value}
+                    onClick={() => updateSetting('secondarySubtitleLanguage', option.value as any)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${settings.secondarySubtitleLanguage === option.value
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted/30 text-foreground hover:bg-muted/50'
+                      }`}
+                    title="Secondary subtitle overlay"
+                  >
+                    {option.label}
+                  </button>
+                ));
+              })()}
+            </div>
+          </section>
+
+          {/* Audio Tracks (Multi-dub MKV) */}
+          {audioTracks.length >= 1 && (
+            <section className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Volume2 className="w-4 h-4 text-primary" />
+                <h3 className="text-sm font-medium">Audio Tracks</h3>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {audioTracks.map(track => (
+                  <button
+                    key={track.id}
+                    onClick={() => onAudioTrackChange?.(track.id)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${currentAudioTrack === track.id
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted/30 text-foreground hover:bg-muted/50'
+                      }`}
+                  >
+                    {track.label || `Track ${track.id}`} ({track.lang || 'und'})
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Internal Subtitles (MKV) */}
+          {internalSubtitles.length > 0 && (
+            <section className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Subtitles className="w-4 h-4 text-primary" />
+                <h3 className="text-sm font-medium">Internal Subtitles</h3>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {internalSubtitles.map(track => (
+                  <button
+                    key={track.id}
+                    onClick={() => onInternalSubtitleChange?.(track.id)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${currentInternalSubtitleTrackId === track.id
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted/30 text-foreground hover:bg-muted/50'
+                      }`}
+                  >
+                    Load {track.label} ({track.lang})
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* Subtitle Styling */}
           <section className="space-y-3">
@@ -259,3 +360,4 @@ export function VideoSettingsPanel({ isOpen, onClose, embedded = false, availabl
     </div>
   );
 }
+

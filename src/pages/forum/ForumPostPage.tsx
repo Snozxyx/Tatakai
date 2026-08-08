@@ -16,7 +16,7 @@ import {
   useDeleteForumPost,
   useDeleteForumComment,
   type ForumComment,
-} from '@/hooks/useForum';
+} from '@/hooks/community/useForum';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import { motion } from 'framer-motion';
@@ -34,7 +34,7 @@ import {
   Pin,
   Lock,
 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/ui/use-toast';
 
 function CommentCard({ comment, postId }: { comment: ForumComment; postId: string }) {
   const { user } = useAuth();
@@ -504,3 +504,5 @@ export default function ForumPostPage() {
     </div>
   );
 }
+
+

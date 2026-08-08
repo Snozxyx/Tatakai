@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useWatchlistItem, useAddToWatchlist, useRemoveFromWatchlist, WatchlistStatus } from '@/hooks/useWatchlist';
+import { useWatchlistItem, useAddToWatchlist, useRemoveFromWatchlist, WatchlistStatus } from '@/hooks/user/useWatchlist';
 import { Button } from '@/components/ui/button';
 import { Plus, Check, Loader2, BookmarkPlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -154,3 +154,4 @@ export function WatchlistButton({ animeId, animeName, animePoster, variant = 'de
     </DropdownMenu>
   );
 }
+

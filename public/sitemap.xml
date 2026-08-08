@@ -31,15 +31,22 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://tatakai.me/download</loc>
-    <lastmod>2025-01-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
     <loc>https://tatakai.me/settings</loc>
     <lastmod>2025-01-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
+  <url>
+    <loc>https://tatakai.me/extensions</loc>
+    <lastmod>2026-05-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.65</priority>
+  </url>
+  <url>
+    <loc>https://tatakai.me/offline-library</loc>
+    <lastmod>2026-05-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.55</priority>
+  </url>
+  <!-- Dynamic episode pages (/watch/:episodeId) are emitted by the SPA; surface hub URLs for crawlers. -->
 </urlset>

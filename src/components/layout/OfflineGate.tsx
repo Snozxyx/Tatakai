@@ -1,5 +1,5 @@
-import { useOnline } from '@/hooks/useOnline';
-import { useIsNativeApp } from '@/hooks/useIsNativeApp';
+import { useOnline } from '@/hooks/ui/useOnline';
+import { useIsNativeApp } from '@/hooks/ui/useIsNativeApp';
 import NoInternetPage from '@/pages/error/NoInternetPage';
 import { useLocation } from 'react-router-dom';
 
@@ -22,3 +22,4 @@ export function OfflineGate({ children }: { children: React.ReactNode }) {
   if (!online) return <NoInternetPage isNative={isNative} />;
   return <>{children}</>;
 }
+

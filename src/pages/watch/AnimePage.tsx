@@ -1,10 +1,21 @@
-import { useMemo } from "react";
+/**
+ * AnimePage.tsx
+ * Dynamic Anime detail and episode listing page.
+ * Features:
+ * - Dynamic Video Background Hero
+ * - Intelligent episode grouping
+ * - Series Relation Tree using UnifiedMediaCard
+ * - Integration with Jikan for HQ covers
+ */
+
+import { useMemo, useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { useAnimeInfo, useEpisodes, useNextEpisodeSchedule } from "@/hooks/useAnimeData";
-import { useHiAnimeSeasons } from "@/hooks/useHiAnimeSeasons";
-import { useExternalIds } from "@/hooks/useExternalIds";
+import { useAnimeInfo, useEpisodes, useNextEpisodeSchedule } from "@/hooks/api/useAnimeData";
+import { useAnimeSeasons } from "@/hooks/api/useAnimeSeasons";
+import { contentGraph, toAnimeCard } from "@/core";
+import type { MediaRelation } from "@/core/content/types";
+import type { AnimeCard } from "@/types/anime";
 import { Background } from "@/components/layout/Background";
-import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import { Skeleton } from "@/components/ui/skeleton-custom";
@@ -20,8 +31,27 @@ import { NextEpisodeSchedule } from "@/components/anime/NextEpisodeSchedule";
 import { getProxiedImageUrl, fetchJikanCover, fetchProducerAnimes } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
-import { useEffect, useState } from "react";
-import { Loader2, Search, ArrowLeft, Play, Star, Calendar, Clock, Film, Tv, Layers, Users, Download, CloudDownload } from "lucide-react";
+import {
+  Loader2,
+  Search,
+  ArrowLeft,
+  Play,
+  Star,
+  Calendar,
+  Clock,
+  Film,
+  Tv,
+  Layers,
+  Users,
+  Download,
+  CloudDownload,
+  Sparkles,
+  PenTool,
+  ExternalLink as ExternalLinkIcon,
+  GitGraph,
+  ArrowRight,
+  ChevronRight,
+} from "lucide-react";
 import { SeasonDownloadModal } from "@/components/anime/SeasonDownloadModal";
 import { Helmet } from "react-helmet-async";
 import {
@@ -31,39 +61,122 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { fetchCombinedSources } from "@/lib/api";
-import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from '@/hooks/useIsNativeApp';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from '@/hooks/ui/useIsNativeApp';
+import { updateDiscordRpc, clearDiscordRpc } from '@/lib/discordRpc';
+import { useIsMobile } from '@/hooks/ui/use-mobile';
 import { Capacitor } from '@capacitor/core';
 
 const EPISODES_PER_GROUP = 24;
+
+import { UnifiedMediaCard } from "@/components/UnifiedMediaCard";
+import { ExtensionSlot } from "@/core/extensions/ExtensionSlot";
+
+// --- Helper Component: Relation Tree ---
+function RelationTree({ relations }: { relations: MediaRelation[] }) {
+  if (relations.length === 0) return null;
+
+  return (
+    <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+      {relations.map((rel, index) => {
+        const isNovel = rel.format?.toUpperCase().includes('NOVEL');
+        const isManga = rel.format?.toUpperCase().includes('MANGA') || rel.format?.toUpperCase().includes('ONE_SHOT');
+        
+        return (
+          <div key={`${rel.id}-${index}`} className="min-w-[160px] md:min-w-[200px] max-w-[220px]">
+            <UnifiedMediaCard 
+              item={{
+                id: String(rel.id),
+                name: rel.titleEnglish || rel.titleRomaji || "Untitled",
+                poster: rel.coverImage || "",
+                type: rel.relationType,
+                status: rel.format || undefined,
+                mediaType: isManga ? 'manga' : (isNovel ? 'manga' : 'anime'),
+                href: isNovel ? '/novel/comingsoon' : undefined
+              }}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function AnimePage() {
   const { animeId } = useParams<{ animeId: string }>();
   const navigate = useNavigate();
   const routeAnimeId = animeId;
-  const isExternalAnimeRoute = !!routeAnimeId && /^(mal|anilist)-\d+$/i.test(routeAnimeId);
 
   const { data: animeData, isLoading: loadingInfo } = useAnimeInfo(routeAnimeId);
-  const resolvedAnimeId = useMemo(() => {
+  const { data: mappingDebug } = useQuery({
+    queryKey: ["anime-mapping-debug", routeAnimeId],
+    queryFn: async () => {
+      if (!routeAnimeId) return null;
+      const res = await fetch(`/api/v3/content/${encodeURIComponent(routeAnimeId)}`);
+      if (!res.ok) return null;
+      const json = await res.json();
+      return json?.data ?? null;
+    },
+    enabled: !!routeAnimeId,
+    staleTime: 60 * 1000,
+  });
+
+  useEffect(() => {
+    if (!import.meta.env.DEV || !mappingDebug) return;
+    
+    // Extract any additional mapping IDs from debug data
+    const tmdbId = mappingDebug.tmdbId || mappingDebug.media?.tmdbId || 
+                 mappingDebug.media?.externalLinks?.find((l: any) => l.site.toLowerCase() === 'tmdb')?.url.split('/').pop();
+
+    console.debug("[AnimePage] Comprehensive Mapping Debug", {
+      tatakaiId: mappingDebug.media?.tatakaiId || mappingDebug.id,
+      anilistId: mappingDebug.media?.anilistId || mappingDebug.anilistId,
+      malId: mappingDebug.media?.malId || mappingDebug.malId,
+      tmdbId,
+      source: mappingDebug.source || mappingDebug.media?.source_api,
+      raw: mappingDebug
+    });
+  }, [mappingDebug]);
+
+  const anilistId = animeData?.moreInfo?.anilistId || mappingDebug?.media?.anilistId || mappingDebug?.anilistId || null;
+  const parsedAniListId = useMemo(() => {
+    if (anilistId != null) {
+      const num = Number(anilistId);
+      if (Number.isFinite(num) && num > 0) return num;
+    }
+    const rawId = routeAnimeId || '';
+    const numericMatch = rawId.match(/^anilist[:_-]?(\d+)$/i) || rawId.match(/^(\d+)$/);
+    if (numericMatch?.[1]) {
+      const num = Number(numericMatch[1]);
+      if (Number.isFinite(num) && num > 0) return num;
+    }
+    return undefined;
+  }, [anilistId, routeAnimeId]);
+
+  const previewTitles = useMemo(() => {
+    if (!animeData?.info?.name) return [];
+    return [
+      animeData.info.name,
+      (animeData.info as any).japaneseName,
+      (animeData.info as any).englishName,
+    ].filter(Boolean) as string[];
+  }, [animeData?.info]);
+
+  const contentAnimeId = useMemo(() => {
+    if (anilistId && Number.isFinite(Number(anilistId))) return String(anilistId);
     if (!routeAnimeId) return undefined;
-    if (!isExternalAnimeRoute) return routeAnimeId;
-    const resolved = animeData?.anime?.info?.id;
-    if (!resolved) return undefined;
-    return /^(mal|anilist)-\d+$/i.test(resolved) ? undefined : resolved;
-  }, [routeAnimeId, isExternalAnimeRoute, animeData?.anime?.info?.id]);
+    return routeAnimeId;
+  }, [routeAnimeId, anilistId]);
 
-  const contentAnimeId = resolvedAnimeId || routeAnimeId;
+  const seasonsQueryId = useMemo(() => {
+    if (anilistId && Number.isFinite(Number(anilistId))) return String(anilistId);
+    if (routeAnimeId && /^\d+$/.test(routeAnimeId)) return routeAnimeId;
+    return undefined;
+  }, [anilistId, routeAnimeId]);
 
-  const { data: episodesData, isLoading: loadingEpisodes } = useEpisodes(
-    resolvedAnimeId || (!isExternalAnimeRoute ? routeAnimeId : undefined)
-  );
-  const { data: hiAnimeSeasons = [] } = useHiAnimeSeasons(
-    resolvedAnimeId || (!isExternalAnimeRoute ? routeAnimeId : undefined)
-  );
-  const { data: externalIds, isLoading: loadingExternalIds } = useExternalIds(contentAnimeId); // Robust multi-source ID resolution
-  const { data: nextEpisodeSchedule } = useNextEpisodeSchedule(
-    resolvedAnimeId || (!isExternalAnimeRoute ? routeAnimeId : undefined)
-  );
+  const { data: seasonsData } = useAnimeSeasons(seasonsQueryId);
+
+  const { data: episodesData, isLoading: loadingEpisodes } = useEpisodes(contentAnimeId);
+  const { data: nextEpisodeSchedule } = useNextEpisodeSchedule(contentAnimeId);
 
   const episodeGroups = useMemo(() => {
     const episodes = episodesData?.episodes || [];
@@ -76,28 +189,39 @@ export default function AnimePage() {
     return groups;
   }, [episodesData?.episodes]);
 
-  // Get MAL/AniList IDs from the robust multi-source hook
-  const malId = externalIds?.malId || null;
-  const anilistId = externalIds?.anilistId || null;
+  // Get MAL/AniList IDs from Tatakai API response
+  const malId = animeData?.moreInfo?.malId || null;
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    console.debug("[AnimePage] External IDs Debug", {
+      routeAnimeId,
+      contentAnimeId,
+      malId,
+      anilistId,
+      hasAnimeData: Boolean(animeData),
+    });
+  }, [routeAnimeId, contentAnimeId, malId, anilistId, Boolean(animeData)]);
 
   // Fetch highest quality cover from Jikan (MAL large_image_url) when malId is known
   const { data: hqPoster } = useQuery({
     queryKey: ['jikan-cover', malId],
-    queryFn: () => fetchJikanCover(malId, animeData?.anime?.info?.poster ?? ''),
+    queryFn: () => fetchJikanCover(malId, animeData?.info?.poster ?? ''),
     enabled: !!malId,
     staleTime: 1000 * 60 * 60 * 24, // 24h — covers don't change often
   });
 
-  const producerNames = useMemo(() => {
-    const fromPayload = Array.isArray(animeData?.anime?.moreInfo?.producers)
-      ? animeData.anime.moreInfo.producers.map((producer: unknown) => String(producer || '').trim()).filter(Boolean)
+  const producerNames = useMemo<string[]>(() => {
+    const rawProducers = animeData?.moreInfo?.producers;
+    const fromPayload = Array.isArray(rawProducers)
+      ? rawProducers.map((producer) => String(producer || '').trim()).filter(Boolean)
       : [];
 
     if (fromPayload.length > 0) {
       return Array.from(new Set(fromPayload));
     }
 
-    const studioText = String(animeData?.anime?.moreInfo?.studios || '').trim();
+    const studioText = String(rawProducers || animeData?.moreInfo?.studios || '').trim();
     if (!studioText) return [];
 
     return Array.from(
@@ -108,7 +232,7 @@ export default function AnimePage() {
           .filter(Boolean)
       )
     );
-  }, [animeData?.anime?.moreInfo?.producers, animeData?.anime?.moreInfo?.studios]);
+  }, [animeData?.moreInfo?.producers, animeData?.moreInfo?.studios]);
 
   const producerRequestCandidates = useMemo(() => {
     const slugifyProducer = (value: string) => {
@@ -161,22 +285,21 @@ export default function AnimePage() {
       .slice(0, 6);
   }, [producerAnimeData?.animes, contentAnimeId]);
   
-  // Debug log for tracking ID extraction
-  console.log('[AnimePage] External IDs Debug:', {
-    routeAnimeId,
-    contentAnimeId,
-    loadingExternalIds,
-    source: externalIds?.source,
-    malId,
-    anilistId,
-    seasonsCount: hiAnimeSeasons?.length || 0
-  });
 
   const [selectedEpisodeGroup, setSelectedEpisodeGroup] = useState(0);
   const isNative = useIsNativeApp(); // Any native app (desktop or mobile)
   const isDesktopApp = useIsDesktopApp(); // Only Electron/Tauri
   const isMobileNative = useIsMobileApp(); // Only Capacitor (Android/iOS)
   const isMobile = useIsMobile(); // Screen width based check
+
+  useEffect(() => {
+    const title = animeData?.info?.name;
+    if (!title) return;
+    updateDiscordRpc(`Viewing ${title}`, 'Browsing details');
+    return () => {
+      clearDiscordRpc();
+    };
+  }, [animeData?.info?.name]);
   
   // Show sidebar on desktop (web or app), but not on mobile (web or app)
   const showSidebar = !isMobile && !isMobileNative;
@@ -186,7 +309,7 @@ export default function AnimePage() {
   // handleDownloadEpisode removed as per user request to only keep season download here
 
   // Use HiAnime seasons directly - they have proper season titles like "Season 1", "Season 2", etc.
-  const allSeasons = hiAnimeSeasons;
+  const allSeasons = Array.isArray(seasonsData) ? seasonsData : [];
 
   // Auto-select episode 1 when clicking watch
   const handleWatchNow = () => {
@@ -199,6 +322,89 @@ export default function AnimePage() {
     navigate(`/watch/${encodeURIComponent(episodeId)}`);
   };
 
+  const info = animeData?.info;
+  const moreInfo = animeData?.moreInfo;
+
+  const relatedAnime = useMemo<AnimeCard[]>(() => {
+    if (!info || !moreInfo) return [];
+    const relations = (moreInfo.relations || []) as MediaRelation[];
+    const seen = new Set<string>();
+    return relations
+      .map((rel) => {
+        const id = String(rel.id || '').trim();
+        if (!id) return null;
+        if (String(contentAnimeId || '') === id) return null;
+        if (seen.has(id)) return null;
+        
+        const isManga = rel.format && ['MANGA', 'ONE_SHOT', 'NOVEL'].includes(rel.format as any);
+        if (isManga) return null;
+
+        seen.add(id);
+        return {
+          id,
+          name: rel.titleEnglish ?? rel.titleRomaji ?? "Untitled",
+          poster: rel.coverImage || info.poster,
+          type: rel.format || undefined,
+          episodes: { sub: 0, dub: 0 },
+          mediaType: 'anime',
+        } as any;
+      })
+      .filter(Boolean) as AnimeCard[];
+  }, [moreInfo, info, contentAnimeId]);
+
+  const relatedManga = useMemo<AnimeCard[]>(() => {
+    if (!info || !moreInfo) return [];
+    const relations = (moreInfo.relations || []) as MediaRelation[];
+    const seen = new Set<string>();
+    return relations
+      .map((rel) => {
+        const id = String(rel.id || '').trim();
+        if (!id) return null;
+        if (String(contentAnimeId || '') === id) return null;
+        if (seen.has(id)) return null;
+
+        const isManga = rel.format && ['MANGA', 'ONE_SHOT', 'NOVEL'].includes(rel.format as any);
+        if (!isManga) return null;
+
+        seen.add(id);
+        return {
+          id,
+          name: rel.titleEnglish ?? rel.titleRomaji ?? "Untitled",
+          poster: rel.coverImage || info.poster,
+          type: rel.format || undefined,
+          episodes: { sub: 0, dub: 0 },
+          mediaType: 'manga',
+        } as any;
+      })
+      .filter(Boolean) as AnimeCard[];
+  }, [moreInfo, info, contentAnimeId]);
+
+  const genreSeeds = useMemo(
+    () => (moreInfo?.genres || []).filter(Boolean).slice(0, 2),
+    [moreInfo?.genres]
+  );
+  const { data: recommendationRows } = useQuery({
+    queryKey: ["anime-recommendations", contentAnimeId, genreSeeds.join("|")],
+    queryFn: async () => {
+      if (genreSeeds.length === 0) return [] as AnimeCard[];
+      const result = await contentGraph.search({
+        genres: genreSeeds,
+        page: 1,
+        perPage: 12,
+        sortBy: "POPULARITY_DESC",
+        isAdult: false,
+      });
+      return result.media.map(toAnimeCard);
+    },
+    enabled: genreSeeds.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const recommendedAnimes = useMemo(() => {
+    const rows = recommendationRows || [];
+    return rows.filter((row) => String(row.id) !== String(contentAnimeId)).slice(0, 12);
+  }, [recommendationRows, contentAnimeId]);
+
   useEffect(() => {
     setSelectedEpisodeGroup(0);
   }, [contentAnimeId]);
@@ -207,8 +413,12 @@ export default function AnimePage() {
     return (
       <div className="min-h-screen bg-background text-foreground">
         <Background />
-        {showSidebar && <Sidebar />}
-        <main className="relative z-10 pl-6 md:pl-32 pr-6 py-6 max-w-[1800px] mx-auto">
+        <main
+          className={cn(
+            "relative z-10 pr-6 py-6 max-w-[1800px] mx-auto",
+            isDesktopApp ? "pl-6" : "pl-6 md:pl-32",
+          )}
+        >
           <div className="space-y-8">
             <Skeleton className="h-8 w-32" />
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -229,7 +439,7 @@ export default function AnimePage() {
     );
   }
 
-  if (!animeData || !animeData.anime) {
+  if (!animeData) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
@@ -242,15 +452,6 @@ export default function AnimePage() {
       </div>
     );
   }
-
-  const { anime, recommendedAnimes: rawRecommended = [], relatedAnimes: rawRelated = [] } = animeData;
-  const { info, moreInfo } = anime;
-
-  // Filter out duplicates between related and recommended to avoid key collisions
-  const relatedAnimes = rawRelated.slice(0, 6);
-  const recommendedAnimes = rawRecommended
-    .filter(rec => !relatedAnimes.some(rel => rel.id === rec.id))
-    .slice(0, 6);
 
   const totalEpisodes = episodesData?.episodes?.length || 0;
   const hasEpisodeGroups = totalEpisodes > EPISODES_PER_GROUP;
@@ -278,10 +479,13 @@ export default function AnimePage() {
       </Helmet>
 
       <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-        {showSidebar && <Sidebar />}
-
         {/* Video Background Hero */}
-        <VideoBackground animeId={contentAnimeId!} poster={info.poster}>
+        <VideoBackground
+          animeId={contentAnimeId!}
+          poster={info.poster}
+          anilistId={parsedAniListId}
+          titles={previewTitles}
+        >
           <main className={cn(
             "relative z-10 pr-6 py-6 max-w-[1800px] mx-auto pb-24 md:pb-6",
             isDesktopApp ? "pl-6" : "pl-6 md:pl-32" // Original web padding
@@ -312,6 +516,7 @@ export default function AnimePage() {
                   <h1 className="font-display text-4xl md:text-5xl font-bold mb-4">
                     {info.name}
                   </h1>
+                  <ExtensionSlot slotId="anime-details-after-title" props={{ anime: animeData }} />
 
                   {/* Stats */}
                   <div className="flex flex-wrap gap-4 mb-6">
@@ -343,9 +548,9 @@ export default function AnimePage() {
 
                   {/* Genres */}
                   <div className="flex flex-wrap gap-2 mb-6">
-                    {moreInfo.genres?.map((genre) => (
+                    {moreInfo.genres?.map((genre, index) => (
                       <span
-                        key={genre}
+                        key={`${genre}-${index}`}
                         onClick={() => navigate(`/genre/${genre.toLowerCase()}`)}
                         className="px-3 py-1 rounded-full border border-border text-sm cursor-pointer hover:bg-muted transition-colors"
                       >
@@ -380,7 +585,18 @@ export default function AnimePage() {
                   {moreInfo.studios && (
                     <div>
                       <span className="text-xs text-muted-foreground uppercase tracking-wider">Studios</span>
-                      <p className="font-medium mt-1">{moreInfo.studios}</p>
+                      <p 
+                        className="font-medium mt-1 hover:text-primary cursor-pointer transition-colors"
+                        onClick={() => navigate(`/search/producer/${encodeURIComponent(moreInfo.studios)}`)}
+                      >
+                        {moreInfo.studios}
+                      </p>
+                    </div>
+                  )}
+                  {(moreInfo.season || moreInfo.year) && (
+                    <div>
+                      <span className="text-xs text-muted-foreground uppercase tracking-wider">Season</span>
+                      <p className="font-medium mt-1 capitalize">{moreInfo.season} {moreInfo.year}</p>
                     </div>
                   )}
                   {producerNames.length > 0 && (
@@ -455,14 +671,20 @@ export default function AnimePage() {
           </main>
         </VideoBackground>
 
-        <main className="relative z-10 pl-6 md:pl-32 pr-6 max-w-[1800px] mx-auto pb-24 md:pb-6">
+        <main
+          className={cn(
+            "relative z-10 pr-6 max-w-[1800px] mx-auto pb-24 md:pb-6",
+            isDesktopApp ? "pl-6" : "pl-6 md:pl-32",
+          )}
+        >
           {/* Next Episode Schedule - for airing anime */}
-          {moreInfo.status === 'Currently Airing' && nextEpisodeSchedule?.airingISOTimestamp && (
+          {nextEpisodeSchedule?.airingISOTimestamp && (
             <NextEpisodeSchedule
               animeId={contentAnimeId!}
               animeName={info.name}
               airingTime={nextEpisodeSchedule.airingISOTimestamp}
-              nextEpisodeNumber={(info.stats.episodes.sub || info.stats.episodes.dub || 0) + 1}
+              nextEpisodeNumber={nextEpisodeSchedule.episode || (info.stats.episodes.sub || info.stats.episodes.dub || 0) + 1}
+              dayOfWeek={nextEpisodeSchedule.dayOfWeek}
             />
           )}
 
@@ -511,8 +733,8 @@ export default function AnimePage() {
               </div>
             ) : episodesData ? (
               <div className="grid grid-cols-4 md:grid-cols-8 lg:grid-cols-12 gap-2">
-                {visibleEpisodes.map((ep) => (
-                  <ContextMenu key={ep.episodeId}>
+                {visibleEpisodes.map((ep, index) => (
+                  <ContextMenu key={`${ep.episodeId}-${index}`}>
                     <ContextMenuTrigger>
                       <button
                         onClick={() => handleEpisodeClick(ep.episodeId)}
@@ -594,6 +816,77 @@ export default function AnimePage() {
             </section>
           )}
 
+          {/* Relation Tree */}
+          {moreInfo.relations && moreInfo.relations.length > 0 && (
+            <section className="mb-16">
+              <h2 className="font-display text-2xl font-semibold mb-6 flex items-center gap-2">
+                <GitGraph className="w-5 h-5 text-primary" />
+                Series Tree
+              </h2>
+              <RelationTree relations={moreInfo.relations} />
+            </section>
+          )}
+
+          {/* Characters */}
+          {info.characterVoiceActor && info.characterVoiceActor.length > 0 && (
+            <section className="mb-16">
+              <h2 className="font-display text-2xl font-semibold mb-6 flex items-center gap-2">
+                <Users className="w-5 h-5 text-primary" />
+                Characters
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {info.characterVoiceActor.slice(0, 12).map((cva, index) => (
+                  <GlassPanel 
+                    key={`${cva.character.id}-${index}`} 
+                    className="p-3 flex items-center gap-3 hover:bg-white/10 transition-all cursor-pointer group"
+                    onClick={() => navigate(`/character/${cva.character.id}?name=${encodeURIComponent(cva.character.name)}`)}
+                  >
+                    <img 
+                      src={getProxiedImageUrl(cva.character.poster) || "/placeholder.svg"} 
+                      alt={cva.character.name}
+                      className="w-14 h-14 rounded-full object-cover border border-white/10 group-hover:scale-110 transition-transform"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-sm truncate group-hover:text-primary transition-colors">{cva.character.name}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{cva.character.cast || "Character"}</p>
+                    </div>
+                    {cva.voiceActor.name !== "Unknown" && (
+                       <div className="text-right border-l border-white/10 pl-3 hidden sm:block">
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Voice</p>
+                          <p className="text-[11px] font-medium truncate max-w-[80px]">{cva.voiceActor.name}</p>
+                       </div>
+                    )}
+                  </GlassPanel>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Staff */}
+          {moreInfo.staff && moreInfo.staff.length > 0 && (
+            <section className="mb-16">
+              <h2 className="font-display text-2xl font-semibold mb-6 flex items-center gap-2">
+                <PenTool className="w-5 h-5 text-primary" />
+                Staff
+              </h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {moreInfo.staff.map((s, index) => (
+                  <GlassPanel key={`${s.id}-${index}`} className="p-3 flex items-center gap-3 hover:bg-white/10 transition-colors">
+                    <img 
+                      src={getProxiedImageUrl(s.imageUrl) || "/placeholder.svg"} 
+                      alt={s.name}
+                      className="w-10 h-10 rounded-full object-cover border border-white/10"
+                    />
+                    <div className="min-w-0">
+                      <p className="font-bold text-xs truncate">{s.name}</p>
+                      <p className="text-[9px] text-muted-foreground uppercase tracking-wider">{s.role || "Staff"}</p>
+                    </div>
+                  </GlassPanel>
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* Ratings Section */}
           <section className="mb-16">
             <RatingsSection animeId={contentAnimeId!} />
@@ -612,15 +905,21 @@ export default function AnimePage() {
             />
           )}
 
-          {/* Related Animes */}
-          {relatedAnimes.length > 0 && (
-            <AnimeGrid animes={relatedAnimes.slice(0, 6)} title="Related Anime" />
+          {/* Related Anime */}
+          {relatedAnime.length > 0 && (
+            <AnimeGrid animes={relatedAnime.slice(0, 6)} title="Anime Recommendation" />
+          )}
+
+          {/* Related Manga */}
+          {relatedManga.length > 0 && (
+            <AnimeGrid animes={relatedManga.slice(0, 6)} title="Manga Recommendation" />
           )}
 
           {/* Recommended */}
           {recommendedAnimes.length > 0 && (
             <AnimeGrid animes={recommendedAnimes.slice(0, 6)} title="Recommended" />
           )}
+
         </main>
 
         {!showSidebar && <MobileNav />}
@@ -632,9 +931,12 @@ export default function AnimePage() {
             episodes={episodesData.episodes}
             animeName={info.name}
             posterUrl={info.poster}
+            animeId={contentAnimeId}
           />
         )}
       </div>
     </>
   );
 }
+
+

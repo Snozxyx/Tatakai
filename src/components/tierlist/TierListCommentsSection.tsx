@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTierListComments, useTierListCommentReplies, useAddTierListComment, useDeleteTierListComment, useLikeTierListComment } from '@/hooks/useTierListComments';
+import { useTierListComments, useTierListCommentReplies, useAddTierListComment, useDeleteTierListComment, useLikeTierListComment } from '@/hooks/user/useTierListComments';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';

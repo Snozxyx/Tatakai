@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { usePublicWatchRooms } from '@/hooks/useWatchRoom';
+import { usePublicWatchRooms } from '@/hooks/media/useWatchRoom';
 import { WatchRoomCard } from '@/pages/watch/IsshoNiPage';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';

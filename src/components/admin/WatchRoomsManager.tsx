@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAllWatchRooms, useAdminDeleteRoom } from '@/hooks/useWatchRoom';
+import { useAllWatchRooms, useAdminDeleteRoom } from '@/hooks/media/useWatchRoom';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';

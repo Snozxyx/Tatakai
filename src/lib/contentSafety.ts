@@ -54,3 +54,30 @@ export function inferMangaAdultFlag(
     return EXPLICIT_PATTERNS.some((pattern) => pattern.test(normalized));
   });
 }
+
+export function inferAnimeAdultFlag(anime: any): boolean {
+  if (!anime) return false;
+  if (typeof anime.isAdult === "boolean") return anime.isAdult;
+  if (typeof anime.adult === "boolean") return anime.adult;
+  if (typeof anime.is18Plus === "boolean") return anime.is18Plus;
+  if (typeof anime.isNsfw === "boolean") return anime.isNsfw;
+
+  const ratingStr = String(anime.rating || anime.ageRating || "").toLowerCase();
+  if (ratingStr.includes("rx") || ratingStr.includes("r18") || ratingStr.includes("18+") || ratingStr.includes("hentai")) {
+    return true;
+  }
+
+  const genres: string[] = Array.isArray(anime.genres) ? anime.genres : [];
+  if (genres.some((g) => typeof g === "string" && EXPLICIT_PATTERNS.some((p) => p.test(g.toLowerCase())))) {
+    return true;
+  }
+
+  const candidates = [anime.name, anime.title, anime.englishTitle, anime.japaneseTitle]
+    .filter((v): v is string => typeof v === "string" && v.trim().length > 0);
+
+  return candidates.some((title) => {
+    const normalized = normalize(title);
+    return EXPLICIT_PATTERNS.some((pattern) => pattern.test(normalized));
+  });
+}
+

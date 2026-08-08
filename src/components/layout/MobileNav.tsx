@@ -2,9 +2,9 @@ import { LayoutGrid, Search, User, LogIn, Users, Heart, TrendingUp, Settings, Sh
 import { NavIcon } from "@/components/ui/NavIcon";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNotifications } from "@/hooks/useNotifications";
-import { useIsMobileApp } from "@/hooks/useIsNativeApp";
-import { useHaptics } from "@/hooks/useHaptics";
+import { useNotifications } from "@/hooks/community/useNotifications";
+import { useIsMobileApp } from "@/hooks/ui/useIsNativeApp";
+import { useHaptics } from "@/hooks/ui/useHaptics";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { NotificationModal } from "@/components/profile/NotificationModal";
 import { cn } from "@/lib/utils";
@@ -214,3 +214,6 @@ export function MobileNav() {
   // Render using portal to ensure it's at the body level
   return typeof document !== 'undefined' ? createPortal(navContent, document.body) : navContent;
 }
+
+
+

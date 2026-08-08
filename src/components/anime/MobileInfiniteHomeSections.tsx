@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GlassPanel } from '@/components/ui/GlassPanel';
-import { useInfiniteHomeSections } from '@/hooks/useInfiniteHomeSections';
-import { useHomeData } from '@/hooks/useAnimeData';
+import { useInfiniteHomeSections } from '@/hooks/api/useInfiniteHomeSections';
+import { useHomeData } from '@/hooks/api/useAnimeData';
 import { getHighQualityPoster } from '@/lib/api';
 import { buildPreferredAnimeRouteId } from '@/lib/animeIdMapping';
 
@@ -201,3 +201,4 @@ export function MobileInfiniteHomeSections() {
     </section>
   );
 }
+

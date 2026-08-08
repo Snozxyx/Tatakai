@@ -4,7 +4,7 @@ import { Background } from '@/components/layout/Background';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
 import { useAuth } from '@/contexts/AuthContext';
-import { useUserSuggestions, useCreateSuggestion } from '@/hooks/useSuggestions';
+import { useUserSuggestions, useCreateSuggestion } from '@/hooks/api/useSuggestions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ArrowLeft, Lightbulb, Send, Loader2, Upload, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
+import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 
 const STATUS_COLORS = {
   pending: 'bg-yellow-500/20 text-yellow-500 border-yellow-500/20',
@@ -27,6 +28,7 @@ const STATUS_COLORS = {
 
 export default function SuggestionsPage() {
   const navigate = useNavigate();
+  const isDesktopApp = useIsDesktopApp();
   const { user } = useAuth();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -136,7 +138,7 @@ export default function SuggestionsPage() {
       <Background />
       <Sidebar />
 
-      <main className="relative z-10 pl-6 md:pl-32 pr-6 py-6 max-w-[1400px] mx-auto pb-24 md:pb-6">
+      <main className={`relative z-10 ${isDesktopApp ? 'pl-6' : 'pl-6 md:pl-32'} pr-6 py-6 max-w-[1400px] mx-auto pb-24 md:pb-6`}>
         <button
           onClick={() => navigate(-1)}
           className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"

@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { useIsNativeApp } from '@/hooks/useIsNativeApp';
+import { useIsNativeApp } from '@/hooks/ui/useIsNativeApp';
 import { X, Terminal, Trash2, Copy, Download, Search, Filter, ChevronDown, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -283,3 +283,4 @@ export function LogViewer() {
     </AnimatePresence>
   );
 }
+

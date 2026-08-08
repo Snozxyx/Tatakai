@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Bell, X, CheckCheck, AlertTriangle, Info, AlertCircle, Megaphone } from 'lucide-react';
-import { useAdminMessages, AdminMessage } from '@/hooks/useAdminMessages';
-import { useNotifications } from '@/hooks/useNotifications';
+import { useAdminMessages, AdminMessage } from '@/hooks/admin/useAdminMessages';
+import { useNotifications } from '@/hooks/community/useNotifications';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { GlassPanel } from '@/components/ui/GlassPanel';
@@ -209,3 +209,4 @@ export function NotificationBell() {
     </div>
   );
 }
+

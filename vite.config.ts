@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
+import { visualizer } from "rollup-plugin-visualizer";
 import path from "path";
 import packageJson from "./package.json";
 
@@ -17,10 +18,7 @@ export default defineConfig(({ mode }) => {
   const hmrClientPort = env.VITE_HMR_CLIENT_PORT
     ? Number(env.VITE_HMR_CLIENT_PORT)
     : undefined;
-  const backendOrigin =
-    env.VITE_BACKEND_ORIGIN ||
-    env.VITE_LOCAL_HIANIME_ORIGIN ||
-    'https://api.tatakai.me';
+  const apiV3Origin = env.VITE_API_V3_ORIGIN || "http://localhost:4001";
 
   return {
     plugins: [react()],
@@ -52,7 +50,7 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       host: "::",
-      port: isWebMode ? 8081 : 8088, // Standard port for Electron dev
+      port: isWebMode ? 8081 : 8090, // Standard port for Electron dev
       // Allow Discord Activity iframe to embed the app
       allowedHosts: [
         "tatakai.me",
@@ -65,67 +63,21 @@ export default defineConfig(({ mode }) => {
         ...(hmrClientPort ? { clientPort: hmrClientPort } : {}),
       },
       proxy: {
-        '/api/v2/anime/hianime': {
-          target: backendOrigin,
+        "/api/v3": {
+          target: apiV3Origin,
           changeOrigin: true,
           secure: false,
         },
-        '/api/v2/hianime': {
-          target: backendOrigin,
+        "/api/proxy": {
+          target: apiV3Origin,
           changeOrigin: true,
           secure: false,
         },
-        // Preferred dev proxy for provider calls
-        '/api/v2/anime': {
-          target: backendOrigin,
+        "/api/v3/relay/signal": {
+          target: apiV3Origin,
           changeOrigin: true,
           secure: false,
-        },
-        '/api/v2/manga': {
-          target: backendOrigin,
-          changeOrigin: true,
-          secure: false,
-        },
-        // Dev proxy for all provider calls → local TatakaiCore (https://api.tatakai.me)
-        '/api/providers': {
-          target: backendOrigin,
-          changeOrigin: true,
-          secure: false,
-          rewrite: (p) => p.replace(/^\/api\/providers/, ''),
-        },
-        // Same-origin dev proxy to local HiAnime API (prevents browser CORS errors)
-        '/api/tatakai': {
-          target: backendOrigin,
-          changeOrigin: true,
-          secure: false,
-          rewrite: (p) => p.replace(/^\/api\/tatakai/, '/api/v2/hianime'),
-        },
-        '/api/stream': {
-          target: backendOrigin,
-          changeOrigin: true,
-          secure: false,
-        },
-        '/api/servers': {
-          target: backendOrigin,
-          changeOrigin: true,
-          secure: false,
-        },
-        '/api/proxy': {
-          target: backendOrigin,
-          changeOrigin: true,
-          secure: false,
-        },
-        '/api/v1/streamingProxy': {
-          target: backendOrigin,
-          changeOrigin: true,
-          secure: false,
-        },
-        // Proxy all calls starting with /api/proxy/aniwatch to the third-party API (dev only)
-        '/api/proxy/aniwatch': {
-          target: 'https://aniwatch-api-taupe-eight.vercel.app',
-          changeOrigin: true,
-          secure: true,
-          rewrite: (p) => p.replace(/^\/api\/proxy\/aniwatch/, '/api/v2/hianime'),
+          ws: true,
         },
       },
       // Allow embedding in Discord Activity iframe

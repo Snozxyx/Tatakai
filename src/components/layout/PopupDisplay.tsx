@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
-import { useIsDesktopApp } from '@/hooks/useIsNativeApp';
+import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 import { cn } from '@/lib/utils';
 
 interface Popup {
@@ -209,6 +209,9 @@ export function PopupDisplay() {
               modal.use_theme_colors && "bg-background/95 backdrop-blur-xl border-border/50 text-foreground"
             )}
           >
+            <DialogTitle className="sr-only">{modal.title}</DialogTitle>
+            <DialogDescription className="sr-only">Popup Announcement Modal</DialogDescription>
+            
             {modal.image_url && (
               <img src={modal.image_url} alt="" className="w-full rounded-lg mb-4" />
             )}
@@ -267,3 +270,4 @@ export function PopupDisplay() {
     </>
   );
 }
+

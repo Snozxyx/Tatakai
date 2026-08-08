@@ -1,3 +1,5 @@
+import type { MediaRelation, StaffMember, ExternalLink } from "@/core/content/types";
+
 export interface Episode {
   sub: number;
   dub: number;
@@ -103,6 +105,9 @@ export interface AnimeInfo {
     duration: string;
     malId?: number | null;
     anilistId?: number | null;
+    relations: MediaRelation[];
+    staff?: StaffMember[];
+    externalLinks?: ExternalLink[];
     [key: string]: any;
   };
 }
@@ -142,6 +147,18 @@ export interface StreamingSource {
   server?: string;
   contributorDisplay?: string;
   contributorUsername?: string;
+  magnetLink?: string;
+  torrentFileUrl?: string;
+  externalUrl?: string;
+  streamUrl?: string;
+  releaseGroup?: string;
+  sourceType?: 'subtitle' | 'server' | 'magnet' | 'torrent' | 'external';
+  codec?: string;
+  audio?: string;
+  subtitleType?: string;
+  episodeRange?: string;
+  notes?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface Subtitle {
@@ -239,6 +256,7 @@ export interface CharacterApiResponse<T> {
 export interface NextEpisodeSchedule {
   airingAt: number;
   timeUntilAiring: number;
-  episode: number;
+  episode?: number;
   airingISOTimestamp?: string;
+  dayOfWeek?: string;
 }

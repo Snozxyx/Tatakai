@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Playlist } from '@/hooks/usePlaylist';
+import { Playlist } from '@/hooks/user/usePlaylist';
 import { getProxiedImageUrl } from '@/lib/api';
 import { Music2, Globe, Lock, MoreVertical, Trash2, Edit2, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -150,3 +150,4 @@ export function PlaylistCardCompact({ playlist }: { playlist: Playlist }) {
     </Link>
   );
 }
+

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { KeyRound, Monitor } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { useIsMobile } from '@/hooks/ui/use-mobile';
 
 interface Shortcut {
   keys: string[];
@@ -132,3 +132,4 @@ export function KeyboardShortcutsProvider() {
 
   return <KeyboardShortcutsModal open={open} onOpenChange={setOpen} />;
 }
+

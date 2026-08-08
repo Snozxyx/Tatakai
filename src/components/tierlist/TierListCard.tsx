@@ -3,7 +3,7 @@ import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Heart, Share2, Eye, Lock, Globe, User } from 'lucide-react';
-import { useLikeTierList, DEFAULT_TIERS, type TierList } from '@/hooks/useTierLists';
+import { useLikeTierList, DEFAULT_TIERS, type TierList } from '@/hooks/user/useTierLists';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
@@ -188,3 +188,4 @@ export function TierListGrid({ tierLists, showAuthor = true, emptyMessage = 'No 
     </div>
   );
 }
+

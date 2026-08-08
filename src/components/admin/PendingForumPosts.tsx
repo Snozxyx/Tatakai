@@ -4,11 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { usePendingForumPosts, useApproveForumPost, useRejectForumPost } from '@/hooks/useForum';
+import { usePendingForumPosts, useApproveForumPost, useRejectForumPost } from '@/hooks/community/useForum';
 import { formatDistanceToNow } from 'date-fns';
 import { Search, CheckCircle, XCircle, Image as ImageIcon, Eye, User, AlertTriangle } from 'lucide-react';
 import { getProxiedImageUrl } from '@/lib/api';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/ui/use-toast';
 
 export function PendingForumPosts() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -182,3 +182,5 @@ export function PendingForumPosts() {
     </div>
   );
 }
+
+

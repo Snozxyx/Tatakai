@@ -97,45 +97,32 @@ export function getAniListAuthUrl(): string {
   return `${ANILIST_AUTH_URL}?${params.toString()}`;
 }
 
-// Exchange code for tokens via Edge Function
+// Exchange code for tokens via Hono API
 export async function exchangeAniListCode(code: string, userId: string): Promise<boolean> {
-  // Refresh session first to ensure we have a valid JWT
   await supabase.auth.refreshSession().catch(() => { });
   const { data: { session } } = await supabase.auth.getSession();
 
-  const bearer = session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const bearer = session?.access_token;
   if (!bearer) throw new Error('Missing auth token for AniList exchange');
 
-  const authHeaders: Record<string, string> = {
-    'Authorization': `Bearer ${bearer}`,
-  };
-
-  const { data: edgeFunctionData, error: edgeFunctionError } = await supabase.functions.invoke('external-auth', {
-    body: {
-      action: 'anilist',
+  const res = await fetch('/api/v3/sync/exchange', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${bearer}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      integration: 'anilist',
       code,
       redirectUri: ANILIST_REDIRECT_URI,
-    },
-    headers: authHeaders,
+    })
   });
 
-  if (edgeFunctionError) throw new Error(edgeFunctionError.message);
-  if (edgeFunctionData.error) throw new Error(edgeFunctionData.error);
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({ error: 'Exchange failed' }));
+    throw new Error(errorBody.error || 'Failed to exchange AniList code');
+  }
 
-  const data = edgeFunctionData;
-  const expiresAt = new Date(Date.now() + data.expires_in * 1000);
-
-  // Store tokens in profile
-  const { error } = await supabase
-    .from('profiles')
-    .update({
-      anilist_access_token: data.access_token,
-      anilist_token_expires_at: expiresAt.toISOString(),
-      anilist_refresh_token: data.refresh_token, // Store refresh token if available (though AniList JWTs are long-lived usually)
-    })
-    .eq('user_id', userId);
-
-  if (error) throw error;
   return true;
 }
 
@@ -269,19 +256,39 @@ export async function fetchAniListMangaList(accessToken: string, userId: number)
 export async function updateAniListAnimeStatus(
   accessToken: string,
   mediaId: number,
-  status: 'CURRENT' | 'COMPLETED' | 'PAUSED' | 'DROPPED' | 'PLANNING',
+  status: 'CURRENT' | 'COMPLETED' | 'PAUSED' | 'DROPPED' | 'PLANNING' | string,
   progress?: number
 ): Promise<boolean> {
-  const query = `
-    mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int) {
-      SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress) {
-        id
-        status
-        progress
-      }
-    }
-  `;
-  await anilistQuery(query, { mediaId, status, progress }, accessToken);
+  const { data: { session } } = await supabase.auth.getSession();
+  const bearer = session?.access_token;
+  if (!bearer) throw new Error('Not authenticated');
+
+  const statusMap: Record<string, string> = {
+    CURRENT: 'watching',
+    COMPLETED: 'completed',
+    PLANNING: 'plan_to_watch',
+    DROPPED: 'dropped',
+    PAUSED: 'on_hold',
+  };
+  const localStatus = statusMap[status] || status;
+
+  const res = await fetch('/api/v3/sync/single-sync', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${bearer}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      type: 'anime',
+      anilistId: mediaId,
+      status: localStatus,
+      progress
+    })
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to update AniList anime status');
+  }
   return true;
 }
 
@@ -289,19 +296,39 @@ export async function updateAniListAnimeStatus(
 export async function updateAniListMangaStatus(
   accessToken: string,
   mediaId: number,
-  status: 'CURRENT' | 'COMPLETED' | 'PAUSED' | 'DROPPED' | 'PLANNING',
+  status: 'CURRENT' | 'COMPLETED' | 'PAUSED' | 'DROPPED' | 'PLANNING' | string,
   progress?: number
 ): Promise<boolean> {
-  const query = `
-    mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int) {
-      SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress) {
-        id
-        status
-        progress
-      }
-    }
-  `;
-  await anilistQuery(query, { mediaId, status, progress }, accessToken);
+  const { data: { session } } = await supabase.auth.getSession();
+  const bearer = session?.access_token;
+  if (!bearer) throw new Error('Not authenticated');
+
+  const statusMap: Record<string, string> = {
+    CURRENT: 'watching',
+    COMPLETED: 'completed',
+    PLANNING: 'plan_to_watch',
+    DROPPED: 'dropped',
+    PAUSED: 'on_hold',
+  };
+  const localStatus = statusMap[status] || status;
+
+  const res = await fetch('/api/v3/sync/single-sync', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${bearer}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      type: 'manga',
+      anilistId: mediaId,
+      status: localStatus,
+      progress
+    })
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to update AniList manga status');
+  }
   return true;
 }
 

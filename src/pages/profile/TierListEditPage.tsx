@@ -3,11 +3,12 @@ import { Background } from '@/components/layout/Background';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
 import { TierListEditor } from '@/components/tierlist/TierListEditor';
-import { useTierListAccess } from '@/hooks/useTierListCollaboration';
+import { useTierListAccess } from '@/hooks/user/useTierListCollaboration';
 import { useAuth } from '@/contexts/AuthContext';
 import { ArrowLeft } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 
 // Fetch tier list by ID (not share code)
 function useTierListById(id: string) {
@@ -32,6 +33,7 @@ function useTierListById(id: string) {
 export default function TierListEditPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const isDesktopApp = useIsDesktopApp();
     const { user } = useAuth();
     const { data: tierList, isLoading, error } = useTierListById(id || '');
     const { data: tierListAccess, isLoading: loadingAccess } = useTierListAccess(tierList?.id);
@@ -93,7 +95,7 @@ export default function TierListEditPage() {
             <Background />
             <Sidebar />
 
-            <main className="relative z-10 pl-6 md:pl-32 pr-6 py-6 max-w-[1400px] mx-auto pb-24 md:pb-6">
+            <main className={`relative z-10 ${isDesktopApp ? 'pl-6' : 'pl-6 md:pl-32'} pr-6 py-6 max-w-[1400px] mx-auto pb-24 md:pb-6`}>
                 <div className="flex items-center gap-4 mb-8">
                     <button
                         onClick={handleClose}

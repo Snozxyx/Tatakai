@@ -2,10 +2,10 @@ import { useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { UnifiedMediaCard } from '@/components/UnifiedMediaCard';
-import { useInfiniteMangaSections, type MangaSection, type SectionLayout } from '@/hooks/useInfiniteMangaSections';
+import { useInfiniteMangaSections, type MangaSection, type SectionLayout } from '@/hooks/api/useInfiniteMangaSections';
 import { Loader2, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useContentSafetySettings } from '@/hooks/useContentSafetySettings';
+import { useContentSafetySettings } from '@/hooks/user/useContentSafetySettings';
 
 function SectionSkeleton({ layout }: { layout: SectionLayout }) {
   return (

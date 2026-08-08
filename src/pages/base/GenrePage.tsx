@@ -1,26 +1,31 @@
 import { useParams } from "react-router-dom";
-import { useGenreAnimes } from "@/hooks/useAnimeData";
+import { useGenreAnimes } from "@/hooks/api/useAnimeData";
 import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { Header } from "@/components/layout/Header";
 import { AnimeGrid } from "@/components/anime/AnimeGrid";
+import { VirtualAnimeGrid } from "@/components/virtualized/VirtualAnimeGrid";
 import { CardSkeleton } from "@/components/ui/skeleton-custom";
 import { Tag } from "lucide-react";
 import { useState } from "react";
+import { FeatureFlag, useFeatureFlag } from "@/core/feature-flags";
+import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 
 export default function GenrePage() {
   const { genre } = useParams<{ genre: string }>();
   const [page, setPage] = useState(1);
+  const isDesktopApp = useIsDesktopApp();
   
   const { data, isLoading } = useGenreAnimes(genre, page);
+  const useVirtual = useFeatureFlag(FeatureFlag.VIRTUAL_GRID);
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <Background />
       <Sidebar />
 
-      <main className="relative z-10 pl-6 md:pl-32 pr-6 py-6 max-w-[1800px] mx-auto pb-24 md:pb-6">
+      <main className={`relative z-10 ${isDesktopApp ? 'pl-6' : 'pl-6 md:pl-32'} pr-6 py-6 max-w-[1800px] mx-auto pb-24 md:pb-6`}>
         <Header />
 
         <div className="mb-12">
@@ -44,7 +49,11 @@ export default function GenrePage() {
           </div>
         ) : data?.animes.length ? (
           <>
-            <AnimeGrid animes={data.animes} />
+            {useVirtual ? (
+              <VirtualAnimeGrid animes={data.animes} />
+            ) : (
+              <AnimeGrid animes={data.animes} />
+            )}
             
             {/* Pagination */}
             {data.totalPages > 1 && (
@@ -82,3 +91,4 @@ export default function GenrePage() {
     </div>
   );
 }
+

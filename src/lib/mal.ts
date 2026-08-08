@@ -81,22 +81,19 @@ export async function exchangeMalCode(code: string) {
         throw new Error('You must be logged in to link MyAnimeList.');
     }
 
-    const functionUrl = getMalAuthFunctionUrl();
+    console.debug('[MAL Auth] Calling TatakaiAPI exchange...');
 
-    console.debug('[MAL Auth] Calling Edge Function:', functionUrl, 'action:', 'exchange');
-
-    const response = await fetch(functionUrl, {
+    const response = await fetch('/api/v3/sync/exchange', {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+            'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            action: 'exchange',
+            integration: 'mal',
             code,
-            code_verifier: codeVerifier,
-            redirect_uri: REDIRECT_URI,
+            codeVerifier,
+            redirectUri: REDIRECT_URI,
         })
     });
 
@@ -108,7 +105,7 @@ export async function exchangeMalCode(code: string) {
             errorBody = { raw: await response.text().catch(() => 'No body') };
         }
 
-        console.error('[MAL Auth] Edge Function error response:', {
+        console.error('[MAL Auth] TatakaiAPI exchange error response:', {
             status: response.status,
             statusText: response.statusText,
             body: errorBody
@@ -120,7 +117,7 @@ export async function exchangeMalCode(code: string) {
     }
 
     const data = await response.json();
-    console.debug('[MAL Auth] Edge Function success:', data);
+    console.debug('[MAL Auth] TatakaiAPI exchange success:', data);
 
     localStorage.removeItem('mal_code_verifier');
     return data;
@@ -257,27 +254,24 @@ export async function updateMalAnimeStatus(
         }
     }
 
-    // 2. Call Edge Function to sync
-    console.log('[MAL Sync] REQ - Calling Edge Function sync for malId:', malId);
+    // 2. Call TatakaiAPI to sync
+    console.log('[MAL Sync] REQ - Calling TatakaiAPI single-sync for malId:', malId);
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) throw new Error('Not authenticated');
 
-    const functionUrl = getMalAuthFunctionUrl();
-
-    const response = await fetch(functionUrl, {
+    const response = await fetch('/api/v3/sync/single-sync', {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+            'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            action: 'sync',
+            type: 'anime',
             malId,
             status,
             score,
-            numWatchedEpisodes
+            progress: numWatchedEpisodes
         })
     });
 
@@ -289,7 +283,7 @@ export async function updateMalAnimeStatus(
             errorData = { error: 'Unknown server error', details: await response.text().catch(() => 'No body') };
         }
 
-        console.error('[MAL Sync] Sync failed in Edge Function:', errorData);
+        console.error('[MAL Sync] Sync failed in TatakaiAPI:', errorData);
         throw new Error(`MAL Sync Error: ${errorData.error || 'Failed to update MAL'}${errorData.details ? `: ${JSON.stringify(errorData.details)}` : ''}`);
     }
 
@@ -501,20 +495,18 @@ export async function updateMalMangaStatus(
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) throw new Error('Not authenticated');
 
-    const functionUrl = getMalAuthFunctionUrl();
-    const response = await fetch(functionUrl, {
+    const response = await fetch('/api/v3/sync/single-sync', {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+            'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            action: 'sync_manga',
+            type: 'manga',
             malId,
             status: mapTatakaiMangaStatusToMal(status),
             score,
-            numReadChapters,
+            progress: numReadChapters,
         })
     });
 

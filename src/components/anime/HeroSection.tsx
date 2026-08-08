@@ -1,9 +1,10 @@
 import { Star, Play } from "lucide-react";
 import { GlassPanel } from "@/components/ui/GlassPanel";
-import { SpotlightAnime, getProxiedImageUrl } from "@/lib/api";
+import { SpotlightAnime, getProxiedImageUrl, getHighQualityImage } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { AddToPlaylistButton } from '@/components/playlist/AddToPlaylistButton';
+import { buildPreferredAnimeRouteId } from "@/lib/animeIdMapping";
 
 interface HeroSectionProps {
   spotlight: SpotlightAnime;
@@ -17,6 +18,13 @@ export function HeroSection({ spotlight, spotlights = [] }: HeroSectionProps) {
   
   const allSpotlights = spotlights.length > 0 ? spotlights.slice(0, 5) : [spotlight];
   const activeSpotlight = allSpotlights[currentIndex] || spotlight;
+  const heroImage = activeSpotlight.banner || activeSpotlight.poster;
+  const routeAnimeId = buildPreferredAnimeRouteId({
+    id: activeSpotlight.id,
+    name: activeSpotlight.name,
+    malId: (activeSpotlight as any)?.malId,
+    anilistId: (activeSpotlight as any)?.anilistId,
+  });
 
   // Auto-rotate spotlights
   useEffect(() => {
@@ -34,7 +42,7 @@ export function HeroSection({ spotlight, spotlights = [] }: HeroSectionProps) {
   }, [allSpotlights.length]);
 
   const handleWatch = () => {
-    navigate(`/anime/${activeSpotlight.id}`);
+    navigate(`/anime/${routeAnimeId || activeSpotlight.id}`);
   };
 
   return (
@@ -44,7 +52,7 @@ export function HeroSection({ spotlight, spotlights = [] }: HeroSectionProps) {
         {/* Background poster with gradient overlay */}
         <div className="absolute inset-0 h-[400px] overflow-hidden">
           <img 
-            src={getProxiedImageUrl(activeSpotlight.poster)} 
+            src={getHighQualityImage(activeSpotlight.banner || activeSpotlight.poster)} 
             alt="" 
             fetchPriority="high"
             decoding="async"
@@ -62,7 +70,7 @@ export function HeroSection({ spotlight, spotlights = [] }: HeroSectionProps) {
             <div className="w-32 flex-shrink-0">
               <GlassPanel className="overflow-hidden rounded-xl">
                 <img 
-                  src={getProxiedImageUrl(activeSpotlight.poster)} 
+                  src={getHighQualityImage(activeSpotlight.poster)} 
                   alt={activeSpotlight.name}
                   className="w-full aspect-[3/4] object-cover"
                 />
@@ -231,7 +239,7 @@ export function HeroSection({ spotlight, spotlights = [] }: HeroSectionProps) {
           <GlassPanel className="w-full h-full p-2 rotate-[-2deg] hover:rotate-0 transition-transform duration-700 ease-out group">
             <div className="relative w-full h-full rounded-2xl overflow-hidden">
               <img 
-                src={getProxiedImageUrl(activeSpotlight.poster)} 
+                src={getHighQualityImage(heroImage)} 
                 alt={activeSpotlight.name} 
                 className="w-full h-full object-cover filter brightness-90 contrast-110 transition-transform duration-700 group-hover:scale-105" 
               />

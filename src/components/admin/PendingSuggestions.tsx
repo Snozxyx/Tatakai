@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAllSuggestions, useReviewSuggestion, useDeleteSuggestion } from '@/hooks/useSuggestions';
+import { useAllSuggestions, useReviewSuggestion, useDeleteSuggestion } from '@/hooks/api/useSuggestions';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
