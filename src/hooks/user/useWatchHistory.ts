@@ -149,8 +149,8 @@ export function useUpdateWatchHistory() {
         anime_poster: animePoster,
         episode_id: episodeId,
         episode_number: episodeNumber,
-        progress_seconds: progressSeconds,
-        duration_seconds: durationSeconds,
+        progress_seconds: Math.round(progressSeconds),
+        duration_seconds: durationSeconds != null ? Math.round(durationSeconds) : durationSeconds,
         completed,
         watched_at: new Date().toISOString(),
       };

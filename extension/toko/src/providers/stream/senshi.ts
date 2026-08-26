@@ -1,7 +1,7 @@
-import { normalizeQuality, detectSourceType } from '../../utils/quality.js';
-import type { StreamProvider, SourceOptions, SourceResult } from '../../types.js';
+import { normalizeQuality, detectSourceType } from '../../utils/scraping/quality.js';
+import type { StreamProvider, SourceOptions, SourceResult } from '../../types/index.js';
 
-import { fetchResponse } from '../../utils/http.js';
+import { fetchResponse } from '../../utils/http/fetch.js';
 
 const BASE_URL = 'https://senshi.live';
 
@@ -24,20 +24,18 @@ interface SenshiSource {
 }
 
 async function search(query: string): Promise<SenshiAnime[]> {
+  if (!query) return [];
   try {
-    console.log('[Senshi.search] Fetching:', `${BASE_URL}/anime/filter`);
     const res = await fetchResponse(`${BASE_URL}/anime/filter`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ searchTerm: query, page: 1, limit: 5 }),
     });
-    console.log('[Senshi.search] Response status:', res.status, res.ok);
     if (!res.ok) return [];
     const json = await res.json() as { data?: SenshiAnime[] } | SenshiAnime[];
     const data = Array.isArray(json) ? json : ((json as { data?: SenshiAnime[] }).data ?? []);
     return Array.isArray(data) ? data : [];
-  } catch (err) {
-    console.error('[Senshi.search] Error:', err);
+  } catch {
     return [];
   }
 }
@@ -64,47 +62,52 @@ async function findEpisodeServer(malId: string, epId: number): Promise<SenshiSou
   }
 }
 
+/** Map Senshi status to language info */
+function resolveLanguage(status: string): { audioLanguage: string; language: string } {
+  const s = String(status).toLowerCase();
+  if (s === 'dub' || s.includes('dub')) return { audioLanguage: 'en', language: 'English Dub' };
+  // HardSub / SoftSub / default → Japanese sub
+  return { audioLanguage: 'ja', language: 'Japanese' };
+}
+
 const provider: StreamProvider = {
   name: 'senshi',
+  sites: [BASE_URL],
   async single(opts: SourceOptions): Promise<SourceResult[]> {
-    console.log('[Senshi] Starting search for:', opts.titles[0]);
+    const title = opts.titles[0] ?? '';
+    // Guard: skip if title is empty — avoids useless search + 502 spam
+    if (!title) return [];
+
     try {
-      const title = opts.titles[0] ?? '';
-      console.log('[Senshi] Calling search with:', title);
       const animes = await search(title);
-      console.log('[Senshi] Search returned:', animes.length, 'results');
       if (animes.length === 0) return [];
 
       const anime = animes[0];
-      console.log('[Senshi] Getting episodes for anime:', anime.id);
       const episodes = await findEpisodes(anime.id);
-      console.log('[Senshi] Got', episodes.length, 'episodes');
       if (episodes.length === 0) return [];
 
       const targetEp = opts.episode ?? 1;
       const episode = episodes.find(ep => ep.ep_id === targetEp) ?? episodes[0];
-      console.log('[Senshi] Finding sources for episode:', episode.ep_id);
 
       const sources = await findEpisodeServer(episode.mal_id, episode.ep_id);
-      console.log('[Senshi] Got', sources.length, 'sources');
       if (sources.length === 0) return [];
 
-      // Prefer HardSub, fallback to all
-      const filtered = sources.filter(s => s.status === 'HardSub');
-      const pool = filtered.length > 0 ? filtered : sources;
-
-      return pool
+      return sources
         .filter(s => !!s.url)
-        .map(s => ({
-          source: 'senshi',
-          url: s.url,
-          quality: normalizeQuality(''),
-          headers: { Referer: `${BASE_URL}/` },
-          subtitles: [],
-          sourceType: detectSourceType(s.url),
-        }));
-    } catch (err) {
-      console.error('[Senshi] Error:', err);
+        .map(s => {
+          const { audioLanguage, language } = resolveLanguage(s.status);
+          return {
+            source: `senshi-${s.status.toLowerCase()}`,
+            url: s.url,
+            quality: normalizeQuality(''),
+            headers: { Referer: `${BASE_URL}/` },
+            subtitles: [],
+            audioLanguage,
+            language,
+            sourceType: detectSourceType(s.url),
+          };
+        });
+    } catch {
       return [];
     }
   },

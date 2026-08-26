@@ -61,6 +61,37 @@ const App = () => {
     document.addEventListener('click', handler, true);
     return () => document.removeEventListener('click', handler, true);
   }, []);
+
+  // App-level ad/popunder blocker notifications. The blocking itself happens in
+  // the main process (network + popup layer, never injected into the embed);
+  // this only surfaces it so a blocked click-hijack is visible to the user.
+  useEffect(() => {
+    const electronBridge = (window as any).electron;
+    if (!electronBridge?.onSecurityBlocked) return;
+
+    return electronBridge.onSecurityBlocked((data: any) => {
+      if (data?.kind === 'popup') {
+        toast.warning(
+          data.reason === 'ad-network'
+            ? 'Blocked an ad popup'
+            : 'Blocked a popup from the embedded player',
+          {
+            description: data.host
+              ? `${data.host} tried to open a new window.`
+              : 'A new window was opened without your interaction.',
+          },
+        );
+        return;
+      }
+
+      if (data?.kind === 'request' && data.count > 0) {
+        toast.info(`Blocked ${data.count} ad request${data.count === 1 ? '' : 's'}`, {
+          description:
+            Array.isArray(data.hosts) && data.hosts.length ? data.hosts.join(', ') : undefined,
+        });
+      }
+    });
+  }, []);
   
   return (
     <QueryClientProvider client={queryClient}>

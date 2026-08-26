@@ -2,6 +2,7 @@ import { contentGraph, toAnimeCard, toHomeData } from "@/core";
 import type { EpisodeData, EpisodeServer, HomeData, StreamingData } from "@/types/anime";
 import { getHighQualityImage } from "@/lib/api/proxy-utils";
 import { fetchJikanEpisodes } from "@/core/content/jikan-client";
+import { fetchAniZipMapping } from "@/lib/mapping/anizip";
 
 export const TATAKAI_API_URL = import.meta.env.VITE_TATAKAI_API_URL || "https://api.tatakai.app/api/v3";
 
@@ -175,15 +176,23 @@ export async function fetchEpisodes(animeId: string) {
   // In v6, episodes are usually part of the media object or fetched via content graph
   const media = await contentGraph.getMedia(animeId);
   const baseId = media.tatakaiId || animeId;
-  const streamingEpisodes = media.streamingEpisodes ?? [];
   let episodes: EpisodeData[] = [];
 
-  if (streamingEpisodes.length > 0) {
-    episodes = streamingEpisodes.map((ep, idx) => ({
-      episodeId: ep.url || `${baseId}?ep=${idx + 1}`,
-      number: idx + 1,
-      title: ep.title || `Episode ${idx + 1}`,
+  // ani.zip leads for the same reason it does in `useEpisodes`: AniList's
+  // `streamingEpisodes` is regularly a neighbouring season's Crunchyroll listing
+  // stored newest-first, so its array order is not this season's episode order.
+  const mapping = await fetchAniZipMapping(media.anilistId).catch(() => null);
+  if (mapping) {
+    episodes = mapping.episodes.map((entry) => ({
+      episodeId: `${baseId}?ep=${entry.number}`,
+      number: entry.number,
+      title: entry.title || `Episode ${entry.number}`,
       isFiller: false,
+      overview: entry.overview ?? undefined,
+      image: entry.image ?? undefined,
+      airDate: entry.airDate ?? undefined,
+      runtime: entry.runtime ?? undefined,
+      hasAired: entry.hasAired,
     }));
   }
 
@@ -223,7 +232,7 @@ export async function fetchEpisodes(animeId: string) {
 
   return {
     episodes,
-    totalEpisodes: media.episodeSubCount ?? media.episodes ?? episodes.length,
+    totalEpisodes: mapping?.episodeCount ?? media.episodeSubCount ?? media.episodes ?? episodes.length,
   };
 }
 
@@ -302,6 +311,11 @@ export async function fetchNextEpisodeSchedule(animeId: string) {
   return null;
 }
 
+/** True for anything that is a URL rather than an internal episode identifier. */
+function looksLikeUrl(value: string): boolean {
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(value) || value.startsWith("//");
+}
+
 /** V6 dispatch adapter: calls TatakaiAPI playback dispatcher and converts the metadata envelope into a StreamingData-compatible shape. Actual stream URLs are resolved by local extensions or runtime. */
 export async function fetchCombinedSources(
   episodeId: string | undefined,
@@ -314,11 +328,19 @@ export async function fetchCombinedSources(
   knownMalId?: number | string | null
 ): Promise<StreamingData> {
   const normalizedEpisodeId = String(episodeId || "").trim();
+
+  // An off-site watch URL is not an episode id. These leaked in from AniList
+  // `streamingEpisodes[].url`; the producers are fixed, but a stale cache entry or
+  // a bookmarked route can still deliver one, and sending it made the server
+  // answer 400 with nothing actionable in the console.
+  const isUrlId = looksLikeUrl(normalizedEpisodeId);
+
   const parsedTatakaiId = (() => {
-    if (!normalizedEpisodeId) return null;
+    if (!normalizedEpisodeId || isUrlId) return null;
     const idx = normalizedEpisodeId.indexOf("?");
     if (idx > 0) return normalizedEpisodeId.slice(0, idx);
-    return null;
+    // No query string: the whole value is the id (uuid or numeric AniList id).
+    return /^[\w:-]+$/.test(normalizedEpisodeId) ? normalizedEpisodeId : null;
   })();
   const parsedEpisodeNumber = (() => {
     const match = normalizedEpisodeId.match(/[?&]ep(?:isode)?=(\d{1,5})/i);
@@ -327,13 +349,15 @@ export async function fetchCombinedSources(
     return Number.isFinite(num) && num > 0 ? num : null;
   })();
 
+  const resolvedEpisodeNumber = episodeNumber ?? parsedEpisodeNumber;
+
   const res = await fetch(`${TATAKAI_API_URL}/playback/dispatch`, {
     method: "POST",
     headers: withClientHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({
-      episodeId,
+      episodeId: isUrlId ? undefined : episodeId,
       animeName,
-      episodeNumber: episodeNumber ?? parsedEpisodeNumber,
+      episodeNumber: resolvedEpisodeNumber,
       tatakaiId: parsedTatakaiId,
       server,
       category,
@@ -342,6 +366,15 @@ export async function fetchCombinedSources(
       malId: knownMalId,
     }),
   });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(
+      `playback/dispatch ${res.status} for episodeId="${normalizedEpisodeId}" ` +
+      `(tatakaiId=${parsedTatakaiId ?? "none"}, ep=${resolvedEpisodeNumber ?? "none"}, ` +
+      `anilistId=${knownAnilistId ?? "none"})${detail ? `: ${detail.slice(0, 200)}` : ""}`
+    );
+  }
 
   const envelope = await res.json();
   const dispatch = unwrapApiData<any>(envelope);
@@ -379,10 +412,21 @@ export async function fetchCombinedSources(
   };
 }
 
-/** Utility to unwrap API data */
+/**
+ * Unwrap a TatakaiAPI envelope.
+ *
+ * The envelope is `{ success, data, meta?, error? }` (see `TatakaiAPI/src/lib/envelope.ts`).
+ * This used to test `res.status === "ok"`, a field the API has never sent, so it
+ * threw "API Error" on every response — successful ones included.
+ */
 export function unwrapApiData<T>(res: any): T {
-  if (res.status === "ok") return res.data;
-  throw new Error(res.message || "API Error");
+  if (res && typeof res === "object") {
+    if (res.success === true) return res.data as T;
+    if (res.success === false) throw new Error(res.error || res.message || "API Error");
+    // Bare payload (some legacy endpoints return data with no envelope).
+    if (!("success" in res)) return res as T;
+  }
+  throw new Error("API Error");
 }
 
 // Re-export image quality helpers for convenience

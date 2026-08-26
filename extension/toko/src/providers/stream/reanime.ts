@@ -11,11 +11,11 @@
  * directly playable URL whenever decryption succeeds, and falls back to the
  * embed URL (custom source type) otherwise.
  */
-import { normalizeQuality, detectSourceType } from '../../utils/quality.js';
-import { resolveFlixCloud } from '../../utils/flixcloud.js';
-import type { StreamProvider, SourceOptions, SourceResult, SubtitleTrack } from '../../types.js';
+import { normalizeQuality, detectSourceType } from '../../utils/scraping/quality.js';
+import { resolveFlixCloud } from '../../utils/common/flixcloud.js';
+import type { StreamProvider, SourceOptions, SourceResult, SubtitleTrack } from '../../types/index.js';
 
-import { fetchResponse } from '../../utils/http.js';
+import { fetchResponse } from '../../utils/http/fetch.js';
 
 const BASE_URL = 'https://reanime.to';
 const ALT_BASE_URL = 'https://reanime.net';
@@ -74,6 +74,7 @@ async function fetchFlix(anilistId: number, episode: number): Promise<FlixServer
 
 const provider: StreamProvider = {
   name: 'reanime',
+  sites: [BASE_URL, ALT_BASE_URL],
 
   async single(opts: SourceOptions): Promise<SourceResult[]> {
     const anilistId = opts.anilistId;
@@ -123,19 +124,20 @@ const provider: StreamProvider = {
       }));
 
       results.push({
-        source: 'reanime',
+        source: `reanime-${server.serverName || 'hd'}`,
         url: streamUrl,
         quality: normalizeQuality(server.serverName || 'auto'),
         headers: { Referer: `${BASE_URL}/` },
         subtitles,
-        audioLanguage: languageLabel(server.dataType),
+        audioLanguage: server.dataType === 'dub' ? 'en' : 'ja',
+        language: server.dataType === 'dub' ? 'English Dub' : 'Japanese',
+        server: server.serverName || 'hd',
         // FlixCloud always serves HLS once decrypted; embed fallback is custom.
         sourceType: resolved ? detectSourceType(streamUrl) : 'custom',
       });
 
-      // One playable direct source is enough — stop after the first success to
-      // keep fan-out fast. If decryption failed we still only want one embed.
-      break;
+      // Return up to 4 servers — enough variety without over-fetching.
+      if (results.length >= 4) break;
     }
 
     return results;

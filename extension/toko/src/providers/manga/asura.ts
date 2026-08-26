@@ -3,15 +3,16 @@
  * Requirements: 5.2, 5.3, 5.4
  */
 
-import type { MangaProvider, MangaChapterEntry, MangaChapterParams, MangaPageEntry } from '../../types.js';
+import type { MangaProvider, MangaChapterEntry, MangaChapterParams, MangaPageEntry } from '../../types/index.js';
 
-import { fetchResponse, loadHtml } from '../../utils/http.js';
+import { fetchResponse, loadHtml } from '../../utils/http/fetch.js';
 
 const PROVIDER_NAME = 'asura';
 const BASE_URL = 'https://asuracomic.net';
 
 const provider: MangaProvider = {
   name: PROVIDER_NAME,
+  sites: [BASE_URL],
 
   async getChapters(params: MangaChapterParams): Promise<MangaChapterEntry[]> {
     const q = encodeURIComponent(params.title ?? '');

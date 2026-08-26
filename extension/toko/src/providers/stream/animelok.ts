@@ -20,12 +20,12 @@
  *
  * We always prefer direct m3u8 sources and fall back to best-effort embeds.
  */
-import { normalizeQuality, detectSourceType } from '../../utils/quality.js';
-import { buildSearchQueries } from '../../utils/titleNorm.js';
-import { getLanguageCode } from '../../utils/language.js';
-import type { StreamProvider, SourceOptions, SourceResult, SubtitleTrack } from '../../types.js';
+import { normalizeQuality, detectSourceType } from '../../utils/scraping/quality.js';
+import { buildSearchQueries } from '../../utils/scraping/title-normalizer.js';
+import { getLanguageCode, normalizeLangCode } from '../../utils/scraping/language.js';
+import type { StreamProvider, SourceOptions, SourceResult, SubtitleTrack } from '../../types/index.js';
 
-import { fetchResponse } from '../../utils/http.js';
+import { fetchResponse } from '../../utils/http/fetch.js';
 
 const BASE = 'https://animelok.live';
 const ANILIST_GRAPHQL = 'https://graphql.anilist.co';
@@ -196,9 +196,13 @@ function parseServerVariants(rawUrl: string): ResolvedVariant[] | null {
   }
 }
 
-function mapLanguage(server: RawServer): string {
-  const lang = server.languages?.[0] || server.langCode || '';
-  return getLanguageCode(String(lang));
+function mapLanguage(server: RawServer) {
+  const nameLang = server.name ? normalizeLangCode(server.name) : null;
+  if (nameLang && nameLang.code !== 'und') {
+    return nameLang;
+  }
+  const raw = server.languages?.[0] || server.langCode || server.tip || '';
+  return normalizeLangCode(raw);
 }
 
 function isDirectHls(url: string): boolean {
@@ -271,6 +275,7 @@ function scoreServer(server: RawServer, resolved: string): number {
 
 export const animelok: StreamProvider = {
   name: 'animelok',
+  sites: [BASE],
 
   async single(opts: SourceOptions): Promise<SourceResult[]> {
     const ep = opts.episode ?? 1;
@@ -329,53 +334,54 @@ export const animelok: StreamProvider = {
     if (candidates2.length === 0) return [];
     candidates2.sort((a, b) => b.score - a.score);
 
-    // 5. Try to resolve short/embed links, but always emit at least the best.
-    const results: SourceResult[] = [];
+    // 5. Resolve all servers concurrently (short links in parallel).
+    //    Emit ALL sources — direct HLS and embed links — so the UI can show
+    //    multiple server tabs. Cap at 8 to avoid flooding.
     const seen = new Set<string>();
 
-    for (const cand of candidates2) {
-      if (seen.has(cand.url)) continue;
-      seen.add(cand.url);
+    const resolved2 = await Promise.all(
+      candidates2.slice(0, 8).map(async (cand) => {
+        if (seen.has(cand.url)) return null;
+        seen.add(cand.url);
 
-      let finalUrl = cand.url;
-      let sourceType = detectSourceType(finalUrl);
+        let finalUrl = cand.url;
+        let sourceType = detectSourceType(finalUrl);
 
-      // Short links redirect to the actual CDN/embed. Resolve when possible.
-      if (isShortLink(finalUrl)) {
-        const direct = await resolveShortLink(finalUrl);
-        if (direct) {
-          finalUrl = direct;
-          sourceType = detectSourceType(finalUrl);
-        } else {
-          sourceType = 'custom';
+        if (isShortLink(finalUrl)) {
+          const direct = await resolveShortLink(finalUrl);
+          if (direct) {
+            finalUrl = direct;
+            sourceType = detectSourceType(finalUrl);
+          } else {
+            sourceType = 'custom';
+          }
         }
-      }
 
-      const language = mapLanguage(cand.server);
-      const referer = isDirectHls(finalUrl)
-        ? (finalUrl.includes('anvod.pro') ? BASE : 'https://kwik.cx/')
-        : `${BASE}/watch/${slug}?ep=${ep}`;
+        const langObj = mapLanguage(cand.server);
+        const serverName = cand.server.name || 'server';
+        const referer = isDirectHls(finalUrl)
+          ? (finalUrl.includes('anvod.pro') ? BASE : 'https://kwik.cx/')
+          : `${BASE}/watch/${slug}?ep=${ep}`;
 
-      results.push({
-        source: `animelok-${cand.server.name || 'server'}`,
-        url: finalUrl,
-        quality: normalizeQuality(cand.quality || (isDirectHls(finalUrl) ? 'auto' : '')),
-        headers: {
-          Referer: referer,
-          'User-Agent': UA,
-          ...(isDirectHls(finalUrl) && finalUrl.includes('anvod.pro') ? { Origin: BASE } : {}),
-        },
-        subtitles,
-        audioLanguage: language,
-        sourceType,
-      });
+        return {
+          source: `animelok-${serverName}`,
+          url: finalUrl,
+          quality: normalizeQuality(cand.quality || (isDirectHls(finalUrl) ? 'auto' : '')),
+          headers: {
+            Referer: referer,
+            'User-Agent': UA,
+            ...(isDirectHls(finalUrl) && finalUrl.includes('anvod.pro') ? { Origin: BASE } : {}),
+          },
+          subtitles,
+          audioLanguage: langObj.code,
+          language: langObj.name,
+          server: serverName,
+          sourceType,
+        } as SourceResult;
+      })
+    );
 
-      // Return the best playable direct source right away; include subs once.
-      if (isDirectHls(finalUrl)) return results;
-    }
-
-    // No direct HLS — return the first (highest-scored) embed/custom source.
-    return results.slice(0, 1);
+    return resolved2.filter((r): r is SourceResult => r !== null);
   },
 };
 

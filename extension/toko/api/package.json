@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "cors": "^2.8.5",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "lru-cache": "^11.5.2",
+    "puppeteer-real-browser": "^1.4.4"
   }
 }

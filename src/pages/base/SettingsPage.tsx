@@ -117,7 +117,7 @@ const FALLBACK_CHANGELOG = [
     version: '5.2.0',
     date: '2026-04-20',
     changes: [
-      'Source Host Priority: JustAnime/Goku stream selection now prefers vod.netmagcdn.com:2228 before watching.onl variants',
+      'Source Host Priority: Nebula/Goku stream selection now prefers vod.netmagcdn.com:2228 before watching.onl variants',
       'Preview Playback Stability: Fixed anime card/trending preview edge cases for non-HLS sources and retry behavior',
       'Homepage Startup Optimization: Deferred non-critical sections and startup listeners to improve first paint responsiveness',
       'Proxy Reliability Upgrade: Added bounded retries, no-repeat proxy attempts, and in-flight dedupe for proxy requests',
@@ -1410,18 +1410,18 @@ export default function SettingsPage() {
                   <p className="text-sm text-muted-foreground">Curated extensions to enhance your experience</p>
                 </div>
               </div>
-              
+
               <div className="space-y-4">
                 <p className="text-muted-foreground">
                   Extensions add new sources, features, and customization options to Tatakai.
                 </p>
-                
+
                 <Button asChild className="w-full sm:w-auto">
                   <a href="/extensions">
                     Open Extension Hub
                   </a>
                 </Button>
-                
+
                 <div className="pt-4 mt-4 border-t border-border/50">
                   <p className="text-xs text-muted-foreground">
                     <Shield className="inline-block w-3 h-3 mr-1" />
@@ -1451,7 +1451,7 @@ export default function SettingsPage() {
                 Display Settings
               </h2>
               <div className="space-y-6">
-                    {/* <div>
+                {/* <div>
                       <p className="font-medium">Interface Language</p>
                       <p className="text-sm text-muted-foreground">Language for UI text</p>
                     </div>

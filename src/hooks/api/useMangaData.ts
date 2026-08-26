@@ -6,6 +6,8 @@ import {
   getMangaReadByKey,
   type MangaSearchOptions,
 } from "@/core/content/manga-client";
+import { fetchMangaBakaSeries, type MangaBakaSeries } from "@/lib/mapping/mangabaka";
+import { fetchKitsuChapterHierarchy, type KitsuChapterHierarchy } from "@/lib/mapping/kitsu";
 
 // Detect mobile for longer cache times
 const isMobileNative = typeof window !== 'undefined' && 
@@ -134,5 +136,25 @@ export function useMangaRead(id: string | undefined, chapterKey: string | undefi
     refetchOnMount: FORCE_FRESH_MANGA_READS ? "always" : true,
     refetchOnWindowFocus: FORCE_FRESH_MANGA_READS,
     refetchOnReconnect: FORCE_FRESH_MANGA_READS,
+  });
+}
+
+export function useMangaBakaSeries(anilistId: number | null | undefined) {
+  return useQuery({
+    queryKey: ["mangabaka-series", anilistId],
+    queryFn: () => fetchMangaBakaSeries(anilistId),
+    enabled: typeof anilistId === "number" && anilistId > 0,
+    staleTime: 6 * 60 * 60 * 1000, // 6 hours — near-static metadata
+    retry: false,
+  });
+}
+
+export function useMangaKitsuHierarchy(anilistId: number | null | undefined) {
+  return useQuery({
+    queryKey: ["kitsu-chapters", anilistId],
+    queryFn: () => fetchKitsuChapterHierarchy(anilistId),
+    enabled: typeof anilistId === "number" && anilistId > 0,
+    staleTime: 6 * 60 * 60 * 1000,
+    retry: false,
   });
 }

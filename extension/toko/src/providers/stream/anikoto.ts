@@ -13,13 +13,14 @@
  * VidCloud) that needs its own extraction. We try common embed resolvers for the
  * well-known hosts and otherwise return the embed as a custom source.
  */
-import { normalizeQuality, detectSourceType } from '../../utils/quality.js';
-import { buildSearchQueries, scoreMatch } from '../../utils/titleNorm.js';
-import type { StreamProvider, SourceOptions, SourceResult } from '../../types.js';
+import { normalizeQuality, detectSourceType } from '../../utils/scraping/quality.js';
+import { buildSearchQueries, scoreMatch } from '../../utils/scraping/title-normalizer.js';
+import type { StreamProvider, SourceOptions, SourceResult } from '../../types/index.js';
 
-import { fetchResponse, loadHtml } from '../../utils/http.js';
+import { fetchResponse, loadHtml } from '../../utils/http/fetch.js';
 
-const BASES = ['https://anikoto.cz', 'https://anikoto.me', 'https://anikoto.to'];
+const BASES = ['https://anikoto.net', 'https://anikoto.cz', 'https://anikoto.me', 'https://anikoto.to'];
+const ANILIST_GRAPHQL = 'https://graphql.anilist.co';
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36';
 
 const AJAX_HEADERS = {
@@ -36,7 +37,10 @@ interface SearchCandidate {
 
 async function fetchText(url: string, init?: RequestInit): Promise<string | null> {
   try {
-    const res = await fetchResponse(url, init);
+    const res = await fetchResponse(url, {
+      ...init,
+      signal: init?.signal || AbortSignal.timeout(6000),
+    } as RequestInit);
     if (!res.ok) return null;
     return await res.text();
   } catch {
@@ -44,29 +48,74 @@ async function fetchText(url: string, init?: RequestInit): Promise<string | null
   }
 }
 
+async function fetchAniListTitles(anilistId: number): Promise<string[]> {
+  try {
+    const res = await fetchResponse(ANILIST_GRAPHQL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        query: `query ($id: Int) { Media(id: $id, type: ANIME) { title { english romaji userPreferred native } } }`,
+        variables: { id: anilistId },
+      }),
+      timeoutMs: 6000,
+    });
+    if (!res.ok) return [];
+    const data = await res.json() as any;
+    const t = data?.data?.Media?.title;
+    const out = [t?.english, t?.romaji, t?.userPreferred, t?.native].filter((v): v is string => Boolean(v && v.trim()));
+    return Array.from(new Set(out));
+  } catch {
+    return [];
+  }
+}
+
 async function searchAnime(titles: string[]): Promise<SearchCandidate | null> {
   for (const base of BASES) {
     for (const query of buildSearchQueries(titles)) {
-      const html = await fetchText(`${base}/filter?keyword=${encodeURIComponent(query)}`, {
-        headers: { 'User-Agent': UA, Accept: 'text/html' },
-      });
-      if (!html) continue;
+      // Primary: /filter?keyword= (used by the site's search UI)
+      for (const searchPath of [
+        `${base}/filter?keyword=${encodeURIComponent(query)}`,
+        `${base}/search?keyword=${encodeURIComponent(query)}`,
+        `${base}/?s=${encodeURIComponent(query)}`,
+      ]) {
+        const html = await fetchText(searchPath, {
+          headers: { 'User-Agent': UA, Accept: 'text/html' },
+        });
+        if (!html) continue;
 
-      const $ = loadHtml(html);
-      const candidates: Array<{ slug: string; title: string; score: number }> = [];
+        const $ = loadHtml(html);
+        const candidates: Array<{ slug: string; title: string; score: number }> = [];
 
-      $.find('a[href*="/watch/"]').each((_: number, el: any) => {
-        const href: string = el.attr?.('href') ?? '';
-        const title: string = (el.attr?.('title') ?? el.text?.() ?? '').trim();
-        const m = href.match(/\/watch\/([^/?#]+)/);
-        if (!m || !title) return;
-        if (title.length < 2) return;
-        candidates.push({ slug: m[1], title, score: scoreMatch(query, title) });
-      });
+        $.find('a[href*="/watch/"]').each((_: number, el: any) => {
+          const $el = $(el);
+          const href: string = $el.attr('href') ?? '';
+          const title: string = ($el.attr('title') ?? $el.find('.name').text() ?? $el.text() ?? '').trim();
+          const m = href.match(/\/watch\/([^/?#]+)/);
+          if (!m || !title) return;
+          if (title.length < 2) return;
+          candidates.push({ slug: m[1], title, score: scoreMatch(query, title) });
+        });
 
-      if (candidates.length === 0) continue;
-      candidates.sort((a, b) => b.score - a.score);
-      return { ...candidates[0], base };
+        // Also check data-jp attributes (Japanese titles)
+        $.find('[data-jp]').each((_: number, el: any) => {
+          const $el = $(el);
+          const jp: string = $el.attr('data-jp') ?? '';
+          const parentA = $el.closest('a[href*="/watch/"]');
+          const href: string = parentA.attr('href') ?? $el.parents('a').first().attr('href') ?? '';
+          const m = href.match(/\/watch\/([^/?#]+)/);
+          if (!m || !jp) return;
+          candidates.push({ slug: m[1], title: jp, score: scoreMatch(query, jp) });
+        });
+
+        if (candidates.length === 0) continue;
+        candidates.sort((a, b) => b.score - a.score);
+        if (candidates[0].score >= 0.3) {
+          return { ...candidates[0], base };
+        }
+      }
     }
   }
   return null;
@@ -89,7 +138,7 @@ async function resolveAnimeId(slug: string, base: string): Promise<number | null
   let found: string | null = null;
   $.find('#watch-main, [data-id]').each((_: number, el: any) => {
     if (found) return;
-    const id = el.attr?.('data-id');
+    const id = $(el).attr('data-id');
     if (id && /^\d+$/.test(id)) found = id;
   });
   return found ? parseInt(found, 10) : null;
@@ -117,8 +166,9 @@ async function getEpisodeRefs(animeId: number, base: string): Promise<EpisodeRef
   const $ = loadHtml(html);
   const episodes: EpisodeRef[] = [];
   $.find('a[data-ids][data-num], li[data-ids][data-num], a[data-ids], li[data-ids]').each((_: number, el: any) => {
-    const ids: string = (el.attr?.('data-ids') ?? '').replace(/^['"]|['"]$/g, '');
-    const numRaw = el.attr?.('data-num') ?? el.attr?.('data-episode-number');
+    const $el = $(el);
+    const ids: string = ($el.attr('data-ids') ?? '').replace(/^['"]|['"]$/g, '');
+    const numRaw = $el.attr('data-num') ?? $el.attr('data-episode-number');
     const num = parseInt(numRaw, 10);
     if (ids && Number.isFinite(num) && num > 0) episodes.push({ number: num, ids });
   });
@@ -148,10 +198,12 @@ async function getServers(ids: string, base: string): Promise<ServerRef[]> {
   const $ = loadHtml(html);
   const servers: ServerRef[] = [];
   $.find('.type, .servers .type, [data-type]').each((_: number, typeEl: any) => {
-    const type: string = typeEl.attr?.('data-type') ?? typeEl.attr?.('data-server-type') ?? 'sub';
-    typeEl.find('li[data-link-id], a[data-link-id]').each((__: number, li: any) => {
-      const linkId: string = li.attr?.('data-link-id') ?? '';
-      const name: string = (li.find?.('.btn')?.text?.() ?? li.text?.() ?? '').trim();
+    const $typeEl = $(typeEl);
+    const type: string = $typeEl.attr('data-type') ?? $typeEl.attr('data-server-type') ?? 'sub';
+    $typeEl.find('li[data-link-id], a[data-link-id]').each((__: number, li: any) => {
+      const $li = $(li);
+      const linkId: string = $li.attr('data-link-id') ?? '';
+      const name: string = ($li.find('.btn').text() ?? $li.text() ?? '').trim();
       if (linkId) servers.push({ type, name, linkId });
     });
   });
@@ -159,11 +211,12 @@ async function getServers(ids: string, base: string): Promise<ServerRef[]> {
   // Fallback: some skins render the li elements directly without .type wrappers.
   if (servers.length === 0) {
     $.find('li[data-link-id], a[data-link-id]').each((_: number, li: any) => {
-      const linkId: string = li.attr?.('data-link-id') ?? '';
+      const $li = $(li);
+      const linkId: string = $li.attr('data-link-id') ?? '';
       if (linkId) {
         servers.push({
-          type: li.attr?.('data-type') ?? 'sub',
-          name: (li.text?.() ?? '').trim(),
+          type: $li.attr('data-type') ?? 'sub',
+          name: ($li.text() ?? '').trim(),
           linkId,
         });
       }
@@ -298,10 +351,13 @@ async function extractDirectFromWatchPage(slug: string, base: string, ep: number
 
 const provider: StreamProvider = {
   name: 'anikoto',
+  sites: BASES,
 
   async single(opts: SourceOptions): Promise<SourceResult[]> {
     const targetEp = opts.episode ?? 1;
-    const anime = await searchAnime(opts.titles);
+    const aniListTitles = opts.anilistId ? await fetchAniListTitles(opts.anilistId) : [];
+    const titles = Array.from(new Set([...(aniListTitles || []), ...(opts.titles || [])])).filter(Boolean);
+    const anime = await searchAnime(titles);
 
     // Try direct watch-page pahe m3u8 extraction first (works without JS-only
     // data-id/AJAX), then fall back to the server resolution path.

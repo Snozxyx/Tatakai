@@ -3,9 +3,9 @@
  * Requirements: 5.1, 5.3, 5.4
  * All scraping runs locally inside the Toko worker — no server dependency.
  */
-import type { MangaProvider, MangaChapterEntry, MangaChapterParams, MangaPageEntry } from '../../types.js';
+import type { MangaProvider, MangaChapterEntry, MangaChapterParams, MangaPageEntry } from '../../types/index.js';
 
-import { fetchResponse, loadHtml } from '../../utils/http.js';
+import { fetchResponse, loadHtml } from '../../utils/http/fetch.js';
 
 const BASE = 'https://mangafire.to';
 const PROVIDER_NAME = 'mangafire';
@@ -71,6 +71,7 @@ async function fetchChapterList(mangaId: string): Promise<MangaChapterEntry[]> {
 
 const provider: MangaProvider = {
   name: PROVIDER_NAME,
+  sites: [BASE],
 
   async getChapters(params: MangaChapterParams): Promise<MangaChapterEntry[]> {
     try {

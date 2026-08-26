@@ -3,6 +3,7 @@ import { contentGraph, toAnimeCard, toHomeData } from "@/core";
 import { trackEvent } from "@/core/analytics/AnalyticsService";
 import type { MediaFormat, MediaStatus, SearchFilters, TatakaiMedia } from "@/core";
 import { fetchEpisodeServers } from "@/lib/api";
+import { fetchAniZipMapping, type AniZipEpisode, type AniZipMapping } from "@/lib/mapping/anizip";
 import type {
   AnimeInfo,
   EpisodeData,
@@ -190,7 +191,7 @@ const STALE_TIME = {
   search: isMobileNative ? 5 * 60 * 1000 : 2 * 60 * 1000,
 };
 
-function mediaToAnimeInfo(m: TatakaiMedia): AnimeInfo {
+function mediaToAnimeInfo(m: TatakaiMedia, mapping: AniZipMapping | null = null): AnimeInfo {
   const statusLabel = m.status === 'RELEASING'
     ? 'Currently Airing'
     : m.status === 'FINISHED'
@@ -202,6 +203,17 @@ function mediaToAnimeInfo(m: TatakaiMedia): AnimeInfo {
           : m.status === 'HIATUS'
             ? 'On Hiatus'
             : 'Unknown';
+
+  // AniList's own titles first (they match what the rest of the UI shows), then
+  // AniList synonyms, then ani.zip's ~14 localized titles. Deduped
+  // case-insensitively so "Solo Leveling" doesn't appear three times.
+  const titleAliases = dedupeStrings([
+    m.titleEnglish,
+    m.titleRomaji,
+    m.titleNative,
+    ...(m.synonyms ?? []),
+    ...(mapping?.aliases ?? []),
+  ]);
 
   return {
     info: {
@@ -252,21 +264,146 @@ function mediaToAnimeInfo(m: TatakaiMedia): AnimeInfo {
       externalLinks: m.externalLinks ?? [],
       nextAiringEpisode: m.nextAiringEpisode ?? null,
       mapping: (m as { mapping?: unknown }).mapping ?? null,
+      titleAliases,
+      localizedTitles: mapping?.titles ?? {},
+      mappedIds: mapping ? { ...mapping.ids } : {},
+      aniZipArtwork: mapping?.artwork ?? null,
     },
   };
 }
 
+/** Trim, drop empties, and dedupe case-insensitively while keeping first-seen order. */
+function dedupeStrings(values: Array<string | null | undefined>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of values) {
+    const text = String(value ?? '').trim();
+    if (!text) continue;
+    const key = text.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(text);
+  }
+  return out;
+}
+
+// ── AniList `streamingEpisodes` ───────────────────────────────────────────────
+//
+// This is the least trustworthy episode source in the stack and the reason
+// episode identity moved to ani.zip. Two independent problems, both visible on
+// AniList 151807 (Solo Leveling season 1, 12 episodes):
+//
+//   * the 13 rows it carries are season *two*'s Crunchyroll episodes, labelled
+//     with absolute numbers — "Episode 25 - On to the Next Target" … "Episode 13
+//     - You Aren't E-Rank, Are You?";
+//   * they are stored newest-first, so row 0 is episode 25.
+//
+// Reading `idx + 1` off that array gave episode 1 the title "Episode 25 - On to
+// the Next Target" and a 13-entry list for a 12-episode season. Neither the array
+// order nor the embedded number can be trusted, so these rows are now only ever
+// used to *attach a link* to an episode ani.zip already established, and as a
+// last-resort list when nothing else answered.
+
+/**
+ * `"Episode 25 - On to the Next Target"` → `{ number: 25, title: "On to the Next Target" }`.
+ *
+ * The `Episode N` prefix is Crunchyroll boilerplate rather than part of the title,
+ * so it is stripped either way. `number` is `null` when no label is present.
+ */
+function parseStreamingEpisodeLabel(raw?: string | null): { number: number | null; title: string | null } {
+  const text = String(raw || '').trim();
+  if (!text) return { number: null, title: null };
+
+  const match = /^(?:episode|ep\.?|e)\s*(\d{1,4})\s*(?:[-–—:.]\s*(.*))?$/i.exec(text);
+  if (!match) return { number: null, title: text };
+
+  const number = Number(match[1]);
+  const title = String(match[2] ?? '').trim();
+  return {
+    number: Number.isFinite(number) && number > 0 ? number : null,
+    title: title || null,
+  };
+}
+
+/**
+ * Fallback episode list built from `streamingEpisodes`, used only when ani.zip,
+ * the DB and Jikan all came up empty.
+ *
+ * Rows are ordered by their own label rather than by array position, and a
+ * contiguous run of absolute numbers (13–25) is rebased onto 1–13 so the internal
+ * `?ep=<n>` ids stay season-relative. Unlabelled rows fall back to array order,
+ * which is all there is to go on.
+ */
 async function buildEpisodeList(media: TatakaiMedia, baseId: string): Promise<EpisodeData[]> {
   const rows = media.streamingEpisodes ?? [];
-  if (rows.length > 0) {
-    return rows.map((ep, idx) => ({
-      episodeId: ep.url || buildEpisodeId(baseId, idx + 1),
-      number: idx + 1,
-      title: normalizeEpisodeTitle(ep.title, idx + 1),
-      isFiller: false,
-    }));
+  if (rows.length === 0) return [];
+
+  const parsed = rows.map((ep) => ({ row: ep, ...parseStreamingEpisodeLabel(ep.title) }));
+  const labels = parsed.map((entry) => entry.number).filter((n): n is number => n != null);
+  const allLabelled = labels.length === parsed.length && new Set(labels).size === labels.length;
+
+  if (allLabelled) {
+    parsed.sort((a, b) => (a.number ?? 0) - (b.number ?? 0));
   }
-  return [];
+
+  // Rebase only a contiguous run — a gappy set means the labels describe something
+  // other than this season and renumbering them would be a guess.
+  const min = labels.length > 0 ? Math.min(...labels) : 1;
+  const max = labels.length > 0 ? Math.max(...labels) : 1;
+  const contiguous = allLabelled && max - min + 1 === labels.length;
+  const offset = contiguous ? min - 1 : 0;
+
+  return parsed.map((entry, idx) => {
+    const number = allLabelled && entry.number != null ? entry.number - offset : idx + 1;
+    return {
+      // Always the internal `<baseId>?ep=<n>` form. `row.url` is an off-site
+      // Crunchyroll/Netflix watch page — using it as the episodeId poisoned every
+      // downstream parser (dispatch 400, "Episode ?", the Supabase 406). It is
+      // kept as `externalUrl` instead.
+      episodeId: buildEpisodeId(baseId, number),
+      number,
+      title: normalizeEpisodeTitle(entry.title, number),
+      isFiller: false,
+      externalUrl: entry.row.url || undefined,
+    };
+  });
+}
+
+/**
+ * Attach `streamingEpisodes` watch links to a list that already has its identity.
+ *
+ * A row is only accepted when its label lines up with an episode we already hold —
+ * by season number first, then by ani.zip's absolute number, which is what catches
+ * a season-two row labelled "Episode 25". Rows that match neither (season one's
+ * entry carrying season two's links) are dropped rather than forced into a slot.
+ */
+function mergeStreamingLinks(episodes: EpisodeData[], media: TatakaiMedia): EpisodeData[] {
+  const rows = media.streamingEpisodes ?? [];
+  if (rows.length === 0 || episodes.length === 0) return episodes;
+
+  const byNumber = new Map<number, EpisodeData>();
+  const byAbsolute = new Map<number, EpisodeData>();
+  for (const episode of episodes) {
+    byNumber.set(episode.number, episode);
+    if (episode.absoluteNumber != null) byAbsolute.set(episode.absoluteNumber, episode);
+  }
+
+  const urlByEpisodeId = new Map<string, string>();
+  for (const row of rows) {
+    if (!row?.url) continue;
+    const { number } = parseStreamingEpisodeLabel(row.title);
+    if (number == null) continue;
+    const target = byNumber.get(number) ?? byAbsolute.get(number);
+    if (!target || urlByEpisodeId.has(target.episodeId)) continue;
+    urlByEpisodeId.set(target.episodeId, row.url);
+  }
+
+  if (urlByEpisodeId.size === 0) return episodes;
+
+  return episodes.map((episode) => {
+    const url = urlByEpisodeId.get(episode.episodeId);
+    return url && !episode.externalUrl ? { ...episode, externalUrl: url } : episode;
+  });
 }
 
 async function fetchDbEpisodes(media: TatakaiMedia, baseId: string): Promise<EpisodeData[]> {
@@ -281,6 +418,68 @@ async function fetchDbEpisodes(media: TatakaiMedia, baseId: string): Promise<Epi
       title: normalizeEpisodeTitle(row.title, row.episodeNumber),
       isFiller: Boolean(row.isFiller),
     }));
+}
+
+// ── ani.zip episode enrichment ────────────────────────────────────────────────
+
+/** Shape an ani.zip episode into an `EpisodeData`, keeping the enrichment fields. */
+function aniZipToEpisodeData(entry: AniZipEpisode, baseId: string, isFiller = false): EpisodeData {
+  return {
+    episodeId: buildEpisodeId(baseId, entry.number),
+    number: entry.number,
+    title: normalizeEpisodeTitle(entry.title, entry.number),
+    isFiller,
+    overview: entry.overview ?? undefined,
+    image: entry.image ?? undefined,
+    airDate: entry.airDate ?? undefined,
+    airDateUtc: entry.airDateUtc ?? undefined,
+    runtime: entry.runtime ?? undefined,
+    titles: Object.keys(entry.titles).length > 0 ? entry.titles : undefined,
+    hasAired: entry.hasAired,
+    isSpecial: entry.isSpecial || undefined,
+    absoluteNumber: entry.absoluteNumber ?? undefined,
+    seasonNumber: entry.seasonNumber ?? undefined,
+  };
+}
+
+/** Build the episode list purely from ani.zip. Used when every other tier is empty. */
+function episodesFromAniZip(mapping: AniZipMapping | null, baseId: string): EpisodeData[] {
+  if (!mapping) return [];
+  return mapping.episodes.map((entry) => aniZipToEpisodeData(entry, baseId));
+}
+
+/**
+ * Layer ani.zip detail over an episode list that came from somewhere else.
+ *
+ * The existing list owns identity — `episodeId` and `isFiller` decide playback
+ * and are left alone. ani.zip only fills gaps and supplies fields no other
+ * source has (air date, synopsis, screencap, localized titles). Its title wins
+ * over a placeholder like "Episode 7" but never over a real title we already
+ * had, since the earlier tiers are closer to what the user's provider will show.
+ */
+function mergeAniZipEpisodes(episodes: EpisodeData[], mapping: AniZipMapping | null): EpisodeData[] {
+  if (!mapping || mapping.byNumber.size === 0) return episodes;
+
+  return episodes.map((episode) => {
+    const entry = mapping.byNumber.get(episode.number);
+    if (!entry) return episode;
+
+    const isPlaceholderTitle = !episode.title || /^episode\s*\d*$/i.test(episode.title.trim());
+
+    return {
+      ...episode,
+      title: isPlaceholderTitle && entry.title ? entry.title : episode.title,
+      overview: episode.overview ?? entry.overview ?? undefined,
+      image: episode.image ?? entry.image ?? undefined,
+      airDate: episode.airDate ?? entry.airDate ?? undefined,
+      airDateUtc: episode.airDateUtc ?? entry.airDateUtc ?? undefined,
+      runtime: episode.runtime ?? entry.runtime ?? undefined,
+      titles: episode.titles ?? (Object.keys(entry.titles).length > 0 ? entry.titles : undefined),
+      hasAired: episode.hasAired ?? entry.hasAired,
+      absoluteNumber: episode.absoluteNumber ?? entry.absoluteNumber ?? undefined,
+      seasonNumber: episode.seasonNumber ?? entry.seasonNumber ?? undefined,
+    };
+  });
 }
 
 /** Server-mediated Jikan episodes via TatakaiAPI (never call api.jikan.moe from the browser). */
@@ -379,6 +578,7 @@ export function useAnimeInfo(animeId: string | undefined) {
     queryFn: async (): Promise<AnimeInfo> => {
       if (!animeId) throw new Error("Anime ID is required");
       const media = await contentGraph.getMedia(animeId);
+      const mapping = await fetchAniZipMapping(media.anilistId);
 
       if (import.meta.env.DEV) {
         const tmdbLink = media.externalLinks?.find(l => l.site.toLowerCase() === 'tmdb' || l.url.includes('themoviedb.org'));
@@ -394,7 +594,7 @@ export function useAnimeInfo(animeId: string | undefined) {
         });
       }
 
-      return mediaToAnimeInfo(media);
+      return mediaToAnimeInfo(media, mapping);
     },
     enabled: !!animeId,
     staleTime: STALE_TIME.anime,
@@ -405,14 +605,22 @@ export function useAnimeInfo(animeId: string | undefined) {
 export function useEpisodes(animeId: string | undefined) {
   return useQuery({
     queryKey: ["episodes", animeId],
-    queryFn: async (): Promise<{ totalEpisodes: number; episodes: EpisodeData[] }> => {
+    queryFn: async (): Promise<{ totalEpisodes: number; episodes: EpisodeData[]; specials: EpisodeData[] }> => {
       if (!animeId) throw new Error("Anime ID is required");
       const media = await contentGraph.getMedia(animeId);
       const baseId = media.tatakaiId || animeId;
       let episodes: EpisodeData[] = [];
 
-      // 1. AniList streamingEpisodes (primary)
-      episodes = await buildEpisodeList(media, baseId);
+      // ani.zip decides episode identity, so it is awaited before the fallback
+      // chain rather than alongside it. It is the only source here that is keyed
+      // by *this* AniList entry's episode numbers — AniList's own
+      // `streamingEpisodes` regularly carries a neighbouring season's rows (see
+      // `buildEpisodeList`), and Jikan is keyed by MAL, which splits seasons
+      // differently again.
+      const mapping = await fetchAniZipMapping(media.anilistId);
+
+      // 1. ani.zip — numbers, titles, air dates, synopses and screencaps.
+      episodes = episodesFromAniZip(mapping, baseId);
 
       // 2. TatakaiAPI DB episode rows
       if (episodes.length === 0) {
@@ -430,7 +638,12 @@ export function useEpisodes(animeId: string | undefined) {
         }
       }
 
-      // 4. Count-based placeholders from AniList episode total
+      // 4. AniList `streamingEpisodes`, re-derived from their own labels.
+      if (episodes.length === 0) {
+        episodes = await buildEpisodeList(media, baseId);
+      }
+
+      // 5. Count-based placeholders from AniList episode total
       if (episodes.length === 0) {
         const count = Math.min(media.episodes ?? 0, 2000);
         episodes = Array.from({ length: count }, (_, i) => ({
@@ -441,17 +654,28 @@ export function useEpisodes(animeId: string | undefined) {
         }));
       }
 
+      // Whichever tier produced the list, ani.zip fills in what it lacks, and
+      // AniList contributes only off-site watch links — never numbers or order.
+      episodes = mergeAniZipEpisodes(episodes, mapping);
+      episodes = mergeStreamingLinks(episodes, media);
+
       if (import.meta.env.DEV) {
         console.debug("[useEpisodes] Episodes loaded", {
           animeId,
           tatakaiId: media.tatakaiId,
           count: episodes.length,
+          aniZip: mapping ? { episodes: mapping.episodes.length, specials: mapping.specials.length } : null,
         });
       }
 
       return {
-        totalEpisodes: media.episodeSubCount ?? media.episodes ?? episodes.length,
+        // ani.zip's count is the one that matches the list actually rendered, so
+        // it leads. AniList's `episodeSubCount`/`episodes` are the season totals
+        // and only stand in when ani.zip has no record.
+        totalEpisodes:
+          mapping?.episodeCount ?? media.episodeSubCount ?? media.episodes ?? episodes.length,
         episodes: episodes,
+        specials: mapping ? mapping.specials.map((entry) => aniZipToEpisodeData(entry, baseId)) : [],
       };
     },
     enabled: !!animeId,
@@ -612,6 +836,28 @@ export function useNextEpisodeSchedule(animeId: string | undefined) {
 
       let resolvedMalId = media.malId ?? null;
 
+      // ani.zip carries a real dated schedule per episode, so it answers this
+      // exactly when AniList's `nextAiringEpisode` is missing — which happens
+      // for shows AniList tracks loosely (split cours, late-announced slots).
+      // The Jikan broadcast path below can only *derive* a time from a weekday
+      // string, so try the concrete date first.
+      const mapping = await fetchAniZipMapping(media.anilistId);
+      const upcoming = mapping?.nextEpisode;
+      if (upcoming?.airDateUtc) {
+        const airingMs = Date.parse(upcoming.airDateUtc);
+        if (Number.isFinite(airingMs)) {
+          return {
+            airingAt: Math.floor(airingMs / 1000),
+            timeUntilAiring: Math.max(0, Math.floor((airingMs - Date.now()) / 1000)),
+            episode: upcoming.number,
+            airingISOTimestamp: new Date(airingMs).toISOString(),
+            title: upcoming.title ?? undefined,
+            overview: upcoming.overview ?? undefined,
+            image: upcoming.image ?? undefined,
+          };
+        }
+      }
+
       if (!resolvedMalId) {
         resolvedMalId = await resolveMalIdFromSearch(media);
       }
@@ -647,6 +893,40 @@ export function useNextEpisodeSchedule(animeId: string | undefined) {
     },
     enabled: !!animeId,
     staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+}
+
+export type EpisodeSearchHit = {
+  animeId: string;
+  anilistId: number | null;
+  malId: number | null;
+  animeName: string;
+  animePoster: string | null;
+  episodeTitle: string;
+  episodeThumbnail: string | null;
+  episodeUrl: string | null;
+  _matchType: 'episode';
+};
+
+/**
+ * Search episode titles via TatakaiAPI `/content/search/episodes`.
+ * Returns anime + episode-title hits, marked with `_matchType: "episode"`.
+ * Only fires when `query` is at least 3 characters.
+ */
+export function useEpisodeTitleSearch(query: string, enabled = true) {
+  return useQuery({
+    queryKey: ['episode-title-search', query],
+    queryFn: async (): Promise<EpisodeSearchHit[]> => {
+      if (!query || query.trim().length < 3) return [];
+      const params = new URLSearchParams({ q: query.trim(), perPage: '10' });
+      const res = await fetch(`/api/v3/content/search/episodes?${params}`);
+      if (!res.ok) return [];
+      const json = await res.json();
+      return Array.isArray(json?.data) ? json.data : [];
+    },
+    enabled: enabled && query.trim().length >= 3,
+    staleTime: 60 * 1000,
     retry: false,
   });
 }

@@ -18,7 +18,28 @@ export interface SourceOptions {
   exclusions?: string[];
   preferredLanguage?: string;
   preferredLanguages?: string[];
+  /**
+   * Optional, caller-controlled limits for the provider fan-out.  These are
+   * deliberately bounded by the bundle before use so a stale UI value cannot
+   * create an unbounded retry/request loop.
+   */
+  providerOptions?: ProviderRunOptions;
 }
+
+/** Runtime limits for a single source lookup. */
+export interface ProviderRunOptions {
+  /** Number of providers that may scrape at once. */
+  maxConcurrency?: number;
+  /** Extra attempts after an empty or failed provider call. */
+  maxRetries?: number;
+  /** Base delay before a retry. Each attempt adds a small linear backoff. */
+  retryDelayMs?: number;
+  /** Hard timeout for one provider attempt. */
+  timeoutMs?: number;
+}
+
+/** Video container inferred from a torrent release name or its file list. */
+export type TorrentFileFormat = 'mkv' | 'mp4' | 'webm' | 'avi' | 'mov' | 'm4v' | 'video';
 
 export interface SubtitleTrack {
   url: string;
@@ -49,6 +70,20 @@ export interface SourceResult {
   providerName?: string;
   providerKey?: string;
   server?: string;
+  /** Torrent metadata — only set when sourceType === 'torrent' */
+  seeders?: number;
+  leechers?: number;
+  peers?: number;      // seeders + leechers
+  torrentTitle?: string;
+  fileSize?: string;   // human-readable size string e.g. "1.4 GB"
+  /** Magnet link — always set for torrents when available. url may be a .torrent file URL */
+  magnetLink?: string;
+  /** 0–100 relevance score: how well title + episode match the request */
+  matchScore?: number;
+  /** Parsed release group name e.g. "SubsPlease" */
+  releaseGroup?: string;
+  /** Container tag for torrent results, e.g. `mkv`, `mp4`, or generic `video`. */
+  fileFormat?: TorrentFileFormat;
 }
 
 export interface LanguageCapability {

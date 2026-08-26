@@ -1,73 +1,95 @@
 /**
- * NekoBT torrent provider adapter (HTML scrape via loadHtml).
- * Source: A2-port
- * Requirements: 4.1, 4.3
+ * NekoBT torrent provider adapter (using Torznab API / RSS).
  */
+import { normalizeQuality } from '../../utils/scraping/quality.js';
+import type { TorrentProvider, SourceOptions, SourceResult } from '../../types/index.js';
+import { fetchResponse, loadHtml } from '../../utils/http/fetch.js';
+import { scoreEpisodeMatch, isBatchTitle } from '../../utils/torrent/matcher.js';
+import { buildSearchQueries } from '../../utils/scraping/title-normalizer.js';
 
-import { normalizeQuality } from '../../utils/quality.js';
-import type { TorrentProvider, SourceOptions, SourceResult } from '../../types.js';
+function formatSize(bytes?: number): string {
+  if (!bytes) return '';
+  if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
+  if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(0)} MB`;
+  return `${(bytes / 1e3).toFixed(0)} KB`;
+}
 
-import { fetchResponse, loadHtml } from '../../utils/http.js';
+const BASE = 'https://nekobt.to';
 
 const provider: TorrentProvider = {
   name: 'nekobt',
+  sites: [BASE],
   async batch(opts: SourceOptions): Promise<SourceResult[]> {
-    const query = encodeURIComponent(`${opts.titles[0] ?? ''} ${opts.episode ?? ''}`.trim());
-    const url = `https://nekobt.com/?s=${query}`;
+    const titles = opts.titles ?? [];
+    const ep = opts.episode ?? 0;
+    if (titles.length === 0) return [];
 
-    let res: Response;
-    try {
-      res = await fetchResponse(url);
-    } catch {
-      return [];
+    const epPad = ep > 0 ? String(ep).padStart(2, '0') : '';
+    const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36';
+
+    let xml = '';
+    for (const title of buildSearchQueries(titles)) {
+      const qStr = ep > 0 ? `${title} ${epPad}` : title;
+      const url = `${BASE}/api/torznab/api?t=search&q=${encodeURIComponent(qStr)}`;
+      try {
+        const res = await fetchResponse(url, {
+          headers: { 'User-Agent': UA },
+          timeoutMs: 6000,
+        });
+        if (res.ok) {
+          const text = await res.text();
+          if (text.includes('<item>')) {
+            xml = text;
+            break;
+          }
+        }
+      } catch { continue; }
     }
 
-    if (!res.ok) return [];
+    if (!xml) return [];
 
-    let html: string;
-    try {
-      html = await res.text();
-    } catch {
-      return [];
-    }
-
-    if (!html) return [];
-
-    let $ : any;
-    try {
-      $ = loadHtml(html);
-    } catch {
-      return [];
-    }
-
+    const $ = loadHtml(xml);
     const results: SourceResult[] = [];
+    const seenUrls = new Set<string>();
 
-    // Extract magnet links from <a href="magnet:..."> elements
-    $('a[href^="magnet:"]').each((_: number, el: any) => {
-      const href = $(el).attr('href') ?? '';
-      if (!href) return;
+    $.find('item').each((_: number, item: any) => {
+      const title = $(item).find('title').first().text().trim();
+      const magnetUrl = $(item).find('link').first().text().trim() || $(item).find('enclosure').attr('url') || '';
+      if (!magnetUrl || !magnetUrl.startsWith('magnet:') || seenUrls.has(magnetUrl)) return;
 
-      // Try to grab a title from the link text or a nearby title element
-      const linkText = $(el).text().trim();
-      const parentTitle = $(el).closest('article, .post, .item, li')
-        .find('h2, h3, .title, .entry-title')
-        .first()
-        .text()
-        .trim();
+      if (ep > 0) {
+        if (isBatchTitle(title)) return;
+        if (scoreEpisodeMatch(title, ep) === 0) return;
+      }
+      seenUrls.add(magnetUrl);
 
-      const title = parentTitle || linkText;
+      const sizeStr = $(item).find('size').text().trim() || $(item).find('torznab\\:attr[name="size"]').attr('value');
+      const seedersStr = $(item).find('torznab\\:attr[name="seeders"]').attr('value');
+      const leechersStr = $(item).find('torznab\\:attr[name="leechers"]').attr('value');
+
+      const size = sizeStr ? parseInt(sizeStr, 10) : undefined;
+      const seeders = seedersStr ? parseInt(seedersStr, 10) : undefined;
+      const leechers = leechersStr ? parseInt(leechersStr, 10) : undefined;
+      const peers = (seeders || 0) + (leechers || 0);
 
       results.push({
         source: 'nekobt',
-        url: href,
+        url: magnetUrl,
         quality: normalizeQuality(title),
         headers: {},
         subtitles: [],
         sourceType: 'torrent' as const,
+        audioLanguage: 'ja',
+        torrentTitle: title,
+        seeders,
+        leechers,
+        peers: peers > 0 ? peers : undefined,
+        fileSize: formatSize(size),
       });
     });
 
-    return results;
+    results.sort((a, b) => (b.seeders ?? 0) - (a.seeders ?? 0));
+    return results.slice(0, 15);
   },
 };
 

@@ -187,6 +187,16 @@
       "resources/**/*",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "extension",
+        "to": "extension",
+        "filter": [
+          "*/manifest.json",
+          "*/dist/bundle.js"
+        ]
+      }
+    ],
     "publish": [
       {
         "provider": "github",

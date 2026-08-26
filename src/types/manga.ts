@@ -1,4 +1,4 @@
-import type { Character, StaffMember, MediaRelation, ExternalLink } from "@/core/content/types";
+ import type { Character, StaffMember, MediaRelation, ExternalLink } from "@/core/content/types";
 
 export interface MangaCard {
   id: string;
@@ -139,6 +139,20 @@ export interface MappedMangaChapter {
   volume: number | null;
   canonicalOrder: number;
   sources: MangaChapterSource[];
+
+  // ── Kitsu enrichment (see src/lib/mapping/kitsu.ts) ────────────────────────
+  // Scanlation providers give a number and, if you are lucky, a title. Kitsu
+  // supplies the volume a chapter belongs to — which is what makes the volume
+  // hierarchy possible at all, since most providers omit it — plus the publish
+  // date, page count and a thumbnail. All optional: a manga MangaBaka can't map
+  // to a Kitsu id renders exactly as it did before.
+  /** Kitsu chapter id, when this chapter matched a Kitsu row. */
+  kitsuId?: string;
+  /** `YYYY-MM-DD` release date from Kitsu. */
+  published?: string | null;
+  pageCount?: number | null;
+  thumbnail?: string | null;
+  synopsis?: string | null;
 }
 
 export interface MangaChapterResponse {

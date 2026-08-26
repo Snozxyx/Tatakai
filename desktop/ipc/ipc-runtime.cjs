@@ -24,6 +24,7 @@ const { withCallTimeout, CALL_TIMEOUT_MS } = require('../runtime/security/timeou
 const { LocalProxyServer } = require('../runtime/proxy/local-proxy-server.cjs');
 const { WarpTunnel } = require('../runtime/warp/warp-tunnel.cjs');
 const { parseKaiFile, installKaiExtension } = require('../runtime/extension/kai-format.cjs');
+const { createExtensionApiHost } = require('../runtime/extension-api-host/supervisor.cjs');
 
 // ── Tatakai API base URL ──────────────────────────────────────────────────────
 // Resolves to http://localhost:4001/api/v3 in dev, https://api.tatakai.me/api/v3 in prod.
@@ -95,6 +96,11 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
         workerPool.setFetchProxyBaseUrl(proxyBaseUrl);
         return proxyBaseUrl;
     };
+    // Generic extension-API host (app-owned, in-process). Serves the
+    // streaming-sources-v3 contract for any installed extension whose manifest
+    // declares `apiServer` (and is `sideloaded`). Started by main.cjs after
+    // extensions auto-load; reuses the same registry + localProxy singletons.
+    const extensionApiHost = createExtensionApiHost();
     const warp = new WarpTunnel({ app, fs, path, logger });
     const auditPath = path.join(app.getPath('userData'), 'extension-audit.log');
     const appendAudit = (event, payload) => {
@@ -144,8 +150,24 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
                 version: manifest.version ?? null,
                 type: manifest.type ?? null,
                 capabilities: Array.isArray(manifest.capabilities) ? manifest.capabilities : [],
+                apiServer: manifest.apiServer && typeof manifest.apiServer === 'object' ? manifest.apiServer : null,
             };
         });
+    });
+
+    // ── runtime:get-api-base ──────────────────────────────────────────────────
+    //
+    // Returns the base URL of the app-owned extension-API host plus the list of
+    // currently mounted namespaces, so the renderer never hardcodes the port.
+    // The generic SSE consumer (useExtensionSourceStream) resolves this once and
+    // builds `${baseUrl}/api/v3/<namespace>/...` from it.
+    //
+    // Shape: { baseUrl: string|null, namespaces: Array<{ namespace, extensionId, contract, routes }> }
+    ipcMain.handle('runtime:get-api-base', async () => {
+        return {
+            baseUrl: extensionApiHost.getBaseUrl(),
+            namespaces: extensionApiHost.listNamespaces(),
+        };
     });
 
     // ── runtime:resolve-sources ───────────────────────────────────────────────
@@ -643,6 +665,19 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
         return localProxy.getEmbeddedFlareSolverrStatus();
     });
 
+    // ── runtime:bypass-mode ───────────────────────────────────────────────────
+    // Set the Cloudflare bypass mode: playwright | flaresolverr | embedded
+    ipcMain.handle('runtime:bypass-mode', async (_event, mode) => {
+        try {
+            localProxy.setBypassMode(mode);
+            logger?.info(`[IPC] Bypass mode set to: ${mode}`);
+            return { success: true, mode };
+        } catch (err) {
+            logger?.warn(`[IPC] Failed to set bypass mode: ${err.message}`);
+            return { success: false, error: err.message };
+        }
+    });
+
     // ── extension:load-kai ─────────────────────────────────────────────────────
     // Accepts a raw .kai file buffer from the renderer (via file picker or URL download)
     // Parses, validates, installs, and registers the extension.
@@ -1043,11 +1078,12 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
     }
 
     // Expose registry/workerPool and autoLoadBundledExtensions for main.cjs
-    return { 
-        registry, 
-        workerPool, 
-        autoLoadBundledExtensions, 
+    return {
+        registry,
+        workerPool,
+        autoLoadBundledExtensions,
         ensureExtensionFetchProxy,
+        extensionApiHost, // Generic extension-API host — main.cjs starts/stops it
         localProxy, // Expose for debugging
     };
 };

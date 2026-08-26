@@ -1,6 +1,6 @@
 {
   "name": "toko-extension",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "build": "tsx build.ts"
@@ -13,6 +13,7 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "cheerio": "^1.2.0"
+    "cheerio": "^1.2.0",
+    "puppeteer-real-browser": "^1.4.4"
   }
 }

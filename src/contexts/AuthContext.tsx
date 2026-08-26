@@ -195,8 +195,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   anime_poster: item.animePoster,
                   episode_id: item.episodeId,
                   episode_number: item.episodeNumber,
-                  progress_seconds: item.progressSeconds,
-                  duration_seconds: item.durationSeconds || null,
+                  progress_seconds: Math.round(item.progressSeconds),
+                  duration_seconds: item.durationSeconds != null ? Math.round(item.durationSeconds) : null,
                   completed: false,
                   watched_at: item.watchedAt,
                 }));

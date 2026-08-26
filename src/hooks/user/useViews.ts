@@ -28,6 +28,20 @@ export interface TrendingAnime {
   total_views: number;
 }
 
+/**
+ * True for values that are usable as an `anime_id`.
+ *
+ * Off-site watch URLs used to reach this hook as the anime id (they leaked in
+ * from AniList `streamingEpisodes[].url`), and PostgREST answered 406 on the
+ * resulting filter. The producers are fixed, but a stale query cache can still
+ * hand one over, so the guard stays.
+ */
+function isUsableAnimeId(value: string): boolean {
+  if (!value) return false;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(value) || value.startsWith("//")) return false;
+  return value.length <= 200;
+}
+
 // Fetch view count for a single anime
 // Note: Returns 0 if table doesn't exist yet (migration pending)
 export function useAnimeViewCount(animeId: string | undefined) {
@@ -35,27 +49,29 @@ export function useAnimeViewCount(animeId: string | undefined) {
     queryKey: ['viewCount', animeId],
     queryFn: async (): Promise<number> => {
       if (!animeId) return 0;
-      
+
       try {
         // Use raw SQL query to avoid type issues with new table
         const { data, error } = await (supabase as any)
           .from('anime_view_counts')
           .select('total_views')
           .eq('anime_id', animeId)
-          .single();
-        
+          // `maybeSingle`, not `single`: an anime nobody has watched yet has no
+          // row, and `single` turns that ordinary case into a 406.
+          .maybeSingle();
+
         if (error && error.code !== 'PGRST116') { // PGRST116 = no rows
           // Table might not exist yet
           if (error.code === '42P01') return 0;
           console.error('Error fetching view count:', error);
         }
-        
+
         return data?.total_views || 0;
       } catch {
         return 0;
       }
     },
-    enabled: !!animeId,
+    enabled: !!animeId && isUsableAnimeId(animeId),
     staleTime: 60000, // 1 minute
   });
 }

@@ -229,6 +229,52 @@ class LocalProxyServer {
         return `${this.baseUrl()}/stream/${token}`;
     }
 
+    /**
+     * CORS headers that must be on *every* response, errors included.
+     *
+     * The renderer runs on http://localhost:8090 and this server on
+     * http://127.0.0.1:<ephemeral>, so every request to it is cross-origin. Only
+     * the success paths used to set `access-control-allow-origin`, which meant a
+     * failed subtitle fetch surfaced in the console as
+     *
+     *   Access to text track at 'http://127.0.0.1:49351/stream/…' from origin
+     *   'http://localhost:8090' has been blocked by CORS policy: No
+     *   'Access-Control-Allow-Origin' header is present
+     *
+     * on top of the real error (502 / 410 expired). Chrome strips a cross-origin
+     * response with no ACAO before the page can read its status, so the actual
+     * failure — an expired token, a dead upstream — was invisible and every
+     * proxy fault looked like the same CORS bug. Errors carry the headers now so
+     * the status the player sees is the status that happened.
+     */
+    _corsHeaders(extra) {
+        return {
+            'access-control-allow-origin': '*',
+            'access-control-allow-methods': 'GET, HEAD, POST, OPTIONS',
+            // `*` is not honoured for allow-headers on requests with credentials,
+            // and hls.js/track fetches send Range plus content negotiation.
+            'access-control-allow-headers': 'Range, Content-Type, Accept, Origin, Authorization, X-Requested-With',
+            'access-control-expose-headers': '*',
+            'access-control-max-age': '86400',
+            ...(extra || {}),
+        };
+    }
+
+    /** Terminate a request with a status + text body, always CORS-safe. */
+    _endWithStatus(res, status, message) {
+        if (res.headersSent) {
+            res.end();
+            return;
+        }
+        const body = Buffer.from(String(message ?? ''), 'utf8');
+        res.writeHead(status, this._corsHeaders({
+            'content-type': 'text/plain; charset=utf-8',
+            'content-length': String(body.length),
+            'cache-control': 'no-store',
+        }));
+        res.end(body);
+    }
+
     _rewritePlaylistUrls(playlistText, playlistUrl, sourceHeaders) {
         const base = new URL(playlistUrl);
         const rewriteUrl = (targetUrl) => {
@@ -273,17 +319,45 @@ class LocalProxyServer {
         return headers;
     }
 
-    async _forwardResponse(res, upstream) {
-        const passHeaders = {};
+    /**
+     * Build the headers to send downstream from an upstream `fetch` response.
+     *
+     * The one that matters is `content-encoding`. Node's `fetch` transparently
+     * gunzips/brotli-decodes the response, so the bytes we relay are already
+     * plaintext while the upstream header still says `gzip`/`br`. Copying it
+     * tells Chrome to inflate plaintext, which fails the request as
+     * ERR_CONTENT_DECODING_FAILED *at HTTP 200* — hls.js reads that as a fatal
+     * network error and retries forever ("Fatal network error, trying to
+     * recover..."). `content-length` has to go with it, because the length
+     * upstream reported describes the encoded body, not what we write.
+     */
+    _responseHeaders(upstream) {
         const hop = new Set([
             'connection', 'keep-alive', 'proxy-authenticate',
             'proxy-authorization', 'te', 'trailers', 'transfer-encoding', 'upgrade',
         ]);
+        const encoding = String(upstream.headers.get('content-encoding') || '')
+            .trim()
+            .toLowerCase();
+        // 'identity' (or absent) means fetch passed the bytes through untouched,
+        // so the upstream content-length is still accurate — keep it, byte-range
+        // playback depends on it.
+        const wasDecoded = encoding !== '' && encoding !== 'identity';
+
+        const passHeaders = {};
         upstream.headers.forEach((value, key) => {
-            if (!hop.has(String(key).toLowerCase())) passHeaders[key] = value;
+            const name = String(key).toLowerCase();
+            if (hop.has(name)) return;
+            if (name === 'content-encoding') return;
+            if (name === 'content-length' && wasDecoded) return;
+            passHeaders[key] = value;
         });
-        passHeaders['access-control-allow-origin'] = '*';
-        res.writeHead(upstream.status, passHeaders);
+        Object.assign(passHeaders, this._corsHeaders());
+        return passHeaders;
+    }
+
+    async _forwardResponse(res, upstream) {
+        res.writeHead(upstream.status, this._responseHeaders(upstream));
         if (!upstream.body) {
             res.end();
             return;
@@ -308,12 +382,12 @@ class LocalProxyServer {
             target = new URL(targetUrl);
         } catch (_) {
             console.error('[LocalProxy] Invalid target URL:', targetUrl);
-            res.writeHead(400).end('invalid target url');
+            this._endWithStatus(res, 400, 'invalid target url');
             return;
         }
         if (!['http:', 'https:'].includes(target.protocol)) {
             console.error('[LocalProxy] Unsupported protocol:', target.protocol);
-            res.writeHead(400).end('unsupported target protocol');
+            this._endWithStatus(res, 400, 'unsupported target protocol');
             return;
         }
 
@@ -428,14 +502,63 @@ class LocalProxyServer {
         await this._forwardResponse(res, upstream);
     }
 
+    /**
+     * GET an upstream stream asset, retrying once on a *connection-level* failure.
+     *
+     * A single `fetch` reject used to become a 502 straight away, and the assets
+     * most likely to hit one are the small ones: subtitle tracks on
+     * `cdn.watching.onl` sit behind a CDN that resets the first connection often
+     * enough to be noticeable, while the video segments — requested in a steady
+     * stream over an already-warm socket — almost never do. So the visible
+     * symptom was "the .vtt 502s but the video plays".
+     *
+     * Only network rejections are retried. An HTTP error (403/404/5xx) is a real
+     * answer from the origin and is relayed as-is, and an abort means the 18s
+     * budget is gone so there is no time for a second attempt.
+     */
+    async _fetchStreamUpstream(url, headers, signal) {
+        let lastErr;
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+            try {
+                return await fetch(url, {
+                    method: 'GET',
+                    headers,
+                    redirect: 'follow',
+                    signal,
+                });
+            } catch (err) {
+                lastErr = err;
+                if (signal?.aborted || /abort/i.test(String(err?.name || ''))) throw err;
+                if (attempt === 0) {
+                    this._logger?.warn?.(
+                        `[LocalProxy] upstream fetch failed (${err.message}) — retrying once`,
+                    );
+                    await new Promise((resolve) => setTimeout(resolve, 250));
+                }
+            }
+        }
+        throw lastErr;
+    }
+
     async _handleRequest(req, res) {
         try {
             const rawUrl = req.url || '/';
             const parsed = new URL(rawUrl, this.baseUrl());
+
+            // Preflight. A `<track>` element never sends one, but hls.js does as
+            // soon as a request carries a non-simple header (Range on a seek,
+            // Content-Type on a key request), and without an answer here those
+            // fail before the GET is ever attempted.
+            if (String(req.method || '').toUpperCase() === 'OPTIONS') {
+                res.writeHead(204, this._corsHeaders({ 'content-length': '0' }));
+                res.end();
+                return;
+            }
+
             if (parsed.pathname === '/proxy') {
                 const targetUrl = parsed.searchParams.get('url');
                 if (!targetUrl) {
-                    res.writeHead(400).end('missing target url');
+                    this._endWithStatus(res, 400, 'missing target url');
                     return;
                 }
                 await this._handleExtensionFetch(req, res, targetUrl);
@@ -443,14 +566,16 @@ class LocalProxyServer {
             }
             const match = parsed.pathname.match(/^\/stream\/([a-f0-9]{32})$/i);
             if (!match) {
-                res.writeHead(404).end('not found');
+                this._endWithStatus(res, 404, 'not found');
                 return;
             }
             const token = match[1];
             const entry = this._tokenMap.get(token);
             if (!entry || !entry.url) {
                 this._emit('runtime-proxy-miss', { token });
-                res.writeHead(410).end('expired');
+                // 410 rather than 404: the token was valid, it aged out of
+                // `_tokenMap` (15m). The player re-requests sources on this.
+                this._endWithStatus(res, 410, 'stream token expired');
                 return;
             }
 
@@ -460,6 +585,13 @@ class LocalProxyServer {
             if (!outboundHeaders['User-Agent'] && !outboundHeaders['user-agent']) {
                 outboundHeaders['User-Agent'] = DEFAULT_USER_AGENT;
             }
+            // Media is already compressed, and a gzipped byte-range response is a
+            // mess to relay correctly. Ask for the bytes raw unless the source
+            // explicitly wants otherwise, so content-length/content-range stay
+            // true all the way to the player.
+            if (!outboundHeaders['Accept-Encoding'] && !outboundHeaders['accept-encoding']) {
+                outboundHeaders['Accept-Encoding'] = 'identity';
+            }
             if (req.headers.range) outboundHeaders.Range = req.headers.range;
 
             // Check if this stream URL needs Cloudflare bypass
@@ -467,7 +599,7 @@ class LocalProxyServer {
             try {
                 streamTarget = new URL(entry.url);
             } catch {
-                res.writeHead(400).end('invalid stream url');
+                this._endWithStatus(res, 400, 'invalid stream url');
                 return;
             }
             
@@ -535,12 +667,7 @@ class LocalProxyServer {
             const timeoutId = setTimeout(() => controller.abort(), 18_000);
             let upstream;
             try {
-                upstream = await fetch(entry.url, {
-                    method: 'GET',
-                    headers: outboundHeaders,
-                    redirect: 'follow',
-                    signal: controller.signal,
-                });
+                upstream = await this._fetchStreamUpstream(entry.url, outboundHeaders, controller.signal);
             } finally {
                 clearTimeout(timeoutId);
             }
@@ -561,12 +688,16 @@ class LocalProxyServer {
             if (isPlaylist) {
                 const playlistText = await upstream.text();
                 const rewritten = this._rewritePlaylistUrls(playlistText, entry.url, entry.headers || {});
-                res.writeHead(upstream.status, {
+                const body = Buffer.from(rewritten, 'utf8');
+                res.writeHead(upstream.status, this._corsHeaders({
                     'content-type': 'application/vnd.apple.mpegurl',
+                    // The rewritten body is a different length than upstream's,
+                    // and never compressed — state both explicitly so nothing is
+                    // inherited from the upstream response.
+                    'content-length': String(body.length),
                     'cache-control': 'no-cache',
-                    'access-control-allow-origin': '*',
-                });
-                res.end(rewritten);
+                }));
+                res.end(body);
                 return;
             }
 
@@ -574,8 +705,12 @@ class LocalProxyServer {
         } catch (err) {
             this._logger.error('[LocalProxy] request failed:', err.message);
             this._emit('runtime-proxy-error', { error: err.message });
-            if (!res.headersSent) res.writeHead(502);
-            res.end('proxy error');
+            // Streamed responses have already written their head; only a
+            // pre-body failure can still say 502. Either way the CORS headers
+            // are on the response, so the player reads the status instead of a
+            // CORS violation.
+            const aborted = /abort/i.test(String(err?.name || err?.message || ''));
+            this._endWithStatus(res, aborted ? 504 : 502, `proxy error: ${err.message}`);
         }
     }
 }
