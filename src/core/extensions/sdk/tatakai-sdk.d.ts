@@ -101,4 +101,4 @@ declare global {
   var __tatakai_parse_html__: (html: string) => CheerioLikeAPI;
 }
 
-export {};
+export { };

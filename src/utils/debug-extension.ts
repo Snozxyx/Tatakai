@@ -158,7 +158,7 @@ class ExtensionDebugger {
 
       if (invokeResult.success && invokeResult.result) {
         console.log(`\n✅ Got ${invokeResult.result.length} results`);
-        
+
         const grouped = new Map<string, any[]>();
         invokeResult.result.forEach((r: any) => {
           const provider = r.source || r.providerName || 'unknown';
@@ -216,18 +216,18 @@ class ExtensionDebugger {
   // Quick test - just checks if things are working
   async quickTest(): Promise<boolean> {
     console.log('🔍 Quick Test...');
-    
+
     try {
       const extensions = await (window as any).electron.listInstalledExtensions();
       const toko = extensions.find((e: ExtensionInfo) => e.id === 'tatakai.extension.toko');
-      
+
       if (!toko) {
         console.error('❌ Toko not loaded');
         return false;
       }
-      
+
       console.log('✅ Toko loaded');
-      
+
       const result = await this.invoke('runtime:resolve-sources', {
         anilistId: 21,
         titles: ['One Piece'],
@@ -235,7 +235,7 @@ class ExtensionDebugger {
         method: 'single',
         extensionIds: ['tatakai.extension.toko'],
       });
-      
+
       if (result.success && result.sources?.length > 0) {
         console.log(`✅ Got ${result.sources.length} sources`);
         return true;

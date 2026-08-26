@@ -150,7 +150,10 @@ class ExtensionWorkerPool {
   async getOrSpawn(extensionId, extensionCode, manifest) {
     if (this._workers.has(extensionId)) {
       const entry = this._workers.get(extensionId);
-      if (entry.fetchProxyBaseUrl !== this._fetchProxyBaseUrl) {
+      // Respawn if proxy endpoint changed OR if bundle code has changed
+      const codeHash = require('crypto').createHash('sha1').update(extensionCode).digest('hex').slice(0, 16);
+      if (entry.fetchProxyBaseUrl !== this._fetchProxyBaseUrl || entry.codeHash !== codeHash) {
+        console.log(`[Worker] Bundle changed for ${extensionId} (${entry.codeHash} → ${codeHash}), respawning`);
         this.terminate(extensionId);
       } else {
         entry.lastActivity = Date.now();

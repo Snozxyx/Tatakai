@@ -13,7 +13,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { useMangaDetail, useMangaChapters } from "@/hooks/api/useMangaData";
+import { useMangaDetail, useMangaChapters, useMangaBakaSeries, useMangaKitsuHierarchy } from "@/hooks/api/useMangaData";
 import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
@@ -48,7 +48,6 @@ import {
   Puzzle,
   ChevronDown,
 } from "lucide-react";
-
 import type { MediaRelation } from "@/core/content/types";
 
 // --- Helper Component: Relation Tree ---
@@ -207,6 +206,8 @@ export default function MangaPage() {
 
   const { data: mangaData, isLoading: loadingInfo, error } = useMangaDetail(mangaId);
   const { data: chapterData, isLoading: loadingChapters } = useMangaChapters(mangaId);
+  const { data: mangaBakaData } = useMangaBakaSeries(mangaData?.detail?.anilistId);
+  const { data: kitsuHierarchy } = useMangaKitsuHierarchy(mangaData?.detail?.anilistId);
 
   // Fetch extension manga chapters (Toko + other installed manga extensions) and merge
   // with API data before rendering. Requirements: 8.4, 8.5
@@ -269,14 +270,63 @@ export default function MangaPage() {
 
   const chapters = useMemo(() => {
     const base = chapterData?.mappedChapters ? chapterData.mappedChapters : [];
-    if (!extensionChapterPayload?.chapters?.length) return base;
-    // Merge Toko/extension chapters into the base chapter list (req 8.4, 8.5)
+
+    // Build a Kitsu chapter lookup map keyed by chapter number so we can enrich
+    // base chapters with Kitsu-sourced titles, synopses and thumbnails.
+    const kitsuByNumber = new Map<number, { title: string; synopsis: string | null; thumbnail: string | null; published: string | null; pageCount: number | null }>();
+    if (kitsuHierarchy?.chapters) {
+      for (const kc of kitsuHierarchy.chapters) {
+        if (kc.number != null) {
+          kitsuByNumber.set(kc.number, {
+            title: kc.isGeneratedTitle ? '' : kc.title,
+            synopsis: kc.synopsis,
+            thumbnail: kc.thumbnail,
+            published: kc.published,
+            pageCount: kc.pageCount,
+          });
+        }
+      }
+    }
+
+    // Merge Kitsu metadata into every mapped chapter that has a chapter number
+    const enriched = base.map((ch) => {
+      const num = ch.chapterNumber;
+      if (num == null) return ch;
+      const kc = kitsuByNumber.get(num);
+      if (!kc) return ch;
+      return {
+        ...ch,
+        chapterTitle: ch.chapterTitle || kc.title || ch.chapterTitle,
+        _kitsuSynopsis: kc.synopsis,
+        _kitsuThumbnail: kc.thumbnail,
+        _kitsuPublished: kc.published,
+        _kitsuPageCount: kc.pageCount,
+      };
+    });
+
+    if (!extensionChapterPayload?.chapters?.length) return enriched;
+    // Merge Toko/extension chapters into the enriched list (req 8.4, 8.5)
     if (chapterData) {
       const merged = mergeChaptersWithExtensions(chapterData, extensionChapterPayload);
-      return merged.mappedChapters ?? base;
+      const mergedBase = merged.mappedChapters ?? base;
+      // Re-apply Kitsu enrichment on the merged list
+      return mergedBase.map((ch) => {
+        const num = ch.chapterNumber;
+        if (num == null) return ch;
+        const kc = kitsuByNumber.get(num);
+        if (!kc) return ch;
+        return {
+          ...ch,
+          chapterTitle: ch.chapterTitle || kc.title || ch.chapterTitle,
+          _kitsuSynopsis: kc.synopsis,
+          _kitsuThumbnail: kc.thumbnail,
+          _kitsuPublished: kc.published,
+          _kitsuPageCount: kc.pageCount,
+        };
+      });
     }
-    return base;
-  }, [chapterData, extensionChapterPayload]);
+    return enriched;
+  }, [chapterData, extensionChapterPayload, kitsuHierarchy]);
   const isChapterListLoading = loadingChapters && !chapterData;
   const [preferredProvider, setPreferredProvider] = useState<string>("auto");
   const [preferredLanguage, setPreferredLanguage] = useState<string>("auto");
@@ -587,20 +637,30 @@ export default function MangaPage() {
   useEffect(() => {
     setAllowAdultForSession(false);
     setPreferredProvider("auto");
-    setPreferredLanguage(profilePreferredMangaLanguage);
+    // Reset to "auto", not to the profile language: "auto" is what lets
+    // `effectivePreferredLanguage` apply the profile preference while still
+    // ranking against whatever languages this particular manga actually has.
+    setPreferredLanguage("auto");
     setChapterSortMode("newest");
     setChapterSearchTerm("");
     setSelectedChapterGroup(0);
     setSelectedVolumeFilter(null);
   }, [mangaId, profilePreferredMangaLanguage]);
 
-  useEffect(() => {
-    if (preferredLanguage !== "auto") return;
-    setPreferredLanguage(profilePreferredMangaLanguage);
-  }, [preferredLanguage, profilePreferredMangaLanguage]);
+  // NOTE: there is deliberately no effect pushing `profilePreferredMangaLanguage`
+  // into `preferredLanguage`. `effectivePreferredLanguage` already resolves
+  // "auto" against the profile, so writing it into state was redundant — and it
+  // formed an infinite render loop with the validation effect below: that effect
+  // reset an unavailable language to "auto", which made this one write the
+  // profile language straight back. With `languageOptions` empty (chapters still
+  // loading, or the detail request failing) the two ping-ponged every commit
+  // until React gave up with "Maximum update depth exceeded".
 
   useEffect(() => {
     if (preferredProvider === "auto") return;
+    // Nothing to validate against yet — resetting here would silently discard a
+    // deliberate choice every time the chapter list refetches.
+    if (providerOptions.length === 0) return;
     if (!providerOptions.includes(preferredProvider)) {
       setPreferredProvider("auto");
     }
@@ -608,6 +668,7 @@ export default function MangaPage() {
 
   useEffect(() => {
     if (preferredLanguage === "auto") return;
+    if (languageOptions.length === 0) return;
     if (!languageOptions.some((option) => option.value === preferredLanguage)) {
       setPreferredLanguage("auto");
     }
@@ -1061,6 +1122,39 @@ export default function MangaPage() {
                 </section>
               )}
 
+                  {mangaBakaData && mangaBakaData.tags.filter((t) => !t.isSpoiler).length > 0 && (
+                <section>
+                  <h3 className="font-display text-xl md:text-2xl font-bold mb-4 flex items-center gap-2">
+                    <Palette className="w-5 h-5 text-primary" />
+                    Tags
+                  </h3>
+                  <GlassPanel className="p-5">
+                    <div className="flex flex-wrap gap-1.5">
+                      {mangaBakaData.tags
+                        .filter((t) => !t.isSpoiler)
+                        .slice(0, 30)
+                        .map((tag) => (
+                          <button
+                            key={`tag-${tag.id ?? tag.name}`}
+                            type="button"
+                            onClick={() => navigate(`/search?type=manga&genre=${encodeURIComponent(tag.name)}`)}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors hover:border-primary/40 hover:text-primary ${
+                              tag.weight === 'defining'
+                                ? 'bg-primary/10 border-primary/20 text-primary/80'
+                                : tag.weight === 'core'
+                                ? 'bg-white/5 border-white/10 text-foreground/70'
+                                : 'bg-white/[0.03] border-white/5 text-muted-foreground'
+                            }`}
+                            title={tag.path ?? undefined}
+                          >
+                            {tag.name}
+                          </button>
+                        ))}
+                    </div>
+                  </GlassPanel>
+                </section>
+              )}
+
               {/* Relation Tree */}
               {info.relations && info.relations.length > 0 && (
                 <section className="mb-8">
@@ -1235,9 +1329,28 @@ export default function MangaPage() {
                 ) : filteredDisplayChapters.length > 0 ? (
                   <div className="flex flex-col gap-2">
                     {chapterCards.map((chapter) => (
-                      <MangaChapterProviderRows
-                        key={`${chapter.canonicalOrder}-${chapter.chapterNumber ?? "?"}`}
-                        chapter={{
+                      <div key={`${chapter.canonicalOrder}-${chapter.chapterNumber ?? "?"}`}>
+                        {/* Kitsu chapter enrichment: thumbnail + synopsis */}
+                        {((chapter as any)._kitsuThumbnail || (chapter as any)._kitsuSynopsis) && (
+                          <div className="mb-1 flex gap-3 px-3 pt-3 pb-0">
+                            {(chapter as any)._kitsuThumbnail && (
+                              <img
+                                src={(chapter as any)._kitsuThumbnail}
+                                alt=""
+                                className="w-16 h-10 object-cover rounded-lg border border-white/10 shrink-0"
+                                loading="lazy"
+                              />
+                            )}
+                            {(chapter as any)._kitsuSynopsis && (
+                              <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
+                                {(chapter as any)._kitsuSynopsis}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        <MangaChapterProviderRows
+                          key={`${chapter.canonicalOrder}-${chapter.chapterNumber ?? "?"}`}
+                          chapter={{
                           chapterNumber: chapter.chapterNumber ?? null,
                           chapterTitle: chapter.chapterTitle ?? null,
                           sources: (chapter.sources || []).map((src) => ({
@@ -1264,6 +1377,7 @@ export default function MangaPage() {
                           );
                         }}
                       />
+                      </div>
                     ))}
                   </div>
                 ) : (
@@ -1486,6 +1600,89 @@ export default function MangaPage() {
                     <p className="text-sm text-muted-foreground">No genres available.</p>
                   )}
                 </div>
+
+                {/* MangaBaka enrichment: cross-site ratings */}
+                {mangaBakaData && Object.keys(mangaBakaData.sources).length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-white/5">
+                    <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Cross-site Ratings
+                    </p>
+                    <div className="space-y-1.5">
+                      {Object.entries(mangaBakaData.sources)
+                        .filter(([, src]) => src.ratingNormalized !== null)
+                        .sort(([, a], [, b]) => (b.ratingNormalized ?? 0) - (a.ratingNormalized ?? 0))
+                        .map(([key, src]) => {
+                          const label = key === 'anilist' ? 'AniList' : key === 'my_anime_list' ? 'MAL' : key === 'kitsu' ? 'Kitsu' : key === 'manga_updates' ? 'MU' : key === 'anime_planet' ? 'AP' : key === 'shikimori' ? 'Shikimori' : key === 'anime_news_network' ? 'ANN' : key.replace(/_/g, ' ');
+                          const pct = Math.round(src.ratingNormalized ?? 0);
+                          return (
+                            <div key={key} className="flex items-center gap-2">
+                              <span className="text-[10px] text-muted-foreground w-16 shrink-0">{label}</span>
+                              <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                                <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }} />
+                              </div>
+                              <span className="text-[10px] font-bold text-foreground/70 w-8 text-right">{src.rating !== null ? src.rating.toFixed(2) : '—'}</span>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
+
+                {/* MangaBaka: publishers */}
+                {mangaBakaData && mangaBakaData.publishers.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-white/5">
+                    <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Publishers
+                    </p>
+                    <div className="space-y-1">
+                      {mangaBakaData.publishers.map((pub, i) => (
+                        <div key={i} className="flex items-center justify-between text-xs">
+                          <span className="text-foreground/80">{pub.name}</span>
+                          {pub.type && (
+                            <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-white/5">
+                              {pub.type}{pub.note ? ` · ${pub.note}` : ''}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* MangaBaka: anime coverage */}
+                {mangaBakaData?.animeCoverage && mangaBakaData.hasAnime && (
+                  <div className="mt-4 pt-4 border-t border-white/5">
+                    <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Anime Coverage
+                    </p>
+                    <p className="text-xs text-foreground/80">
+                      {mangaBakaData.animeCoverage.start && `From: ${mangaBakaData.animeCoverage.start}`}
+                      {mangaBakaData.animeCoverage.end && ` → ${mangaBakaData.animeCoverage.end}`}
+                    </p>
+                  </div>
+                )}
+
+                {/* MangaBaka: external links */}
+                {mangaBakaData && mangaBakaData.links.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-white/5">
+                    <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      External Links
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {mangaBakaData.links.slice(0, 6).map((link, i) => (
+                        <a
+                          key={i}
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2 py-1 rounded-md border border-white/10 bg-white/5 text-[10px] font-semibold text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors"
+                        >
+                          {link.label}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </GlassPanel>
             </div>
           </div>

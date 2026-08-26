@@ -17,13 +17,14 @@ const fs = require('fs');
 const crypto = require('crypto');
 
 // ── Production-readiness services ─────────────────────────────────────────────
-const { apply: applyBranding }  = require('./services/branding-init.cjs');
-const { createCrashService }    = require('./services/crash-service.cjs');
-const { createLogService }      = require('./services/log-service.cjs');
-const { createErrorTracker }    = require('./services/error-tracker.cjs');
-const { createPerfMonitor }     = require('./services/perf-monitor.cjs');
+const { apply: applyBranding } = require('./services/branding-init.cjs');
+const { createCrashService } = require('./services/crash-service.cjs');
+const { createLogService } = require('./services/log-service.cjs');
+const { createErrorTracker } = require('./services/error-tracker.cjs');
+const { createPerfMonitor } = require('./services/perf-monitor.cjs');
 const { createPlatformAdapter } = require('./services/platform-adapter.cjs');
-const { createUpdateManager }   = require('./services/update-manager.cjs');
+const { createUpdateManager } = require('./services/update-manager.cjs');
+const { adBlocker } = require('./security/ad-blocker.cjs');
 
 const isDev = !app.isPackaged;
 const DESKTOP_DIR = __dirname;
@@ -93,6 +94,11 @@ const getMainWindow = () => winState.mainWindow;
 // Constructed after winState so getMainWindow closure is valid.
 const perfMonitor = createPerfMonitor({ logger, getMainWindow, ipcMain });
 const platformAdapter = createPlatformAdapter({ app, BrowserWindow, logger });
+
+// App-level ad / popunder blocker. Blocks at the network + popup layer in the
+// main process; nothing is injected into embedded pages.
+adBlocker.init({ logger, getMainWindow });
+adBlocker.registerIpc(ipcMain);
 const updateManager = createUpdateManager({
     ipcMain,
     autoUpdater,
@@ -138,6 +144,29 @@ if (extensionRuntimeApi?.ensureExtensionFetchProxy) {
         .catch((err) => {
             logger.error('[Runtime] Failed to pre-start proxy:', err.message);
             console.error('[Runtime] ❌ Proxy pre-start failed:', err.message);
+        });
+}
+
+// Start the generic extension-API host. Runs after extensions auto-load (above)
+// so installed namespaces (e.g. Toko) mount, and passes ensureExtensionFetchProxy
+// so emitted media URLs get proxied through the in-app proxy. No-op if no
+// installed extension declares `apiServer`.
+if (extensionRuntimeApi?.extensionApiHost) {
+    extensionRuntimeApi.extensionApiHost.start({
+        registry: extensionRuntimeApi.registry,
+        localProxy: extensionRuntimeApi.localProxy,
+        logger,
+        ensureProxy: extensionRuntimeApi.ensureExtensionFetchProxy,
+    })
+        .then((baseUrl) => {
+            if (baseUrl) {
+                logger.info(`[Runtime] Extension-API host started at ${baseUrl}`);
+                console.log(`[Runtime] ✅ Extension-API host at ${baseUrl}`);
+            }
+        })
+        .catch((err) => {
+            logger.error('[Runtime] Failed to start extension-API host:', err.message);
+            console.error('[Runtime] ❌ Extension-API host start failed:', err.message);
         });
 }
 
@@ -245,7 +274,8 @@ app.on('will-quit', async () => {
     app.isQuitting = true;
     globalShortcut.unregisterAll();
     perfMonitor.stop();
-    try { await logger.close(); } catch (_) {}
+    try { await extensionRuntimeApi?.extensionApiHost?.stop(); } catch (_) { }
+    try { await logger.close(); } catch (_) { }
 });
 
 app.on('web-contents-created', (_event, contents) => {
@@ -254,7 +284,11 @@ app.on('web-contents-created', (_event, contents) => {
         logger.warn('[Security] Blocked webview attach');
     });
     contents.setWindowOpenHandler(({ url }) => {
-        if (/^https:\/\//i.test(url)) shell.openExternal(url);
+        // Popups are routed through the app-level ad blocker: an embed's
+        // popunder must never reach shell.openExternal (i.e. the user's real
+        // browser). Legitimate in-app links still open externally.
+        const verdict = adBlocker.evaluateWindowOpen(url, { source: 'web-contents' });
+        if (verdict.allowExternal) shell.openExternal(url);
         return { action: 'deny' };
     });
 });

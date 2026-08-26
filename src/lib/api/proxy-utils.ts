@@ -2,7 +2,22 @@ const STREAM_PROXY_PASSWORD = String(
   import.meta.env.VITE_STREAM_PROXY_PASSWORD || import.meta.env.VITE_PROXY_PASSWORD || ''
 ).trim();
 
-const STREAM_PROXY_BASE = 'http://localhost:3000/api/v1/streamingProxy';
+// Hardcoding `localhost:3000` here meant every proxied playback URL pointed at a
+// server nobody runs (ERR_CONNECTION_REFUSED in the renderer) while the actual
+// proxy address sat unused in VITE_STREAM_PROXY_URL. Prefer the configured proxy;
+// keep the local default only as the last resort.
+const STREAM_PROXY_BASE = String(
+  import.meta.env.VITE_STREAM_PROXY_URL ||
+    import.meta.env.VITE_PROXY_NODE_URL ||
+    import.meta.env.VITE_PROXY_CF_URL ||
+    'http://localhost:3000/api/v1/streamingProxy'
+).trim();
+
+// Local API base for subtitle proxying — avoids CORS issues with the external streaming proxy.
+// The local API sets Access-Control-Allow-Origin: * so subtitle <track> elements always load.
+const LOCAL_API_BASE = String(
+  import.meta.env.VITE_TATAKAI_API_URL || 'http://localhost:8090/api/v3'
+).trim().replace(/\/api\/v3\/?$/, '');
 
 function isLocalLike(url: string): boolean {
   return (
@@ -85,7 +100,16 @@ export function getProxiedVideoUrl(rawUrl: string, referer?: string, userAgent?:
 }
 
 export function getProxiedSubtitleUrl(rawUrl: string, referer?: string, userAgent?: string): string {
-  return buildProxyUrl(rawUrl, referer, userAgent, 'subtitle');
+  const url = unwrapProxyUrl(rawUrl);
+  if (!url || isLocalLike(url) || !/^https?:/i.test(url)) return url;
+
+  // Route subtitles through the local API (/api/proxy/subtitle) which sets
+  // Access-Control-Allow-Origin: * — avoids the CORS block that happens when
+  // the browser loads <track> elements directly from the external streaming proxy.
+  const params = new URLSearchParams({ url });
+  if (referer) params.set('referer', referer);
+  if (userAgent) params.set('userAgent', userAgent);
+  return `${LOCAL_API_BASE}/api/proxy/subtitle?${params.toString()}`;
 }
 
 export function readProxyQuerySnapshot(rawUrl: string): {

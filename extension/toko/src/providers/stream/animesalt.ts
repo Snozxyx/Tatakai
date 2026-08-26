@@ -6,36 +6,54 @@
  * Search is `/?s=<query>`. The watch page embeds the HLS/MP4 URL inside a
  * `<video>` / `<iframe>` or an inline script.
  */
-import { normalizeQuality, detectSourceType } from '../../utils/quality.js';
-import { buildSearchQueries, scoreMatch } from '../../utils/titleNorm.js';
-import type { StreamProvider, SourceOptions, SourceResult } from '../../types.js';
+import { normalizeQuality, detectSourceType } from '../../utils/scraping/quality.js';
+import { buildSearchQueries, scoreMatch } from '../../utils/scraping/title-normalizer.js';
+import type { StreamProvider, SourceOptions, SourceResult } from '../../types/index.js';
 
-declare const __tatakai_fetch__: (url: string, init?: RequestInit) => Promise<Response>;
-declare const __tatakai_parse_html__: (html: string) => any;
+import { fetchResponse, loadHtml } from '../../utils/http/fetch.js';
 
-const BASES = ['https://animesalt.link', 'https://animesalt.com'];
+const BASES = ['https://animesalt.link', 'https://animesalt.top', 'https://animesalt.com', 'https://animesalt.net'];
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36';
 
 async function fetchHtml(url: string): Promise<{ html: string; base: string } | null> {
-  for (const base of BASES) {
+  // If absolute URL, try it directly
+  if (url.startsWith('http')) {
+    const base = new URL(url).origin;
     try {
-      const candidate = url.startsWith('http') ? url : `${base}${url}`;
-      const res = await __tatakai_fetch__(candidate, {
+      const res = await fetchResponse(url, {
         headers: { 'User-Agent': UA, Accept: 'text/html', Referer: `${base}/` },
-      });
-      if (!res.ok) continue;
-      const html = await res.text();
-      if (html.length < 200) continue;
-      return { html, base };
-    } catch { /* try next mirror */ }
+        signal: AbortSignal.timeout(3000),
+      } as RequestInit);
+      if (res.ok) {
+        const html = await res.text();
+        if (html.length >= 200) return { html, base };
+      }
+    } catch { /* fall through */ }
+    return null;
   }
-  return null;
+  // Relative path — try all bases in parallel
+  const results = await Promise.all(
+    BASES.map(async (base) => {
+      try {
+        const res = await fetchResponse(`${base}${url}`, {
+          headers: { 'User-Agent': UA, Accept: 'text/html', Referer: `${base}/` },
+          signal: AbortSignal.timeout(3000),
+        } as RequestInit);
+        if (!res.ok) return null;
+        const html = await res.text();
+        if (html.length < 200) return null;
+        return { html, base };
+      } catch { return null; }
+    })
+  );
+  return results.find(r => r !== null) ?? null;
 }
 
 interface SearchHit {
   slug: string;
   kind: 'series' | 'movies';
   title: string;
+  base: string;
 }
 
 function extractSlugFromHref(href: string): { slug: string; kind: 'series' | 'movies' } | null {
@@ -48,7 +66,7 @@ async function searchAnime(titles: string[]): Promise<SearchHit | null> {
   for (const query of buildSearchQueries(titles)) {
     const page = await fetchHtml(`/?s=${encodeURIComponent(query)}`);
     if (!page) continue;
-    const $ = __tatakai_parse_html__(page.html);
+    const $ = loadHtml(page.html);
 
     const hits: SearchHit[] = [];
     $.find('a[href*="/series/"], a[href*="/movies/"]').each((_: number, el: any) => {
@@ -57,7 +75,7 @@ async function searchAnime(titles: string[]): Promise<SearchHit | null> {
       if (!parsed) return;
       const title: string = (el.attr?.('title') ?? el.text?.() ?? '').trim();
       if (!title) return;
-      hits.push({ ...parsed, title });
+      hits.push({ ...parsed, title, base: page.base });
     });
 
     if (hits.length === 0) continue;
@@ -112,6 +130,77 @@ async function findEpisodeUrl(hit: SearchHit, episode: number, base: string): Pr
   return `${base}/episode/${hit.slug}-1x${episode}/`;
 }
 
+async function resolvePageSources(html: string, pageUrl: string, base: string): Promise<SourceResult[]> {
+  const initial = extractStreams(html, pageUrl);
+
+  // If we got a WordPress AJAX marker, resolve it
+  const ajaxResult = initial.find(s => s.url.includes('admin-ajax.php|nonce='));
+  if (ajaxResult) {
+    const [ajaxUrl, nonceParam, postIdParam] = ajaxResult.url.split('|');
+    const nonce = nonceParam?.split('=')[1];
+    const postId = postIdParam?.split('=')[1];
+    if (nonce && postId) {
+      try {
+        const res = await fetchResponse(ajaxUrl, {
+          method: 'POST',
+          headers: {
+            'User-Agent': UA,
+            'Content-Type': 'application/x-www-form-urlencoded',
+            Referer: pageUrl,
+            Origin: base,
+          },
+          body: `action=get_player_src&nonce=${nonce}&post_id=${postId}&type=series`,
+          timeoutMs: 8000,
+        });
+        if (res.ok) {
+          const text = await res.text();
+          try {
+            const data = JSON.parse(text) as { success?: boolean; data?: string | { url?: string; embed?: string } };
+            const raw = typeof data.data === 'string' ? data.data : (data.data?.url ?? data.data?.embed ?? '');
+            if (raw && /^https?:\/\//.test(raw)) {
+              return [{
+                source: 'animesalt',
+                url: raw,
+                quality: normalizeQuality('HD'),
+                headers: { Referer: pageUrl, 'User-Agent': UA },
+                subtitles: [],
+                sourceType: detectSourceType(raw),
+              }];
+            }
+            // Could be raw HTML with iframe
+            const iframeMatch = raw.match(/src=["']([^"']+)["']/i);
+            if (iframeMatch) {
+              return [{
+                source: 'animesalt',
+                url: iframeMatch[1],
+                quality: normalizeQuality('HD'),
+                headers: { Referer: pageUrl, 'User-Agent': UA },
+                subtitles: [],
+                sourceType: detectSourceType(iframeMatch[1]),
+              }];
+            }
+          } catch { /* not JSON — maybe raw iframe HTML */ }
+          const m3u8 = text.match(/https?:\/\/[^\s"'<>]+\.m3u8[^\s"'<>]*/i);
+          if (m3u8) {
+            return [{
+              source: 'animesalt',
+              url: m3u8[0],
+              quality: normalizeQuality('HD'),
+              headers: { Referer: pageUrl, 'User-Agent': UA },
+              subtitles: [],
+              sourceType: 'hls',
+            }];
+          }
+        }
+      } catch { /* fall through */ }
+    }
+    // Return the non-AJAX results (minus the AJAX marker)
+    return initial.filter(s => !s.url.includes('admin-ajax.php|nonce='));
+  }
+
+  return initial;
+}
+
 function extractStreams(html: string, pageUrl: string): SourceResult[] {
   const headers = { Referer: pageUrl, 'User-Agent': UA };
   const results: SourceResult[] = [];
@@ -131,7 +220,7 @@ function extractStreams(html: string, pageUrl: string): SourceResult[] {
   }
 
   if (results.length === 0) {
-    const $ = __tatakai_parse_html__(html);
+    const $ = loadHtml(html);
     let embed: string | null = null;
     $.find('iframe[src], iframe[data-src]').each((_: number, el: any) => {
       if (embed) return;
@@ -150,27 +239,61 @@ function extractStreams(html: string, pageUrl: string): SourceResult[] {
     }
   }
 
+  // WordPress torofilm theme: player loaded via admin-ajax.php with nonce.
+  // Extract post ID and nonce from the page then call the AJAX endpoint.
+  if (results.length === 0) {
+    const nonceMatch = html.match(/["']nonce["']\s*:\s*["']([a-f0-9]+)["']/i);
+    const ajaxUrlMatch = html.match(/["']url["']\s*:\s*["'](https?:\/\/[^"']+admin-ajax\.php)["']/i);
+    const postIdMatch = html.match(/["'](?:post_id|postId|trid)["']\s*:\s*["']?(\d+)["']?/i);
+    if (nonceMatch && ajaxUrlMatch && postIdMatch) {
+      // Return a marker — the caller will do the async AJAX call
+      results.push({
+        source: 'animesalt',
+        url: `${ajaxUrlMatch[1]}|nonce=${nonceMatch[1]}|postId=${postIdMatch[1]}`,
+        quality: normalizeQuality('HD'),
+        headers,
+        subtitles: [],
+        sourceType: 'custom',
+      });
+    }
+  }
+
   return results;
 }
 
 const provider: StreamProvider = {
   name: 'animesalt',
+  sites: BASES,
 
   async single(opts: SourceOptions): Promise<SourceResult[]> {
     try {
       const targetEp = opts.episode ?? 1;
+
+      // Strategy 1: Direct episode URL using slugified title — probe primary domain first
+      for (const title of buildSearchQueries(opts.titles).slice(0, 2)) {
+        const slug = title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/\s+/g, '-').replace(/-+/g, '-');
+        if (!slug) continue;
+        for (const season of [1, 2]) {
+          const epUrl = `${BASES[0]}/episode/${slug}-${season}x${targetEp}/`;
+          const page = await fetchHtml(epUrl);
+          if (!page) continue;
+          const sources = await resolvePageSources(page.html, epUrl, page.base);
+          if (sources.length > 0) return sources;
+        }
+      }
+
+      // Strategy 2: Search → find slug → construct episode URL
       const hit = await searchAnime(opts.titles);
       if (!hit) return [];
 
-      // searchAnime already selected a working base implicitly; re-resolve base.
-      const base = BASES[0];
+      const base = hit.base ?? BASES[0];
       const epUrl = await findEpisodeUrl(hit, targetEp, base);
       if (!epUrl) return [];
 
       const page = await fetchHtml(epUrl);
       if (!page) return [];
 
-      return extractStreams(page.html, epUrl);
+      return resolvePageSources(page.html, epUrl, page.base ?? base);
     } catch {
       return [];
     }

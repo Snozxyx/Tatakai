@@ -12,13 +12,10 @@ import { describe, it, expect, vi } from 'vitest';
 import reanime from '../../extension/toko/src/providers/stream/reanime.js';
 import animepahe from '../../extension/toko/src/providers/stream/animepahe.js';
 import anikoto from '../../extension/toko/src/providers/stream/anikoto.js';
-import mkissa from '../../extension/toko/src/providers/stream/mkissa.js';
 import anizone from '../../extension/toko/src/providers/stream/anizone.js';
 import animesalt from '../../extension/toko/src/providers/stream/animesalt.js';
 import senshi from '../../extension/toko/src/providers/stream/senshi.js';
 import watchaw from '../../extension/toko/src/providers/stream/watchanimeworld.js';
-import desidub from '../../extension/toko/src/providers/stream/desidub.js';
-import hindidubbed from '../../extension/toko/src/providers/stream/hindidubbed.js';
 import aniworld from '../../extension/toko/src/providers/stream/aniworld.js';
 import animeya from '../../extension/toko/src/providers/stream/animeya.js';
 import toonstream from '../../extension/toko/src/providers/stream/toonstream.js';
@@ -26,8 +23,8 @@ import fouranime from '../../extension/toko/src/providers/stream/fouranime.js';
 import animelok from '../../extension/toko/src/providers/stream/animelok.js';
 
 const providers = {
-  reanime, animepahe, anikoto, mkissa, anizone, animesalt, senshi,
-  watchanimeworld: watchaw, desidub, hindidubbed, aniworld, animeya,
+  reanime, animepahe, anikoto, anizone, animesalt, senshi,
+  watchanimeworld: watchaw, aniworld, animeya,
   toonstream, fouranime, animelok,
 };
 

@@ -36,7 +36,7 @@ export function initDemoExtension() {
     id: `${extensionId}.slot-after-title`,
     slotId: 'anime-details-after-title',
     component: ({ anime }: { anime: any }) => (
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, x: -10 }}
         animate={{ opacity: 1, x: 0 }}
         className="flex items-center gap-2 mt-2 p-2 rounded-xl bg-primary/10 border border-primary/20 w-fit"
@@ -56,18 +56,18 @@ export function initDemoExtension() {
     search: async (query: string) => {
       // Simulate network delay
       await new Promise(r => setTimeout(r, 600));
-      
+
       if (query.toLowerCase().includes('demo')) {
         return [
-          { 
-            title: 'Demo Result 1', 
-            type: 'Direct Stream', 
+          {
+            title: 'Demo Result 1',
+            type: 'Direct Stream',
             image: 'https://images.unsplash.com/photo-1541562232579-512a21360020?w=100',
             url: 'https://tatakai.app'
           },
-          { 
-            title: 'Demo Result 2', 
-            type: 'Cloud Drive', 
+          {
+            title: 'Demo Result 2',
+            type: 'Cloud Drive',
             image: 'https://images.unsplash.com/photo-1578632738908-6624ce957c8f?w=100',
             url: 'https://tatakai.app'
           }

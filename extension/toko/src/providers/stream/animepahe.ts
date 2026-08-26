@@ -1,13 +1,34 @@
-import { normalizeQuality, detectSourceType } from '../../utils/quality.js';
-import { buildSearchQueries } from '../../utils/titleNorm.js';
-import type { StreamProvider, SourceOptions, SourceResult } from '../../types.js';
+import { normalizeQuality, detectSourceType } from '../../utils/scraping/quality.js';
+import { buildSearchQueries } from '../../utils/scraping/title-normalizer.js';
+import type { StreamProvider, SourceOptions, SourceResult } from '../../types/index.js';
 
-declare const __tatakai_fetch__: (url: string, init?: RequestInit) => Promise<Response>;
+import { fetchResponse } from '../../utils/http/fetch.js';
 
 // animepahe.com now 30x-redirects to a rotating mirror (animepahe.pw, .ru, .ac).
 // The extension worker follows redirects but some mirrors reject requests
 // without a browser UA, so we try the canonical domain first then mirrors.
-const BASE_URLS = ['https://animepahe.com', 'https://animepahe.pw', 'https://animepahe.ru', 'https://animepahe.ac'];
+// `.su` is the mirror `.ru` currently redirects to; it is listed so the provider
+// recovers on its own if the DDoS-Guard interstitial there is ever lifted.
+const BASE_URLS = ['https://animepahe.ru', 'https://animepahe.su', 'https://animepahe.is', 'https://animepahe.org', 'https://animepahe.pw', 'https://animepahe.io', 'https://animepahe.com'];
+
+/**
+ * Circuit breaker for the whole mirror set — same reasoning as watchanimeworld.
+ *
+ * Measured: every mirror is unusable. `.ru` 301s to `animepahe.su`, and `.su`
+ * answers `/api?m=search` with a DDoS-Guard JS challenge rather than JSON, so no
+ * base can return a result no matter what we ask for. Each `apiGetJson` round
+ * still costs the full 4s abort, and `single()` ran one per search query, which
+ * exhausted the provider's 15s budget and reported `timeout`.
+ *
+ * A timeout costs far more than an empty result: it holds a slot in the runner's
+ * concurrency pool for the entire deadline, delaying providers that do work. So
+ * after two consecutive all-mirrors-failed rounds, stop trying for a while; the
+ * breaker reopens on the next TTL expiry in case a mirror comes back.
+ */
+const BREAKER_TTL_MS = 5 * 60 * 1000;
+const BREAKER_THRESHOLD = 2;
+let consecutiveFailures = 0;
+let breakerOpenUntil = 0;
 
 interface AnimePaheSearchItem {
   session: string;
@@ -34,10 +55,9 @@ interface AnimePaheSource {
 
 function headersFor(base: string, path = '/'): Record<string, string> {
   return {
-    Cookie: '__ddg1_=;__ddg2_=;av=1',
     Referer: `${base}${path}`,
     Origin: base,
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
     Accept: 'application/json, text/plain, */*',
     'Accept-Language': 'en-US,en;q=0.9',
     'X-Requested-With': 'XMLHttpRequest',
@@ -50,21 +70,29 @@ function headersFor(base: string, path = '/'): Record<string, string> {
  * provider resilient without forcing the worker to chase redirects.
  */
 async function apiGetJson<T>(path: string): Promise<T | null> {
-  for (const base of BASE_URLS) {
-    try {
-      const res = await __tatakai_fetch__(`${base}${path}`, { headers: headersFor(base, path.split('?')[0]) });
-      if (!res.ok) continue;
+  if (Date.now() < breakerOpenUntil) return null;
+
+  const settled = await Promise.allSettled(
+    BASE_URLS.map(async (base) => {
+      const res = await fetchResponse(`${base}${path}`, {
+        headers: headersFor(base, path.split('?')[0]),
+        timeoutMs: 4000,
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const text = await res.text();
-      if (!text) continue;
-      try {
-        return JSON.parse(text) as T;
-      } catch {
-        // Some mirrors return an HTML interstitial; try the next mirror.
-        continue;
-      }
-    } catch {
-      // try next mirror
+      if (!text) throw new Error('empty');
+      return JSON.parse(text) as T;
+    }),
+  );
+  for (const attempt of settled) {
+    if (attempt.status === 'fulfilled') {
+      consecutiveFailures = 0;
+      return attempt.value;
     }
+  }
+  if (++consecutiveFailures >= BREAKER_THRESHOLD) {
+    breakerOpenUntil = Date.now() + BREAKER_TTL_MS;
+    consecutiveFailures = 0;
   }
   return null;
 }
@@ -84,19 +112,14 @@ async function getEpisodes(animeSession: string, page = 1): Promise<AnimePaheEpi
 }
 
 async function getEpisodeSources(animeSession: string, epSession: string): Promise<AnimePaheSource[]> {
-  // The legacy m=links endpoint now requires a numeric anime id and returns
-  // "not enough arguments" when given a session UUID. The /play/{anime}/{ep}
-  // page renders the Kwik buttons server-side, so scrape the embed URLs from
-  // there instead.
-  for (const base of BASE_URLS) {
-    try {
-      const res = await __tatakai_fetch__(`${base}/play/${animeSession}/${epSession}`, {
+  const settled = await Promise.allSettled(
+    BASE_URLS.map(async (base) => {
+      const res = await fetchResponse(`${base}/play/${animeSession}/${epSession}`, {
         headers: headersFor(base, `/anime/${animeSession}`),
+        timeoutMs: 4000,
       });
-      if (!res.ok) continue;
+      if (!res.ok) throw new Error('not ok');
       const html = await res.text();
-      // Play page links look like <a class="..." href="https://kwik.cx/e/...">
-      // or data-src attributes pointing at kwik/pahewin embeds.
       const sources: AnimePaheSource[] = [];
       const seen = new Set<string>();
       const re = /https?:\/\/(kwik\.[a-z]+|pahe\.win|kwik\.cx)\/e\/[A-Za-z0-9_-]+/gi;
@@ -107,8 +130,12 @@ async function getEpisodeSources(animeSession: string, epSession: string): Promi
         seen.add(u);
         sources.push({ kwik: u, quality: 'auto', audio: 'japanese' });
       }
-      if (sources.length > 0) return sources;
-    } catch { /* try next mirror */ }
+      if (sources.length === 0) throw new Error('no sources');
+      return sources;
+    }),
+  );
+  for (const attempt of settled) {
+    if (attempt.status === 'fulfilled') return attempt.value;
   }
   return [];
 }
@@ -169,7 +196,7 @@ function unpackKwikJs(packedJS: string): string | null {
 async function extractDirectKwikStream(kwikUrl: string): Promise<string | null> {
   try {
     const ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
-    const res = await __tatakai_fetch__(kwikUrl, {
+    const res = await fetchResponse(kwikUrl, {
       headers: { Referer: 'https://kwik.cx/', 'User-Agent': ua },
     });
     if (!res.ok) return null;
@@ -206,10 +233,13 @@ async function extractDirectKwikStream(kwikUrl: string): Promise<string | null> 
 
 const provider: StreamProvider = {
   name: 'animepahe',
+  sites: BASE_URLS,
   async single(opts: SourceOptions): Promise<SourceResult[]> {
     try {
       const targetEp = opts.episode ?? 1;
-      const queries = buildSearchQueries(opts.titles);
+      // Two queries, as everywhere else. Unbounded, this loop cost one 4s
+      // all-mirrors round per title and blew the provider's whole deadline.
+      const queries = buildSearchQueries(opts.titles).slice(0, 2);
 
       for (const query of queries) {
         // 1. Search
@@ -250,7 +280,7 @@ const provider: StreamProvider = {
             quality: normalizeQuality(s.quality ?? ''),
             headers: { Referer: 'https://kwik.cx/' },
             subtitles: [],
-            audioLanguage: s.audio === 'jpn' ? 'Japanese/Sub' : (s.audio || undefined),
+            audioLanguage: s.audio === 'jpn' ? 'ja' : (s.audio || undefined),
             sourceType: isHls ? 'hls' : detectSourceType(streamUrl),
           });
         }

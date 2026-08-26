@@ -142,6 +142,23 @@ contextBridge.exposeInMainWorld('electron', {
         ipcRenderer.on('home-server:status', handler);
         return () => ipcRenderer.removeListener('home-server:status', handler);
     },
+
+    // App-level ad / popunder blocker, scoped to the watch page.
+    // `setWatchActive` arms the network filter (nothing is filtered elsewhere);
+    // `setEmbedActive` additionally tells the main process an untrusted embed is on
+    // screen so popups from it are refused instead of being opened in the user's
+    // real browser.
+    security: {
+        getAdBlockStats: () => ipcRenderer.invoke('security:get-adblock-stats'),
+        setWatchActive: (active) => ipcRenderer.invoke('security:set-watch-active', active === true),
+        setEmbedActive: (active) => ipcRenderer.invoke('security:set-embed-active', active === true),
+        setAdBlockEnabled: (enabled) => ipcRenderer.invoke('security:set-adblock-enabled', enabled !== false),
+    },
+    onSecurityBlocked: (callback) => {
+        const handler = (_event, data) => callback(data);
+        ipcRenderer.on('security:blocked', handler);
+        return () => ipcRenderer.removeListener('security:blocked', handler);
+    },
 });
 
 // Phase 0+: tatakaiRuntime — typed IPC bridge for the V6 local runtime.
@@ -149,6 +166,10 @@ contextBridge.exposeInMainWorld('electron', {
 contextBridge.exposeInMainWorld('tatakaiRuntime', {
     // Runtime health
     health: () => ipcRenderer.invoke('runtime:health'),
+
+    // Extension-API host base URL + mounted namespaces (generic SSE consumer).
+    // Renderer resolves this once and builds `${baseUrl}/api/v3/<namespace>/...`.
+    getExtensionApiBase: () => ipcRenderer.invoke('runtime:get-api-base'),
 
     // Source resolution (Phase 4 — local extension scraping)
     resolveEpisodeSources: (options) =>
@@ -259,6 +280,11 @@ contextBridge.exposeInMainWorld('tatakaiRuntime', {
 
     // Generic invoke (fallback for newer channels if preload is stale)
     invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
+
+    // FlareSolverr — configure and query the external bypass service
+    flareSolverrConfig: (config) => ipcRenderer.invoke('runtime:flaresolverr-config', config),
+    flareSolverrStatus: () => ipcRenderer.invoke('runtime:flaresolverr-status'),
+    flareSolverrSetBypassMode: (mode) => ipcRenderer.invoke('runtime:bypass-mode', mode),
 
     // Tatakai Home Server (LAN / remote media server)
     homeServerGetStatus: () => ipcRenderer.invoke('home-server:get-status'),

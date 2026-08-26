@@ -11,7 +11,7 @@ import { Search, X, Loader2, Film, User, ExternalLink, Users, BookOpen,Camera, P
 import { useAniListCharacterSearch } from '@/hooks/user/useProfileFeatures';
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import { ALL_GENRES } from "@/lib/externalIntegrations";
-import { useInfiniteSearch as useInfSearch, type AnimeSearchFilters } from "@/hooks/api/useAnimeData";
+import { useInfiniteSearch as useInfSearch, type AnimeSearchFilters, useEpisodeTitleSearch } from "@/hooks/api/useAnimeData";
 import { useInfiniteMangaSearch } from "@/hooks/api/useMangaData";
 import { useRef, useCallback, useState, useEffect, useMemo } from "react";
 import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
@@ -84,7 +84,13 @@ export default function SearchPage() {
   const [query, setQuery] = useState(queryParam);
   const [searchInput, setSearchInput] = useState(queryParam);
   const [page, setPage] = useState(1);
-  const [resultType, setResultType] = useState<'all' | 'anime' | 'manga' | 'character'>('all');
+  const [resultType, setResultType] = useState<'all' | 'anime' | 'manga' | 'character'>(() => {
+    const t = searchParams.get("type");
+    if (t === 'manga') return 'manga';
+    if (t === 'anime') return 'anime';
+    if (t === 'character') return 'character';
+    return 'all';
+  });
   const [enableSecondaryResultStreams, setEnableSecondaryResultStreams] = useState(false);
   const [animeTypeFilter, setAnimeTypeFilter] = useState<string>('all');
   const [animeStatusFilter, setAnimeStatusFilter] = useState<string>('all');
@@ -92,7 +98,10 @@ export default function SearchPage() {
   const [animeSortFilter, setAnimeSortFilter] = useState<string>('default');
   const [mangaTypeFilter, setMangaTypeFilter] = useState<string>('all');
   const [mangaStatusFilter, setMangaStatusFilter] = useState<string>('all');
-  const [mangaGenreFilter, setMangaGenreFilter] = useState<string>('all');
+  const [mangaGenreFilter, setMangaGenreFilter] = useState<string>(() => {
+    const g = searchParams.get("genre");
+    return g ? g.trim() : 'all';
+  });
   const [mangaAdultFilter, setMangaAdultFilter] = useState(false);
   const [minRating, setMinRating] = useState<number>(0);
   const [minReleaseYear, setMinReleaseYear] = useState<number>(0);
@@ -107,8 +116,7 @@ export default function SearchPage() {
   const [localAnimeSort, setLocalAnimeSort] = useState(animeSortFilter);
   const [localMangaType, setLocalMangaType] = useState(mangaTypeFilter);
   const [localMangaStatus, setLocalMangaStatus] = useState(mangaStatusFilter);
-  const [localMangaGenre, setLocalMangaGenre] = useState(mangaGenreFilter);
-  const [localMinRating, setLocalMinRating] = useState(minRating);
+  const [localMangaGenre, setLocalMangaGenre] = useState(mangaGenreFilter);  const [localMinRating, setLocalMinRating] = useState(minRating);
   const [localMinReleaseYear, setLocalMinReleaseYear] = useState(minReleaseYear);
   const [localSortMode, setLocalSortMode] = useState(sortMode);
   const [localMangaAdult, setLocalMangaAdult] = useState(mangaAdultFilter);
@@ -340,21 +348,25 @@ export default function SearchPage() {
   ]);
 
   const atsuGenreOptions = useMemo(() => {
+    // Use the full AniList genre list so manga tag-based navigation finds a match.
+    // These are the genre names AniList accepts for manga searches.
     return [
-      { label: "Action", value: "action" },
-      { label: "Adventure", value: "adventure" },
-      { label: "Comedy", value: "comedy" },
-      { label: "Drama", value: "drama" },
-      { label: "Fantasy", value: "fantasy" },
-      { label: "Horror", value: "horror" },
-      { label: "Psychological", value: "psychological" },
-      { label: "Romance", value: "romance" },
-      { label: "Sci-Fi", value: "sci-fi" },
-      { label: "Slice of Life", value: "slice-of-life" },
-      { label: "Sports", value: "sports" },
-      { label: "Supernatural", value: "supernatural" },
-      { label: "Thriller", value: "thriller" },
-    ];
+      "Action", "Adventure", "Comedy", "Drama", "Ecchi", "Fantasy", "Hentai",
+      "Horror", "Mahou Shoujo", "Mecha", "Music", "Mystery", "Psychological",
+      "Romance", "Sci-Fi", "Slice of Life", "Sports", "Supernatural", "Thriller",
+      // Common manga-specific tags promoted to top-level options
+      "Isekai", "Shounen", "Shoujo", "Seinen", "Josei",
+      "Martial Arts", "Historical", "School", "Supernatural", "Demons",
+      "Game", "Harem", "Military", "Parody", "Police", "Samurai", "Space",
+      "Super Power", "Vampire", "Yaoi", "Yuri",
+    ]
+      // Dedupe preserving first occurrence
+      .filter((g, i, arr) => arr.indexOf(g) === i)
+      .sort()
+      .map((genre) => ({
+        label: genre,
+        value: genre.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
+      }));
   }, []);
 
   const shouldEnableAnimeSearch =
@@ -548,6 +560,10 @@ export default function SearchPage() {
 
   const loadingCharacters = loadingAniListCharacters;
 
+  // Episode title search — fires when result type includes anime and query >= 3 chars
+  const showEpisodeSearch = (resultType === 'all' || resultType === 'anime') && query.trim().length >= 3;
+  const { data: episodeTitleResults = [] } = useEpisodeTitleSearch(query, showEpisodeSearch);
+
   // Image search states
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imageResults, setImageResults] = useState<any[] | null>(null);
@@ -713,7 +729,64 @@ export default function SearchPage() {
 
       if (!response.ok) throw new Error("Search failed");
       const data = await response.json();
-      setImageResults(data.result || []);
+      const rawResults = data.result || [];
+
+      // Deduplicate by anilist id — keep the best similarity per anime
+      const bestByAnilist = new Map<number, any>();
+      for (const r of rawResults) {
+        const existing = bestByAnilist.get(r.anilist);
+        if (!existing || r.similarity > existing.similarity) {
+          bestByAnilist.set(r.anilist, r);
+        }
+      }
+
+      // Batch-fetch anime titles from AniList for all unique ids
+      const anilistIds = Array.from(bestByAnilist.keys()).filter(Boolean);
+      const titleMap = new Map<number, { title: string; coverImage: string }>();
+
+      if (anilistIds.length > 0) {
+        try {
+          const gql = `
+            query ($ids: [Int]) {
+              Page(perPage: 50) {
+                media(id_in: $ids, type: ANIME) {
+                  id
+                  title { romaji english native }
+                  coverImage { medium }
+                }
+              }
+            }
+          `;
+          const res = await fetch('https://graphql.anilist.co', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: gql, variables: { ids: anilistIds } }),
+          });
+          if (res.ok) {
+            const json = await res.json();
+            const mediaList = json?.data?.Page?.media || [];
+            for (const m of mediaList) {
+              titleMap.set(m.id, {
+                title: m.title?.english || m.title?.romaji || m.title?.native || `Anime #${m.id}`,
+                coverImage: m.coverImage?.medium || '',
+              });
+            }
+          }
+        } catch {
+          // Non-critical — fall back to filename parsing
+        }
+      }
+
+      // Enrich results with resolved anime metadata
+      const enriched = Array.from(bestByAnilist.values()).map((r) => ({
+        ...r,
+        _animeTitle: titleMap.get(r.anilist)?.title || null,
+        _animeCover: titleMap.get(r.anilist)?.coverImage || null,
+      }));
+
+      // Sort by similarity descending
+      enriched.sort((a, b) => b.similarity - a.similarity);
+      setImageResults(enriched);
     } catch (error) {
       console.error("Image search error:", error);
     } finally {
@@ -1136,6 +1209,12 @@ export default function SearchPage() {
                       className="w-full h-10 rounded-xl bg-background/80 border border-white/10 px-3 text-sm focus:border-primary/50 outline-none transition-colors"
                     >
                       <option value="all">Any genre</option>
+                      {/* If a tag from MangaPage was passed via URL and isn't in the list, show it as the first option */}
+                      {localMangaGenre !== 'all' && !atsuGenreOptions.some((g) => g.value === localMangaGenre) && (
+                        <option value={localMangaGenre}>
+                          {localMangaGenre.split(/[-_]+/).map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                        </option>
+                      )}
                       {atsuGenreOptions.map((genre) => (
                         <option key={genre.value} value={genre.value}>
                           {genre.label}
@@ -1246,13 +1325,14 @@ export default function SearchPage() {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold flex items-center gap-2">
                 <Film className="w-5 h-5 text-primary" />
-                Identification Results ({filteredImageResults.length})
+                Scene <span className="text-primary italic">Identification</span>
+                <span className="text-sm font-normal text-muted-foreground ml-1">({filteredImageResults.length} match{filteredImageResults.length !== 1 ? 'es' : ''})</span>
               </h2>
               <button
-                onClick={() => setImageResults(null)}
+                onClick={() => { setImageResults(null); setSelectedFile(null); }}
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
-                Clear Results
+                Clear
               </button>
             </div>
             {filteredImageResults.length === 0 ? (
@@ -1260,41 +1340,112 @@ export default function SearchPage() {
                 No frame matches above {Math.round(imageConfidenceThreshold * 100)}% confidence. Lower the confidence filter to see more candidates.
               </GlassPanel>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredImageResults.map((result, idx) => (
-                <GlassPanel key={idx} className="p-4 flex gap-4 items-start group hover:border-primary/50 transition-colors">
-                  <div className="relative w-32 aspect-video rounded-lg overflow-hidden flex-shrink-0 bg-muted ring-1 ring-white/10">
-                    <img
-                      src={result.image}
-                      alt="Result frame"
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                      <Play className="w-8 h-8 text-white fill-white" />
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-sm line-clamp-1 mb-1" title={result.filename}>
-                      {result.filename}
-                    </h3>
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider font-bold">
-                        <span className="text-primary">{(result.similarity * 100).toFixed(1)}% Match</span>
-                        <span className="text-muted-foreground/60">EP {result.episode || '?'}</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {filteredImageResults.map((result, idx) => {
+                  const animeTitle = result._animeTitle || (() => {
+                    // Fallback: parse from filename like "[Group] Title - 01 (…)"
+                    const namePart = result.filename?.split('] ')?.[1]?.split(' - ')?.[0]?.trim();
+                    return namePart || result.filename || 'Unknown Anime';
+                  })();
+                  const similarityPct = (result.similarity * 100).toFixed(1);
+                  const similarityColor =
+                    result.similarity >= 0.95
+                      ? 'text-emerald-400'
+                      : result.similarity >= 0.85
+                      ? 'text-amber-400'
+                      : 'text-muted-foreground';
+                  const timestampSecs = typeof result.at === 'number' ? result.at : null;
+                  const formatTimestamp = (secs: number) => {
+                    const h = Math.floor(secs / 3600);
+                    const m = Math.floor((secs % 3600) / 60);
+                    const s = Math.floor(secs % 60);
+                    if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+                    return `${m}:${String(s).padStart(2,'0')}`;
+                  };
+
+                  return (
+                    <GlassPanel key={`img-result-${idx}`} className="overflow-hidden group hover:border-primary/40 transition-colors flex flex-col">
+                      {/* Preview image / video row */}
+                      <div className="relative aspect-video bg-black flex-shrink-0 overflow-hidden">
+                        <img
+                          src={result.image}
+                          alt={`Frame from ${animeTitle}`}
+                          className="w-full h-full object-cover"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
+                        {/* Similarity badge */}
+                        <div className={`absolute top-2 right-2 px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-sm text-xs font-black ${similarityColor}`}>
+                          {similarityPct}%
+                        </div>
+                        {/* Episode badge */}
+                        {result.episode != null && (
+                          <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-sm text-xs font-bold text-white">
+                            EP {result.episode}
+                          </div>
+                        )}
+                        {/* Timestamp */}
+                        {timestampSecs !== null && (
+                          <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/70 backdrop-blur-sm text-[10px] text-white font-mono">
+                            {formatTimestamp(timestampSecs)}
+                          </div>
+                        )}
+                        {/* Video preview button */}
+                        {result.video && (
+                          <a
+                            href={result.video}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30"
+                            onClick={(e) => e.stopPropagation()}
+                            title="Preview scene"
+                          >
+                            <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30 hover:bg-white/30 transition-colors">
+                              <Play className="w-5 h-5 text-white fill-white ml-0.5" />
+                            </div>
+                          </a>
+                        )}
                       </div>
-                      <div className="text-[10px] text-muted-foreground/60">
-                        At {new Date(result.at * 1000).toISOString().substr(11, 8)}
+
+                      {/* Content */}
+                      <div className="p-4 flex gap-3 flex-1">
+                        {/* Cover image */}
+                        {result._animeCover && (
+                          <img
+                            src={result._animeCover}
+                            alt=""
+                            className="w-10 h-14 object-cover rounded-lg shrink-0"
+                          />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-sm leading-tight line-clamp-2 mb-1">{animeTitle}</p>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+                            {result.episode != null && (
+                              <span className="font-semibold text-foreground/70">Episode {result.episode}</span>
+                            )}
+                            {timestampSecs !== null && (
+                              <span>at {formatTimestamp(timestampSecs)}</span>
+                            )}
+                            <span className={`font-black ${similarityColor}`}>{similarityPct}% match</span>
+                          </div>
+                          <div className="mt-3 flex gap-2">
+                            <button
+                              onClick={() => navigate(`/anime/${result.anilist}`)}
+                              className="flex-1 py-1.5 rounded-lg bg-primary/15 hover:bg-primary/30 text-[10px] font-bold text-primary transition-all border border-primary/20 hover:border-primary/40"
+                            >
+                              View Anime
+                            </button>
+                            <button
+                              onClick={() => navigate(`/search?q=${encodeURIComponent(animeTitle)}`)}
+                              className="flex-1 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[10px] font-bold text-muted-foreground hover:text-foreground transition-all border border-white/5"
+                            >
+                              Search
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <button
-                      onClick={() => navigate(`/search?q=${encodeURIComponent(result.filename.split('] ')[1]?.split(' - ')[0] || result.filename)}`)}
-                      className="mt-3 w-full py-1.5 rounded-lg bg-white/5 hover:bg-primary/20 text-[10px] font-bold text-primary transition-all border border-white/5 hover:border-primary/30"
-                    >
-                      Search on Tatakai
-                    </button>
-                  </div>
-                </GlassPanel>
-                ))}
+                    </GlassPanel>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1348,25 +1499,70 @@ export default function SearchPage() {
                   <h2 className="text-2xl font-black tracking-tight">Character <span className="text-primary italic">Matches</span></h2>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {characterResults.map((character: any) => (
+                {characterResults.map((character: any) => (
                     <GlassPanel 
                       key={character.id} 
                       className="p-3 flex items-center gap-4 hover:bg-white/10 transition-all cursor-pointer group border-white/5 hover:border-primary/30"
-                      onClick={() => navigate(`/character/${character.id}?name=${encodeURIComponent(character.name)}`)}
+                      onClick={() => navigate(`/character/${character.id}?name=${encodeURIComponent(character.name?.full || character.name || '')}`)}
                     >
                       <div className="relative w-16 h-16 flex-shrink-0 overflow-hidden rounded-2xl border border-white/10">
                         <img
-                          src={character.poster}
-                          alt={character.name}
+                          src={character.image?.large || character.image?.medium || character.poster || '/placeholder.svg'}
+                          alt={character.name?.full || character.name || 'Character'}
                           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                           loading="lazy"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-bold text-sm truncate group-hover:text-primary transition-colors">{character.name.full}</p>
+                        <p className="font-bold text-sm truncate group-hover:text-primary transition-colors">{character.name?.full || character.name}</p>
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Registry: AniList</span>
+                          <ChevronRight className="w-3 h-3 text-muted-foreground/40 group-hover:translate-x-1 transition-transform" />
+                        </div>
+                      </div>
+                    </GlassPanel>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Episode title search results */}
+            {showEpisodeSearch && episodeTitleResults.length > 0 && (
+              <div className="mb-12">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                    <Film className="w-5 h-5" />
+                  </div>
+                  <h2 className="text-2xl font-black tracking-tight">
+                    Episode <span className="text-primary italic">Matches</span>
+                    <span className="ml-2 text-sm font-normal text-muted-foreground">(by episode title)</span>
+                  </h2>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {episodeTitleResults.map((hit: any, idx: number) => (
+                    <GlassPanel
+                      key={`ep-${hit.anilistId ?? idx}`}
+                      className="p-3 flex items-center gap-4 hover:bg-white/10 transition-all cursor-pointer group border-white/5 hover:border-primary/30"
+                      onClick={() => navigate(`/anime/${hit.animeId || hit.anilistId}`)}
+                    >
+                      {hit.animePoster && (
+                        <div className="relative w-12 h-16 flex-shrink-0 overflow-hidden rounded-xl border border-white/10">
+                          <img
+                            src={hit.animePoster}
+                            alt={hit.animeName}
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                            loading="lazy"
+                          />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-sm truncate group-hover:text-primary transition-colors">{hit.animeName}</p>
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">
+                          <span className="font-semibold text-primary/70">Episode: </span>{hit.episodeTitle}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-primary/50 bg-primary/10 px-1.5 py-0.5 rounded-md">Episode Match</span>
                           <ChevronRight className="w-3 h-3 text-muted-foreground/40 group-hover:translate-x-1 transition-transform" />
                         </div>
                       </div>

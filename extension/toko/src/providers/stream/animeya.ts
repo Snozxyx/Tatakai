@@ -8,12 +8,10 @@
  * Provider 2 (mp4upload): Scrape from watch page
  *   URL: https://animeya.cc/watch/{anime-name}-{anilistId}
  */
-import { normalizeQuality } from '../../utils/quality.js';
-import { buildSearchQueries } from '../../utils/titleNorm.js';
-import type { StreamProvider, SourceOptions, SourceResult, SubtitleTrack } from '../../types.js';
+import { normalizeQuality } from '../../utils/scraping/quality.js';
+import type { StreamProvider, SourceOptions, SourceResult, SubtitleTrack } from '../../types/index.js';
 
-declare const __tatakai_fetch__: (url: string, init?: RequestInit) => Promise<Response>;
-declare const __tatakai_parse_html__: (html: string) => any;
+import { fetchResponse, loadHtml } from '../../utils/http/fetch.js';
 
 const BASE_URL = 'https://animeya.cc';
 const VIDNEST_BASE = 'https://vidnest.fun/animepahe';
@@ -24,36 +22,40 @@ const HEADERS = {
 };
 
 /**
- * Provider 1: VidNest direct embed (fastest, uses anilistId)
+ * Provider 1: VidNest direct embed (fastest, uses anilistId).
+ * Works for any valid positive anilistId.
  */
 async function tryVidNestDirect(anilistId: number, episode: number): Promise<SourceResult[]> {
   try {
-    // Try both sub and dub variants
-    const variants = ['sub', 'dub'];
-    
+    // Try sub then dub variants
+    const variants: Array<{ suffix: string; audioLanguage: string; language: string }> = [
+      { suffix: 'sub', audioLanguage: 'ja', language: 'Japanese' },
+      { suffix: 'dub', audioLanguage: 'en', language: 'English Dub' },
+    ];
+
+    const results: SourceResult[] = [];
+
     for (const variant of variants) {
-      const embedUrl = `${VIDNEST_BASE}/${anilistId}/${episode}/${variant}`;
-      console.log('[Animeya.VidNest] Trying:', embedUrl);
-      const res = await __tatakai_fetch__(embedUrl, {
+      const embedUrl = `${VIDNEST_BASE}/${anilistId}/${episode}/${variant.suffix}`;
+      const res = await fetchResponse(embedUrl, {
         headers: { ...HEADERS, Referer: `${BASE_URL}/` },
-      });
-      
-      console.log('[Animeya.VidNest] Response status:', res.status);
-      
+        signal: AbortSignal.timeout(3000),
+      } as RequestInit);
+
       if (!res.ok) continue;
-      
+
       const html = await res.text();
-      
+
       // Extract sources from VidNest embed
       const sourcesMatch = html.match(/sources\s*:\s*\[([^\]]+)\]/);
       if (sourcesMatch) {
         const sourcesStr = sourcesMatch[1];
         const fileMatch = sourcesStr.match(/file\s*:\s*["']([^"']+)["']/);
-        
+
         if (fileMatch) {
           const url = fileMatch[1];
           const subtitles: SubtitleTrack[] = [];
-          
+
           // Extract subtitles if present
           const tracksMatch = html.match(/tracks\s*:\s*\[([^\]]+)\]/);
           if (tracksMatch) {
@@ -68,43 +70,66 @@ async function tryVidNestDirect(anilistId: number, episode: number): Promise<Sou
               });
             }
           }
-          
-          return [{
-            source: 'animeya-vidnest',
+
+          results.push({
+            source: `animeya-vidnest-${variant.suffix}`,
             url,
             quality: normalizeQuality(''),
             headers: { Referer: embedUrl },
             subtitles,
+            audioLanguage: variant.audioLanguage,
+            language: variant.language,
             sourceType: url.includes('.m3u8') ? 'hls' as const : 'mp4' as const,
-          }];
+          });
+          continue;
         }
       }
-      
-      // Fallback: Look for direct video URLs in script tags
-      const m3u8Match = html.match(/["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/);
+
+      // Fallback: Look for direct video URLs in script tags or Next.js payload
+      const m3u8Match = html.match(/["'](https?:\/\/[^"']+\.m3u8[^"']*)['"]/);
       if (m3u8Match) {
-        return [{
-          source: 'animeya-vidnest',
+        results.push({
+          source: `animeya-vidnest-${variant.suffix}`,
           url: m3u8Match[1],
           quality: normalizeQuality(''),
           headers: { Referer: embedUrl },
           subtitles: [],
+          audioLanguage: variant.audioLanguage,
+          language: variant.language,
           sourceType: 'hls' as const,
-        }];
+        });
+        continue;
       }
-      
-      const mp4Match = html.match(/["'](https?:\/\/[^"']+\.mp4[^"']*)["']/);
+
+      const mp4Match = html.match(/["'](https?:\/\/[^"']+\.mp4[^"']*)['"]/);
       if (mp4Match) {
-        return [{
-          source: 'animeya-vidnest',
+        results.push({
+          source: `animeya-vidnest-${variant.suffix}`,
           url: mp4Match[1],
           quality: normalizeQuality(''),
           headers: { Referer: embedUrl },
           subtitles: [],
+          audioLanguage: variant.audioLanguage,
+          language: variant.language,
           sourceType: 'mp4' as const,
-        }];
+        });
+        continue;
       }
+
+      // If VidNest itself is an embed container, emit the embed URL
+      results.push({
+        source: `animeya-vidnest-${variant.suffix}`,
+        url: embedUrl,
+        quality: normalizeQuality(''),
+        headers: { Referer: `${BASE_URL}/` },
+        subtitles: [],
+        audioLanguage: variant.audioLanguage,
+        language: variant.language,
+        sourceType: 'custom' as const,
+      });
     }
+
+    return results;
   } catch (err) {
     console.error('[Animeya.VidNest] Error:', err);
   }
@@ -117,18 +142,16 @@ async function tryVidNestDirect(anilistId: number, episode: number): Promise<Sou
 async function tryMp4UploadScrape(titles: string[], anilistId: number | undefined, episode: number): Promise<SourceResult[]> {
   try {
     // If we have anilistId, try direct watch URL construction
-    if (anilistId) {
+    if (anilistId && anilistId > 0) {
       // Try to construct anime name from titles
       const animeName = titles[0]?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') ?? '';
       if (animeName) {
         const watchUrl = `${BASE_URL}/watch/${animeName}-${anilistId}`;
-        console.log('[Animeya.mp4upload] Trying direct watch URL:', watchUrl);
         const sources = await extractMp4UploadSources(watchUrl, episode);
         if (sources.length > 0) return sources;
       }
     }
-    
-    console.log('[Animeya.mp4upload] Direct watch URL failed, no search available');
+
     return [];
   } catch (err) {
     console.error('[Animeya.mp4upload] Error:', err);
@@ -138,76 +161,65 @@ async function tryMp4UploadScrape(titles: string[], anilistId: number | undefine
 
 async function extractMp4UploadSources(watchUrl: string, episode: number): Promise<SourceResult[]> {
   try {
-    // Construct episode URL
     const epUrl = `${watchUrl}?ep=${episode}`;
-    
-    console.log('[Animeya.mp4upload] Fetching episode page:', epUrl);
-    const res = await __tatakai_fetch__(epUrl, { headers: HEADERS });
-    if (!res.ok) {
-      console.log('[Animeya.mp4upload] Episode page returned', res.status);
-      return [];
-    }
-    
+    const res = await fetchResponse(epUrl, { headers: HEADERS });
+    if (!res.ok) return [];
+
     const html = await res.text();
-    console.log('[Animeya.mp4upload] HTML length:', html.length);
-    const $ = __tatakai_parse_html__(html);
-    
-    // Look for mp4upload iframes or video sources
+    const $ = loadHtml(html);
+
     const sources: SourceResult[] = [];
-    
+
     // Check for embedded mp4upload iframes
     $.find('iframe[src*="mp4upload"], iframe[src*="vidnest"]').each((_: number, el: any) => {
       const src: string = el.attr?.('src') ?? '';
-      console.log('[Animeya.mp4upload] Found iframe:', src);
       if (src && !sources.length) {
-        // For mp4upload, we'd need to resolve the iframe
-        // For now, return as embed URL that needs resolution
         sources.push({
           source: 'animeya-mp4upload',
           url: src,
           quality: normalizeQuality(''),
           headers: HEADERS,
           subtitles: [],
-          sourceType: 'custom', // Embed URL — may need player-side resolution
+          audioLanguage: 'ja',
+          language: 'Japanese',
+          sourceType: 'custom',
         });
       }
     });
-    
-    if (sources.length > 0) {
-      console.log('[Animeya.mp4upload] Found', sources.length, 'iframe sources');
-      return sources;
-    }
-    
+
+    if (sources.length > 0) return sources;
+
     // Fallback: Direct video URL extraction from script tags
     $.find('script').each((_: number, el: any) => {
       const text: string = el.text?.() ?? '';
-      const m3u8Match = text.match(/["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/);
+      const m3u8Match = text.match(/["'](https?:\/\/[^"']+\.m3u8[^"']*)['"]/);
       if (m3u8Match && !sources.length) {
-        console.log('[Animeya.mp4upload] Found m3u8 in script:', m3u8Match[1]);
         sources.push({
           source: 'animeya-mp4upload',
           url: m3u8Match[1],
           quality: normalizeQuality(''),
           headers: HEADERS,
           subtitles: [],
+          audioLanguage: 'ja',
+          language: 'Japanese',
           sourceType: 'hls' as const,
         });
       }
-      const mp4Match = text.match(/["'](https?:\/\/[^"']+\.mp4[^"']*)["']/);
+      const mp4Match = text.match(/["'](https?:\/\/[^"']+\.mp4[^"']*)['"]/);
       if (mp4Match && !sources.length) {
-        console.log('[Animeya.mp4upload] Found mp4 in script:', mp4Match[1]);
         sources.push({
           source: 'animeya-mp4upload',
           url: mp4Match[1],
           quality: normalizeQuality(''),
           headers: HEADERS,
           subtitles: [],
+          audioLanguage: 'ja',
+          language: 'Japanese',
           sourceType: 'mp4' as const,
         });
       }
     });
-    
-    console.log('[Animeya.mp4upload] Total sources found:', sources.length);
+
     return sources;
   } catch (err) {
     console.error('[Animeya.mp4upload.extract] Error:', err);
@@ -217,33 +229,29 @@ async function extractMp4UploadSources(watchUrl: string, episode: number): Promi
 
 const provider: StreamProvider = {
   name: 'animeya',
+  sites: [BASE_URL, VIDNEST_BASE],
   async single(opts: SourceOptions): Promise<SourceResult[]> {
     try {
       const targetEp = opts.episode ?? 1;
       const anilistId = opts.anilistId;
-      
-      console.log('[Animeya] Starting with anilistId:', anilistId, 'episode:', targetEp);
-      
-      // Try Provider 1 (VidNest) first if we have anilistId - it's faster
-      if (anilistId) {
-        console.log('[Animeya] Trying VidNest direct embed...');
+
+      // Try Provider 1 (VidNest) first — works when anilistId is a valid positive integer
+      if (anilistId && anilistId > 0) {
         const vidnestSources = await tryVidNestDirect(anilistId, targetEp);
         if (vidnestSources.length > 0) {
-          console.log('[Animeya] ✅ VidNest returned', vidnestSources.length, 'sources');
           return vidnestSources;
         }
-        console.log('[Animeya] VidNest failed, falling back to mp4upload scraping');
       }
-      
+
       // Fallback to Provider 2 (mp4upload scraping)
-      console.log('[Animeya] Trying mp4upload scraping...');
-      const mp4uploadSources = await tryMp4UploadScrape(opts.titles, anilistId, targetEp);
-      if (mp4uploadSources.length > 0) {
-        console.log('[Animeya] ✅ mp4upload returned', mp4uploadSources.length, 'sources');
-        return mp4uploadSources;
+      const titles = opts.titles ?? [];
+      if (titles.length > 0) {
+        const mp4uploadSources = await tryMp4UploadScrape(titles, anilistId, targetEp);
+        if (mp4uploadSources.length > 0) {
+          return mp4uploadSources;
+        }
       }
-      
-      console.log('[Animeya] Both providers failed');
+
       return [];
     } catch (err) {
       console.error('[Animeya] Error:', err);

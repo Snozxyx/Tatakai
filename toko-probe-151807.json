@@ -1,0 +1,341 @@
+{
+  "anilistId": 151807,
+  "episode": 1,
+  "titles": [
+    "Solo Leveling",
+    "Ore dake Level Up na Ken",
+    "俺だけレベルアップな件"
+  ],
+  "rows": [
+    {
+      "provider": "nyaa",
+      "kind": "torrent",
+      "count": 20,
+      "status": "ok",
+      "ms": 2883,
+      "error": "",
+      "sample": [
+        {
+          "source": "nyaa",
+          "type": "torrent",
+          "url": "magnet:?xt=urn:btih:9ad49d790050e74ca815e1e9d4056dbbee27a52d&dn=%5BSubsPlease%5D%20Solo%20Leveling%20-%2001%20",
+          "seeders": 92
+        },
+        {
+          "source": "nyaa",
+          "type": "torrent",
+          "url": "magnet:?xt=urn:btih:846480294f9a1545acc3d3ee376e6a9f05a6c4e9&dn=%5BFLE%5D%20Solo%20Leveling%20-%20S01%20(BD%20",
+          "seeders": 71
+        }
+      ]
+    },
+    {
+      "provider": "animetosho",
+      "kind": "torrent",
+      "count": 15,
+      "status": "ok",
+      "ms": 862,
+      "error": "",
+      "sample": [
+        {
+          "source": "animetosho",
+          "type": "torrent",
+          "url": "magnet:?xt=urn:btih:QRSIAKKPTIKULLGD2PXDO3TKT4C2NRHJ&tr=http%3A%2F%2Fnyaa.tracker.wf%3A7777%2Fannounce&tr=http",
+          "seeders": 68
+        },
+        {
+          "source": "animetosho",
+          "type": "torrent",
+          "url": "magnet:?xt=urn:btih:NZ3LNJORDHWPRH6SBYO7SJPHUOQKLGGA&tr=http%3A%2F%2Fnyaa.tracker.wf%3A7777%2Fannounce&tr=udp%",
+          "seeders": 49
+        }
+      ]
+    },
+    {
+      "provider": "animelok",
+      "kind": "stream",
+      "count": 8,
+      "status": "ok",
+      "ms": 1861,
+      "error": "",
+      "sample": [
+        {
+          "source": "animelok-bato",
+          "type": "hls",
+          "url": "https://af04.anvod.pro/media/a9tv/c06/678d8486c32394fbb6a5860c/anixl-master.m3u8"
+        },
+        {
+          "source": "animelok-pahe",
+          "type": "hls",
+          "url": "https://vault-06.uwucdn.top/stream/06/11/8f74ef87e87a7c478a3e50477f511fc1899b40e7f759a79690c7c07dd050e882/uwu."
+        }
+      ]
+    },
+    {
+      "provider": "watchanimeworld",
+      "kind": "stream",
+      "count": 5,
+      "status": "ok",
+      "ms": 9065,
+      "error": "",
+      "sample": [
+        {
+          "source": "watchanimeworld",
+          "type": "custom",
+          "url": "https://short.icu/S8ZofkQ9_"
+        },
+        {
+          "source": "watchanimeworld",
+          "type": "custom",
+          "url": "https://short.icu/6ylxO6qWC"
+        }
+      ]
+    },
+    {
+      "provider": "nekobt",
+      "kind": "torrent",
+      "count": 4,
+      "status": "ok",
+      "ms": 956,
+      "error": "",
+      "sample": [
+        {
+          "source": "nekobt",
+          "type": "torrent",
+          "url": "magnet:?xt=urn:btih:846480294f9a1545acc3d3ee376e6a9f05a6c4e9&dn=%5BFLE%5D%20Solo%20Leveling%20-%20S01%20(BD%20",
+          "seeders": 22
+        },
+        {
+          "source": "nekobt",
+          "type": "torrent",
+          "url": "magnet:?xt=urn:btih:b71be6b85254725151b27ba6af5d94e2b45ac887&dn=Solo.Leveling.S01.2160p.WEB-DL.MULTI.AAC2.0.x2",
+          "seeders": 5
+        }
+      ]
+    },
+    {
+      "provider": "subplease",
+      "kind": "torrent",
+      "count": 3,
+      "status": "ok",
+      "ms": 410,
+      "error": "",
+      "sample": [
+        {
+          "source": "subplease",
+          "type": "torrent",
+          "url": "magnet:?xt=urn:btih:RFG62STLJQXPAYY3NHC3J6QQBLWX7NTX&dn=%5BSubsPlease%5D%20Solo%20Leveling%20-%2001%20%28480p%"
+        },
+        {
+          "source": "subplease",
+          "type": "torrent",
+          "url": "magnet:?xt=urn:btih:D63ENUYHTKOYS7Q3ZWYVFBSVKGKWSP7M&dn=%5BSubsPlease%5D%20Solo%20Leveling%20-%2001%20%28720p%"
+        }
+      ]
+    },
+    {
+      "provider": "animeya",
+      "kind": "stream",
+      "count": 2,
+      "status": "ok",
+      "ms": 1521,
+      "error": "",
+      "sample": [
+        {
+          "source": "animeya-vidnest-sub",
+          "type": "custom",
+          "url": "https://vidnest.fun/animepahe/151807/1/sub"
+        },
+        {
+          "source": "animeya-vidnest-dub",
+          "type": "custom",
+          "url": "https://vidnest.fun/animepahe/151807/1/dub"
+        }
+      ]
+    },
+    {
+      "provider": "reanime",
+      "kind": "stream",
+      "count": 2,
+      "status": "ok",
+      "ms": 1730,
+      "error": "",
+      "sample": [
+        {
+          "source": "reanime-HD-2",
+          "type": "hls",
+          "url": "https://fetch8.flixcloud.cc/_v7/7ffa35da-20a6-4cf9-aa76-1d12f98d76eb/master.m3u8?token=eyJhbGciOiJIUzI1NiIsInR"
+        },
+        {
+          "source": "reanime-HD-1",
+          "type": "hls",
+          "url": "https://fetch.flixcloud.cc/_v7/7ffa35da-20a6-4cf9-aa76-1d12f98d76eb/master.m3u8?token=eyJhbGciOiJIUzI1NiIsInR5"
+        }
+      ]
+    },
+    {
+      "provider": "seadex",
+      "kind": "torrent",
+      "count": 2,
+      "status": "ok",
+      "ms": 1103,
+      "error": "",
+      "sample": [
+        {
+          "source": "seadex",
+          "type": "torrent",
+          "url": "magnet:?xt=urn:btih:846480294f9a1545acc3d3ee376e6a9f05a6c4e9&dn=%5BFLE%5D%20Solo%20Leveling%20-%20S01E01%20(BD"
+        },
+        {
+          "source": "seadex",
+          "type": "torrent",
+          "url": "magnet:?xt=urn:btih:<redacted>&dn=Extras%2F%5BFLE%5D%20Solo%20Leveling%20-%20S01NCED%20(BD%201080p%20HEVC%20x2"
+        }
+      ]
+    },
+    {
+      "provider": "4anime",
+      "kind": "stream",
+      "count": 1,
+      "status": "ok",
+      "ms": 1831,
+      "error": "",
+      "sample": [
+        {
+          "source": "4anime",
+          "type": "custom",
+          "url": "https://4anime.com.ro/wp-content/themes/animestream-child/player/?source=embed&url=KVoJ9Uaxww4br46EcrpCudGAFrg"
+        }
+      ]
+    },
+    {
+      "provider": "anikoto",
+      "kind": "stream",
+      "count": 1,
+      "status": "ok",
+      "ms": 3339,
+      "error": "",
+      "sample": [
+        {
+          "source": "anikoto",
+          "type": "custom",
+          "url": "https://megaplay.buzz/stream/s-2/141748/sub"
+        }
+      ]
+    },
+    {
+      "provider": "animeheaven",
+      "kind": "stream",
+      "count": 1,
+      "status": "ok",
+      "ms": 2573,
+      "error": "",
+      "sample": [
+        {
+          "source": "animeheaven",
+          "type": "mp4",
+          "url": "https://rt.animeheaven.me/video.mp4?cdf506ddcffdb2b65c2ed2f10352ad3d&a99497f85bd7b431a59cb221df1f517e"
+        }
+      ]
+    },
+    {
+      "provider": "acgrip",
+      "kind": "torrent",
+      "count": 0,
+      "status": "empty",
+      "ms": 1346,
+      "error": "",
+      "sample": []
+    },
+    {
+      "provider": "aniliberty",
+      "kind": "torrent",
+      "count": 0,
+      "status": "empty",
+      "ms": 1493,
+      "error": "",
+      "sample": []
+    },
+    {
+      "provider": "animeblkom",
+      "kind": "stream",
+      "count": 0,
+      "status": "empty",
+      "ms": 1227,
+      "error": "",
+      "sample": []
+    },
+    {
+      "provider": "animepahe",
+      "kind": "stream",
+      "count": 0,
+      "status": "empty",
+      "ms": 4349,
+      "error": "",
+      "sample": []
+    },
+    {
+      "provider": "animesalt",
+      "kind": "stream",
+      "count": 0,
+      "status": "empty",
+      "ms": 396,
+      "error": "",
+      "sample": []
+    },
+    {
+      "provider": "aniworld",
+      "kind": "stream",
+      "count": 0,
+      "status": "empty",
+      "ms": 4891,
+      "error": "",
+      "sample": []
+    },
+    {
+      "provider": "anizone",
+      "kind": "stream",
+      "count": 0,
+      "status": "empty",
+      "ms": 6010,
+      "error": "",
+      "sample": []
+    },
+    {
+      "provider": "desidub",
+      "kind": "stream",
+      "count": 0,
+      "status": "empty",
+      "ms": 3077,
+      "error": "",
+      "sample": []
+    },
+    {
+      "provider": "mkissa",
+      "kind": "stream",
+      "count": 0,
+      "status": "empty",
+      "ms": 9416,
+      "error": "",
+      "sample": []
+    },
+    {
+      "provider": "senshi",
+      "kind": "stream",
+      "count": 0,
+      "status": "empty",
+      "ms": 797,
+      "error": "",
+      "sample": []
+    },
+    {
+      "provider": "toonstream",
+      "kind": "stream",
+      "count": 0,
+      "status": "empty",
+      "ms": 13019,
+      "error": "",
+      "sample": []
+    }
+  ]
+}

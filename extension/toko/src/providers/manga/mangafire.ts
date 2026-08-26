@@ -3,10 +3,9 @@
  * Requirements: 5.1, 5.3, 5.4
  * All scraping runs locally inside the Toko worker — no server dependency.
  */
-import type { MangaProvider, MangaChapterEntry, MangaChapterParams, MangaPageEntry } from '../../types.js';
+import type { MangaProvider, MangaChapterEntry, MangaChapterParams, MangaPageEntry } from '../../types/index.js';
 
-declare const __tatakai_fetch__: (url: string, init?: RequestInit) => Promise<Response>;
-declare const __tatakai_parse_html__: (html: string) => any;
+import { fetchResponse, loadHtml } from '../../utils/http/fetch.js';
 
 const BASE = 'https://mangafire.to';
 const PROVIDER_NAME = 'mangafire';
@@ -15,7 +14,7 @@ const HEADERS = { 'User-Agent': UA, Referer: `${BASE}/` };
 
 async function search(title: string): Promise<{ id: string } | null> {
   try {
-    const res = await __tatakai_fetch__(
+    const res = await fetchResponse(
       `${BASE}/ajax/search?keyword=${encodeURIComponent(title)}`,
       { headers: { ...HEADERS, 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } },
     );
@@ -33,7 +32,7 @@ async function search(title: string): Promise<{ id: string } | null> {
 }
 
 async function fetchChapterList(mangaId: string): Promise<MangaChapterEntry[]> {
-  const res = await __tatakai_fetch__(
+  const res = await fetchResponse(
     `${BASE}/ajax/manga/${encodeURIComponent(mangaId)}/chapter/en`,
     { headers: { ...HEADERS, 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } },
   );
@@ -42,7 +41,7 @@ async function fetchChapterList(mangaId: string): Promise<MangaChapterEntry[]> {
   const html: string = data?.result ?? '';
   if (!html) return [];
 
-  const $ = __tatakai_parse_html__(html);
+  const $ = loadHtml(html);
   const chapters: MangaChapterEntry[] = [];
 
   $.find('li[data-id], a[href*="/read/"]').each((i: number, el: any) => {
@@ -72,6 +71,7 @@ async function fetchChapterList(mangaId: string): Promise<MangaChapterEntry[]> {
 
 const provider: MangaProvider = {
   name: PROVIDER_NAME,
+  sites: [BASE],
 
   async getChapters(params: MangaChapterParams): Promise<MangaChapterEntry[]> {
     try {
@@ -89,7 +89,7 @@ const provider: MangaProvider = {
       const providerChapterId = decodeURIComponent(colonIdx >= 0 ? chapterKey.slice(colonIdx + 1) : chapterKey);
 
       // MangaFire chapter pages API
-      const res = await __tatakai_fetch__(
+      const res = await fetchResponse(
         `${BASE}/ajax/read/${encodeURIComponent(providerChapterId)}/image/list/1/en`,
         { headers: { ...HEADERS, 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } },
       );
@@ -107,10 +107,10 @@ const provider: MangaProvider = {
 
       // Fallback: fetch chapter HTML and extract images
       const href = providerChapterId.startsWith('http') ? providerChapterId : `${BASE}/read/${providerChapterId}`;
-      const pageRes = await __tatakai_fetch__(href, { headers: HEADERS });
+      const pageRes = await fetchResponse(href, { headers: HEADERS });
       if (!pageRes.ok) return [];
       const html = await pageRes.text();
-      const $ = __tatakai_parse_html__(html);
+      const $ = loadHtml(html);
       const pages: MangaPageEntry[] = [];
 
       $.find('.page-image img, .chapter-pages img, img[src*="cdn"]').each((i: number, el: any) => {

@@ -34,12 +34,12 @@ export interface ExtensionSearchProvider {
 
 class ExtensionRegistry {
   private static instance: ExtensionRegistry;
-  
+
   private pages: Map<string, ExtensionPage> = new Map();
   private slots: Map<string, ExtensionSlot[]> = new Map();
   private searchProviders: Map<string, ExtensionSearchProvider> = new Map();
 
-  private constructor() {}
+  private constructor() { }
 
   static getInstance(): ExtensionRegistry {
     if (!ExtensionRegistry.instance) {
@@ -85,11 +85,11 @@ class ExtensionRegistry {
     this.pages.forEach((page, id) => {
       if (id.startsWith(extensionId)) this.pages.delete(id);
     });
-    
+
     this.slots.forEach((list, slotId) => {
       this.slots.set(slotId, list.filter(s => !s.id.startsWith(extensionId)));
     });
-    
+
     this.searchProviders.forEach((provider, id) => {
       if (id.startsWith(extensionId)) this.searchProviders.delete(id);
     });

@@ -411,7 +411,7 @@ export default function FavoritesPage() {
                     <div className="flex items-center gap-2 mb-6">
                       <Heart className="w-5 h-5 text-pink-400" />
                       <h2 className="text-xl font-bold">Fan Favorites</h2>
-                      <span className="text-xs text-muted-foreground ml-2">(Mapped into Tatakai IDs)</span>
+                      <span className="text-xs text-muted-foreground ml-2">Choose Your Favorites</span>
                     </div>
 
                     {loadingAniListFavorites ? (

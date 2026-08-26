@@ -70,6 +70,7 @@ import {
 } from "@/core/player/subtitle-utils";
 import { playbackEventBus, PlayerEvents } from "@/core/player/PlaybackEventBus";
 import { sourceAdapterRegistry } from "@/core/player/SourceAdapterRegistry";
+import { registerGlobalVideo, updateGlobalVideoTime } from "@/core/player/global-video-ref";
 import { Seekbar } from "./controls/Seekbar";
 import { SubtitleMemory } from "@/core/player/subtitle-memory";
 import { DubTracker } from "@/core/content/dub-tracker";
@@ -418,6 +419,19 @@ export function VideoPlayer({
       externalRef.current = videoRef.current;
     }
   }, [externalRef]);
+
+  // Register with the global video registry so Miniplayer / PiP consumers can access the element.
+  // Only runs once after mount (when the video element is attached) and on unmount.
+  useEffect(() => {
+    registerGlobalVideo(videoRef.current, window.location.pathname, {
+      animeName: animeName ?? undefined,
+      animePoster: poster ?? undefined,
+    });
+    return () => {
+      registerGlobalVideo(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const controlsOverlayRef = useRef<HTMLDivElement>(null);
@@ -1357,6 +1371,23 @@ export function VideoPlayer({
     loadVideo();
   }, [currentSource?.url, currentSource?.isM3U8, currentSource?.sourceType, isOffline, settings.autoplay]);
 
+  // When sources become empty (e.g. during a torrent handover), unload the
+  // current adapter so the previous stream stops immediately. Without this the
+  // old adapter stays attached to the video element and keeps playing while the
+  // torrent stream is resolving, because loadVideo() returns early when
+  // currentSource is undefined and never calls switchTo/unload.
+  useEffect(() => {
+    if (currentSource) return;
+    const adapter = sourceAdapterRegistry.getCurrentAdapter();
+    if (adapter) {
+      void adapter.unload();
+    }
+    if (videoRef.current) {
+      videoRef.current.src = '';
+      videoRef.current.load();
+    }
+  }, [currentSource]);
+
   const probeInProgressRef = useRef(false);
 
   const triggerMediaProbe = useCallback(async () => {
@@ -1575,18 +1606,27 @@ export function VideoPlayer({
       const sessionId = new URLSearchParams(window.location.search).get('sessionId');
       const isTorrentSource = Boolean(sessionId && (currentSource?.sourceType === 'torrent' || currentSource?.url?.startsWith('magnet:')));
 
-      // Torrent playback should always request a fresh stream for the selected audio
-      // track. The media element's native audioTracks API uses its own zero-based track
-      // indexes and can silently disable all tracks when fed probe stream indexes.
+      // ── Torrent ──────────────────────────────────────────────────────────
+      // The only way to change the audio track of a remuxed MKV is to ask the
+      // runtime for a fresh HLS variant mapped to that track, then hand the new
+      // manifest to the adapter that actually owns the element.
+      //
+      // `trackId` is the *absolute* ffprobe stream index — what `probe()`
+      // reports as `index` and what the menu stores as `track.id`. hls-remux now
+      // maps it with `0:<index>`, so it is passed through unchanged (previously
+      // it was fed to `0:a:<index>`, an audio-relative selector, which played
+      // the wrong track or referenced a nonexistent one and hung the transcode).
       if (isTorrentSource && runtime?.getTorrentStreamUrl) {
         try {
           const currentTimeSnapshot = Number.isFinite(video.currentTime) ? video.currentTime : 0;
           const wasPaused = video.paused;
-          const playbackRate = video.playbackRate || 1;
 
-          toast.loading('Switching dub audio (reloading stream)...');
-
-          const stream = await runtime.getTorrentStreamUrl(sessionId, (window as any).currentFileIndex ?? undefined, { audioTrackIndex: trackId });
+          toast.loading('Switching audio track (reloading stream)...');
+          const stream = await runtime.getTorrentStreamUrl(
+            sessionId,
+            (window as any).currentFileIndex ?? undefined,
+            { audioTrackIndex: trackId }
+          );
           toast.dismiss();
 
           if (!stream?.success || !stream.url) {
@@ -1597,138 +1637,102 @@ export function VideoPlayer({
           setActiveExtractedAudioTrack(null);
           setCurrentAudioTrack(trackId);
 
-          const onLoadedMetadata = () => {
-            try {
-              if (Number.isFinite(currentTimeSnapshot) && currentTimeSnapshot > 0) {
-                video.currentTime = currentTimeSnapshot;
-              }
-              video.playbackRate = playbackRate;
-              video.muted = false;
-              handleSubtitleChange(currentSubtitle);
-              if (!wasPaused) {
-                void video.play().catch(() => {});
-              }
-            } catch {
-              // Ignore transient seek/play errors while the stream stabilizes.
-            } finally {
-              video.removeEventListener('loadedmetadata', onLoadedMetadata);
-            }
-          };
+          // Route through the adapter registry — NOT `video.src = <m3u8>`. hls.js
+          // owns the element (it called `attachMedia`), so a raw `src` assignment
+          // either does nothing or fights the still-attached instance, which is
+          // exactly why the picture never changed. `switchTo` unloads the old
+          // adapter (destroying that Hls) and attaches a fresh one to the new
+          // variant manifest, restoring position and play state.
+          await sourceAdapterRegistry.switchTo({
+            source: { id: stream.url, url: stream.url, mode: 'hls' },
+            videoElement: video,
+            startTime: currentTimeSnapshot,
+            autoPlay: !wasPaused,
+          });
 
-          video.addEventListener('loadedmetadata', onLoadedMetadata);
-          video.src = stream.url;
-          video.load();
-
-          toast.success('Dub audio switched');
+          // Re-apply the chosen subtitle against the reloaded element.
+          handleSubtitleChange(currentSubtitle);
+          toast.success('Audio track switched');
           return;
         } catch (err: any) {
           toast.dismiss();
-          toast.error(err?.message || 'Error switching dub audio');
+          toast.error(err?.message || 'Error switching audio track');
           return;
         }
       }
 
-      // In Electron, we can try to switch audio tracks via the video element if enabled
-      // but a more reliable way for MKV is often not available via standard JS.
-      // However, if we enabled experimental features, video.audioTracks might work.
-      if (video.audioTracks) {
-        for (let i = 0; i < video.audioTracks.length; i++) {
-          video.audioTracks[i].enabled = (i === trackId);
+      // ── Non-torrent, in-container tracks ─────────────────────────────────
+      // Try the element's native audioTracks. That list is zero-based and
+      // audio-only, but `trackId` is an absolute ffprobe index — so translate
+      // through the menu's own ordering: the position of `trackId` inside
+      // `audioTracks` is its index into `video.audioTracks`. The old code
+      // compared the absolute index directly (`i === trackId`), which disabled
+      // every track for any file whose audio did not start at stream 0.
+      const nativeList = video.audioTracks;
+      if (nativeList && nativeList.length > 1) {
+        const pos = audioTracks.findIndex((t) => t.id === trackId);
+        const targetPos = pos >= 0 ? pos : trackId;
+        for (let i = 0; i < nativeList.length; i++) {
+          nativeList[i].enabled = (i === targetPos);
         }
         setActiveExtractedAudioTrack(null);
         setCurrentAudioTrack(trackId);
-      } else {
-      void (async () => {
-        try {
-          const runtime = (window as any).tatakaiRuntime;
-          // If we're playing a torrent session, prefer requesting a new transcode
-          // stream that maps the selected audio track, avoiding external extraction.
-          const sessionId = new URLSearchParams(window.location.search).get('sessionId');
-          const fileIndex = (window as any).currentFileIndex ?? undefined;
+        toast.success('Audio track switched');
+        return;
+      }
 
-          if (sessionId && runtime?.getTorrentStreamUrl) {
-            toast.loading('Switching dub audio (reloading stream)...');
-            // Request a new transcode stream with the selected audio track
-            const stream = await runtime.getTorrentStreamUrl(sessionId, fileIndex, { audioTrackIndex: trackId });
-            toast.dismiss();
-            if (stream?.success && stream?.url) {
-              // Clear any active extracted external audio
-              setActiveExtractedAudioTrack(null);
-              setExtractedAudioUrls((prev) => {
-                const copy = { ...prev };
-                return copy;
-              });
-              // Update video src to the new stream URL
-              try {
-                if (videoRef.current) {
-                  videoRef.current.src = stream.url;
-                  videoRef.current.load();
-                  setCurrentAudioTrack(trackId);
-                  toast.success('Dub audio switched');
-                }
-              } catch (e) {
-                toast.error('Failed to switch audio stream');
-              }
-            } else {
-              toast.error(stream?.error || 'Failed to request audio-switched stream');
-            }
-            return;
-          }
-
-          // Fallback: use extractAudioTrack when not a torrent stream
-          if (!runtime?.extractAudioTrack) {
-            toast.error('Audio extraction runtime unavailable');
-            return;
-          }
-
-          const existing = extractedAudioUrls[trackId];
-          if (existing) {
-            setCurrentAudioTrack(trackId);
-            setActiveExtractedAudioTrack(trackId);
-            toast.success('Dub audio switched');
-            return;
-          }
-
-          toast.loading('Extracting dub audio...');
-          let probeUrl = currentSource?.url || '';
-          if (videoRef.current?.src) probeUrl = videoRef.current.src;
-
-          // Prefer local torrent file path for reliable extraction while torrenting.
-          try {
-            if (sessionId && runtime?.getTorrentFilePath) {
-              const pathRes = await runtime.getTorrentFilePath(sessionId);
-              if (pathRes?.success && pathRes?.path) {
-                probeUrl = pathRes.path;
-              }
-            }
-          } catch {
-            // fallback to stream URL
-          }
-
-          const result = await runtime.extractAudioTrack(probeUrl, trackId);
-          toast.dismiss();
-
-          if (result?.success && result?.url) {
-            let extractedUrl = String(result.url || '').trim();
-            if (!/^https?:\/\//i.test(extractedUrl) && !extractedUrl.startsWith('file://') && /^[A-Za-z]:\\|\\\\/.test(extractedUrl)) {
-              extractedUrl = convertFileSrc(extractedUrl);
-            }
-
-            setExtractedAudioUrls(prev => ({ ...prev, [trackId]: extractedUrl }));
-            setCurrentAudioTrack(trackId);
-            setActiveExtractedAudioTrack(trackId);
-            toast.success('Dub audio loaded');
-          } else {
-            toast.error(result?.error || 'Failed to extract dub audio');
-          }
-        } catch (err: any) {
-          toast.dismiss();
-          toast.error(err?.message || 'Error extracting dub audio');
+      // ── Fallback: extract the track to a separate file ───────────────────
+      // Played as an external audio element synced to the muted video, for
+      // sources whose in-container tracks the element refuses to switch.
+      try {
+        if (!runtime?.extractAudioTrack) {
+          toast.error('Audio extraction runtime unavailable');
+          return;
         }
-      })();
+
+        const existing = extractedAudioUrls[trackId];
+        if (existing) {
+          setCurrentAudioTrack(trackId);
+          setActiveExtractedAudioTrack(trackId);
+          toast.success('Audio track switched');
+          return;
+        }
+
+        toast.loading('Extracting audio track...');
+        let probeUrl = currentSource?.url || '';
+        if (video?.src) probeUrl = video.src;
+
+        // Prefer the local torrent file path for reliable extraction.
+        try {
+          if (sessionId && runtime?.getTorrentFilePath) {
+            const pathRes = await runtime.getTorrentFilePath(sessionId);
+            if (pathRes?.success && pathRes?.path) probeUrl = pathRes.path;
+          }
+        } catch {
+          // fall back to stream URL
+        }
+
+        const result = await runtime.extractAudioTrack(probeUrl, trackId);
+        toast.dismiss();
+
+        if (result?.success && result?.url) {
+          let extractedUrl = String(result.url || '').trim();
+          if (!/^https?:\/\//i.test(extractedUrl) && !extractedUrl.startsWith('file://') && /^[A-Za-z]:\\|\\\\/.test(extractedUrl)) {
+            extractedUrl = convertFileSrc(extractedUrl);
+          }
+          setExtractedAudioUrls((prev) => ({ ...prev, [trackId]: extractedUrl }));
+          setCurrentAudioTrack(trackId);
+          setActiveExtractedAudioTrack(trackId);
+          toast.success('Audio track loaded');
+        } else {
+          toast.error(result?.error || 'Failed to extract audio track');
+        }
+      } catch (err: any) {
+        toast.dismiss();
+        toast.error(err?.message || 'Error extracting audio track');
       }
     })();
-  }, [isNative, currentSource?.url, currentSource?.sourceType, extractedAudioUrls, currentSubtitle, handleSubtitleChange]);
+  }, [isNative, currentSource?.url, currentSource?.sourceType, extractedAudioUrls, currentSubtitle, handleSubtitleChange, audioTracks]);
 
   const handleInternalSubtitleChange = useCallback(async (trackId: number, options?: { silent?: boolean }): Promise<boolean> => {
     if (!currentSource?.url || !isNative) return false;
@@ -1792,8 +1796,21 @@ export function VideoPlayer({
       const fileIndex = (window as any).currentFileIndex ?? undefined;
 
       const extractOnce = async () => {
+        // Prefer, in order: the local file on disk → the source URL → the
+        // element's own src.
+        //
+        // `video.src` is deliberately last and heavily filtered. Once hls.js
+        // attaches it is a `blob:` URL owned by the renderer's MSE buffer, which
+        // ffmpeg in the main process cannot open at all; and during torrent
+        // playback it is the HLS *manifest*, whose variants are built with
+        // `-map 0:v -map 0:a:N -c copy` and therefore contain no subtitle
+        // streams whatsoever. Either one turned a working extraction into a
+        // timeout.
         let probeUrl = currentSource.url;
-        if (videoRef.current?.src) probeUrl = videoRef.current.src;
+        const elementSrc = String(videoRef.current?.src || '');
+        const elementSrcIsUsable =
+          /^(https?|file):/i.test(elementSrc) && !/\.m3u8(?:[?#]|$)/i.test(elementSrc);
+        if (!probeUrl && elementSrcIsUsable) probeUrl = elementSrc;
 
         // For subtitle extraction, we always prefer the local file path if available.
         // Running ffmpeg on the local sparse file reads zeros instantly for missing parts
@@ -1807,6 +1824,12 @@ export function VideoPlayer({
           }
         } catch {
           // fallback to stream URL
+        }
+
+        // A manifest URL as the *source* is equally unusable — fall back to the
+        // element's src only if that one is a real media URL.
+        if (/\.m3u8(?:[?#]|$)/i.test(String(probeUrl)) && elementSrcIsUsable) {
+          probeUrl = elementSrc;
         }
 
         if (sessionId && runtime?.ensureTorrentPrebuffer) {
@@ -2053,6 +2076,7 @@ export function VideoPlayer({
 
     const handleTimeUpdate = () => {
       setCurrentTime(video.currentTime);
+      updateGlobalVideoTime(video.currentTime);
       if (video.currentTime > lastObservedTimeRef.current + 0.05) {
         lastObservedTimeRef.current = video.currentTime;
         lastProgressAtRef.current = Date.now();

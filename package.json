@@ -14,8 +14,8 @@
   "scripts": {
     "dev": "concurrently \"npm:dev:web\" \"npm:dev:api-v3\"",
     "dev:web": "vite",
-    "dev:api-v3": "npm --prefix TatakaiAPI run dev",
-    "dev:api": "npm --prefix TatakaiAPI run dev",
+    "dev:api-v3": "npm run dev:toko-api",
+    "dev:api": "npm run dev:toko-api",
     "build": "cross-env NODE_ENV=production vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
@@ -29,7 +29,12 @@
     "assets:generate": "node scripts/generate-assets.cjs",
     "mobile:dev": "npm run build && npx cap open android",
     "mobile:sync": "npm run build && npx cap sync",
-    "mobile:build": "npx cap sync android && cd android && gradlew assembleRelease"
+    "mobile:build": "npx cap sync android && cd android && gradlew assembleRelease",
+    "build:toko": "npm --prefix extension/toko run build",
+    "api": "npm run build:toko && npm --prefix TatakaiAPI start",
+    "dev:toko-api": "npm --prefix extension/toko run build && npm --prefix extension/toko/api run dev",
+    "toko:build": "npm --prefix extension/toko run build",
+    "toko:api": "npm --prefix extension/toko run build && npm --prefix extension/toko/api start"
   },
   "dependencies": {
     "@capacitor-community/keep-awake": "^8.0.0",
@@ -181,6 +186,16 @@
       "desktop/**/*",
       "resources/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "extension",
+        "to": "extension",
+        "filter": [
+          "*/manifest.json",
+          "*/dist/bundle.js"
+        ]
+      }
     ],
     "publish": [
       {

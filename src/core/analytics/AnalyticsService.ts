@@ -100,7 +100,7 @@ class AnalyticsService {
     public trackPageView(path: string, title?: string) {
         // Skip tracking when offline
         if (!isOnline()) return;
-        
+
         if (typeof window.gtag === 'function') {
             window.gtag('event', 'page_view', {
                 page_title: title || document.title,
@@ -122,7 +122,7 @@ class AnalyticsService {
     public trackEvent(eventName: string, params?: Record<string, any>) {
         // Skip tracking when offline
         if (!isOnline()) return;
-        
+
         if (typeof window.gtag === 'function') {
             window.gtag('event', eventName, params);
         }
@@ -139,7 +139,7 @@ class AnalyticsService {
     public trackError(error: Error, context?: Record<string, any>) {
         // Skip tracking when offline
         if (!isOnline()) return;
-        
+
         if (!this.datadogDisabled) {
             try {
                 datadogLogs.logger.error(error.message, { error, ...context });
@@ -189,9 +189,9 @@ export const analytics = AnalyticsService.getInstance();
 export const trackEvent = (eventName: string, params?: Record<string, any>) => analytics.trackEvent(eventName, params);
 export const trackPageView = (path: string, title?: string) => analytics.trackPageView(path, title);
 export const trackError = (error: Error, context?: Record<string, any>) => analytics.trackError(error, context);
-export const trackAnimeInteraction = (type: 'view' | 'search' | 'add_to_list' | 'remove_from_list', animeId: string, metadata?: Record<string, any>) => 
+export const trackAnimeInteraction = (type: 'view' | 'search' | 'add_to_list' | 'remove_from_list', animeId: string, metadata?: Record<string, any>) =>
     analytics.trackAnimeInteraction(type, animeId, metadata);
-export const trackSocialInteraction = (type: 'follow' | 'unfollow' | 'comment' | 'rate' | 'share', targetId: string, metadata?: Record<string, any>) => 
+export const trackSocialInteraction = (type: 'follow' | 'unfollow' | 'comment' | 'rate' | 'share', targetId: string, metadata?: Record<string, any>) =>
     analytics.trackSocialInteraction(type, targetId, metadata);
-export const trackWatchProgress = (animeId: string, episode: number, progress: number, duration: number) => 
+export const trackWatchProgress = (animeId: string, episode: number, progress: number, duration: number) =>
     analytics.trackWatchProgress(animeId, episode, progress, duration);

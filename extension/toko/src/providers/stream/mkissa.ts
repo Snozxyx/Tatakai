@@ -14,14 +14,16 @@
  * When the security check blocks us the provider simply returns [] — the rest
  * of the Toko fan-out is unaffected.
  */
-import { normalizeQuality, detectSourceType } from '../../utils/quality.js';
-import { buildSearchQueries, scoreMatch } from '../../utils/titleNorm.js';
-import type { StreamProvider, SourceOptions, SourceResult } from '../../types.js';
+import { normalizeQuality, detectSourceType } from '../../utils/scraping/quality.js';
+import { buildSearchQueries, scoreMatch } from '../../utils/scraping/title-normalizer.js';
+import type { StreamProvider, SourceOptions, SourceResult } from '../../types/index.js';
 
-declare const __tatakai_fetch__: (url: string, init?: RequestInit) => Promise<Response>;
-declare const __tatakai_parse_html__: (html: string) => any;
+import { fetchTextWithBypass } from '../../utils/common/fetch-bypass.js';
+import { loadHtml } from '../../utils/http/fetch.js';
 
-const BASES = ['https://mkissa.to', 'https://mkissa.com'];
+// `mkissa.com` is a parked domain that accepts the connection and never answers,
+// so every attempt against it costs the full 12s timeout. Only `.to` is live.
+const BASES = ['https://mkissa.to'];
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36';
 
 const HEADERS = {
@@ -40,17 +42,12 @@ function isBlocked(html: string): boolean {
 }
 
 async function fetchHtml(url: string, referer?: string): Promise<string | null> {
-  try {
-    const res = await __tatakai_fetch__(url, {
-      headers: { ...HEADERS, Referer: referer ?? new URL(url).origin + '/' },
-    });
-    if (!res.ok) return null;
-    const html = await res.text();
-    if (isBlocked(html)) return null;
-    return html;
-  } catch {
-    return null;
-  }
+  const html = await fetchTextWithBypass(url, {
+    headers: { ...HEADERS, Referer: referer ?? new URL(url).origin + '/' },
+    timeoutMs: 12000,
+  });
+  if (!html || isBlocked(html)) return null;
+  return html;
 }
 
 interface Candidate {
@@ -60,7 +57,11 @@ interface Candidate {
 
 async function searchAnime(titles: string[]): Promise<Candidate | null> {
   for (const base of BASES) {
-    for (const query of buildSearchQueries(titles)) {
+    // Two queries, as everywhere else. Unbounded, this loop ran
+    // bases × titles × 2 URLs attempts at up to 12s each and reliably burned the
+    // provider's whole 15-20s deadline before reaching the episode lookup, so
+    // mkissa reported `timeout` on every show instead of a result.
+    for (const query of buildSearchQueries(titles).slice(0, 2)) {
       // mkissa.to SPA search
       const searchUrls = [
         `${base}/search/anime?q=${encodeURIComponent(query)}`,
@@ -69,7 +70,7 @@ async function searchAnime(titles: string[]): Promise<Candidate | null> {
       for (const searchUrl of searchUrls) {
         const html = await fetchHtml(searchUrl);
         if (!html) continue;
-        const $ = __tatakai_parse_html__(html);
+        const $ = loadHtml(html);
 
         const candidates: Candidate[] = [];
         const collect = (el: any) => {
@@ -103,7 +104,7 @@ async function searchAnime(titles: string[]): Promise<Candidate | null> {
 async function findEpisodeUrl(animeUrl: string, epNumber: number): Promise<string | null> {
   const html = await fetchHtml(animeUrl);
   if (!html) return null;
-  const $ = __tatakai_parse_html__(html);
+  const $ = loadHtml(html);
 
   let epUrl: string | null = null;
   const patterns = [
@@ -147,7 +148,7 @@ function extractSourcesFromHtml(html: string, epUrl: string): SourceResult[] {
   }
 
   if (out.length === 0) {
-    const $ = __tatakai_parse_html__(html);
+    const $ = loadHtml(html);
     let embedUrl: string | null = null;
     $.find('iframe[src], iframe[data-src]').each((_: number, el: any) => {
       if (embedUrl) return;
@@ -179,6 +180,7 @@ function extractSourcesFromHtml(html: string, epUrl: string): SourceResult[] {
 
 const provider: StreamProvider = {
   name: 'mkissa',
+  sites: BASES,
 
   async single(opts: SourceOptions): Promise<SourceResult[]> {
     try {

@@ -114,7 +114,18 @@ function startRemuxJob({ app, logger, sessionId, inputUrl, audioTrackIndex }) {
   );
 
   if (audioTrackIndex != null && Number.isFinite(Number(audioTrackIndex))) {
-    args.push('-map', `0:a:${Number(audioTrackIndex)}`);
+    // The renderer passes the *absolute* ffprobe stream index — what `probe()`
+    // in media-probe.cjs reports as `index` and what the audio menu stores as
+    // `track.id`. Map it by absolute stream index (`0:N`), NOT by the
+    // audio-relative selector (`0:a:N`).
+    //
+    // The two disagree the moment a file has any non-audio stream before its
+    // audio, which is every file: in the reported 18-track MKV the first audio
+    // is stream 1 (`0:a:0`), so `0:a:1` played the *second* audio and `0:a:4`
+    // (a Thai track at absolute index 4, but only audio indices 0..3 exist)
+    // referenced nothing — ffmpeg exited, the manifest was never written, and
+    // the poll loop timed out. That is the whole "audio not changing" bug.
+    args.push('-map', `0:${Number(audioTrackIndex)}`);
   } else {
     // default: first audio track if present, otherwise let ffmpeg decide.
     args.push('-map', '0:a:0?');

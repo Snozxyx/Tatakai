@@ -1,0 +1,99 @@
+name: Build and Release Toko Extension
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v1.0.0)'
+        required: false
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build extension
+        run: npm run build
+
+      - name: Verify build output
+        run: |
+          if [ ! -f dist/toko.kai ]; then
+            echo "Error: toko.kai not found in dist/"
+            exit 1
+          fi
+          echo "Build successful: toko.kai ($(stat -c%s dist/toko.kai) bytes)"
+
+      - name: Extract version from tag or input
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Toko Extension ${{ steps.version.outputs.version }}
+          body: |
+            ## Toko Extension ${{ steps.version.outputs.version }}
+
+            ### Installation
+            1. Download `toko.kai`
+            2. Install in Tatakai application via Settings → Extensions → Install from file
+
+            ### What's Included
+            - **Stream Providers**: 16 sources for anime streaming
+            - **Manga Providers**: 5 sources for manga reading
+            - **Torrent Providers**: 7 sources for torrent downloads
+
+            ### Features
+            - Concurrent provider execution
+            - Automatic quality detection
+            - Multi-language support
+            - Cloudflare bypass integration
+            - HLS and MP4 streaming
+
+            ### Checksums
+            ```
+            SHA256: $(sha256sum dist/toko.kai | cut -d' ' -f1)
+            ```
+
+            ---
+
+            **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.version.outputs.version }}
+          files: |
+            dist/toko.kai
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: toko-kai-${{ steps.version.outputs.version }}
+          path: dist/toko.kai
+          retention-days: 90

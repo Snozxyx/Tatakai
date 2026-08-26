@@ -772,6 +772,13 @@ class TorrentSessionManager extends EventEmitter {
             seeders,
             leechers,
             ratio: t.ratio,
+            // Byte counters for the session panel. `progress` alone cannot say
+            // "1.2 GB of 5.4 GB", and the size the indexer advertised is often
+            // wrong or absent — these come from the metadata we actually got.
+            downloaded: Number(t.downloaded) || 0,
+            uploaded: Number(t.uploaded) || 0,
+            length: Number(t.length) || 0,
+            numFiles: Array.isArray(t.files) ? t.files.length : 0,
             done: Boolean(t.done),
             verified: Boolean(t.done),
             eta,

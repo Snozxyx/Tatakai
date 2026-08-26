@@ -1,0 +1,79 @@
+name: Build Extension
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'LICENSE'
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build extension
+        run: npm run build
+
+      - name: Verify build output
+        run: |
+          if [ ! -f dist/toko.kai ]; then
+            echo "Error: toko.kai not found in dist/"
+            exit 1
+          fi
+
+          FILE_SIZE=$(stat -c%s dist/toko.kai)
+          FILE_SIZE_MB=$(echo "scale=2; $FILE_SIZE / 1024 / 1024" | bc)
+
+          echo "Build successful!"
+          echo "toko.kai: ${FILE_SIZE_MB}MB (${FILE_SIZE} bytes)"
+
+          MAX_SIZE=$((10 * 1024 * 1024))
+          if [ "$FILE_SIZE" -gt "$MAX_SIZE" ]; then
+            echo "Error: File size exceeds 10MB limit"
+            exit 1
+          fi
+
+      - name: List bundle contents
+        run: |
+          echo "Bundle contents:"
+          unzip -l dist/toko.kai
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: toko-kai-build-${{ github.sha }}
+          path: dist/toko.kai
+          retention-days: 30
+
+      - name: Add build summary
+        run: |
+          FILE_SIZE=$(stat -c%s dist/toko.kai)
+          FILE_SIZE_MB=$(echo "scale=2; $FILE_SIZE / 1024 / 1024" | bc)
+          SHA256=$(sha256sum dist/toko.kai | cut -d' ' -f1)
+
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **File**: toko.kai" >> $GITHUB_STEP_SUMMARY
+          echo "- **Size**: ${FILE_SIZE_MB}MB (${FILE_SIZE} bytes)" >> $GITHUB_STEP_SUMMARY
+          echo "- **SHA256**: \`${SHA256}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Bundle Contents" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          unzip -l dist/toko.kai >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

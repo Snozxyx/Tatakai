@@ -8,7 +8,7 @@ interface ExtensionSlotProps {
 
 export function ExtensionSlot({ slotId, props }: ExtensionSlotProps) {
   const components = extensionRegistry.getSlotComponents(slotId);
-  
+
   if (components.length === 0) return null;
 
   return (

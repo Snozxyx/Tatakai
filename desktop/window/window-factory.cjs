@@ -4,6 +4,7 @@ const pathModule = require('path');
 const { Menu, shell } = require('electron');
 const { attachStreamingCors } = require('./cors-bridge.cjs');
 const { registerShortcuts } = require('./shortcuts.cjs');
+const { adBlocker } = require('../security/ad-blocker.cjs');
 
 /**
  * @param {object} deps
@@ -29,6 +30,7 @@ function createMainWindow(deps) {
     const isAllowedAppUrl = (url) => {
         if (!url || typeof url !== 'string') return false;
         return (
+            
             url.startsWith('https://api.tatakai.me') ||
             url.startsWith('http://localhost:8090') ||
             url.startsWith('http://127.0.0.1:8090') ||
@@ -134,6 +136,9 @@ function createMainWindow(deps) {
     }, 15000);
 
     attachStreamingCors(mainWindow.webContents.session);
+    // Network-level ad/tracker filter — drops ad scripts and ad iframes inside
+    // third-party embeds before they load, without modifying the embed itself.
+    adBlocker.attachToSession(mainWindow.webContents.session);
     mainWindow.webContents.session.setPermissionRequestHandler((_wc, permission, callback) => {
         callback(['clipboard-read', 'clipboard-write'].includes(permission));
     });
@@ -198,7 +203,10 @@ function createMainWindow(deps) {
     });
 
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-        if (/^https?:\/\//i.test(url)) {
+        // Same gate as main.cjs: ad-network and embed-initiated popups are
+        // dropped here instead of being forwarded to the system browser.
+        const verdict = adBlocker.evaluateWindowOpen(url, { source: 'main-window' });
+        if (verdict.allowExternal) {
             shell.openExternal(url);
         }
         return { action: 'deny' };
@@ -211,13 +219,23 @@ function createMainWindow(deps) {
         }
     });
 
-    mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
-        console.error('Failed to load:', { errorCode, errorDescription, validatedURL });
-        if (isDev) {
-            setTimeout(() => {
-                if (mainWindow && !mainWindow.isDestroyed()) mainWindow.reload();
-            }, 3000);
-        }
+    // Codes that mean "this load was deliberately stopped", not "the app is
+    // broken": a cancelled request, an ad-blocker cancel, a CSP/CORB refusal.
+    // Reloading on these is actively harmful — every ad request the blocker
+    // drops inside an embed iframe would otherwise reload the whole app three
+    // seconds later, so the embed could never finish starting.
+    const DELIBERATE_LOAD_FAILURES = new Set([-3, -20, -27]); // ABORTED, BLOCKED_BY_CLIENT, BLOCKED_BY_RESPONSE
+
+    mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+        console.error('Failed to load:', { errorCode, errorDescription, validatedURL, isMainFrame });
+        // Only the app's own top-level document failing to load is a reason to
+        // retry. Subframe failures are the embed's business (and its ads').
+        if (!isDev || !isMainFrame) return;
+        if (DELIBERATE_LOAD_FAILURES.has(errorCode)) return;
+        if (!isAllowedAppUrl(validatedURL)) return;
+        setTimeout(() => {
+            if (mainWindow && !mainWindow.isDestroyed()) mainWindow.reload();
+        }, 3000);
     });
 
     mainWindow.webContents.on('dom-ready', () => {

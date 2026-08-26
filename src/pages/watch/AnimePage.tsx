@@ -28,6 +28,7 @@ import { WatchlistButton } from "@/components/anime/WatchlistButton";
 import { ShareButton } from "@/components/anime/ShareButton";
 import { AddToPlaylistButton } from "@/components/playlist/AddToPlaylistButton";
 import { NextEpisodeSchedule } from "@/components/anime/NextEpisodeSchedule";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { getProxiedImageUrl, fetchJikanCover, fetchProducerAnimes } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
@@ -51,6 +52,8 @@ import {
   GitGraph,
   ArrowRight,
   ChevronRight,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import { SeasonDownloadModal } from "@/components/anime/SeasonDownloadModal";
 import { Helmet } from "react-helmet-async";
@@ -175,11 +178,41 @@ export default function AnimePage() {
 
   const { data: seasonsData } = useAnimeSeasons(seasonsQueryId);
 
+  const [selectedEpisodeGroup, setSelectedEpisodeGroup] = useState(0);
+  const [episodeQuery, setEpisodeQuery] = useState("");
+  const [episodeLayout, setEpisodeLayout] = useState<"grid" | "compact">("compact");
+
   const { data: episodesData, isLoading: loadingEpisodes } = useEpisodes(contentAnimeId);
   const { data: nextEpisodeSchedule } = useNextEpisodeSchedule(contentAnimeId);
 
-  const episodeGroups = useMemo(() => {
+  /**
+   * Episodes matching the search box, or all of them when it is empty.
+   *
+   * Matches the number, the title, every localized title ani.zip carries and the
+   * synopsis — so "temple" finds the episode by what happens in it, not just by
+   * what it is called.
+   */
+  const filteredEpisodes = useMemo(() => {
     const episodes = episodesData?.episodes || [];
+    const needle = episodeQuery.trim().toLowerCase();
+    if (!needle) return episodes;
+
+    return episodes.filter((ep) => {
+      if (String(ep.number) === needle) return true;
+      const haystack = [
+        ep.title,
+        ep.overview,
+        ...Object.values(ep.titles ?? {}),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(needle);
+    });
+  }, [episodesData?.episodes, episodeQuery]);
+
+  const episodeGroups = useMemo(() => {
+    const episodes = filteredEpisodes;
     if (episodes.length <= EPISODES_PER_GROUP) return [episodes];
 
     const groups: typeof episodes[] = [];
@@ -187,7 +220,29 @@ export default function AnimePage() {
       groups.push(episodes.slice(index, index + EPISODES_PER_GROUP));
     }
     return groups;
+  }, [filteredEpisodes]);
+
+  /**
+   * Thumbnails are only worth a card grid if there are thumbnails. ani.zip covers
+   * most catalogued shows but not all, and a wall of empty 16:9 boxes reads worse
+   * than the numbered pills, so the default follows the data.
+   */
+  const episodesHaveThumbnails = useMemo(() => {
+    const episodes = episodesData?.episodes || [];
+    if (episodes.length === 0) return false;
+    const withImage = episodes.filter((ep) => Boolean(ep.image)).length;
+    return withImage / episodes.length >= 0.5;
   }, [episodesData?.episodes]);
+
+  useEffect(() => {
+    setEpisodeLayout(episodesHaveThumbnails ? "grid" : "compact");
+  }, [episodesHaveThumbnails]);
+
+  // A filtered-down list has its own grouping; jumping back to the first group
+  // keeps the range buttons and the rendered slice in agreement.
+  useEffect(() => {
+    setSelectedEpisodeGroup(0);
+  }, [episodeQuery]);
 
   // Get MAL/AniList IDs from Tatakai API response
   const malId = animeData?.moreInfo?.malId || null;
@@ -286,7 +341,6 @@ export default function AnimePage() {
   }, [producerAnimeData?.animes, contentAnimeId]);
   
 
-  const [selectedEpisodeGroup, setSelectedEpisodeGroup] = useState(0);
   const isNative = useIsNativeApp(); // Any native app (desktop or mobile)
   const isDesktopApp = useIsDesktopApp(); // Only Electron/Tauri
   const isMobileNative = useIsMobileApp(); // Only Capacitor (Android/iOS)
@@ -454,9 +508,19 @@ export default function AnimePage() {
   }
 
   const totalEpisodes = episodesData?.episodes?.length || 0;
-  const hasEpisodeGroups = totalEpisodes > EPISODES_PER_GROUP;
+  const matchedEpisodes = filteredEpisodes.length;
+  const isFilteringEpisodes = episodeQuery.trim().length > 0;
+  // The search box appears at the point the plain grid stops being scannable.
+  const showEpisodeToolbar = totalEpisodes > EPISODES_PER_GROUP || episodesHaveThumbnails;
+  const hasEpisodeGroups = matchedEpisodes > EPISODES_PER_GROUP;
   const activeEpisodeGroup = Math.min(selectedEpisodeGroup, Math.max(episodeGroups.length - 1, 0));
-  const visibleEpisodes = episodeGroups[activeEpisodeGroup] || episodesData?.episodes || [];
+  const visibleEpisodes = episodeGroups[activeEpisodeGroup] || filteredEpisodes;
+
+  // Drop the alias that already reads as the page heading so the list doesn't
+  // start by repeating the title above it.
+  const titleAliases = ((moreInfo?.titleAliases as string[] | undefined) ?? []).filter(
+    (alias) => alias.toLowerCase() !== String(info?.name ?? '').toLowerCase()
+  );
 
   if (!info || !moreInfo) return null;
 
@@ -563,6 +627,28 @@ export default function AnimePage() {
                   <p className="text-muted-foreground leading-relaxed">
                     {info.description}
                   </p>
+
+                  {/* Also known as — AniList titles + synonyms + ani.zip's localized
+                      titles. Collapsed by default because popular shows can carry
+                      15+ aliases and they would otherwise bury the synopsis. */}
+                  {titleAliases.length > 0 && (
+                    <details className="mt-4 group">
+                      <summary className="text-xs uppercase tracking-wider text-muted-foreground cursor-pointer hover:text-foreground transition-colors list-none inline-flex items-center gap-1">
+                        Also known as
+                        <span className="text-[10px] opacity-60">({titleAliases.length})</span>
+                      </summary>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {titleAliases.map((alias) => (
+                          <span
+                            key={alias}
+                            className="px-2 py-0.5 rounded-md bg-muted/60 text-xs text-muted-foreground"
+                          >
+                            {alias}
+                          </span>
+                        ))}
+                      </div>
+                    </details>
+                  )}
                 </div>
 
                 {/* More Info */}
@@ -685,6 +771,9 @@ export default function AnimePage() {
               airingTime={nextEpisodeSchedule.airingISOTimestamp}
               nextEpisodeNumber={nextEpisodeSchedule.episode || (info.stats.episodes.sub || info.stats.episodes.dub || 0) + 1}
               dayOfWeek={nextEpisodeSchedule.dayOfWeek}
+              episodeTitle={nextEpisodeSchedule.title}
+              overview={nextEpisodeSchedule.overview}
+              thumbnail={nextEpisodeSchedule.image}
             />
           )}
 
@@ -693,20 +782,70 @@ export default function AnimePage() {
             <div className="flex flex-col gap-4 mb-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="font-display text-2xl font-semibold">Episodes</h2>
-                <span className="text-sm text-muted-foreground">
-                  {totalEpisodes} total
-                </span>
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-sm text-muted-foreground">
+                    {isFilteringEpisodes
+                      ? `${matchedEpisodes} of ${totalEpisodes}`
+                      : `${totalEpisodes} total`}
+                  </span>
+                  {showEpisodeToolbar && (
+                    <>
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                        <input
+                          type="search"
+                          value={episodeQuery}
+                          onChange={(event) => setEpisodeQuery(event.target.value)}
+                          placeholder="Search number or title..."
+                          aria-label="Search episodes"
+                          className="h-9 w-48 md:w-60 pl-8 pr-3 rounded-full bg-muted/50 border border-border text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        />
+                      </div>
+                      <div className="flex items-center rounded-full border border-border overflow-hidden">
+                        <button
+                          onClick={() => setEpisodeLayout("grid")}
+                          aria-label="Thumbnail view"
+                          aria-pressed={episodeLayout === "grid"}
+                          className={cn(
+                            "px-3 h-9 transition-colors",
+                            episodeLayout === "grid"
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-muted/50 text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          <LayoutGrid className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setEpisodeLayout("compact")}
+                          aria-label="Compact view"
+                          aria-pressed={episodeLayout === "compact"}
+                          className={cn(
+                            "px-3 h-9 transition-colors",
+                            episodeLayout === "compact"
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-muted/50 text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          <List className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
               {hasEpisodeGroups && (
                 <div className="flex flex-wrap gap-2">
                   {episodeGroups.map((group, index) => {
-                    const start = index * EPISODES_PER_GROUP + 1;
-                    const end = Math.min((index + 1) * EPISODES_PER_GROUP, totalEpisodes);
+                    // Labelled by the episode numbers actually in the group rather
+                    // than by slice arithmetic — with a search active the groups no
+                    // longer line up with 1-24, 25-48, …
+                    const start = group[0]?.number ?? index * EPISODES_PER_GROUP + 1;
+                    const end = group[group.length - 1]?.number ?? start;
                     const isActive = index === activeEpisodeGroup;
 
                     return (
                       <button
-                        key={`${start}-${end}`}
+                        key={`${start}-${end}-${index}`}
                         onClick={() => setSelectedEpisodeGroup(index)}
                         className={`px-4 py-2 rounded-full text-sm font-semibold transition-all border ${isActive
                           ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20"
@@ -721,7 +860,8 @@ export default function AnimePage() {
               )}
               {hasEpisodeGroups && (
                 <p className="text-xs text-muted-foreground">
-                  Showing episodes {activeEpisodeGroup * EPISODES_PER_GROUP + 1}-{Math.min((activeEpisodeGroup + 1) * EPISODES_PER_GROUP, totalEpisodes)} of {totalEpisodes}
+                  Showing {visibleEpisodes.length} of {matchedEpisodes}
+                  {isFilteringEpisodes ? ` matching episodes` : ` episodes`}
                 </p>
               )}
             </div>
@@ -731,21 +871,170 @@ export default function AnimePage() {
                   <Skeleton key={i} className="h-12 rounded-lg" />
                 ))}
               </div>
-            ) : episodesData ? (
-              <div className="grid grid-cols-4 md:grid-cols-8 lg:grid-cols-12 gap-2">
+            ) : !episodesData ? null : visibleEpisodes.length === 0 ? (
+              <GlassPanel className="p-6 text-center text-sm text-muted-foreground">
+                No episode matches "{episodeQuery.trim()}".
+              </GlassPanel>
+            ) : episodeLayout === "grid" ? (
+              /* Thumbnail cards. The screencap, air date, runtime and synopsis all
+                 come from ani.zip, which is also what decides the numbering here. */
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {visibleEpisodes.map((ep, index) => (
                   <ContextMenu key={`${ep.episodeId}-${index}`}>
                     <ContextMenuTrigger>
                       <button
                         onClick={() => handleEpisodeClick(ep.episodeId)}
-                        className={`h-12 w-full rounded-lg font-medium transition-all hover:scale-105 relative ${ep.isFiller
-                          ? "bg-orange/20 text-orange hover:bg-orange/30"
-                          : "bg-muted hover:bg-primary hover:text-primary-foreground"
-                          }`}
                         title={ep.title}
+                        className={cn(
+                          "group w-full text-left rounded-xl overflow-hidden border bg-muted/30 transition-all hover:border-primary/60 hover:bg-muted/60",
+                          ep.isFiller
+                            ? "border-orange/40"
+                            : ep.hasAired === false
+                              ? "border-dashed border-white/15 opacity-70"
+                              : "border-border"
+                        )}
                       >
-                        {ep.number}
+                        <div className="relative aspect-video bg-muted/60 overflow-hidden">
+                          {ep.image ? (
+                            <img
+                              src={ep.image}
+                              alt={ep.title}
+                              loading="lazy"
+                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                              onError={(event) => {
+                                event.currentTarget.style.visibility = "hidden";
+                              }}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Tv className="w-7 h-7 text-muted-foreground/40" />
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                          <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/70 text-white text-xs font-bold backdrop-blur-sm">
+                            EP {ep.number}
+                          </span>
+                          {ep.isFiller && (
+                            <span className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-orange/90 text-black text-[10px] font-bold uppercase tracking-wide">
+                              Filler
+                            </span>
+                          )}
+                          {ep.hasAired === false && (
+                            <span className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-primary/90 text-primary-foreground text-[10px] font-bold uppercase tracking-wide">
+                              Upcoming
+                            </span>
+                          )}
+                          <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <span className="w-11 h-11 rounded-full bg-primary/90 flex items-center justify-center shadow-lg">
+                              <Play className="w-5 h-5 text-primary-foreground ml-0.5" />
+                            </span>
+                          </span>
+                        </div>
+                        <div className="p-3 space-y-1.5">
+                          <p className="text-sm font-semibold leading-snug line-clamp-2 group-hover:text-primary transition-colors">
+                            {ep.title}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                            {ep.airDate && (
+                              <span className="inline-flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                {ep.airDate}
+                              </span>
+                            )}
+                            {ep.runtime ? (
+                              <span className="inline-flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {ep.runtime}m
+                              </span>
+                            ) : null}
+                          </div>
+                          {ep.overview && (
+                            <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
+                              {ep.overview}
+                            </p>
+                          )}
+                        </div>
                       </button>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent>
+                      <ContextMenuItem
+                        onClick={() => handleEpisodeClick(ep.episodeId)}
+                        className="gap-2 cursor-pointer"
+                      >
+                        <Play className="w-4 h-4" />
+                        Play Episode
+                      </ContextMenuItem>
+                    </ContextMenuContent>
+                  </ContextMenu>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-4 md:grid-cols-8 lg:grid-cols-12 gap-2">
+                {visibleEpisodes.map((ep, index) => (
+                  <ContextMenu key={`${ep.episodeId}-${index}`}>
+                    <ContextMenuTrigger>
+                      <HoverCard openDelay={220} closeDelay={80}>
+                        <HoverCardTrigger asChild>
+                          <button
+                            onClick={() => handleEpisodeClick(ep.episodeId)}
+                            className={`h-12 w-full rounded-lg font-medium transition-all hover:scale-105 relative ${ep.isFiller
+                              ? "bg-orange/20 text-orange hover:bg-orange/30"
+                              : ep.hasAired === false
+                                // Dated in the future: still listed (ani.zip knows
+                                // about it) but visibly not playable yet.
+                                ? "bg-muted/40 text-muted-foreground border border-dashed border-white/15 hover:bg-muted/60"
+                                : "bg-muted hover:bg-primary hover:text-primary-foreground"
+                              }`}
+                            title={ep.title}
+                          >
+                            {ep.number}
+                          </button>
+                        </HoverCardTrigger>
+                        <HoverCardContent side="top" className="w-72 p-0 overflow-hidden">
+                          {ep.image && (
+                            <img
+                              src={ep.image}
+                              alt={ep.title}
+                              loading="lazy"
+                              className="w-full aspect-video object-cover"
+                              onError={(event) => { event.currentTarget.style.display = 'none'; }}
+                            />
+                          )}
+                          <div className="p-3 space-y-1.5">
+                            <p className="text-sm font-semibold leading-snug">
+                              {ep.number}. {ep.title}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                              {ep.airDate && (
+                                <span className="inline-flex items-center gap-1">
+                                  <Calendar className="w-3 h-3" />
+                                  {ep.airDate}
+                                </span>
+                              )}
+                              {ep.runtime ? (
+                                <span className="inline-flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {ep.runtime}m
+                                </span>
+                              ) : null}
+                              {ep.hasAired === false && (
+                                <span className="text-primary font-medium">Not yet aired</span>
+                              )}
+                              {ep.isFiller && <span className="text-orange font-medium">Filler</span>}
+                            </div>
+                            {ep.overview && (
+                              <p className="text-xs text-muted-foreground leading-relaxed line-clamp-5 pt-1">
+                                {ep.overview}
+                              </p>
+                            )}
+                            {/* The native title is the one worth showing beside the
+                                English one; the other ~12 languages would just be noise. */}
+                            {ep.titles?.ja && ep.titles.ja !== ep.title && (
+                              <p className="text-xs text-muted-foreground/80 pt-1">{ep.titles.ja}</p>
+                            )}
+                          </div>
+                        </HoverCardContent>
+                      </HoverCard>
                     </ContextMenuTrigger>
                     <ContextMenuContent>
                       {/* Download Episode removed from context menu */}
@@ -760,7 +1049,7 @@ export default function AnimePage() {
                   </ContextMenu>
                 ))}
               </div>
-            ) : null}
+            )}
           </section>
 
           {/* Seasons Section */}

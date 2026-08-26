@@ -42,6 +42,7 @@ import { ExternalPlayerSettings } from '@/components/settings/ExternalPlayerSett
 import { DebridSettingsPanel } from '@/components/settings/DebridSettingsPanel';
 import { TorrentSettings } from '@/components/settings/TorrentSettings';
 import { HomeServerSettings } from '@/components/settings/HomeServerSettings';
+import { FlareSolverrSettings } from '@/components/settings/FlareSolverrSettings';
 import { isDiscordRpcEnabled } from '@/lib/discordRpc';
 
 import { useIsNativeApp } from '@/hooks/ui/useIsNativeApp';
@@ -522,6 +523,8 @@ export function DesktopSettings() {
                     </div>
 
                     <HomeServerSettings />
+
+                    <FlareSolverrSettings />
 
                     <div className="p-4 rounded-xl bg-muted/30">
                         <CountryPolicyPanel />

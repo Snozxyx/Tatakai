@@ -3,6 +3,7 @@
 const { Notification } = require('electron');
 const pathMod = require('path');
 const extPlayer = require('../services/external-player.cjs');
+const { adBlocker } = require('../security/ad-blocker.cjs');
 
 /**
  * ipc-system.cjs
@@ -34,6 +35,15 @@ module.exports = function registerSystemHandlers(ipcMain, app, dialog, autoUpdat
     // ── External links ─────────────────────────────────────────────────────────
     ipcMain.handle('shell:open-external', async (_event, url) => {
         if (/^https?:\/\//i.test(url)) {
+            // Route through the app-level ad blocker so an ad-network target can
+            // never reach the user's browser, even via the in-app link handler.
+            const verdict = adBlocker.evaluateWindowOpen(url, {
+                source: 'ipc-open-external',
+                userInitiated: true,
+            });
+            if (!verdict.allowExternal) {
+                return { success: false, error: verdict.reason || 'blocked' };
+            }
             await shell.openExternal(url);
             return { success: true };
         }

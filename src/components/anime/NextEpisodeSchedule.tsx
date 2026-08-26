@@ -11,6 +11,12 @@ interface NextEpisodeScheduleProps {
   airingTime?: string; // ISO string or Unix timestamp
   nextEpisodeNumber?: number;
   dayOfWeek?: string;
+  // ── ani.zip enrichment — optional ───────────────────────────────────────────
+  // AniList and the Jikan broadcast fallback only know *when* the next episode
+  // airs; ani.zip also knows what it is, so these render only on that path.
+  episodeTitle?: string;
+  overview?: string;
+  thumbnail?: string;
 }
 
 function formatTimeUntil(targetDate: Date): {
@@ -80,6 +86,9 @@ export function NextEpisodeSchedule({
   airingTime,
   nextEpisodeNumber,
   dayOfWeek,
+  episodeTitle,
+  overview,
+  thumbnail,
 }: NextEpisodeScheduleProps) {
   const [notifyEnabled, setNotifyEnabled] = useState(false);
   const [userTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
@@ -174,11 +183,32 @@ export function NextEpisodeSchedule({
 
       {nextEpisodeNumber && (
         <p className="text-center text-muted-foreground mb-4">
-          Episode {nextEpisodeNumber} airs in:
+          Episode {nextEpisodeNumber}
+          {episodeTitle ? <span className="text-foreground font-medium"> · {episodeTitle}</span> : null}
+          {' '}airs in:
         </p>
       )}
 
       <CountdownTimer targetDate={targetDate} />
+
+      {(thumbnail || overview) && (
+        <div className="mt-6 flex gap-4 items-start">
+          {thumbnail && (
+            <img
+              src={thumbnail}
+              alt={episodeTitle || `Episode ${nextEpisodeNumber ?? ''}`}
+              loading="lazy"
+              className="w-32 aspect-video shrink-0 rounded-lg object-cover border border-white/10"
+              // A missing screencap should leave the synopsis alone rather than
+              // render a broken-image glyph next to it.
+              onError={(event) => { event.currentTarget.style.display = 'none'; }}
+            />
+          )}
+          {overview && (
+            <p className="text-sm text-muted-foreground leading-relaxed line-clamp-4">{overview}</p>
+          )}
+        </div>
+      )}
 
       <div className="mt-6 space-y-2 text-sm text-muted-foreground">
         <div className="flex items-center gap-2">

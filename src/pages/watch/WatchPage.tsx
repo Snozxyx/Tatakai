@@ -6,6 +6,7 @@ import {
   useAnimeInfo,
 } from "@/hooks/api/useAnimeData";
 import { useCombinedSourcesWithRefetch } from "@/hooks/media/useCombinedSources";
+import type { EpisodeServer } from "@/types/anime";
 import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
@@ -55,6 +56,9 @@ import { clearDiscordRpc } from "@/lib/discordRpc";
 import { ReportModal } from "@/components/ui/ReportModal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { EpisodeComments } from "@/components/video/EpisodeComments";
+import { TorrentSwitchDialog } from "@/components/watch/TorrentSwitchDialog";
+import { TorrentSourcePanel } from "@/components/watch/TorrentSourcePanel";
+import { TorrentSessionPanel } from "@/components/watch/TorrentSessionPanel";
 import { ReviewPopup } from "@/components/ui/ReviewPopup";
 import { Button } from "@/components/ui/button";
 import { MarketplaceSubmitModal } from "@/components/ui/MarketplaceSubmitModal";
@@ -124,6 +128,34 @@ function joinLocalPath(root: string, child?: string): string {
   return `${root.replace(/[\\/]+$/g, '')}${separator}${String(child).replace(/^[\\/]+/g, '')}`;
 }
 
+/** Registry/provider key for the primary stream provider (displayed as "Nebula"). */
+const NEBULA_KEY = "nebula";
+
+/**
+ * Identifies Nebula sources. Not an ordering hook — which server plays first is
+ * the extension's call, expressed as `providerPriority` (see `availableServers`).
+ * This is only used where Nebula's sources genuinely behave differently: it may
+ * draw from the whole source pool rather than a provider-scoped slice, and it is
+ * not an "official" source for attribution purposes.
+ *
+ * It sets `providerKey: 'nebula'` explicitly, so the key is the bare name — but
+ * its `server` field names the player and audio track instead
+ * (`nebula-megaplay-sub`, `nebula-megaplay-dub`), and other providers
+ * (animeya, reanime, animelok) leave `providerKey` to fall back to that compound
+ * form. Accept both shapes so a caller passing either field matches, and so a
+ * source still in the host's 10-minute cache under the old `justanime-*` names
+ * is still recognised.
+ */
+function isNebulaServer(serverName?: string | null): boolean {
+  const name = String(serverName || '').trim().toLowerCase();
+  return (
+    name === NEBULA_KEY ||
+    name.startsWith(`${NEBULA_KEY}-`) ||
+    name === 'justanime' ||
+    name.startsWith('justanime-')
+  );
+}
+
 export default function WatchPage() {
   const { episodeId } = useParams<{ episodeId: string }>();
   const navigate = useNavigate();
@@ -184,6 +216,36 @@ export default function WatchPage() {
     }
   }, []);
 
+  /**
+   * The torrent the user clicked, held until they confirm the switch.
+   *
+   * Joining a swarm is not the same kind of act as loading a hosted stream — it
+   * publishes the user's IP to every peer, uploads back to them, and writes the
+   * whole release to disk — so it does not happen as a side effect of clicking a
+   * source button. `TorrentSwitchDialog` states what changes and only then is
+   * `playTorrentSource` allowed to run.
+   */
+  const [pendingTorrentSource, setPendingTorrentSource] = useState<any | null>(null);
+  /** Where the engine writes, read from the runtime so the dialog shows the real path. */
+  const [torrentDownloadPath, setTorrentDownloadPath] = useState<string>('');
+
+  // Resolved when the confirmation is first needed rather than on mount — most
+  // sessions never open a torrent, and this is an IPC round-trip.
+  useEffect(() => {
+    if (!pendingTorrentSource || torrentDownloadPath) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const paths = await (window as any).tatakaiRuntime?.getTorrentStoragePaths?.();
+        const resolved = String(paths?.torrentPath || paths?.cachePath || '').trim();
+        if (!cancelled && resolved) setTorrentDownloadPath(resolved);
+      } catch {
+        // Non-fatal: the dialog just omits the path line.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [pendingTorrentSource, torrentDownloadPath]);
+
   const [torrentPlaybackSource, setTorrentPlaybackSource] = useState<null | {
     id: string;
     url: string;
@@ -226,8 +288,141 @@ export default function WatchPage() {
     return Math.max(0, Math.min(100, raw));
   }, [torrentLiveStats?.progress]);
 
+  /**
+   * Leave the live torrent session and hand playback back to the hosted streams.
+   *
+   * The `?sessionId=` param is the single source of truth for "a torrent is
+   * playing" — the stream-url effect, the timeline lock and the takeover flag all
+   * key off it. Stopping the engine without stripping it left the page in a state
+   * where the torrent branch still won every decision, so the user could not get
+   * back to a normal source without a reload. Both actions belong together.
+   */
+  const leaveTorrentSession = useCallback(() => {
+    const runtime = (window as any).tatakaiRuntime;
+
+    if (torrentSessionId && typeof runtime?.stopTorrentSession === 'function') {
+      // Same policy as finishing an episode: a completed file is worth keeping,
+      // a partial one under storage optimization is not.
+      const keepCompletedFile = Boolean(torrentLiveStats?.done || torrentProgressPercent >= 100);
+      const destroyStore = Boolean(optimizeTorrentStorage && !keepCompletedFile);
+      void runtime.stopTorrentSession(torrentSessionId, { destroyStore }).catch(() => { });
+    }
+
+    setTorrentPlaybackSource(null);
+    setTorrentPlaybackLoading(false);
+    setTorrentPlaybackError(null);
+    setTorrentLiveStats(null);
+
+    const params = new URLSearchParams(location.search);
+    if (params.has('sessionId')) {
+      params.delete('sessionId');
+      const query = params.toString();
+      navigate(query ? `${location.pathname}?${query}` : location.pathname, { replace: true });
+    }
+  }, [
+    torrentSessionId,
+    torrentLiveStats?.done,
+    torrentProgressPercent,
+    optimizeTorrentStorage,
+    location.search,
+    location.pathname,
+    navigate,
+  ]);
+
+  /**
+   * Play a torrent source that the user clicked in the server list.
+   *
+   * Torrent sources are excluded from `playbackSources` on purpose — a magnet URI
+   * is not something a media element can load — and until now that meant
+   * clicking one did nothing visible at all: it was selected, then silently
+   * dropped. The torrent engine is what turns a magnet into a playable URL, and
+   * everything downstream of a live session already works, keyed off the
+   * `?sessionId=` search param. So all this has to do is start the session and
+   * put its id in the URL; the effect above takes it from there.
+   */
+  const playTorrentSource = useCallback(async (source: any) => {
+    const magnet = String(source?.magnetLink || source?.url || '');
+    if (!/^magnet:/i.test(magnet)) {
+      setTorrentPlaybackError('This torrent has no magnet link to start from.');
+      return;
+    }
+
+    const runtime = (window as any).tatakaiRuntime;
+    if (!isDesktop || typeof runtime?.startTorrentSession !== 'function') {
+      setTorrentPlaybackError('Torrent playback is only available in the desktop app.');
+      return;
+    }
+
+    setTorrentPlaybackLoading(true);
+    setTorrentPlaybackError(
+      // Indexer seeder counts are frequently stale, so a 0 is worth trying and
+      // worth warning about rather than refusing outright.
+      Number(source?.seeders ?? 0) === 0
+        ? 'No seeders reported for this release — trying anyway...'
+        : 'Starting torrent...'
+    );
+    setAutoRepairCount(0);
+
+    // Tear the previous stream down *before* the await, not after.
+    //
+    // `committedPlaybackSource` is deliberately sticky so the player does not
+    // churn while sources are still resolving, which meant the source the user
+    // was watching stayed committed for the whole "session starting" window and
+    // kept playing underneath the torrent. An embed was the worst case: the
+    // iframe stayed mounted and audible. Clearing it here — and re-arming the
+    // commit flag so the torrent URL is allowed to take its place — is what
+    // actually stops the old stream.
+    //
+    // These live in the body only. They are declared further down the component,
+    // so naming them in this callback's dependency array would be a TDZ error.
+    pendingPlaybackCommitRef.current = true;
+    setCommittedPlaybackSource(null);
+    setCommittedPlaybackHeaders(null);
+    setLockedSourceUrl(null);
+    setTorrentPlaybackSource(null);
+    setTorrentLiveStats(null);
+
+    try {
+      // The session manager accepts a magnet in place of an info hash and pulls
+      // the hash out itself. `autoSelectLargest` is what makes season packs work
+      // as well as single-episode releases.
+      const started = await runtime.startTorrentSession(magnet, {
+        magnet,
+        autoSelectLargest: true,
+        optimizeStorage: optimizeTorrentStorage,
+      });
+
+      if (started?.sessionId) {
+        const params = new URLSearchParams(location.search);
+        params.set('sessionId', started.sessionId);
+        navigate(`${location.pathname}?${params.toString()}`, { replace: true });
+        return;
+      }
+
+      setTorrentPlaybackLoading(false);
+      setTorrentPlaybackError(String(started?.error || 'Could not start this torrent.'));
+    } catch (err: any) {
+      setTorrentPlaybackLoading(false);
+      setTorrentPlaybackError(err?.message || 'Could not start this torrent.');
+    }
+  }, [isDesktop, optimizeTorrentStorage, location.search, location.pathname, navigate]);
+
   const torrentVerified = Boolean(torrentSessionId && torrentLiveStats?.done === true && torrentLiveStats?.verified !== false);
   const torrentTimelineLocked = Boolean(torrentSessionId && !torrentVerified);
+
+  /**
+   * True from the moment a torrent is confirmed until the session is left.
+   *
+   * While it holds, no hosted stream may be handed to the player at all. Without
+   * it the previous source kept playing after a torrent was selected: for the
+   * whole window between "session starting" and "stream URL resolved",
+   * `torrentPlaybackSource` is still null, so the playback candidate fell back to
+   * `resolvedSelectedSource` and `playbackSources` still listed every direct
+   * stream — and VideoPlayer plays `sources[0]` on auto.
+   */
+  const torrentTakeoverActive = Boolean(
+    torrentSessionId || torrentPlaybackLoading || torrentPlaybackSource,
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -608,6 +803,10 @@ export default function WatchPage() {
   const [newProviderCount, setNewProviderCount] = useState(0);
   const [providerFeedUpdatedAt, setProviderFeedUpdatedAt] = useState<number | null>(null);
   const [lockedSourceUrl, setLockedSourceUrl] = useState<string | null>(null);
+  // Exact source picked from the language-grouped list. `(langCode, providerName)`
+  // is not unique — one provider can return a dozen sources for the same episode,
+  // so keying selection on it highlighted (and played) all of them at once.
+  const [preferredSourceUrl, setPreferredSourceUrl] = useState<string | null>(null);
   const [blockedSourceUrls, setBlockedSourceUrls] = useState<Record<string, number>>({});
   const [committedPlaybackSource, setCommittedPlaybackSource] = useState<any | null>(null);
   const [committedPlaybackHeaders, setCommittedPlaybackHeaders] = useState<{ Referer?: string; "User-Agent"?: string;[key: string]: string | undefined } | null>(null);
@@ -615,6 +814,18 @@ export default function WatchPage() {
   const selectedServerNameRef = useRef<string | null>(null);
   const pendingPlaybackCommitRef = useRef(true);
   const failoverTimeoutRef = useRef<number | null>(null);
+
+  // Arm the app-level ad/popunder blocker for the lifetime of this page only.
+  // Third-party embeds are the sole place the app renders untrusted markup, so
+  // filtering the rest of the app can only produce false positives.
+  useEffect(() => {
+    const security = (window as any).electron?.security;
+    if (!security?.setWatchActive) return;
+    security.setWatchActive(true);
+    return () => {
+      security.setWatchActive(false);
+    };
+  }, []);
 
   useEffect(() => {
     if (!isDeveloperMode && showSourceDebug) {
@@ -882,27 +1093,51 @@ export default function WatchPage() {
     });
 
     const sorted = sortServersByHealth(dedupedServers);
-    const pinServerFirst = (servers: typeof sorted, targetName: string) => {
-      const target = String(targetName || "").trim().toLowerCase();
-      if (!target) return servers;
-      const index = servers.findIndex((server) => String(server.serverName || "").trim().toLowerCase() === target);
-      if (index <= 0) return servers;
-      const pinned = servers[index];
-      return [pinned, ...servers.slice(0, index), ...servers.slice(index + 1)];
-    };
 
+    /**
+     * Server order is the extension's decision, not the app's.
+     *
+     * `providerPriority` is the rank the extension stamps on every source from
+     * its own provider registry (`providerPriorityOf` in
+     * `extension/toko/src/providers/registry.ts`); the host relays it untouched
+     * and `mapRawSourcesToStreamingData` carries it onto each server. Sorting on
+     * it here is not a second policy — the numbers are the extension's, this
+     * only re-applies them after the dedupe above loses the array order.
+     *
+     * This replaces a hardcoded "pin Nebula first" pass, which needed an app
+     * release to change the preferred provider and — because it ran *after* the
+     * saved-preference pin below — silently overrode whichever server the user
+     * had explicitly chosen.
+     *
+     * Stable within a rank, so a provider's own quality/seeder ordering
+     * survives, and unranked servers (the central-dispatch fallback, which
+     * knows nothing about extension providers) keep their relative order at the
+     * end.
+     */
+    const ranked = sorted
+      .map((server, idx) => ({ server, idx }))
+      .sort((a, b) => {
+        const pa = Number.isFinite(a.server?.providerPriority)
+          ? Number(a.server.providerPriority)
+          : Number.MAX_SAFE_INTEGER;
+        const pb = Number.isFinite(b.server?.providerPriority)
+          ? Number(b.server.providerPriority)
+          : Number.MAX_SAFE_INTEGER;
+        return pa === pb ? a.idx - b.idx : pa - pb;
+      })
+      .map(({ server }) => server);
+
+    // An explicit user choice outranks the extension's default.
     const savedPref = getPreferredServer(animeId, category);
-    let ordered = sorted;
     if (savedPref) {
-      const prefIndex = ordered.findIndex((s) => s.serverName.toLowerCase() === savedPref.toLowerCase());
+      const prefIndex = ranked.findIndex((s) => s.serverName.toLowerCase() === savedPref.toLowerCase());
       if (prefIndex > 0) {
-        const pinned = ordered[prefIndex];
-        ordered = [pinned, ...ordered.slice(0, prefIndex), ...ordered.slice(prefIndex + 1)];
+        const pinned = ranked[prefIndex];
+        return [pinned, ...ranked.slice(0, prefIndex), ...ranked.slice(prefIndex + 1)];
       }
     }
 
-    // Keep Koro (justanime) as first server when available.
-    return pinServerFirst(ordered, "justanime");
+    return ranked;
   }, [category, serversData, animeId, dubProfile]);
 
   const availableServersRef = useRef(availableServers);
@@ -937,6 +1172,7 @@ export default function WatchPage() {
       setSelectedLangCode(null);
       setSelectedProviderServerKey(null);
       setPreferredServerName(null);
+      setPreferredSourceUrl(null);
       setFailedServers(new Set());
       return;
     }
@@ -975,7 +1211,8 @@ export default function WatchPage() {
     }
   }, [loadingServers, category, availableServers.length, animeId, decodedEpisodeId, user?.id, selectRegularServer]);
 
-  // Auto-select server when servers load: prefer saved server, then hd-1 (Goku), then first
+  // Auto-select server when servers load: saved server, then the extension's
+  // top-ranked provider, then hd-1 (Goku), then first eligible.
   useEffect(() => {
     if (availableServers.length > 0 && selectedServerIndex === -1) {
       const isEligible = (serverName: string) => {
@@ -983,13 +1220,8 @@ export default function WatchPage() {
         return !shouldAutoSkipSource(key);
       };
 
-      const koroIndex = availableServers.findIndex((s) => s.serverName.toLowerCase() === 'justanime' && isEligible(s.serverName));
-      if (koroIndex !== -1) {
-        selectRegularServer(koroIndex);
-        return;
-      }
-
-      // First try the saved server preference (but not hd-1)
+      // The saved preference is an explicit user choice, so it is tried before
+      // the extension's default rather than after it.
       if (preferredServerName && preferredServerName !== 'hd-1') {
         const savedIndex = availableServers.findIndex(s => s.serverName === preferredServerName);
         if (savedIndex !== -1 && isEligible(availableServers[savedIndex].serverName)) {
@@ -997,6 +1229,25 @@ export default function WatchPage() {
           return;
         }
       }
+
+      // The extension's highest-ranked server, preferring its subbed entry — a
+      // dub group is a deliberate choice, not a default. No provider is named
+      // here: `availableServers` is already in the extension's `providerPriority`
+      // order, so "top-ranked" is simply the first entry that carries a rank.
+      // Reordering the extension's registry changes what plays first with no
+      // change on this side.
+      const isRanked = (s: EpisodeServer) => Number.isFinite(s?.providerPriority);
+      const rankedSub = availableServers.findIndex(
+        (s) => isRanked(s) && !/-dub$/i.test(String(s.serverName || '')) && isEligible(s.serverName),
+      );
+      const rankedIndex = rankedSub !== -1
+        ? rankedSub
+        : availableServers.findIndex((s) => isRanked(s) && isEligible(s.serverName));
+      if (rankedIndex !== -1) {
+        selectRegularServer(rankedIndex);
+        return;
+      }
+
       // Try to find hd-1 (Goku) as default
       const hd1Index = availableServers.findIndex(s => s.serverName === 'hd-1' && isEligible(s.serverName));
       if (hd1Index !== -1) {
@@ -1043,7 +1294,7 @@ export default function WatchPage() {
     }
 
     if (selectedServerIndex === -4) {
-      return [decodedEpisodeId, category, "grouped", (selectedLangCode || "").toLowerCase(), (preferredServerName || "").toLowerCase()].join("|");
+      return [decodedEpisodeId, category, "grouped", (selectedLangCode || "").toLowerCase(), (preferredServerName || "").toLowerCase(), preferredSourceUrl || ""].join("|");
     }
 
     if (selectedServerIndex === -3) {
@@ -1055,18 +1306,35 @@ export default function WatchPage() {
     }
 
     return [decodedEpisodeId, category, String(selectedServerIndex)].join("|");
-  }, [decodedEpisodeId, category, selectedServerIndex, selectedLangCode, selectedProviderServerKey, preferredServerName, availableServers]);
+  }, [decodedEpisodeId, category, selectedServerIndex, selectedLangCode, selectedProviderServerKey, preferredServerName, preferredSourceUrl, availableServers]);
 
   useEffect(() => {
     setLockedSourceUrl(null);
   }, [activeSelectionIdentity]);
 
+  // A pinned source URL belongs to one episode/category only — carrying it over
+  // would leave the grouped list with nothing highlighted after a switch.
+  useEffect(() => {
+    setPreferredSourceUrl(null);
+  }, [decodedEpisodeId, category]);
+
   // Find current episode BEFORE using it in hooks
   const currentEpisodeIndex = useMemo(() => {
     const list = isOfflineMode ? offlineManifest?.episodes : episodesData?.episodes;
-    return list?.findIndex(
+    if (!list || list.length === 0) return -1;
+
+    const exact = list.findIndex(
       (ep: any) => (ep.episodeId || ep.id) === decodedEpisodeId
-    ) ?? -1;
+    );
+    if (exact >= 0) return exact;
+
+    // The id carries its own episode number (`<baseId>?ep=<n>`), so fall back to
+    // that. Without it a link minted from one episode tier goes unrecognised when
+    // the list is later rebuilt from another — which is what left the header
+    // reading "Episode ?" while the sidebar showed the episode just fine.
+    const parsed = Number(/[?&]ep=(\d+)/i.exec(String(decodedEpisodeId || ""))?.[1]);
+    if (!Number.isFinite(parsed) || parsed <= 0) return -1;
+    return list.findIndex((ep: any) => Number(ep.number) === parsed);
   }, [isOfflineMode, offlineManifest, episodesData, decodedEpisodeId]);
 
   const currentEpisode = useMemo(() => {
@@ -1314,6 +1582,62 @@ export default function WatchPage() {
     }
   };
 
+  // Source-type / seeder driven button colouring (Extension-API sources):
+  //   embed → accent (primary) · hls/mp4 → grey (muted) · torrent → green
+  //   torrent with 0 seeders → red. Selected/failed overrides are applied by the
+  //   caller on top of this base class.
+  const getSourceTypeColorClass = (source: any, opts?: { isProviderServer?: boolean }): string => {
+    const s = source || {};
+    const type = String(s.sourceType || "").toLowerCase();
+    const isTorrent = s.isTorrent === true || type === "torrent";
+    if (isTorrent) {
+      const seeders = typeof s.seeders === "number" ? s.seeders : undefined;
+      if (seeders === 0) return "bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30";
+      return "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+    }
+    const isEmbed = s.isEmbed === true || type === "embed";
+    if (isEmbed) return "bg-primary/5 hover:bg-primary/10 text-primary border border-primary/15";
+    const isDirect = type === "hls" || type === "mp4" || s.isM3U8 === true;
+    if (isDirect) return "bg-muted hover:bg-muted/80 text-foreground/80";
+    // Indeterminate: preserve the provider-server accent look, else neutral grey.
+    return opts?.isProviderServer
+      ? "bg-primary/5 hover:bg-primary/10 text-primary border border-primary/15"
+      : "bg-muted hover:bg-muted/80";
+  };
+
+  // Rich hover metadata rows for a source/server (Extension-API enrichment).
+  // Returns [{label, value}] so both button regions render an identical card.
+  const buildSourceHoverRows = (
+    source: any,
+    extra?: { count?: number },
+  ): Array<{ label: string; value: string }> => {
+    if (!source) return [];
+    const rows: Array<{ label: string; value: string }> = [];
+    const push = (label: string, value: any) => {
+      if (value === undefined || value === null || value === "") return;
+      rows.push({ label, value: String(value) });
+    };
+    const type = String(source.sourceType || "").toLowerCase();
+    const isTorrent = source.isTorrent === true || type === "torrent";
+    if (extra?.count && extra.count > 0) push("Sources", extra.count);
+    push("Type", source.sourceType || (source.isEmbed ? "embed" : source.isM3U8 ? "hls" : undefined));
+    push("Quality", source.quality);
+    push("Audio", source.languageLabel || source.language);
+    if (source.language && source.language !== (source.languageLabel || "")) push("Language", source.language);
+    push("Provider", source.providerName);
+    push("Key", source.providerKey);
+    push("Server", source.server);
+    push("Format", source.fileFormat);
+    push("Size", source.fileSize);
+    if (isTorrent) {
+      push("Torrent", source.torrentTitle);
+      push("Seeders", typeof source.seeders === "number" ? source.seeders : undefined);
+      push("Leechers", typeof source.leechers === "number" ? source.leechers : undefined);
+      push("Peers", typeof source.peers === "number" ? source.peers : undefined);
+    }
+    return rows;
+  };
+
   // Fetch subtitles from sub stream in a lightweight way when watching dub.
   // Avoid full combined provider fan-out here to prevent duplicate API bursts.
   const { data: subSourcesData } = useQuery({
@@ -1434,7 +1758,12 @@ export default function WatchPage() {
 
     // Handle grouped sources (index -4)
     if (selectedServerIndex === -4 && selectedLangCode) {
-      // If we have a provider name in state, match it too
+      // Exact URL match first — a provider often returns several sources for the
+      // same language, and only the clicked one should play.
+      if (preferredSourceUrl) {
+        const exact = visibleSources.find((s) => s.url === preferredSourceUrl);
+        if (exact) return exact;
+      }
       return visibleSources.find(s =>
         s.langCode === selectedLangCode &&
         (preferredServerName ? s.providerName === preferredServerName : true)
@@ -1459,19 +1788,18 @@ export default function WatchPage() {
     // Handle regular servers
     if (selectedServerIndex >= 0 && availableServers[selectedServerIndex]) {
       const serverName = availableServers[selectedServerIndex].serverName;
-      const isKoroServer = String(serverName || "").trim().toLowerCase() === "justanime";
-      const candidatePool = isKoroServer
+      const isNebula = isNebulaServer(serverName);
+      const candidatePool = isNebula
         ? visibleSources
         : visibleSources.filter((source) => {
-          const providerKey = String(source.providerKey || "").trim().toLowerCase();
           const providerName = String(source.providerName || "").trim().toLowerCase();
-          return providerKey !== "justanime" && !providerName.includes("koro");
+          return !isNebulaServer(source.providerKey) && !providerName.includes("koro");
         });
       return selectSourceForServer(candidatePool, serverName, category);
     }
 
     return null;
-  }, [visibleSources, selectedServerIndex, selectedLangCode, selectedProviderServerKey, availableServers, preferredServerName]);
+  }, [visibleSources, selectedServerIndex, selectedLangCode, selectedProviderServerKey, availableServers, preferredServerName, preferredSourceUrl]);
 
   const selectedSource = useMemo(() => {
     if (!visibleSources.length) return null;
@@ -1521,20 +1849,23 @@ export default function WatchPage() {
   }, [sourceDataForPlayback?.headers?.Referer, sourceDataForPlayback?.headers?.["User-Agent"], refererRetryIndex, torrentPlaybackSource]);
 
   const playbackCandidateSource = useMemo(() => {
-    return torrentPlaybackSource || resolvedSelectedSource || null;
-  }, [torrentPlaybackSource, resolvedSelectedSource]);
-
-  const playbackSources = useMemo(() => {
-    if (torrentPlaybackSource) {
-      return [torrentPlaybackSource];
-    }
-
-    return visibleSources;
-  }, [torrentPlaybackSource, visibleSources]);
+    if (torrentPlaybackSource) return torrentPlaybackSource;
+    // A torrent has been confirmed but its stream URL is not ready yet. Falling
+    // back to the previously selected stream here is what left the old source
+    // playing behind the torrent, so the candidate is deliberately empty for the
+    // duration of the handover — the player shows its loading state instead.
+    if (torrentTakeoverActive) return null;
+    return resolvedSelectedSource || null;
+  }, [torrentPlaybackSource, torrentTakeoverActive, resolvedSelectedSource]);
 
   useEffect(() => {
     if (!playbackCandidateSource) {
-      if (pendingPlaybackCommitRef.current) {
+      // `pendingPlaybackCommitRef` normally protects the committed source from
+      // being dropped while the next one resolves. A torrent takeover is the one
+      // case where the old source must go immediately whatever that flag says —
+      // it is the source the user just replaced, and keeping it mounted is what
+      // kept the previous stream audible.
+      if (pendingPlaybackCommitRef.current || torrentTakeoverActive) {
         setCommittedPlaybackSource(null);
         setCommittedPlaybackHeaders(null);
       }
@@ -1546,11 +1877,48 @@ export default function WatchPage() {
       setCommittedPlaybackHeaders(playbackHeaders);
       pendingPlaybackCommitRef.current = false;
     }
-  }, [playbackCandidateSource, playbackHeaders, committedPlaybackSource]);
+  }, [playbackCandidateSource, playbackHeaders, committedPlaybackSource, torrentTakeoverActive]);
 
   const activePlaybackSource = committedPlaybackSource || playbackCandidateSource;
   const activePlaybackHeaders = committedPlaybackHeaders || playbackHeaders;
   const playbackLoading = torrentPlaybackLoading || !playbackCandidateSource || !sourceReady;
+
+  const playbackSources = useMemo(() => {
+    if (torrentPlaybackSource) {
+      return [torrentPlaybackSource];
+    }
+
+    // Mid-handover: the session is starting but has no stream URL yet. The list
+    // has to be empty, not "the direct streams minus the torrent" — VideoPlayer
+    // takes `sources[0]` on auto quality, so anything left in here is a stream
+    // that keeps playing while the torrent spins up.
+    if (torrentTakeoverActive) {
+      return [];
+    }
+
+    // VideoPlayer resolves its own source from this list and, on the default
+    // "auto" quality, simply takes `sources[0]`. Handing it the raw
+    // `visibleSources` therefore meant it played whichever provider streamed in
+    // first — including an embed page URL, which `<video>` rejects with
+    // MEDIA_ELEMENT_ERROR (Format error) — no matter which source was selected.
+    // So: keep only what a media element can actually decode, and put the
+    // active selection first.
+    const directOnly = visibleSources.filter((source: any) => {
+      if (!source?.url) return false;
+      if (source.isEmbed === true) return false;
+      if (source.isTorrent === true) return false;
+      const type = String(source.sourceType || "");
+      if (type === "embed" || type === "torrent") return false;
+      return /^(https?:|blob:|file:|\/)/i.test(String(source.url));
+    });
+
+    const activeUrl = activePlaybackSource?.url;
+    if (!activeUrl) return directOnly;
+
+    const activeIndex = directOnly.findIndex((source: any) => source.url === activeUrl);
+    if (activeIndex <= 0) return directOnly;
+    return [directOnly[activeIndex], ...directOnly.filter((_, i) => i !== activeIndex)];
+  }, [torrentPlaybackSource, torrentTakeoverActive, visibleSources, activePlaybackSource?.url]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1644,7 +2012,7 @@ export default function WatchPage() {
   const isOfficialSource = useCallback((source: any) => {
     if (!source) return false;
 
-    if (String(source.providerKey || "").trim().toLowerCase() === "justanime") {
+    if (isNebulaServer(source.providerKey)) {
       return false;
     }
 
@@ -1699,6 +2067,27 @@ export default function WatchPage() {
     return () => clearTimeout(timer);
   }, [newProviderCount]);
 
+  /**
+   * Every torrent source for this episode, in provider-resolution order.
+   *
+   * Torrents are pulled out of the language groups entirely: a release is chosen
+   * on swarm health and file size, not on language, and a flat button row cannot
+   * show either. `TorrentSourcePanel` renders these with those numbers visible
+   * and sortable.
+   */
+  const torrentSources = useMemo(
+    () =>
+      visibleSources.filter(
+        (source: any) => source?.isTorrent === true || source?.sourceType === 'torrent',
+      ),
+    [visibleSources],
+  );
+
+  const isTorrentSource = useCallback(
+    (source: any) => source?.isTorrent === true || source?.sourceType === 'torrent',
+    [],
+  );
+
   // Group external sources by language (excluding marketplace)
   const languageGroups = useMemo<Record<string, any[]>>(() => {
     if (visibleSources.length === 0) return {};
@@ -1707,6 +2096,7 @@ export default function WatchPage() {
       // Only group external providers (Animelok, WatchAnimeWorld, Animeya, etc.)
       // AND exclude marketplace sources (they have their own section)
       if (isOfficialSource(source)) return acc;
+      if (isTorrentSource(source)) return acc;
       if (!source.providerName || source.providerName === 'TatakaiAPI' || source.langCode?.startsWith('marketplace-')) return acc;
 
       let lang = source.language || "Unknown";
@@ -1739,11 +2129,21 @@ export default function WatchPage() {
       acc[lang].push(source);
       return acc;
     }, {});
-  }, [visibleSources, isOfficialSource]);
+  }, [visibleSources, isOfficialSource, isTorrentSource]);
 
+  // Button labels. Two rules matter here:
+  //  - the *label* must derive from the provider (so the curated aliases in
+  //    serverNames.ts apply), never from the language code — keying by langCode
+  //    collapsed every Japanese source onto one entry, which is why they all
+  //    rendered as the last provider's name ("anikoto 34").
+  //  - each individual source still needs its own slot, so identity keys are
+  //    `<providerKey>#<nth>` and the numeric suffix is added by
+  //    buildUniqueSimpleNameMap only when labels actually collide.
   const uniqueLabelMap = useMemo(() => {
     const keys: string[] = [];
     const fallbackByKey: Record<string, string> = {};
+    const identityBySource = new Map<any, string>();
+    const occurrences = new Map<string, number>();
 
     for (const server of availableServers) {
       const key = String(server.serverName);
@@ -1751,15 +2151,21 @@ export default function WatchPage() {
       fallbackByKey[key] = String(server.displayName || server.providerName || server.serverName);
     }
 
-    Object.entries(languageGroups).forEach(([lang, sources]) => {
-      sources.forEach((source: any, sIdx: number) => {
-        const key = String(source?.langCode || source?.server || source?.providerKey || `${lang}-${sIdx}`);
-        keys.push(key);
-        fallbackByKey[key] = String(source?.providerName || key);
+    Object.values(languageGroups).forEach((sources) => {
+      sources.forEach((source: any) => {
+        const providerId = String(
+          source?.providerKey || source?.server || source?.providerName || "source",
+        ).toLowerCase();
+        const nth = (occurrences.get(providerId) || 0) + 1;
+        occurrences.set(providerId, nth);
+        const identityKey = `${providerId}#${nth}`;
+        identityBySource.set(source, identityKey);
+        keys.push(identityKey);
+        fallbackByKey[identityKey] = String(source?.providerName || providerId);
       });
     });
 
-    return buildUniqueSimpleNameMap(keys, fallbackByKey);
+    return { labels: buildUniqueSimpleNameMap(keys, fallbackByKey), identityBySource };
   }, [availableServers, languageGroups]);
 
   // Language-tab filter — when activeSourceLanguage is not 'all', only show sources
@@ -1790,8 +2196,18 @@ export default function WatchPage() {
   };
 
   const getSimpleSourceLabel = (source: any, fallbackKey: string) => {
-    const key = String(source?.langCode || source?.server || source?.providerKey || source?.providerName || fallbackKey);
-    return uniqueLabelMap[key] || getSimpleServerDisplayName(key, String(source?.providerName || fallbackKey));
+    const identityKey = uniqueLabelMap.identityBySource.get(source);
+    if (identityKey && uniqueLabelMap.labels[identityKey]) return uniqueLabelMap.labels[identityKey];
+
+    // Sources outside the grouped list (e.g. the currently selected one after a
+    // refetch) resolve straight from the provider identity.
+    const providerId = String(
+      source?.providerKey || source?.server || source?.providerName || fallbackKey,
+    );
+    return (
+      uniqueLabelMap.labels[providerId] ||
+      getSimpleServerDisplayName(providerId, String(source?.providerName || fallbackKey))
+    );
   };
 
   const activeServerDisplayName = useMemo(() => {
@@ -1929,6 +2345,7 @@ export default function WatchPage() {
     selectRegularServer(-4);
     setSelectedLangCode(nextSource.langCode);
     setPreferredServerName(nextSource.providerName || null);
+    setPreferredSourceUrl(nextSource.url || null);
     setLockedSourceUrl(nextSource.url || null);
     setRefererRetryIndex(0);
     return true;
@@ -1949,6 +2366,11 @@ export default function WatchPage() {
     const isForbiddenStream = statusCode === 403;
     const isMissingStream = statusCode === 404;
     const isManifestFailure = reason.includes("manifest");
+    // EmbedPlayer reports `embed-host-502`, `embed-host-unreachable`,
+    // `embed-load-timeout`, `embed-iframe-error`. All of them mean the iframe
+    // host itself is down, which no retry of ours can change — block the URL and
+    // move on rather than leaving a dead frame on screen.
+    const isEmbedHostFailure = reason.startsWith("embed-");
     const isCodecBufferFailure =
       reason.includes("codec") ||
       reason.includes("buffer") ||
@@ -1992,12 +2414,14 @@ export default function WatchPage() {
       return;
     }
 
-    if (isExpiredStream || isForbiddenStream || isMissingStream || isManifestFailure || isCodecBufferFailure) {
+    if (isExpiredStream || isForbiddenStream || isMissingStream || isManifestFailure || isCodecBufferFailure || isEmbedHostFailure) {
       const ttlMs = isExpiredStream
         ? 2 * 60 * 1000
         : isCodecBufferFailure
           ? 3 * 60 * 1000
-          : 90 * 1000;
+          : isEmbedHostFailure
+            ? 5 * 60 * 1000
+            : 90 * 1000;
       blockPlaybackSourceUrl(activePlaybackSource?.url, ttlMs);
       setLockedSourceUrl(null);
       pendingPlaybackCommitRef.current = true;
@@ -2020,7 +2444,9 @@ export default function WatchPage() {
             ? "codec decode error"
             : isManifestFailure
               ? "manifest error"
-              : `stream error (${statusCode})`,
+              : isEmbedHostFailure
+                ? `embed host down (${reason})`
+                : `stream error (${statusCode})`,
         { purgeProviderFallback: isExpiredStream }
       );
     }
@@ -2374,7 +2800,7 @@ export default function WatchPage() {
             "space-y-4 md:space-y-6",
             !isGenericTorrent ? "xl:col-span-9" : "w-full"
           )}>
-            {/* Torrent status moved to sticky banner (see TorrentStickyBanner) */}
+            {/* Live torrent session state renders below the player (TorrentSessionPanel) */}
 
             <div className="rounded-xl md:rounded-2xl overflow-hidden border border-border/30 bg-card/60">
 
@@ -2384,6 +2810,7 @@ export default function WatchPage() {
                   url={activePlaybackSource.url}
                   poster={animeData?.info.poster}
                   language={activePlaybackSource.language}
+                  referer={activePlaybackHeaders?.Referer}
                   onError={handleVideoError}
                 />
               ) : isMobileApp ? (
@@ -2453,10 +2880,11 @@ export default function WatchPage() {
                   }}
                   onTorrentStop={async () => {
                     try {
-                      await (window as any).tatakaiRuntime?.stopTorrentSession?.(torrentSessionId, { removeData: false });
+                      // Goes through the shared exit path so `?sessionId=` is
+                      // stripped too — otherwise the torrent branch keeps
+                      // winning every playback decision after the stop.
+                      leaveTorrentSession();
                       toast.success('Torrent stopped');
-                      setTorrentLiveStats(null);
-                      setTorrentPlaybackSource(null);
                     } catch (e) {
                       toast.error('Failed to stop torrent');
                     }
@@ -2464,6 +2892,32 @@ export default function WatchPage() {
                 />
               )}
             </div>
+
+            {/* Live torrent session state — only while one is actually running */}
+            {torrentTakeoverActive && (
+              <TorrentSessionPanel
+                sessionId={torrentSessionId}
+                stats={torrentLiveStats}
+                progressPercent={torrentProgressPercent}
+                verified={torrentVerified}
+                loading={torrentPlaybackLoading}
+                error={torrentPlaybackError}
+                downloadPath={torrentDownloadPath}
+                optimizeStorage={optimizeTorrentStorage}
+                onRepair={async () => {
+                  try {
+                    await (window as any).tatakaiRuntime?.reannounceTorrent?.(torrentSessionId);
+                    toast.success('Looking for more peers');
+                  } catch {
+                    toast.error('Repair failed');
+                  }
+                }}
+                onStop={() => {
+                  leaveTorrentSession();
+                  toast.success('Torrent stopped');
+                }}
+              />
+            )}
 
             {/* Episode Info & Navigation */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -2542,27 +2996,15 @@ export default function WatchPage() {
                         <Subtitles className="w-4 h-4" />
                         Sub
                       </button>
-                      <button
-                        onClick={() => handleCategoryChange("dub")}
-                        className={`h-9 md:h-10 px-4 md:px-5 rounded-xl flex items-center gap-2 font-medium transition-all text-sm ${category === "dub"
-                          ? "bg-secondary text-secondary-foreground shadow-lg shadow-secondary/25"
-                          : "bg-muted hover:bg-muted/80"
-                          }`}
-                      >
-                        <Volume2 className="w-4 h-4" />
-                        Dub
-                      </button>
-                      {category === "dub" && (
-                        <select
-                          value={dubProfile}
-                          onChange={(e) => setDubProfile(e.target.value as DubQualityProfile)}
-                          className="h-9 md:h-10 px-3 rounded-xl bg-muted text-sm"
-                          title="Dub profile: Stability prioritizes healthy servers; Quality prioritizes HD servers"
-                        >
-                          <option value="stability">Dub: Stability</option>
-                          <option value="quality">Dub: Quality</option>
-                        </select>
-                      )}
+                      {/*
+                        The Dub toggle (and its stability/quality profile select)
+                        was removed: dubbed audio now arrives as its own entry in
+                        the language groups below — providers label it per source
+                        (`nebula-megaplay-dub`, `animeya-vidnest-dub`, …) — so a
+                        separate global category only ever fought with that list,
+                        refetching every server to land on the same sources the
+                        user could already pick directly.
+                      */}
                     </div>
                     {sourcePreflightError && (
                       <p className="text-xs text-amber-400 mt-1">{sourcePreflightError}</p>
@@ -2630,7 +3072,7 @@ export default function WatchPage() {
                           <div className="flex flex-wrap gap-2">
                             {availableServers.map((server, idx) => {
                               // Skip TatakaiAPI if other servers exist to reduce noise
-                              const serverLabel = uniqueLabelMap[String(server.serverName)] || getSimpleServerDisplayName(server.serverName, server.displayName || server.providerName || server.serverName);
+                              const serverLabel = uniqueLabelMap.labels[String(server.serverName)] || getSimpleServerDisplayName(server.serverName, server.displayName || server.providerName || server.serverName);
                               if (!server.isProviderServer && serverLabel === 'TatakaiAPI' && availableServers.length > 1) return null;
 
                               const serverSource = visibleSources.length
@@ -2642,6 +3084,10 @@ export default function WatchPage() {
                               const healthScore = getSourceHealthScore(server.serverName);
                               const workingState = failCount >= 2 || failedServers.has(server.serverName) ? "Not working" : "Working";
                               const serverDescription = `${workingState} • Health ${healthScore}/100 • Fails ${failCount} • Source ${server.serverName}${serverSource?.url ? ` • ${getUrlHost(serverSource.url)}` : ""}`;
+                              const providerSourceCount = (server as any).sourceCount ?? visibleSources.filter((s: any) => String(s.server || s.providerKey || s.providerName || "") === String(server.serverName)).length;
+                              const serverHoverRows = buildSourceHoverRows(serverSource || server, { count: providerSourceCount });
+                              const serverRealProvider = (serverSource as any)?.providerName || server.providerName || server.serverName;
+                              const serverRealKey = (serverSource as any)?.providerKey || server.providerKey;
 
                               return (
                                 <TooltipProvider key={server.serverId}>
@@ -2653,6 +3099,7 @@ export default function WatchPage() {
                                           setSelectedLangCode(null);
                                           setSelectedProviderServerKey(null);
                                           setPreferredServerName(null);
+                                          setPreferredSourceUrl(null);
                                           setFailedServers(new Set());
                                           setPreferredServer(server.serverName);
                                           setRefererRetryIndex(0);
@@ -2662,9 +3109,7 @@ export default function WatchPage() {
                                           ? "bg-foreground text-background shadow-lg"
                                           : failedServers.has(server.serverName)
                                             ? "bg-destructive/20 text-destructive"
-                                            : server.isProviderServer
-                                              ? "bg-primary/5 hover:bg-primary/10 text-primary border border-primary/15"
-                                              : "bg-muted hover:bg-muted/80"
+                                            : getSourceTypeColorClass(serverSource || server, { isProviderServer: server.isProviderServer })
                                           }`}
                                       >
                                         {serverLabel}
@@ -2674,24 +3119,33 @@ export default function WatchPage() {
                                         {failedServers.has(server.serverName) && " ✗"}
                                       </button>
                                     </TooltipTrigger>
-                                    {nextEstimate && (
-                                      <TooltipContent side="top" className="max-w-xs">
-                                        <div className="flex items-center gap-2">
-                                          <Clock className="w-3 h-3" />
-                                          <span className="text-xs">
-                                            {serverDescription} | Next episode for {serverSource?.language || 'this language'}: {nextEstimate}
+                                    <TooltipContent side="top" className="max-w-xs bg-background/95 backdrop-blur-xl border-white/10 shadow-2xl">
+                                      <div className="space-y-1.5 p-1">
+                                        <div className="flex items-center justify-between gap-2">
+                                          <span className="text-xs font-semibold">{serverLabel}</span>
+                                          <span className="text-[10px] text-muted-foreground truncate max-w-[10rem]" title={serverRealKey ? `${serverRealProvider} (${serverRealKey})` : serverRealProvider}>
+                                            {serverRealProvider}{serverRealKey ? ` · ${serverRealKey}` : ""}
                                           </span>
                                         </div>
-                                      </TooltipContent>
-                                    )}
-                                    {!nextEstimate && (
-                                      <TooltipContent side="top" className="max-w-xs">
-                                        <div className="space-y-1">
-                                          <div className="text-xs font-semibold">{serverLabel}</div>
-                                          <div className="text-xs text-muted-foreground">{serverDescription}</div>
-                                        </div>
-                                      </TooltipContent>
-                                    )}
+                                        {serverHoverRows.length > 0 && (
+                                          <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                                            {serverHoverRows.map((row) => (
+                                              <div key={row.label} className="flex items-center justify-between gap-2 text-[10px]">
+                                                <span className="text-muted-foreground">{row.label}</span>
+                                                <span className="font-medium truncate max-w-[8rem]" title={row.value}>{row.value}</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                        <div className="text-[10px] text-muted-foreground border-t border-white/10 pt-1">{serverDescription}</div>
+                                        {nextEstimate && (
+                                          <div className="flex items-center gap-1.5 text-[10px] text-primary">
+                                            <Clock className="w-3 h-3" />
+                                            <span>Next {serverSource?.language || "episode"}: {nextEstimate}</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </TooltipContent>
                                   </Tooltip>
                                 </TooltipProvider>
                               );
@@ -2720,11 +3174,20 @@ export default function WatchPage() {
                           </div>
                         </div>
 
+                        {/* Torrent releases — sortable on the fields that decide the pick */}
+                        <TorrentSourcePanel
+                          sources={torrentSources}
+                          activeUrl={torrentPlaybackSource?.url}
+                          isDesktop={isDesktop}
+                          onSelect={setPendingTorrentSource}
+                        />
+
                         {/* Language Groups (Categorized External Sources) */}
                         <SourceLanguageTabs
                           sources={visibleSources.filter(
                             (src) =>
                               !isOfficialSource(src) &&
+                              !isTorrentSource(src) &&
                               !!src.providerName &&
                               src.providerName !== "TatakaiAPI" &&
                               !src.langCode?.startsWith("marketplace-"),
@@ -2740,9 +3203,15 @@ export default function WatchPage() {
                             </div>
                             <div className="flex flex-wrap gap-2">
                               {sources.map((source, sIdx) => {
-                                const isSelected = selectedServerIndex === -4 &&
-                                  selectedLangCode === source.langCode &&
-                                  preferredServerName === source.providerName;
+                                // Match on the exact URL when we have one: a provider can
+                                // return many sources for the same episode, so
+                                // (langCode, providerName) would light up all of them.
+                                const isSelected = selectedServerIndex === -4 && (
+                                  preferredSourceUrl
+                                    ? preferredSourceUrl === source.url
+                                    : selectedLangCode === source.langCode &&
+                                      preferredServerName === source.providerName
+                                );
                                 const nextEstimate = getNextEpisodeEstimate(source);
                                 const label = getSimpleSourceLabel(source, `${lang}-${sIdx}`);
                                 const sourceServerName = source.server || source.providerKey || source.langCode || source.providerName || `source-${sIdx}`;
@@ -2751,6 +3220,9 @@ export default function WatchPage() {
                                 const healthScore = getSourceHealthScore(sourceServerName);
                                 const workingState = failCount >= 2 ? "Not working" : "Working";
                                 const hoverInfo = `${workingState} • Health ${healthScore}/100 • Fails ${failCount} • Source ${sourceServerName} • ${getUrlHost(source.url)}`;
+                                const sourceHoverRows = buildSourceHoverRows(source);
+                                const sourceRealProvider = source.providerName || source.server || sourceServerName;
+                                const sourceRealKey = source.providerKey;
 
                                 return (
                                   <TooltipProvider key={`${source.langCode}-${source.providerName}-${sIdx}`}>
@@ -2758,16 +3230,37 @@ export default function WatchPage() {
                                       <TooltipTrigger asChild>
                                         <button
                                           onClick={() => {
+                                            // A torrent can't be handed to the
+                                            // media element — it has to go
+                                            // through the torrent engine first,
+                                            // and joining a swarm is a big
+                                            // enough change to confirm first.
+                                            // Selection state is left alone
+                                            // until then, so cancelling really
+                                            // does nothing.
+                                            if (source.isTorrent === true || source.sourceType === "torrent") {
+                                              setPendingTorrentSource(source);
+                                              return;
+                                            }
+                                            // Picking a hosted stream is also how
+                                            // the user gets *out* of a torrent.
+                                            // Without this the session keeps
+                                            // seeding and `?sessionId=` keeps the
+                                            // torrent branch ahead of whatever
+                                            // was just selected.
+                                            if (torrentTakeoverActive) {
+                                              leaveTorrentSession();
+                                            }
+                                            pendingPlaybackCommitRef.current = true;
                                             selectRegularServer(-4);
                                             setSelectedLangCode(source.langCode);
                                             setPreferredServerName(source.providerName || null);
+                                            setPreferredSourceUrl(source.url || null);
                                             setFailedServers(new Set());
                                           }}
                                           className={`h-9 px-3 md:px-4 rounded-xl font-medium transition-all text-sm flex items-center gap-2 ${isSelected
                                             ? "bg-foreground text-background shadow-lg"
-                                            : source.isEmbed
-                                              ? "bg-primary/5 hover:bg-primary/10 text-primary/80 border border-primary/20"
-                                              : "bg-muted hover:bg-muted/80"
+                                            : getSourceTypeColorClass(source)
                                             }`}
                                           title={hoverInfo}
                                         >
@@ -2794,14 +3287,28 @@ export default function WatchPage() {
                                               {source.server}
                                             </div>
                                           )}
-                                          {nextEstimate && (
-                                            <div className="flex items-center gap-2 text-muted-foreground text-xs">
-                                              <Clock className="w-3 h-3" />
-                                              <span>{hoverInfo} | Next episode: {nextEstimate}</span>
+                                          <div className="flex items-center justify-between gap-2">
+                                            <span className="text-xs font-semibold">{label}</span>
+                                            <span className="text-[10px] text-muted-foreground truncate max-w-[10rem]" title={sourceRealKey ? `${sourceRealProvider} (${sourceRealKey})` : sourceRealProvider}>
+                                              {sourceRealProvider}{sourceRealKey ? ` · ${sourceRealKey}` : ""}
+                                            </span>
+                                          </div>
+                                          {sourceHoverRows.length > 0 && (
+                                            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                                              {sourceHoverRows.map((row) => (
+                                                <div key={row.label} className="flex items-center justify-between gap-2 text-[10px]">
+                                                  <span className="text-muted-foreground">{row.label}</span>
+                                                  <span className="font-medium truncate max-w-[8rem]" title={row.value}>{row.value}</span>
+                                                </div>
+                                              ))}
                                             </div>
                                           )}
-                                          {!source.server?.startsWith('Shared by') && !nextEstimate && (
-                                            <span className="text-xs">{hoverInfo}</span>
+                                          <div className="text-[10px] text-muted-foreground border-t border-white/10 pt-1">{hoverInfo}</div>
+                                          {nextEstimate && (
+                                            <div className="flex items-center gap-1.5 text-[10px] text-primary">
+                                              <Clock className="w-3 h-3" />
+                                              <span>Next episode: {nextEstimate}</span>
+                                            </div>
                                           )}
                                         </div>
                                       </TooltipContent>
@@ -3005,6 +3512,23 @@ export default function WatchPage() {
       <MarketplaceModal
         isOpen={isMarketplaceListVisible}
         onClose={() => setIsMarketplaceListVisible(false)}
+      />
+
+      {/* Gate on the swarm switch — see `pendingTorrentSource`. */}
+      <TorrentSwitchDialog
+        source={pendingTorrentSource}
+        animeTitle={animeData?.info.name || (isOfflineMode ? offlineManifest?.animeName : '') || undefined}
+        episodeLabel={currentEpisode?.number ? `Episode ${currentEpisode.number}` : undefined}
+        isDesktop={isDesktop}
+        optimizeStorage={optimizeTorrentStorage}
+        downloadPath={torrentDownloadPath || undefined}
+        onCancel={() => setPendingTorrentSource(null)}
+        onConfirm={(source) => {
+          setPendingTorrentSource(null);
+          setSelectedLangCode(source.langCode);
+          setPreferredServerName(source.providerName || null);
+          void playTorrentSource(source);
+        }}
       />
 
       {/* Redirect Warning Popup */}
