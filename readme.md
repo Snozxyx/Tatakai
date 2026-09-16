@@ -185,6 +185,7 @@ Need contact? [Click here](mailto:snozxyx@gmail.com)
 ---
 
 ## AI Usage
+https://vsllm.com
 
 This project uses AI.  
 Read more: [docs/disclaimerai.md](docs/disclaimerai.md)
