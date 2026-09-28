@@ -7,6 +7,14 @@ import {
   writeGuestSettingsCookie,
 } from '@/lib/appSettingsPersistence';
 
+export type Anime4KPreset =
+  | 'off'
+  | 'light' // Restore CNN S + Upscale CNN x2 S — cheap sharpen/upscale
+  | 'standard' // Restore CNN M + Upscale CNN x2 M
+  | 'high'; // Denoise + Restore CNN M + Upscale CNN x2 M
+
+export type SleepTimerOption = 'off' | '15' | '30' | '45' | '60' | 'end-of-episode';
+
 export interface VideoSettings {
   defaultQuality: 'auto' | '1080p' | '720p' | '480p' | '360p';
   autoplay: boolean;
@@ -20,49 +28,74 @@ export interface VideoSettings {
     | 'portuguese'
     | 'arabic'
     | 'hindi'
-    | 'auto'
-    | string;
-  secondarySubtitleLanguage:
-    | 'off'
-    | 'english'
-    | 'spanish'
-    | 'french'
-    | 'german'
-    | 'japanese'
-    | 'portuguese'
-    | 'arabic'
-    | 'hindi'
+    | 'korean'
+    | 'chinese'
+    | 'thai'
+    | 'indonesian'
+    | 'vietnamese'
+    | 'italian'
+    | 'russian'
+    | 'turkish'
+    | 'dutch'
+    | 'polish'
     | 'auto'
     | string;
   playbackSpeed: number;
   volume: number;
   autoSkipIntro: boolean;
   autoNextEpisode: boolean;
+  autoNextCountdownSeconds: number; // Up-Next countdown length before auto-advance
   // Subtitle styling
   subtitleSize: 'small' | 'medium' | 'large' | 'xlarge';
-  subtitleFont: 'default' | 'serif' | 'mono' | 'comic';
+  subtitleFont: 'default' | 'serif' | 'mono' | 'comic' | 'custom';
   subtitleBackground: 'none' | 'semi' | 'solid';
+  subtitleColor: string; // hex text color
+  subtitleOpacity: number; // backdrop opacity 0..1
+  subtitleOutline: boolean; // draw text outline/shadow
+  subtitlePosition: number; // vertical offset from bottom, 0..40 (vh-ish steps)
+  subtitleOffset: number; // manual sync offset in seconds, negative = earlier
   alwaysUseExternalPlayer: boolean;
+  // Playback modes / player behavior
+  loopVideo: boolean;
+  ambientMode: boolean; // ambient glow behind player
+  stableVolume: boolean; // dynamic-range compression via WebAudio
+  theaterMode: boolean; // wide layout
+  sleepTimer: SleepTimerOption;
+  // Anime4K upscaling
+  anime4kPreset: Anime4KPreset;
 }
 
 const DEFAULT_SETTINGS: VideoSettings = {
   defaultQuality: 'auto',
   autoplay: true,
   subtitleLanguage: 'english',
-  secondarySubtitleLanguage: 'off',
   playbackSpeed: 1,
   volume: 1,
   autoSkipIntro: false,
   autoNextEpisode: true,
+  autoNextCountdownSeconds: 10,
   subtitleSize: 'medium',
   subtitleFont: 'default',
   subtitleBackground: 'semi',
+  subtitleColor: '#ffffff',
+  subtitleOpacity: 0.7,
+  subtitleOutline: true,
+  subtitlePosition: 0,
+  subtitleOffset: 0,
   alwaysUseExternalPlayer: false,
+  loopVideo: false,
+  ambientMode: false,
+  stableVolume: false,
+  theaterMode: false,
+  sleepTimer: 'off',
+  anime4kPreset: 'off',
 };
 
 const STORAGE_KEY = 'video-player-settings';
 const UPDATE_EVENT = 'tatakai-video-settings-updated';
 const VALID_DEFAULT_QUALITIES = new Set(['auto', '1080p', '720p', '480p', '360p']);
+const VALID_ANIME4K_PRESETS = new Set<Anime4KPreset>(['off', 'light', 'standard', 'high']);
+const VALID_SLEEP_TIMERS = new Set<SleepTimerOption>(['off', '15', '30', '45', '60', 'end-of-episode']);
 const VALID_SUBTITLE_LANGUAGES = new Set([
   'off',
   'english',
@@ -73,10 +106,23 @@ const VALID_SUBTITLE_LANGUAGES = new Set([
   'portuguese',
   'arabic',
   'hindi',
+  'korean',
+  'chinese',
+  'thai',
+  'indonesian',
+  'vietnamese',
+  'italian',
+  'russian',
+  'turkish',
+  'dutch',
+  'polish',
   'auto',
 ]);
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+const asBool = (value: unknown, fallback: boolean) => (typeof value === 'boolean' ? value : fallback);
+const isHexColor = (value: unknown): value is string =>
+  typeof value === 'string' && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value);
 
 const normalizeSettings = (raw: Partial<VideoSettings> & { autoPlayNext?: boolean } | null | undefined): VideoSettings => {
   const autoNextEpisode =
@@ -98,12 +144,6 @@ const normalizeSettings = (raw: Partial<VideoSettings> & { autoPlayNext?: boolea
         ? (value as VideoSettings['subtitleLanguage'])
         : DEFAULT_SETTINGS.subtitleLanguage;
     })(),
-    secondarySubtitleLanguage: (() => {
-      const value = String((raw as any)?.secondarySubtitleLanguage || '');
-      return VALID_SUBTITLE_LANGUAGES.has(value) || value.startsWith('sub:') || value.startsWith('custom:')
-        ? (value as VideoSettings['secondarySubtitleLanguage'])
-        : DEFAULT_SETTINGS.secondarySubtitleLanguage;
-    })(),
     playbackSpeed: clamp(
       Number.isFinite(Number(raw?.playbackSpeed)) ? Number(raw?.playbackSpeed) : DEFAULT_SETTINGS.playbackSpeed,
       0.1,
@@ -114,26 +154,50 @@ const normalizeSettings = (raw: Partial<VideoSettings> & { autoPlayNext?: boolea
       0,
       1,
     ),
-    autoplay: typeof raw?.autoplay === 'boolean' ? raw.autoplay : DEFAULT_SETTINGS.autoplay,
-    autoSkipIntro: typeof raw?.autoSkipIntro === 'boolean' ? raw.autoSkipIntro : DEFAULT_SETTINGS.autoSkipIntro,
-    alwaysUseExternalPlayer: typeof raw?.alwaysUseExternalPlayer === 'boolean' ? raw.alwaysUseExternalPlayer : DEFAULT_SETTINGS.alwaysUseExternalPlayer,
+    autoplay: asBool(raw?.autoplay, DEFAULT_SETTINGS.autoplay),
+    autoSkipIntro: asBool(raw?.autoSkipIntro, DEFAULT_SETTINGS.autoSkipIntro),
+    alwaysUseExternalPlayer: asBool(raw?.alwaysUseExternalPlayer, DEFAULT_SETTINGS.alwaysUseExternalPlayer),
     autoNextEpisode,
+    subtitleColor: isHexColor(raw?.subtitleColor) ? raw!.subtitleColor! : DEFAULT_SETTINGS.subtitleColor,
+    subtitleOpacity: clamp(
+      Number.isFinite(Number(raw?.subtitleOpacity)) ? Number(raw?.subtitleOpacity) : DEFAULT_SETTINGS.subtitleOpacity,
+      0,
+      1,
+    ),
+    subtitleOutline: asBool(raw?.subtitleOutline, DEFAULT_SETTINGS.subtitleOutline),
+    subtitlePosition: clamp(
+      Number.isFinite(Number(raw?.subtitlePosition)) ? Number(raw?.subtitlePosition) : DEFAULT_SETTINGS.subtitlePosition,
+      0,
+      40,
+    ),
+    subtitleOffset: clamp(
+      Number.isFinite(Number(raw?.subtitleOffset)) ? Number(raw?.subtitleOffset) : DEFAULT_SETTINGS.subtitleOffset,
+      -30,
+      30,
+    ),
+    autoNextCountdownSeconds: clamp(
+      Number.isFinite(Number(raw?.autoNextCountdownSeconds))
+        ? Math.round(Number(raw?.autoNextCountdownSeconds))
+        : DEFAULT_SETTINGS.autoNextCountdownSeconds,
+      3,
+      30,
+    ),
+    loopVideo: asBool(raw?.loopVideo, DEFAULT_SETTINGS.loopVideo),
+    ambientMode: asBool(raw?.ambientMode, DEFAULT_SETTINGS.ambientMode),
+    stableVolume: asBool(raw?.stableVolume, DEFAULT_SETTINGS.stableVolume),
+    theaterMode: asBool(raw?.theaterMode, DEFAULT_SETTINGS.theaterMode),
+    sleepTimer: VALID_SLEEP_TIMERS.has(raw?.sleepTimer as SleepTimerOption)
+      ? (raw!.sleepTimer as SleepTimerOption)
+      : DEFAULT_SETTINGS.sleepTimer,
+    anime4kPreset: VALID_ANIME4K_PRESETS.has(raw?.anime4kPreset as Anime4KPreset)
+      ? (raw!.anime4kPreset as Anime4KPreset)
+      : DEFAULT_SETTINGS.anime4kPreset,
   };
 };
 
+// Key-based compare over the full settings shape so new fields never drift out of sync.
 const areSettingsEqual = (left: VideoSettings, right: VideoSettings) =>
-  left.defaultQuality === right.defaultQuality &&
-  left.autoplay === right.autoplay &&
-  left.subtitleLanguage === right.subtitleLanguage &&
-  left.secondarySubtitleLanguage === right.secondarySubtitleLanguage &&
-  left.playbackSpeed === right.playbackSpeed &&
-  left.volume === right.volume &&
-  left.autoSkipIntro === right.autoSkipIntro &&
-  left.autoNextEpisode === right.autoNextEpisode &&
-  left.subtitleSize === right.subtitleSize &&
-  left.subtitleFont === right.subtitleFont &&
-  left.subtitleBackground === right.subtitleBackground &&
-  left.alwaysUseExternalPlayer === right.alwaysUseExternalPlayer;
+  (Object.keys(DEFAULT_SETTINGS) as Array<keyof VideoSettings>).every((key) => left[key] === right[key]);
 
 function loadSettingsFromStorage(): VideoSettings {
   if (typeof window === 'undefined') return DEFAULT_SETTINGS;

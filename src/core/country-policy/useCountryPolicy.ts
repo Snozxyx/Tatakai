@@ -16,6 +16,73 @@ export function blurIp(ip: string | null): string {
   return `${ip.slice(0, 3)}***`;
 }
 
+type GeoResult = { countryCode: string | null; countryName: string | null; ip: string | null };
+
+/**
+ * Geo-IP providers, tried in order until one returns a usable country code.
+ * A single provider (ipapi.co) proved unreliable in the packaged desktop app —
+ * requests from the `file://` origin can be rate-limited or refused — leaving the
+ * setup wizard's region blank. The fallback chain makes the lookup robust to any
+ * one endpoint failing; all three send permissive CORS and need no API key.
+ */
+const GEO_PROVIDERS: Array<{ url: string; parse: (j: any) => GeoResult }> = [
+  {
+    url: 'https://ipapi.co/json/',
+    parse: (j) => ({
+      countryCode: String(j?.country_code || '').toUpperCase() || null,
+      countryName: String(j?.country_name || '').trim() || null,
+      ip: String(j?.ip || '').trim() || null,
+    }),
+  },
+  {
+    // ipwho.is wraps failures in `{ success: false }` rather than an HTTP error.
+    url: 'https://ipwho.is/',
+    parse: (j) =>
+      j && j.success !== false
+        ? {
+            countryCode: String(j?.country_code || '').toUpperCase() || null,
+            countryName: String(j?.country || '').trim() || null,
+            ip: String(j?.ip || '').trim() || null,
+          }
+        : { countryCode: null, countryName: null, ip: null },
+  },
+  {
+    url: 'https://get.geojs.io/v1/ip/geo.json',
+    parse: (j) => ({
+      countryCode: String(j?.country_code || '').toUpperCase() || null,
+      countryName: String(j?.country || '').trim() || null,
+      ip: String(j?.ip || '').trim() || null,
+    }),
+  },
+];
+
+async function lookupGeo(
+  isCancelled: () => boolean,
+  setActiveController: (c: AbortController | null) => void,
+): Promise<GeoResult | null> {
+  for (const provider of GEO_PROVIDERS) {
+    if (isCancelled()) return null;
+    const controller = new AbortController();
+    setActiveController(controller);
+    const timer = setTimeout(() => controller.abort(), 4000);
+    try {
+      const res = await fetch(provider.url, {
+        signal: controller.signal,
+        headers: { Accept: 'application/json' },
+      });
+      if (!res.ok) continue;
+      const parsed = provider.parse(await res.json());
+      if (parsed.countryCode) return parsed;
+    } catch {
+      /* timed out or refused — fall through to the next provider */
+    } finally {
+      clearTimeout(timer);
+      setActiveController(null);
+    }
+  }
+  return null;
+}
+
 export function useCountryPolicy() {
   const [geo, setGeo] = useState<GeoState>({
     countryCode: null,
@@ -27,41 +94,34 @@ export function useCountryPolicy() {
 
   useEffect(() => {
     let cancelled = false;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
+    let activeController: AbortController | null = null;
 
-    fetch('https://ipapi.co/json/', { signal: controller.signal })
-      .then((r) => r.json())
-      .then((json) => {
-        if (cancelled) return;
-        const cc = String(json?.country_code || '').toUpperCase() || null;
-        const cn = String(json?.country_name || '').trim() || null;
-        const ip = String(json?.ip || '').trim() || null;
-        if (cc) localStorage.setItem('tatakai_country_iso2', cc);
-        setGeo({
-          countryCode: cc,
-          countryName: cn,
-          ip,
-          loading: false,
-        });
-      })
-      .catch((err) => {
-        if (cancelled) return;
+    (async () => {
+      const result = await lookupGeo(
+        () => cancelled,
+        (c) => {
+          activeController = c;
+        },
+      );
+      if (cancelled) return;
+      if (result?.countryCode) {
+        localStorage.setItem('tatakai_country_iso2', result.countryCode);
+        setGeo({ ...result, loading: false });
+      } else {
         const stored = localStorage.getItem('tatakai_country_iso2');
         setGeo({
           countryCode: stored?.toUpperCase() || null,
           countryName: null,
           ip: null,
           loading: false,
-          error: err?.message || 'geolookup_failed',
+          error: 'geolookup_failed',
         });
-      })
-      .finally(() => clearTimeout(timer));
+      }
+    })();
 
     return () => {
       cancelled = true;
-      controller.abort();
-      clearTimeout(timer);
+      activeController?.abort();
     };
   }, []);
 

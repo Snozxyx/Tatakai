@@ -9,8 +9,7 @@
 </div>
 
 <div align="center">
-  <img src="public/tatakai-logo-square.png" height="100px"/>
-  <h1>Tatakai</h1>
+  <img src="public/assets/logo/tatakaibanner.png" alt="Tatakai" width="100%" />
 </div>
 
 <div align="center">
@@ -48,21 +47,80 @@ Need contact? [Click here](mailto:snozxyx@gmail.com)
 
 ---
 
-## Preview
+## Showcase
 
-![Home](preview/Home.png)
+### Discover — recommendations that get you
+A hybrid engine learns from everything you watch and read, then surfaces the next thing worth your time.
 
----
+<video src="https://github.com/snozxyx/tatakai/raw/main/public/assets/brand/Recommendation.mp4" controls muted></video>
 
-![AI Recommendations](preview/machinelearn.png)
+### Watch — a player built for how you watch
+Upload your own subtitles, switch tracks mid-scene, and keep playing in the background.
 
----
+<video src="https://github.com/snozxyx/tatakai/raw/main/public/assets/brand/Videoplayer.mp4" controls muted></video>
 
-![Community](preview/Communtiy.png)
+### Read — a fast, comic-style manga reader
+Per-device settings, custom keybinds, and progress that follows you across sessions.
 
----
+<video src="https://github.com/snozxyx/tatakai/raw/main/public/assets/brand/MangaReader.mp4" controls muted></video>
 
-![Profile](preview/Profile.png)
+### Offline & torrents — take it anywhere
+Stream torrents straight through the app, or download whole series for offline.
+
+<video src="https://github.com/snozxyx/tatakai/raw/main/public/assets/brand/Torrent.mp4" controls muted></video>
+
+<video src="https://github.com/snozxyx/tatakai/raw/main/public/assets/brand/Animedownload.mp4" controls muted></video>
+
+<video src="https://github.com/snozxyx/tatakai/raw/main/public/assets/brand/Mangadownload.mp4" controls muted></video>
+
+### Extensions — your sources, your way
+Tatakai is built around extensions. Add the sources you want, theme the app to taste, and run several at once — nothing is hard-wired.
+
+<video src="https://github.com/snozxyx/tatakai/raw/main/public/assets/brand/extension.mp4" controls muted></video>
+
+### Profile & stats — your taste, in numbers
+Activity heatmaps, taste breakdowns, and insights that turn your history into a profile worth following.
+
+<video src="https://github.com/snozxyx/tatakai/raw/main/public/assets/brand/Profile_with_stats.mp4" controls muted></video>
+
+### Rank up as you go
+One unified rank climbs as you watch and read — anime, manga, manhwa and comics all feed the same score. Sixteen tiers, each with its own effect.
+
+<p align="center">
+  <img src="public/assets/rank/Mitsu/rank-1.png" height="44" alt="Filler Watcher" />
+  <img src="public/assets/rank/Mitsu/rank-2.png" height="44" alt="Genin" />
+  <img src="public/assets/rank/Mitsu/rank-3.png" height="44" alt="Chunin" />
+  <img src="public/assets/rank/Mitsu/rank-4.png" height="44" alt="Jonin" />
+  <img src="public/assets/rank/Mitsu/rank-5.png" height="44" alt="Plus Ultra" />
+  <img src="public/assets/rank/Mitsu/rank-6.png" height="44" alt="Pro Hero" />
+  <img src="public/assets/rank/Mitsu/rank-7.png" height="44" alt="Soul Reaper" />
+  <img src="public/assets/rank/Mitsu/rank-8.png" height="44" alt="Bankai" />
+  <img src="public/assets/rank/Mitsu/rank-9.png" height="44" alt="Survey Corps" />
+  <img src="public/assets/rank/Mitsu/rank-10.png" height="44" alt="Titan Shifter" />
+  <img src="public/assets/rank/Mitsu/rank-11.png" height="44" alt="Demon Slayer" />
+  <img src="public/assets/rank/Mitsu/rank-12.png" height="44" alt="Hashira" />
+  <img src="public/assets/rank/Mitsu/rank-13.png" height="44" alt="Sage Mode" />
+  <img src="public/assets/rank/Mitsu/rank-14.png" height="44" alt="Dragon Slayer" />
+  <img src="public/assets/rank/Mitsu/rank-15.png" height="44" alt="Super Saiyan" />
+  <img src="public/assets/rank/Mitsu/rank-16.png" height="44" alt="One Punch" />
+</p>
+
+### Built for the community
+Follow people, discuss every episode, curate playlists, and sync with MyAnimeList or AniList.
+
+![Community feed](public/assets/brand/Community.png)
+
+![Episode discussion](public/assets/brand/Comment.png)
+
+![Playlists](public/assets/brand/Playlist.png)
+
+![Trending](public/assets/brand/Trending.png)
+
+![Profile](public/assets/brand/Profile.png)
+
+![MyAnimeList & AniList sync](public/assets/brand/integration.png)
+
+> Video previews render on github.com. If a player doesn't appear (some mirrors strip `<video>`), the clips live in [`public/assets/brand/`](public/assets/brand).
 
 ---
 
@@ -80,6 +138,16 @@ Need contact? [Click here](mailto:snozxyx@gmail.com)
 ---
 
 ## Features
+
+### Extensions
+
+- Extension-based sources — nothing is hard-wired  
+- Add the anime/manga sources you want, themes included  
+- Run several sources at once (priority routing)  
+- Moderated and trusted before they go public  
+- Community-built and shareable  
+
+---
 
 ### Community Tab
 
@@ -99,18 +167,6 @@ Need contact? [Click here](mailto:snozxyx@gmail.com)
 
 ---
 
-### Dubs
-
-- Expanded from ~8 to 13 languages  
-- Sources:
-  - ~30 servers  
-  - 14+ websites (Animepahe, Animekai, etc.)  
-- Languages include:
-  - German, French, Polish  
-  - Hindi, Telugu, Malayalam  
-  - English (and more coming)  
-
----
 
 ### Video Player
 
@@ -119,6 +175,7 @@ Need contact? [Click here](mailto:snozxyx@gmail.com)
 - Adaptive quality  
 - Subtitle switching  
 - Background playback  
+- 4K Support
 
 ---
 
@@ -132,6 +189,15 @@ Need contact? [Click here](mailto:snozxyx@gmail.com)
 ### Custom Recommendation
 
 - ML-based personalized recommendations  
+
+---
+
+### Ranks & Progression
+
+- One unified rank across anime, manga, manhwa and comics  
+- 16 tiers, each with its own per-rank effect  
+- Weighted RP score with collectible badges  
+- Contributor leaderboards  
 
 ---
 
@@ -188,7 +254,7 @@ Need contact? [Click here](mailto:snozxyx@gmail.com)
 https://vsllm.com
 
 This project uses AI.  
-Read more: [docs/disclaimerai.md](docs/disclaimerai.md)
+Read more: [docs/reference/ai-disclaimer.md](docs/reference/ai-disclaimer.md)
 
 ---
 

@@ -11,6 +11,7 @@ export interface PersistedAppSettings {
     blurAdultInSearch?: boolean;
   };
   video?: Record<string, unknown>;
+  reader?: Record<string, unknown>;
   theme?: {
     theme?: string;
     reduceMotion?: boolean;
@@ -45,6 +46,10 @@ const mergeSettings = (
   video: {
     ...(isObject(base.video) ? base.video : {}),
     ...(isObject(patch.video) ? patch.video : {}),
+  },
+  reader: {
+    ...(isObject(base.reader) ? base.reader : {}),
+    ...(isObject(patch.reader) ? patch.reader : {}),
   },
   theme: {
     ...(isObject(base.theme) ? base.theme : {}),

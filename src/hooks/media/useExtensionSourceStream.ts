@@ -1,4 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  readCachedItemsSync,
+  hydrateCachedItems,
+  writeCachedItems,
+  STREAM_TTL_MS,
+} from "@/lib/cache/extensionResultCache";
 
 /**
  * useExtensionSourceStream
@@ -40,6 +46,22 @@ export interface NamespaceInfo {
   extensionId?: string;
   contract?: string | null;
   routes?: string[];
+  /** Manifest capabilities (e.g. "manga", "preview") — used to route manga. */
+  capabilities?: string[];
+  /**
+   * Isolated read/watch verticals this extension provides (from the manifest).
+   * Empty for non-custom-source extensions. Powers the sidebar "+" menu and the
+   * `custom/*` routes. See CustomSourceDescriptor.
+   */
+  customSources?: Array<{
+    id: string;
+    kind: "read" | "watch";
+    name: string;
+    icon?: string;
+    description?: string;
+  }>;
+  /** The always-mounted `custom/*` routes when `customSources` is non-empty. */
+  customRoutes?: string[];
 }
 
 export interface ExtensionSourceStreamParams {
@@ -68,7 +90,7 @@ export interface ExtensionSourceStreamResult<T = any> {
 // successful resolutions; failures are NOT cached so a later mount can recover
 // if the host started slightly after the first probe (startup race).
 
-interface ResolvedBase {
+export interface ResolvedBase {
   baseUrl: string | null;
   namespaces: NamespaceInfo[];
 }
@@ -116,7 +138,13 @@ async function probeHealth(baseUrl: string, timeoutMs = 1200): Promise<ResolvedB
     if (body.toko) {
       return {
         baseUrl,
-        namespaces: [{ namespace: "toko", routes: ["sources", "stream", "torrent"] }],
+        namespaces: [
+          {
+            namespace: "toko",
+            routes: ["sources", "stream", "torrent", "manga/chapters", "manga/pages"],
+            capabilities: ["manga"],
+          },
+        ],
       };
     }
     return null;
@@ -137,7 +165,13 @@ async function probeExtensionApiBase(): Promise<ResolvedBase | null> {
   return results.find((r): r is ResolvedBase => r !== null) ?? null;
 }
 
-async function resolveExtensionApiBase(force = false): Promise<ResolvedBase> {
+/**
+ * Resolve the extension-API host base URL and its namespace list.
+ *
+ * Exported so non-streaming consumers (manga runtime) reuse the exact same
+ * discovery — preload bridge first, port probe fallback, memoized on success.
+ */
+export async function resolveExtensionApiBase(force = false): Promise<ResolvedBase> {
   if (!force && cachedBase && cachedBase.baseUrl) return cachedBase;
   if (baseInFlight) return baseInFlight;
 
@@ -332,6 +366,21 @@ export function useExtensionSourceStream<T = any>(
     reloadKey,
   });
 
+  // Persistent-cache key: identical to `paramsKey` MINUS `enabled`/`reloadKey`,
+  // so a manual "fetch more" (reloadKey++) and a plain revisit merge into the
+  // SAME cache bucket instead of forking a fresh one. Used to seed the source
+  // list instantly on revisit and to union-merge live arrivals write-through.
+  const streamCacheKey = JSON.stringify({
+    scope: "ext-stream",
+    namespace,
+    anilistId: anilistId ?? null,
+    titlesKey,
+    episode: episode ?? null,
+    resolution,
+    preferredLanguage: preferredLanguage ?? null,
+    route,
+  });
+
   // Read latest params without retriggering the effect for object identity churn.
   const paramsRef = useRef(params);
   paramsRef.current = params;
@@ -352,9 +401,53 @@ export function useExtensionSourceStream<T = any>(
     // Sources actually accepted into state, keyed by lowercased provider name.
     const perProvider = new Map<string, number>();
 
-    setState({ ...INITIAL_STATE, phase: "connecting" });
+    // Providers we've seen a LIVE event from during THIS run. The first live
+    // event from a provider drops its stale seeded/cached servers (so a rotated
+    // or expired URL replaces the dead one instead of both persisting) — see the
+    // `source` handler. Grouping by `providerKey` (falling back to `url` when a
+    // source has no providerKey) is what makes a changed URL a *replacement* of
+    // that provider's entry rather than an accumulated duplicate.
+    const refreshedProviders = new Set<string>();
+    const groupOf = (s: any) => String(s?.providerKey || s?.url || "");
+
+    // ── Seed from cache for instant revisit (stale-while-revalidate) ──────────
+    // Pre-fill the local accumulator + dedup set from the in-memory cache so the
+    // previously-loaded servers render immediately (no blank frame / full-screen
+    // loader) while the SSE reconnects in the background. Non-empty seeded
+    // `sources` makes `streamData` defined downstream → `isLoading:false`,
+    // `isFetching:true`. When the cache is empty this is a no-op and behavior is
+    // exactly as before.
+    const seed = readCachedItemsSync<any>(streamCacheKey) || [];
+    for (const s of seed) {
+      const k = `${s?.providerKey || ""}::${s?.url || ""}`;
+      if (k !== "::" && seen.has(k)) continue;
+      seen.add(k);
+      sources.push(s);
+    }
+
+    setState({ ...INITIAL_STATE, sources: [...sources], phase: "connecting" });
 
     (async () => {
+      // Post-restart the in-memory tier is cold; warm it from Dexie so the very
+      // first revisit after an app relaunch is instant too. Only when the sync
+      // seed found nothing (don't clobber a fresher in-session value).
+      if (sources.length === 0) {
+        try {
+          const hydrated = await hydrateCachedItems<any>(streamCacheKey);
+          if (!cancelled && hydrated && hydrated.length) {
+            for (const s of hydrated) {
+              const k = `${s?.providerKey || ""}::${s?.url || ""}`;
+              if (k !== "::" && seen.has(k)) continue;
+              seen.add(k);
+              sources.push(s);
+            }
+            setState((s) => ({ ...s, sources: [...sources] }));
+          }
+        } catch {
+          /* non-fatal */
+        }
+      }
+
       const base = await resolveExtensionApiBase();
       if (cancelled) return;
 
@@ -403,12 +496,33 @@ export function useExtensionSourceStream<T = any>(
           const src = JSON.parse((e as MessageEvent).data);
           const key = `${src?.providerKey || ""}::${src?.url || ""}`;
           if (key !== "::" && seen.has(key)) return;
+          // First live event from this provider in this run: evict its stale
+          // seeded/cached servers before appending the fresh ones, so a rotated
+          // or expired URL replaces the dead entry (satisfies "if the source of
+          // a provider changes, change it too") instead of both surviving as
+          // separate `${providerKey}::${url}` rows. A provider that never
+          // re-responds keeps its cached servers untouched (no-drop guarantee).
+          const g = groupOf(src);
+          if (g && !refreshedProviders.has(g)) {
+            refreshedProviders.add(g);
+            for (let i = sources.length - 1; i >= 0; i--) {
+              if (groupOf(sources[i]) === g) {
+                const ek = `${sources[i]?.providerKey || ""}::${sources[i]?.url || ""}`;
+                seen.delete(ek);
+                sources.splice(i, 1);
+              }
+            }
+          }
           seen.add(key);
           sources.push(src);
           received++;
           const owner = String(src?.providerName || src?.source || src?.providerKey || "unknown").toLowerCase();
           perProvider.set(owner, (perProvider.get(owner) || 0) + 1);
           setState((s) => ({ ...s, sources: [...sources], phase: "streaming" }));
+          // Write-through: update the persistent union cache so the next revisit
+          // (this session or after restart) seeds from the latest set. Debounced
+          // internally, so a burst of per-event writes collapses to one put.
+          writeCachedItems(streamCacheKey, sources, STREAM_TTL_MS);
         } catch {
           /* ignore malformed event */
         }
@@ -430,6 +544,8 @@ export function useExtensionSourceStream<T = any>(
         if (cancelled) return;
         done = true;
         logStreamSummary(namespace, route, providerStatus, perProvider, received);
+        // Persist the final union so revisits seed from the latest complete set.
+        writeCachedItems(streamCacheKey, sources, STREAM_TTL_MS);
         setState((s) => ({ ...s, phase: "done" }));
         try {
           es?.close();
@@ -442,6 +558,10 @@ export function useExtensionSourceStream<T = any>(
       // errors (no `.data`) dispatch here. Disambiguate by `.data` presence.
       es.addEventListener("error", (e) => {
         if (cancelled) return;
+        // Seeded/cached sources count as "have content": a failed revalidation
+        // must NOT surface as a hard error when we're already showing the cached
+        // list (stale-while-revalidate) — keep displaying it silently.
+        const have = received > 0 || sources.length > 0;
         const data = (e as MessageEvent).data;
         if (data) {
           // Server-sent terminal error.
@@ -454,8 +574,8 @@ export function useExtensionSourceStream<T = any>(
           done = true;
           setState((s) => ({
             ...s,
-            phase: received > 0 ? "done" : "error",
-            error: received > 0 ? s.error : new Error(message),
+            phase: have ? "done" : "error",
+            error: have ? s.error : new Error(message),
           }));
           try {
             es?.close();
@@ -471,10 +591,10 @@ export function useExtensionSourceStream<T = any>(
           done = true;
           setState((s) => ({
             ...s,
-            phase: received > 0 ? "done" : "error",
-            error: received > 0 ? s.error : new Error("stream connection failed"),
+            phase: have ? "done" : "error",
+            error: have ? s.error : new Error("stream connection failed"),
           }));
-        } else if (received > 0) {
+        } else if (have) {
           done = true;
           try {
             es?.close();
@@ -707,6 +827,80 @@ export async function probeAllExtensionProviders(
       .sort((a, b) => b.results - a.results || a.provider.localeCompare(b.provider))
   );
   return results;
+}
+
+/**
+ * One-shot version of the SSE source stream for batch/background callers
+ * (downloads) that need a Promise, not a live subscription. Opens the same
+ * `/api/v3/<namespace>/sources?...&stream=1` connection the player uses,
+ * accumulates `source` events until `done` (or `timeoutMs`), and resolves the
+ * raw sources. This is the reliable resolution path — the local runtime
+ * `resolveEpisodeSources` frequently returns nothing on its own, which is why
+ * the player prefers this stream. Never rejects: returns `[]` when the host is
+ * down, the namespace is unmounted, or the stream times out.
+ */
+export function streamExtensionSources<T = any>(
+  namespace: string,
+  params: ExtensionSourceStreamParams,
+  timeoutMs = 15000,
+): Promise<T[]> {
+  return new Promise<T[]>((resolve) => {
+    let settled = false;
+    let es: EventSource | null = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const seen = new Set<string>();
+    const sources: T[] = [];
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      try { es?.close(); } catch { /* noop */ }
+      resolve(sources);
+    };
+    (async () => {
+      let base: ResolvedBase;
+      try {
+        base = await resolveExtensionApiBase();
+      } catch {
+        return finish();
+      }
+      if (settled) return;
+      const mounted =
+        !!base.baseUrl && (base.namespaces || []).some((n) => n.namespace === namespace);
+      if (!base.baseUrl || !mounted) return finish();
+
+      let url: string;
+      try {
+        url = buildStreamUrl(base.baseUrl, namespace, params.route || "sources", params);
+      } catch {
+        return finish();
+      }
+
+      try {
+        es = new EventSource(url);
+      } catch {
+        return finish();
+      }
+      timer = setTimeout(finish, timeoutMs);
+
+      es.addEventListener("source", (e) => {
+        try {
+          const src = JSON.parse((e as MessageEvent).data);
+          const key = `${src?.providerKey || ""}::${src?.url || ""}`;
+          if (key !== "::" && seen.has(key)) return;
+          seen.add(key);
+          sources.push(src);
+        } catch { /* ignore malformed event */ }
+      });
+      es.addEventListener("done", finish);
+      es.addEventListener("error", (e) => {
+        const data = (e as MessageEvent).data;
+        // Server-sent terminal error, or the transport closed — stop with
+        // whatever sources already arrived.
+        if (data || (es && es.readyState === EventSource.CLOSED)) finish();
+      });
+    })();
+  });
 }
 
 // Reachable from devtools so a provider sweep needs no rebuild:

@@ -155,9 +155,13 @@ export function SourcePanel({
   selectedSourceKey,
   onSelectSource,
 }: SourcePanelProps) {
-  const groups = groupSourcesByDubLanguage(sources);
+  const nonTorrent = sources.filter((s) => s.type !== "torrent");
+  const torrentSources = sources.filter((s) => s.type === "torrent");
 
-  if (groups.length === 0) {
+  const streamGroups = groupSourcesByDubLanguage(nonTorrent);
+  const torrentGroups = groupSourcesByDubLanguage(torrentSources);
+
+  if (streamGroups.length === 0 && torrentGroups.length === 0) {
     return (
       <div className="text-sm text-muted-foreground py-2">
         No sources available.
@@ -168,7 +172,7 @@ export function SourcePanel({
   return (
     <TooltipProvider delayDuration={200}>
       <div className="space-y-4">
-        {groups.map((group) => (
+        {streamGroups.map((group) => (
           <DubLanguageGroupSection
             key={group.languageCode}
             group={group}
@@ -176,6 +180,25 @@ export function SourcePanel({
             onSelectSource={onSelectSource}
           />
         ))}
+
+        {torrentGroups.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-green-400">
+                Torrent
+              </span>
+              <div className="flex-1 h-px bg-green-400/30" />
+            </div>
+            {torrentGroups.map((group) => (
+              <DubLanguageGroupSection
+                key={`torrent-${group.languageCode}`}
+                group={group}
+                selectedSourceKey={selectedSourceKey}
+                onSelectSource={onSelectSource}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </TooltipProvider>
   );

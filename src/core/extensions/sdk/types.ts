@@ -74,6 +74,14 @@ export interface SourceResult {
   /** HTTP headers required to access the URL (e.g. `Referer`, `User-Agent`). */
   headers: Record<string, string>;
 
+  /**
+   * Ordered list of `Referer` values to try (best-first) when proxying this
+   * stream. The core proxy is content-agnostic, so extensions supply the
+   * per-CDN referer knowledge here; `headers.Referer` is the primary and the
+   * first candidate. Only meaningful for direct-stream (hls/mp4) results.
+   */
+  refererCandidates?: string[];
+
   /** Available subtitle tracks for this source. */
   subtitles: SubtitleTrack[];
 
@@ -135,6 +143,110 @@ export interface LanguageCapability {
 // ---------------------------------------------------------------------------
 // Extension manifest types
 // ---------------------------------------------------------------------------
+
+/**
+ * Descriptor for an extension's in-process HTTP API server.
+ * The runtime mounts the bundle's routes under `/api/v3/<namespace>/…`.
+ *
+ * @see Requirements 8.6
+ */
+export interface ExtensionApiServer {
+  /** URL-safe namespace segment (e.g. "toko", "aurora"). Must be unique per extension. */
+  namespace: string;
+
+  /** Contract identifier the bundle implements (e.g. "streaming-sources-v3", "custom-source-v1"). */
+  contract: string;
+
+  /**
+   * Route families this bundle serves. Gated families (`sources`, `stream`, `torrent`,
+   * `download`) must be listed here to be reachable. Ungated families (`providers`,
+   * `manga/*`, `custom/*`) are always reachable and 501 when the bundle method is absent.
+   */
+  routes: string[];
+
+  /** Optional health-check path relative to the namespace mount. */
+  healthPath?: string;
+}
+
+/**
+ * Describes a single custom source (an isolated read/watch vertical) an extension provides.
+ * Custom sources have their own home/info/watch/read UI and are NEVER tied to the
+ * app's anime/manga watchlist or readlist.
+ */
+export interface CustomSourceDescriptor {
+  /** Stable id, unique within the extension (used in routes: `/x/<namespace>/<id>`). */
+  id: string;
+
+  /** `watch` → gets a watch page fed by `SourceResult[]`; `read` → gets a reader page. */
+  kind: 'read' | 'watch';
+
+  /** Human-readable label shown in the sidebar "+" menu and page headers. */
+  name: string;
+
+  /** Base64 data URL or remote URL for the source's icon. */
+  icon?: string;
+
+  /** Short description shown in the source's home header. */
+  description?: string;
+}
+
+/**
+ * Known capability strings an extension can advertise for IPC/runtime discovery.
+ * Arbitrary strings are still accepted for forward compatibility.
+ */
+export type ExtensionCapability =
+  | 'manga'
+  | 'preview'
+  | 'websiteIndex'
+  | 'theme'
+  | 'analytics'
+  | 'service'
+  | 'module'
+  | 'ui'
+  | 'custom-source';
+
+/**
+ * A theme contributed declaratively via the manifest (data-driven — no renderer code).
+ * The `colors` map is written verbatim as CSS custom properties on `:root`.
+ */
+export interface ContributedTheme {
+  /** Unique theme id (namespaced by the extension at registration time). */
+  id: string;
+
+  /** Display name shown in the theme switcher. */
+  name: string;
+
+  /** CSS custom-property token map, e.g. `{ "--primary": "340 82% 66%", ... }`. */
+  colors: Record<string, string>;
+
+  /** Optional display metadata for the switcher. */
+  info?: { label?: string; description?: string; accent?: string };
+}
+
+/**
+ * A declarative analytics sink (data-driven). Events are POSTed to `ingestUrl`.
+ */
+export interface ContributedAnalytics {
+  /** HTTPS endpoint that receives `{ type, name, payload, ts }` JSON bodies. */
+  ingestUrl: string;
+
+  /** Optional allowlist of event names to forward. Empty/absent = forward all. */
+  events?: string[];
+}
+
+/**
+ * Data-driven + code-driven contributions declared in the manifest.
+ */
+export interface ExtensionContributions {
+  /** Path within the bundle to a renderer ESM entry (code-driven; trust-gated). */
+  rendererEntry?: string;
+
+  /** Declarative themes (data-driven). */
+  themes?: ContributedTheme[];
+
+  /** Declarative analytics sinks (data-driven). */
+  analytics?: ContributedAnalytics[];
+}
 
 /**
  * JSON descriptor stored on disk alongside the extension bundle.
@@ -206,7 +318,7 @@ export interface ExtensionManifest {
    *
    * @see Requirements 12.3
    */
-  capabilities?: string[];
+  capabilities?: (ExtensionCapability | string)[];
 
   /**
    * Base64-encoded banner image, or a URL, shown at the top of the detail page.
@@ -214,6 +326,27 @@ export interface ExtensionManifest {
    * @see Requirements 7.5
    */
   banner?: string;
+
+  /**
+   * Descriptor for this extension's in-process HTTP API server.
+   * Present when the extension serves data over the extension-API host.
+   */
+  apiServer?: ExtensionApiServer;
+
+  /**
+   * Isolated read/watch verticals this extension provides. Required (non-empty)
+   * when `capabilities` includes `'custom-source'`.
+   */
+  customSources?: CustomSourceDescriptor[];
+
+  /**
+   * Ordering hint across extensions (lower = earlier). Defaults to 100.
+   * Used to order source-resolution candidates; the primary extension ships `0`.
+   */
+  priority?: number;
+
+  /** Data-driven + code-driven contributions (themes, analytics, renderer entry). */
+  contributes?: ExtensionContributions;
 }
 
 /**
@@ -252,4 +385,90 @@ export interface ExtensionInvokeResult {
    * @see Requirements 9.6
    */
   truncated?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Custom-source content contracts (`custom-source-v1`)
+//
+// A custom source is an isolated read/watch vertical. Its bundle implements the
+// methods below; the app renders generic, anime-styled UI over the returned data.
+// `customWatch` reuses `SourceResult` so the existing VideoPlayer consumes it
+// unchanged; `customRead` reuses the manga-page shape so the existing reader does.
+// Custom sources MUST NOT touch the anime/manga watchlist or readlist.
+// ---------------------------------------------------------------------------
+
+/** A single card in a home row or search grid. */
+export interface CustomMediaCard {
+  /** Stable id used to fetch info (`/x/<ns>/<sourceId>/info/<id>`). */
+  id: string;
+
+  /** Card title. */
+  title: string;
+
+  /** Cover image URL. */
+  image?: string;
+
+  /** Secondary line (e.g. "Ep 12", "Ongoing"). */
+  subtitle?: string;
+
+  /** Corner badge text (e.g. "HD", "NEW"). */
+  badge?: string;
+}
+
+/** One titled row on a custom source's home page. */
+export interface CustomHomeSection {
+  title: string;
+  items: CustomMediaCard[];
+}
+
+/** Result of `customHome(sourceId)`. */
+export interface CustomHomeResult {
+  sections: CustomHomeSection[];
+}
+
+/** Result of `customSearch(sourceId, query, page?)`. */
+export interface CustomSearchResult {
+  results: CustomMediaCard[];
+  hasNextPage?: boolean;
+}
+
+/** A playable/readable entry (episode or chapter) listed on an info page. */
+export interface CustomInfoEntry {
+  /** Stable id used to fetch watch/read content. */
+  id: string;
+
+  /** Display label (e.g. "Episode 1", "Chapter 12"). */
+  label: string;
+
+  /** Numeric ordinal, if applicable. */
+  number?: number;
+}
+
+/** Result of `customInfo(sourceId, id)`. */
+export interface CustomInfoResult {
+  id: string;
+  title: string;
+  image?: string;
+  description?: string;
+  /** Freeform key/value metadata shown in the header (e.g. { Status: "Ongoing" }). */
+  meta?: Record<string, string>;
+  /** Episodes (kind=watch) or chapters (kind=read). */
+  entries: CustomInfoEntry[];
+}
+
+/** Result of `customWatch(sourceId, id, episodeId)` (kind=watch). */
+export interface CustomWatchResult {
+  sources: SourceResult[];
+}
+
+/** A single page image for a read entry. */
+export interface CustomReadPageImage {
+  pageNumber: number;
+  imageUrl: string;
+  headers?: Record<string, string>;
+}
+
+/** Result of `customRead(sourceId, id, chapterId)` (kind=read). */
+export interface CustomReadResult {
+  pages: CustomReadPageImage[];
 }

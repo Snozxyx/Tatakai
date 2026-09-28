@@ -12,6 +12,7 @@ export interface Playlist {
   cover_image: string | null;
   is_public: boolean;
   items_count: number;
+  likes_count?: number | null;
   share_slug?: string | null;
   share_description?: string | null;
   embed_allowed?: boolean | null;
@@ -31,6 +32,8 @@ export interface PlaylistItem {
   anime_id: string;
   anime_name: string;
   anime_poster: string | null;
+  /** Precise media type: anime/manga/manhwa/manhua/comic/novel. Null on legacy rows. */
+  media_format?: string | null;
   position: number;
   added_at: string;
 }
@@ -54,6 +57,44 @@ export function usePlaylists() {
       return data as Playlist[];
     },
     enabled: !!user,
+  });
+}
+
+// Get the public playlists of any user (for the profile Vaults tab).
+export function useUserPlaylists(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['user-playlists', userId],
+    queryFn: async () => {
+      if (!userId) return [];
+      const { data, error } = await supabase
+        .from('playlists')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_public', true)
+        .order('updated_at', { ascending: false });
+      if (error) throw error;
+      return data as Playlist[];
+    },
+    enabled: !!userId,
+  });
+}
+
+// Get ALL playlists of a user for STAFF surfaces (admin user page) — drops the
+// is_public filter. Distinct queryKey so it never collides with the public cache.
+export function useUserPlaylistsStaff(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['user-playlists-staff', userId],
+    queryFn: async () => {
+      if (!userId) return [];
+      const { data, error } = await supabase
+        .from('playlists')
+        .select('*')
+        .eq('user_id', userId)
+        .order('updated_at', { ascending: false });
+      if (error) throw error;
+      return data as Playlist[];
+    },
+    enabled: !!userId,
   });
 }
 
@@ -213,16 +254,18 @@ export function useAddToPlaylist() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ 
-      playlistId, 
-      animeId, 
-      animeName, 
-      animePoster 
-    }: { 
-      playlistId: string; 
-      animeId: string; 
-      animeName: string; 
+    mutationFn: async ({
+      playlistId,
+      animeId,
+      animeName,
+      animePoster,
+      mediaFormat,
+    }: {
+      playlistId: string;
+      animeId: string;
+      animeName: string;
       animePoster?: string;
+      mediaFormat?: string | null;
     }) => {
       // Get current max position
       const { data: items } = await supabase
@@ -241,8 +284,9 @@ export function useAddToPlaylist() {
           anime_id: animeId,
           anime_name: animeName,
           anime_poster: animePoster || null,
+          media_format: mediaFormat || null,
           position: nextPosition,
-        });
+        } as any);
 
       if (error) {
         if (error.code === '23505') {
@@ -335,6 +379,65 @@ export function usePublicPlaylists(userId: string | undefined) {
       return data as Playlist[];
     },
     enabled: !!userId,
+  });
+}
+
+export type DiscoverSort = 'trending' | 'most_liked' | 'newest';
+
+export interface DiscoverPlaylist extends Playlist {
+  author: {
+    username: string | null;
+    display_name: string | null;
+    avatar_url: string | null;
+  } | null;
+}
+
+// Browse everyone's public playlists (the Discover section) with search + sort.
+export function useDiscoverPlaylists({ search = '', sort = 'trending' }: { search?: string; sort?: DiscoverSort } = {}) {
+  return useQuery({
+    queryKey: ['discover_playlists', search, sort],
+    queryFn: async () => {
+      const orderFor = (s: DiscoverSort) =>
+        s === 'most_liked'
+          ? { column: 'likes_count', ascending: false }
+          : s === 'newest'
+            ? { column: 'created_at', ascending: false }
+            : { column: 'updated_at', ascending: false };
+
+      const runQuery = (order: { column: string; ascending: boolean }) => {
+        let q = supabase.from('playlists').select('*').eq('is_public', true);
+        const term = search.trim();
+        if (term) q = q.ilike('name', `%${term}%`);
+        return q.order(order.column, { ascending: order.ascending }).limit(48);
+      };
+
+      let { data, error } = await runQuery(orderFor(sort));
+
+      // likes_count column may not exist yet (migration unapplied) — fall back to recency.
+      if (error && sort === 'most_liked') {
+        ({ data, error } = await runQuery(orderFor('trending')));
+      }
+      if (error) {
+        console.error('Failed to fetch discover playlists:', error);
+        return [] as DiscoverPlaylist[];
+      }
+
+      const playlists = (data || []) as Playlist[];
+      const userIds = [...new Set(playlists.map((p) => p.user_id))];
+      const { data: profiles } = userIds.length
+        ? await supabase
+            .from('profiles')
+            .select('user_id, username, display_name, avatar_url')
+            .in('user_id', userIds)
+        : { data: [] as any[] };
+
+      const profileMap = new Map((profiles || []).map((p) => [p.user_id, p]));
+
+      return playlists.map((p) => ({
+        ...p,
+        author: profileMap.get(p.user_id) || null,
+      })) as DiscoverPlaylist[];
+    },
   });
 }
 

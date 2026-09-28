@@ -14,7 +14,6 @@ import {
   persistDevtoolsTrapState,
 } from '@/lib/devtoolsTrap';
 import { Capacitor } from '@capacitor/core';
-import { Miniplayer } from '@/components/video/Miniplayer';
 import { initializePlayerAdapters } from '@/core/player/adapters-init';
 
 // Base Pages
@@ -29,7 +28,9 @@ const RecommendationsPage = lazy(() => import("../pages/base/RecommendationsPage
 const SuggestionsPage = lazy(() => import("../pages/base/SuggestionsPage"));
 const DiscordPage = lazy(() => import("../pages/base/DiscordPage"));
 const CharacterPage = lazy(() => import("../pages/base/CharacterPage"));
-const SettingsPage = lazy(() => import("../pages/base/SettingsPage"));
+const SettingsRouteOpener = lazy(() =>
+  import("../components/settings/SettingsRouteOpener").then((m) => ({ default: m.SettingsRouteOpener })),
+);
 const ExtensionHubPage = lazy(() => import("../pages/base/ExtensionHubPage"));
 const ExtensionDetailPage = lazy(() => import("../pages/base/ExtensionDetailPage"));
 
@@ -55,6 +56,12 @@ const MangaPage = lazy(() => import("../pages/manga/MangaPage"));
 const MangaReaderPage = lazy(() => import("../pages/manga/MangaReaderPage"));
 const NovelComingSoon = lazy(() => import("../pages/novel/NovelComingSoon"));
 
+// Custom Sources (extension-provided, isolated read/watch verticals)
+const CustomHomePage = lazy(() => import("../pages/custom/CustomHomePage"));
+const CustomInfoPage = lazy(() => import("../pages/custom/CustomInfoPage"));
+const CustomWatchPage = lazy(() => import("../pages/custom/CustomWatchPage"));
+const CustomReadPage = lazy(() => import("../pages/custom/CustomReadPage"));
+
 // Profile & Personal
 const ProfilePage = lazy(() => import("../pages/profile/ProfilePage"));
 const PublicProfilePage = lazy(() => import("../pages/profile/PublicProfilePage"));
@@ -68,19 +75,27 @@ const { PlaylistViewPage } = { PlaylistViewPage: lazy(() => import("../pages/pro
 const PublicPlaylistPage = lazy(() => import("../pages/profile/PublicPlaylistPage"));
 const WrappedPage = lazy(() => import("../pages/profile/WrappedPage"));
 const OfflineLibraryPage = lazy(() => import("../pages/profile/OfflineLibraryPage"));
+const NotificationsPage = lazy(() => import("../pages/profile/NotificationsPage"));
+const CalendarPage = lazy(() => import("../pages/base/CalendarPage"));
+const FollowConnectionsPage = lazy(() => import("../pages/profile/FollowConnectionsPage"));
 
 // Community & Forum
-const CommunityPage = lazy(() => import("../pages/forum/CommunityPage"));
+const CommunityPage = lazy(() => import("../pages/community/CommunityFeedPage"));
+const CommunitySpacePage = lazy(() => import("../pages/community/CommunitySpacePage"));
+const CommunityInformationPage = lazy(() => import("../pages/community/CommunityInformationPage"));
+const CommunitySettingsPage = lazy(() => import("../pages/community/CommunitySettingsPage"));
+const BookmarksPage = lazy(() => import("../pages/community/BookmarksPage"));
 const ForumPostPage = lazy(() => import("../pages/forum/ForumPostPage"));
-const ForumNewPostPage = lazy(() => import("../pages/forum/ForumNewPostPage"));
 
 // Legal
 const TermsPage = lazy(() => import("../pages/legal/TermsPage"));
 const PrivacyPage = lazy(() => import("../pages/legal/PrivacyPage"));
 const DMCAPage = lazy(() => import("../pages/legal/DMCAPage"));
+const CommunityGuidelinesPage = lazy(() => import("../pages/legal/CommunityGuidelinesPage"));
 
 // Admin & Error
 const AdminPage = lazy(() => import("../pages/admin/AdminPage"));
+const AdminUserPage = lazy(() => import("../pages/admin/AdminUserPage"));
 const ErrorPage = lazy(() => import("../pages/error/ErrorPage"));
 const NotFound = lazy(() => import("../pages/error/NotFound"));
 const BannedPage = lazy(() => import("../pages/error/BannedPage"));
@@ -98,6 +113,7 @@ const PageLoader = () => (
 );
 
 import { extensionRegistry } from '@/core/extensions/ExtensionRegistry';
+import { bootstrapExtensions } from '@/core/extensions/bootstrapExtensions';
 
 function CatchAllHandler() {
   const { slug } = useParams<{ slug: string }>();
@@ -159,16 +175,26 @@ export function GlobalListeners() {
   useEffect(() => {
     initializePlayerAdapters();
 
+    // Boot installed extensions' contributions (themes, analytics, custom
+    // sources, and trust-gated renderer bundles). Idempotent — guarded against
+    // StrictMode double-invoke inside bootstrapExtensions.
+    void bootstrapExtensions((path: string) => navigate(path));
+
     // Sync torrent settings with main process on startup (desktop only)
     if (typeof window !== 'undefined' && (window as any).tatakaiRuntime?.updateTorrentSettings) {
       const schedule = localStorage.getItem('tatakai_bandwidth_schedule') || 'default';
       const limitDownload = Number(localStorage.getItem('tatakai_torrent_limit_dl') || 0);
       const limitUpload = Number(localStorage.getItem('tatakai_torrent_limit_ul') || 0);
+      const customTrackers = (localStorage.getItem('tatakai_torrent_custom_trackers') || '')
+        .split(/\r?\n/)
+        .map((s) => s.trim())
+        .filter(Boolean);
 
       (window as any).tatakaiRuntime.updateTorrentSettings({
         schedule,
         limitDownload,
-        limitUpload
+        limitUpload,
+        customTrackers
       });
     }
   }, []);
@@ -257,6 +283,28 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isBannedAllowedPath = bannedAllowedPaths.some(path => location.pathname.startsWith(path));
   const publicPaths = ['/banned', '/maintenance', '/auth', '/error', '/setup'];
   const isPublicPath = publicPaths.some(path => location.pathname.startsWith(path));
+  // Paths whose content is served entirely from the local device (IPC + IndexedDB)
+  // and needs no backend. These must stay reachable during maintenance / an API
+  // outage / a full server-down so the user can still browse and play their
+  // downloaded library. Offline `/watch` (playing a downloaded file) qualifies too.
+  const offlineCapablePaths = ['/downloads', '/offline-library', '/offline'];
+  const isNativeApp =
+    typeof window !== 'undefined' &&
+    Boolean((window as any).electron || (window as any).tatakaiRuntime);
+  const isOfflineWatch =
+    location.pathname.startsWith('/watch') && location.search.includes('offline=true');
+  // Reading a downloaded chapter: the reader serves pages from the local device
+  // (see getMangaReadByKey's offline-first branch), so it must survive a ban /
+  // maintenance / server-down just like offline `/watch`. Gated to native +
+  // an explicit `offline=true` so a web visitor can't use it to bypass a gate.
+  const isOfflineMangaRead =
+    isNativeApp &&
+    location.pathname.startsWith('/manga/read') &&
+    location.search.includes('offline=true');
+  const isOfflineCapablePath =
+    offlineCapablePaths.some(path => location.pathname.startsWith(path)) ||
+    isOfflineWatch ||
+    isOfflineMangaRead;
   const strictLoadingPaths = [
     '/admin',
     '/onboarding',
@@ -271,8 +319,28 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (requiresStrictBootstrap && isLoading) return <PageLoader />;
   if (shouldWaitForMaintenanceRoleResolution) return <PageLoader />;
-  if (isBanned && !isBannedAllowedPath) return <Navigate to="/banned" replace />;
-  if (isMaintenanceMode && !isAdmin && !isPublicPath) return <Navigate to="/maintenance" replace />;
+  if (isBanned && !isBannedAllowedPath && !isOfflineCapablePath) return <Navigate to="/banned" replace />;
+  if (isMaintenanceMode && !isAdmin && !isPublicPath && !isOfflineCapablePath)
+    return <Navigate to="/maintenance" replace />;
+
+  return <>{children}</>;
+}
+
+/**
+ * Staff-only route guard.
+ *
+ * `ProtectedRoute` only handles bans and maintenance mode, so `/admin` was reachable by
+ * any visitor until `AdminPage` self-redirected from a `useEffect` — after the whole
+ * admin bundle had already loaded. This gates the route itself, and waits for
+ * `rolesResolved` rather than `isLoading`, because the auth session settles before the
+ * profile query that carries staff status.
+ */
+export function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, isAdmin, isModerator, isLoading, rolesResolved } = useAuth();
+
+  if (isLoading || !rolesResolved) return <PageLoader />;
+  if (!user) return <Navigate to="/auth" replace />;
+  if (!isAdmin && !isModerator) return <Navigate to="/" replace />;
 
   return <>{children}</>;
 }
@@ -298,10 +366,17 @@ const AppRoutes = () => {
   const { isBanned } = useAuth();
   const { isMaintenanceMode } = useMaintenanceMode();
   const isMobileApp = Capacitor.isNativePlatform();
+  const location = useLocation();
+  // Key the fade by the first path segment only: top-level section changes
+  // (home → search → profile) fade in, but navigating within a section
+  // (episode → episode, reader page → reader page) keeps the same key so the
+  // subtree is never remounted — no refetch flash, no player/reader disruption.
+  const routeSection = location.pathname.split('/')[1] || 'root';
 
   return (
     <Suspense fallback={<PageLoader />}>
       <DevtoolsRouteEnforcer />
+      <div key={routeSection} className="route-enter">
       <Routes>
         <Route path="/maintenance" element={<StatusPageGuard allowedWhen={isMaintenanceMode}><MaintenancePage /></StatusPageGuard>} />
         <Route path="/banned" element={<StatusPageGuard allowedWhen={isBanned}><BannedPage /></StatusPageGuard>} />
@@ -325,10 +400,17 @@ const AppRoutes = () => {
         <Route path="/anime/:animeId" element={<ProtectedRoute><AnimePage /></ProtectedRoute>} />
         <Route path="/manga" element={<ProtectedRoute><MangaHomePage /></ProtectedRoute>} />
         <Route path="/manga/discover" element={<ProtectedRoute><MangaGenreBrowsePage /></ProtectedRoute>} />
+        {/* Bare `/manga/genre` mirrors the anime side's `/genre`: the catalogue with no genre picked. */}
+        <Route path="/manga/genre" element={<ProtectedRoute><MangaGenreBrowsePage /></ProtectedRoute>} />
         <Route path="/manga/genre/:genre" element={<ProtectedRoute><MangaGenreBrowsePage /></ProtectedRoute>} />
         <Route path="/manga/:mangaId" element={<ProtectedRoute><MangaPage /></ProtectedRoute>} />
-        <Route path="/manga/read/:mangaId" element={<ProtectedRoute><WebWatchGate><MangaReaderPage /></WebWatchGate></ProtectedRoute>} />
+        <Route path="/manga/read/:mangaId" element={<ProtectedRoute><WebWatchGate mode="read"><MangaReaderPage /></WebWatchGate></ProtectedRoute>} />
         <Route path="/novel/comingsoon" element={<ProtectedRoute><NovelComingSoon /></ProtectedRoute>} />
+        {/* Custom sources — isolated extension verticals, addressed by (namespace, sourceId). */}
+        <Route path="/x/:namespace/:sourceId" element={<ProtectedRoute><CustomHomePage /></ProtectedRoute>} />
+        <Route path="/x/:namespace/:sourceId/info/:id" element={<ProtectedRoute><CustomInfoPage /></ProtectedRoute>} />
+        <Route path="/x/:namespace/:sourceId/watch/:id/:episodeId" element={<ProtectedRoute><WebWatchGate><CustomWatchPage /></WebWatchGate></ProtectedRoute>} />
+        <Route path="/x/:namespace/:sourceId/read/:id/:chapterId" element={<ProtectedRoute><WebWatchGate mode="read"><CustomReadPage /></WebWatchGate></ProtectedRoute>} />
         <Route path="/watch/:episodeId" element={<ProtectedRoute><WebWatchGate><WatchPage /></WebWatchGate></ProtectedRoute>} />
         <Route path="/downloads" element={<ProtectedRoute>{isMobileApp ? <MobileOfflinePage /> : <OfflineLibraryPage />}</ProtectedRoute>} />
         <Route path="/offline-library" element={<ProtectedRoute><OfflineLibraryPage /></ProtectedRoute>} />
@@ -336,25 +418,36 @@ const AppRoutes = () => {
         <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
         <Route path="/search/producer/:producerName" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
         <Route path="/image-search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
+        <Route path="/genre" element={<ProtectedRoute><GenrePage /></ProtectedRoute>} />
         <Route path="/genre/:genre" element={<ProtectedRoute><GenrePage /></ProtectedRoute>} />
         <Route path="/trending" element={<ProtectedRoute><TrendingPage /></ProtectedRoute>} />
         <Route path="/collections" element={<ProtectedRoute><CollectionsPage /></ProtectedRoute>} />
         <Route path="/favorites" element={<ProtectedRoute><FavoritesPage /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+        <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+        <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
+        <Route path="/social/:username" element={<ProtectedRoute><FollowConnectionsPage /></ProtectedRoute>} />
         <Route path="/integration/mal/redirect" element={<ProtectedRoute><MalRedirectPage /></ProtectedRoute>} />
         <Route path="/integration/anilist/redirect" element={<ProtectedRoute><AniListRedirectPage /></ProtectedRoute>} />
         <Route path="/recommendations" element={<ProtectedRoute><RecommendationsPage /></ProtectedRoute>} />
-        <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
-        <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+        <Route path="/admin" element={<ProtectedRoute><AdminRoute><AdminPage /></AdminRoute></ProtectedRoute>} />
+        <Route path="/admin/user/:userId" element={<ProtectedRoute><AdminRoute><AdminUserPage /></AdminRoute></ProtectedRoute>} />
+        <Route path="/settings" element={<SettingsRouteOpener />} />
         <Route path="/status" element={<ProtectedRoute><StatusPage /></ProtectedRoute>} />
         <Route path="/suggestions" element={<ProtectedRoute><SuggestionsPage /></ProtectedRoute>} />
         <Route path="/terms" element={<ProtectedRoute><TermsPage /></ProtectedRoute>} />
         <Route path="/dmca" element={<ProtectedRoute><DMCAPage /></ProtectedRoute>} />
         <Route path="/privacy" element={<ProtectedRoute><PrivacyPage /></ProtectedRoute>} />
+        <Route path="/community-guidelines" element={<ProtectedRoute><CommunityGuidelinesPage /></ProtectedRoute>} />
+        <Route path="/community-rules" element={<ProtectedRoute><CommunityGuidelinesPage /></ProtectedRoute>} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/update-password" element={<UpdatePasswordPage />} />
         <Route path="/community" element={<ProtectedRoute><CommunityPage /></ProtectedRoute>} />
-        <Route path="/community/forum/new" element={<ProtectedRoute><ForumNewPostPage /></ProtectedRoute>} />
+        <Route path="/community/forum/new" element={<Navigate to="/community" replace />} />
+        <Route path="/community/bookmarks" element={<ProtectedRoute><BookmarksPage /></ProtectedRoute>} />
+        <Route path="/community/c/:slug" element={<ProtectedRoute><CommunitySpacePage /></ProtectedRoute>} />
+        <Route path="/community/c/:slug/information" element={<ProtectedRoute><CommunityInformationPage /></ProtectedRoute>} />
+        <Route path="/community/c/:slug/settings" element={<ProtectedRoute><CommunitySettingsPage /></ProtectedRoute>} />
         <Route path="/community/forum/:postId" element={<ProtectedRoute><ForumPostPage /></ProtectedRoute>} />
         <Route path="/tierlists" element={<ProtectedRoute><TierListPage /></ProtectedRoute>} />
         <Route path="/tierlist/:shareCode" element={<ProtectedRoute><TierListViewPage /></ProtectedRoute>} />
@@ -370,7 +463,7 @@ const AppRoutes = () => {
         <Route path="/isshoni" element={<ProtectedRoute><IsshoNiPage /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
-      <Miniplayer />
+      </div>
     </Suspense>
   );
 };

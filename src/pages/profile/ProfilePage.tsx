@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
@@ -15,29 +15,55 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { WatchStreaks } from '@/components/profile/WatchStreaks';
+import { useWatchStreaks, usePublicWatchStreaks } from '@/hooks/user/useWatchStreaks';
+import { useExternalStats } from '@/hooks/user/useExternalStats';
+import { ProfileOverviewTab } from '@/components/profile/overview';
+import { WatchlistTab, MangaReadlistTab, HistoryTab, VaultTab } from '@/components/profile/tabs';
+import { ProfileSettingsSheet } from '@/components/profile/ProfileSettingsSheet';
+import { ProfileBackgroundEffects } from '@/components/profile/ProfileBackgroundEffects';
+import { readProfileCustomization, ambientAccentStyle } from '@/lib/profileSettings';
+import { Seo } from '@/components/seo/Seo';
 import { useWatchlist } from '@/hooks/user/useWatchlist';
 import { useWatchHistory } from '@/hooks/user/useWatchHistory';
 import { usePublicProfile, usePublicWatchlist, usePublicWatchHistory } from '@/hooks/user/useProfileFeatures';
-import { useMangaReadlist, usePublicMangaReadlist, type MangaReadlistStatus } from '@/hooks/user/useMangaReadlist';
+import {
+  useMangaReadlist,
+  usePublicMangaReadlist,
+  useReadingTrackTotals,
+  usePublicReadingTrackTotals,
+  type MangaReadlistStatus,
+} from '@/hooks/user/useMangaReadlist';
 import { useUserForumPosts } from '@/hooks/community/useForum';
 import { useFollow } from '@/hooks/community/useFollow';
+import { useUserRank } from '@/hooks/community/useLeaderboard';
+import { useUserRatings } from '@/hooks/user/useUserRatings';
+import { useUserComments } from '@/hooks/user/useUserComments';
+import { useTasteProfile } from '@/hooks/user/useTasteProfile';
+import { useCharacterFavorites } from '@/hooks/user/useCharacterFavorites';
+import { computeReputation } from '@/core/profile/reputation';
+import { computeLibraryDistribution } from '@/core/profile/libraryDistribution';
+import { computeWatchingHabits } from '@/core/profile/watchingHabits';
+import { computeRatingDistribution } from '@/core/profile/ratingStats';
+import { computeMonthlySeries } from '@/core/profile/growthSeries';
+import { deriveInsights } from '@/core/profile/insights';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { getProxiedImageUrl } from '@/lib/api';
-import { AvatarPicker } from '@/components/profile/AvatarPicker';
+import { AvatarPickerSheet } from '@/components/profile/AvatarPickerSheet';
 import { SocialLinksEditor, SocialLinksDisplay, SocialLinks } from '@/components/profile/SocialLinksEditor';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import {
   User, Settings, List, History, LogOut, Edit2, Save, X,
-  Play, Trash2, Clock, CheckCircle, Eye, Pause, XCircle, ArrowLeft, Camera, Shield, Sparkles, Globe, Lock, Share2, MessageSquare, AlertCircle, UserPlus, UserMinus, Bell, Check,
-  ShieldCheck, Loader2, Flame, BookOpen
+  Play, Trash2, Clock, CheckCircle, Eye, Pause, XCircle, ArrowLeft, Camera, Shield, Sparkles, Globe, Lock, Share2, Library, AlertCircle, UserPlus, UserMinus, Bell, Check,
+  Loader2, Flame, BookOpen, LayoutGrid
 } from 'lucide-react';
 import { useNotifications } from '@/hooks/community/useNotifications';
 import { motion } from 'framer-motion';
 import { RankBadge } from '@/components/ui/RankBadge';
-import { getRankNameStyle } from '@/lib/rankUtils';
-// import { StatusVideoBackground } from '@/components/layout/StatusVideoBackground';
+import { getRankNameStyle, computeRankScore } from '@/lib/rankUtils';
+import { UserBadges } from '@/components/ui/UserBadges';
+import { useUserBadges } from '@/hooks/community/useUserBadges';
 
 const STATUS_LABELS: Record<string, { label: string; icon: React.ReactNode; color: string; bg: string }> = {
   watching: { label: 'Watching', icon: <Play className="w-3 h-3" />, color: 'text-blue-400', bg: 'bg-blue-400/10' },
@@ -68,21 +94,25 @@ export default function ProfilePage() {
   const showSidebar = !isMobile && !isMobileApp;
   const { data: notifications = [], unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
 
-  // Determine if viewing someone else's profile
-  // Supports /user/:username, /@username (via atUsername), and /:slug (where slug is @username)
   const viewingUsername = usernameParam ||
     (atUsername?.startsWith('@') ? atUsername.slice(1) : atUsername) ||
     (slug?.startsWith('@') ? slug.slice(1) : undefined);
 
   const isViewingOther = !!viewingUsername && viewingUsername !== ownProfile?.username;
+  // Tracker stats use the profile owner's own tokens, so only fetch on your own profile.
+  const { stats: externalStats, isLoading: externalStatsLoading } = useExternalStats(
+    ownProfile,
+    !isViewingOther,
+  );
 
-  // Fetch public profile if viewing other user
   const { data: publicProfile, isLoading: loadingPublicProfile, error: publicProfileError } = usePublicProfile(viewingUsername || '');
 
-  // Use the appropriate profile data
   const profile = isViewingOther ? publicProfile : ownProfile;
 
-  // Fetch watchlist/history/readlist - own data or public data
+  // Per-profile customization (ambient accent + background effect) — read from the
+  // resolved profile so it applies for own AND other viewers.
+  const { ambientColor, backgroundEffect } = readProfileCustomization(profile);
+
   const { data: ownWatchlist, isLoading: loadingOwnWatchlist } = useWatchlist();
   const { data: ownHistory, isLoading: loadingOwnHistory } = useWatchHistory();
   const { data: ownMangaReadlist = [], isLoading: loadingOwnMangaReadlist } = useMangaReadlist();
@@ -113,11 +143,24 @@ export default function ProfilePage() {
     MANGA_READING_ONLY_STATUSES,
   );
 
-  // Fetch forum posts for the profile
-  const { data: forumPosts = [], isLoading: loadingForumPosts } = useUserForumPosts(profile?.user_id);
+  // Reading-track chapter totals (all statuses) — drive per-track ranks.
+  const { data: ownReadingTotals } = useReadingTrackTotals();
+  const { data: publicReadingTotals } = usePublicReadingTrackTotals(
+    publicProfile?.user_id,
+    publicProfile?.is_public ?? false,
+    publicProfile?.show_watchlist ?? true,
+  );
+  const readingTotals = isViewingOther ? publicReadingTotals : ownReadingTotals;
 
-  // Follow features
+  const { data: forumPosts = [] } = useUserForumPosts(profile?.user_id);
   const { isFollowing, checkingFollow, followStats, follow, unfollow, isFollowingLoading } = useFollow(profile?.user_id);
+
+  // Analytics data sources for the Overview tab.
+  const { data: userRatings = [] } = useUserRatings(profile?.user_id);
+  const { data: userCommentRows = [] } = useUserComments(profile?.user_id);
+  const { data: favoriteCharacters = [], isLoading: loadingFavoriteCharacters } = useCharacterFavorites(profile?.user_id);
+  const { data: tasteProfile = null, isLoading: loadingTasteProfile } = useTasteProfile(!isViewingOther);
+  const { data: userRank = null } = useUserRank('active', profile?.user_id);
 
   const watchlist = isViewingOther ? publicWatchlist : ownWatchlist;
   const history = isViewingOther ? publicHistory : ownHistory;
@@ -131,18 +174,11 @@ export default function ProfilePage() {
 
   const computedWatchTimeSeconds = useMemo(() => {
     if (!history || history.length === 0) return 0;
-
     return history.reduce((total: number, item: any) => {
       const progressSeconds = Number(item?.progress_seconds);
-      if (Number.isFinite(progressSeconds) && progressSeconds > 0) {
-        return total + progressSeconds;
-      }
-
+      if (Number.isFinite(progressSeconds) && progressSeconds > 0) return total + progressSeconds;
       const durationSeconds = Number(item?.duration_seconds);
-      if (Number.isFinite(durationSeconds) && durationSeconds > 0) {
-        return total + durationSeconds;
-      }
-
+      if (Number.isFinite(durationSeconds) && durationSeconds > 0) return total + durationSeconds;
       return total;
     }, 0);
   }, [history]);
@@ -153,98 +189,159 @@ export default function ProfilePage() {
         if (!entry) return false;
         const status = String(entry.status || '').trim().toLowerCase();
         if (status !== 'reading') return false;
-
         return Boolean(
           entry.last_chapter_key ||
             entry.last_chapter_number != null ||
             (entry.last_chapter_title && String(entry.last_chapter_title).trim().length > 0),
         );
       })
-      .sort(
-        (left: any, right: any) =>
-          new Date(right?.updated_at || 0).getTime() - new Date(left?.updated_at || 0).getTime(),
-      );
+      .sort((left: any, right: any) => new Date(right?.updated_at || 0).getTime() - new Date(left?.updated_at || 0).getTime());
   }, [mangaHistorySource]);
 
   const hasAnimeHistory = Boolean(history && history.length > 0);
   const hasMangaHistory = mangaHistoryEntries.length > 0;
 
-  // Fetch manual achievement grants for rank display
-  const { data: manualGrants = [] } = useQuery({
-    queryKey: ['user_achievements', profile?.user_id],
-    enabled: !!profile?.user_id,
-    queryFn: async () => {
-      const { data, error } = (await supabase
-        .from('user_achievements' as any)
-        .select('achievement_id')
-        .eq('user_id', profile!.user_id)) as any;
-      if (error) return [];
-      return (data ?? []).map((r: any) => r.achievement_id as string);
-    },
+  // Rank/episode counts reflect REAL watch activity only. Manual achievement
+  // grants unlock badges (via the streak hook), but no longer inflate the
+  // episode count or rank — that mismatch was the Overview↔Streaks↔Wrapped
+  // inconsistency (e.g. "600 episodes / Hashira" vs a real 106 / Bankai).
+  const effectiveEpisodeCount = history?.length || 0;
+
+  // One unified rank per user: episodes + weighted reading chapters/issues.
+  const profileRankScore = computeRankScore({
+    episodes: effectiveEpisodeCount,
+    manga: readingTotals?.manga ?? 0,
+    manhwa: readingTotals?.manhwa ?? 0,
+    comic: readingTotals?.comic ?? 0,
   });
 
-  // Map achievement ID → minimum episodes implied by that rank
-  const ACHIEVEMENT_RANK_EPS: Record<string, number> = {
-    'filler-watcher': 0, 'genin': 5, 'chunin': 10, 'week-warrior': 20,
-    'plus-ultra': 35, 'pro-hero': 50, 'soul-reaper': 75, 'bankai': 100,
-    'survey-corps': 150, 'month-legend': 250, 'demon-slayer': 400, 'hashira': 600,
-  };
-  const grantedMaxEps = manualGrants.reduce(
-    (max, id) => Math.max(max, ACHIEVEMENT_RANK_EPS[id] ?? 0), 0
-  );
-  const effectiveEpisodeCount = Math.max(history?.length || 0, grantedMaxEps);
-
-  // Check if tabs should be visible for public profiles
   const showWatchlistTab = !isViewingOther || (publicProfile?.is_public && publicProfile?.show_watchlist !== false);
   const showHistoryTab = !isViewingOther || (publicProfile?.is_public && publicProfile?.show_history !== false);
 
-  const [isEditing, setIsEditing] = useState(false);
-  const [displayName, setDisplayName] = useState('');
-  const [username, setUsername] = useState('');
-  const [bio, setBio] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
+  const { streak: ownStreak, achievements: ownAchievements = [], stats: ownStreakStats } = useWatchStreaks();
+  const { streak: publicStreak, achievements: publicAchievements = [], stats: publicStreakStats } = usePublicWatchStreaks(
+    publicProfile?.user_id,
+    publicProfile?.is_public ?? false,
+    publicProfile?.show_history ?? true,
+  );
+  // Show the *viewed* user's streaks/achievements/stats when looking at someone else.
+  const viewedStreak = isViewingOther ? publicStreak : ownStreak;
+  const achievements = isViewingOther ? publicAchievements : ownAchievements;
+  const viewedStreakStats = isViewingOther ? publicStreakStats : ownStreakStats;
 
-  // Sync state when profile loads or changes
+  const { data: profileBadges = [] } = useUserBadges(profile?.user_id);
+
+  const { data: commentsCount = 0 } = useQuery({
+    queryKey: ['user_comments_count', profile?.user_id],
+    enabled: !!profile?.user_id,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('comments' as any)
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', profile!.user_id);
+      if (error) return 0;
+      return count || 0;
+    },
+  });
+
+  const mangaCounts = useMemo(() => {
+    let manga = 0, manhwa = 0, comics = 0, totalChapters = 0;
+    (mangaReadlist || []).forEach((item: any) => {
+      const title = (item.manga_title || '').toLowerCase();
+      const format = (item.format || '').toLowerCase();
+      if (format.includes('manhwa') || title.includes('manhwa') || title.includes('solo leveling') || title.includes('ranker') || title.includes('tower of god')) {
+        manhwa++;
+      } else if (format.includes('comic') || title.includes('comic')) {
+        comics++;
+      } else {
+        manga++;
+      }
+      if (item.last_chapter_number) totalChapters += Number(item.last_chapter_number) || 0;
+    });
+    return { manga, manhwa, comics, totalChapters };
+  }, [mangaReadlist]);
+
+  const forumUpvotes = useMemo(
+    () => (forumPosts || []).reduce((acc: number, p: any) => acc + (p.upvotes || 0), 0),
+    [forumPosts],
+  );
+
+  // Real reputation score (0–100) from actual activity signals. viewedStreak is
+  // resolved for whichever profile is open (own or public), so streak now
+  // contributes for other users too.
+  const reputation = useMemo(
+    () =>
+      computeReputation({
+        episodes: history?.length || 0,
+        longestStreak: viewedStreak?.longestStreak || 0,
+        ratingsCount: userRatings.length,
+        commentsCount: commentsCount,
+        forumPosts: forumPosts?.length || 0,
+        forumUpvotes,
+        followers: followStats?.followers || 0,
+      }),
+    [history, viewedStreak, userRatings, commentsCount, forumPosts, forumUpvotes, followStats],
+  );
+  const reputationRate = reputation.score;
+
+  // Derived analytics shared across the Overview cards.
+  const libraryDistribution = useMemo(
+    () => computeLibraryDistribution(watchlist || [], mangaReadlist || []),
+    [watchlist, mangaReadlist],
+  );
+
+  const overviewInsights = useMemo(() => {
+    const habits = computeWatchingHabits(history || []);
+    const ratingDist = computeRatingDistribution(userRatings);
+    const growth = computeMonthlySeries({
+      history: history || [],
+      watchlist: watchlist || [],
+      mangaReadlist: mangaReadlist || [],
+      ratings: userRatings,
+      comments: userCommentRows,
+    });
+    return deriveInsights({
+      distribution: libraryDistribution,
+      habits,
+      ratings: ratingDist,
+      growth,
+      topGenre: tasteProfile?.topGenres?.[0]?.genre ?? null,
+      currentStreak: viewedStreak?.currentStreak || 0,
+      longestStreak: viewedStreak?.longestStreak || 0,
+    });
+  }, [history, userRatings, watchlist, mangaReadlist, userCommentRows, libraryDistribution, tasteProfile, viewedStreak]);
+
+  const [activeTab, setActiveTab] = useState<string>('overview');
+
+  // Allow deep-linking to a tab, e.g. Continue Watching's "History" button → /profile?tab=history.
+  const [searchParams] = useSearchParams();
   useEffect(() => {
-    if (ownProfile && !isViewingOther) {
-      setDisplayName(ownProfile.display_name || '');
-      setUsername(ownProfile.username || '');
-      setBio(ownProfile.bio || '');
+    const tab = searchParams.get('tab');
+    if (tab && ['overview', 'watchlist', 'manga-readlist', 'history', 'vault', 'streaks'].includes(tab)) {
+      setActiveTab(tab);
     }
-  }, [ownProfile, isViewingOther]);
+  }, [searchParams]);
 
-  // Refresh profile on mount to ensure latest MAL tokens
   useEffect(() => {
     if (user && !isViewingOther) {
-      console.log('[Profile] ProfilePage mounted for logged-in user, refreshing tokens...');
       refreshProfile();
     }
   }, []);
 
-  // If viewing other's profile that doesn't exist or is private
   if (isViewingOther && !loadingPublicProfile && (publicProfileError || !publicProfile)) {
     return (
       <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-        {/* <StatusVideoBackground overlayColor="from-background/95 via-background/90 to-background/80" /> */}
         {showSidebar && <Sidebar />}
-        <main className={cn(
-          "relative z-10 w-full",
-          !isDesktopApp && "md:pl-24" // Left padding for floating sidebar on web
-        )}>
+        <main className={cn("relative z-10 w-full", !isDesktopApp && "md:pl-24")}>
           <div className="max-w-7xl mx-auto px-4 md:px-8 py-20">
-            <button
-              onClick={() => navigate(-1)}
-              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-8"
-            >
+            <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-8">
               <ArrowLeft className="w-5 h-5" />
               <span>Back</span>
             </button>
             <div className="text-center">
               <Lock className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
               <h1 className="text-2xl font-bold mb-2">Profile Not Available</h1>
-              <p className="text-muted-foreground mb-6">
-                This profile is private or doesn't exist.
-              </p>
+              <p className="text-muted-foreground mb-6">This profile is private or doesn't exist.</p>
               <Button onClick={() => navigate('/')}>Go Home</Button>
             </div>
           </div>
@@ -254,7 +351,6 @@ export default function ProfilePage() {
     );
   }
 
-  // Loading state for public profile
   if (isViewingOther && loadingPublicProfile) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -263,39 +359,10 @@ export default function ProfilePage() {
     );
   }
 
-  // Redirect to auth if not logged in and viewing own profile
   if (!user && !isViewingOther) {
     navigate('/auth');
     return null;
   }
-
-  const handleSaveProfile = async () => {
-    setIsSaving(true);
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          display_name: displayName.trim() || null,
-          username: username.trim() || null,
-          bio: bio.trim() || null,
-        })
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-
-      await refreshProfile();
-      setIsEditing(false);
-      toast.success('Profile updated successfully!');
-    } catch (error: any) {
-      if (error.message?.includes('unique') || error.code === '23505') {
-        toast.error('Username is already taken');
-      } else {
-        toast.error(`Failed to update profile: ${error.message || 'Unknown error'}`);
-      }
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -311,7 +378,6 @@ export default function ProfilePage() {
     });
   };
 
-  // Calculate stats
   const stats = {
     total: watchlist?.length || 0,
     watching: watchlist?.filter(i => i.status === 'watching').length || 0,
@@ -320,7 +386,6 @@ export default function ProfilePage() {
     watchTimeSeconds: computedWatchTimeSeconds,
   };
 
-  // Format watch time to hours and minutes
   const formatWatchTime = (seconds: number): string => {
     if (seconds === 0) return '0 hours';
     const hours = Math.floor(seconds / 3600);
@@ -330,869 +395,420 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-      {/* <StatusVideoBackground overlayColor="from-background/95 via-background/90 to-background/80" /> */}
+    <div
+      className="min-h-screen bg-background text-foreground overflow-x-hidden relative"
+      style={ambientAccentStyle(ambientColor)}
+    >
+      {profile?.username && (
+        <Seo
+          title={profile.display_name || profile.username}
+          description={profile.bio || `${profile.display_name || profile.username}'s anime profile on Tatakai.`}
+          image={profile.banner_url || profile.avatar_url || undefined}
+          canonicalPath={`/user/${profile.username}`}
+          kind="profile"
+        />
+      )}
       {showSidebar && <Sidebar />}
+
+      {/* ── Per-profile animated background effect (visible to all viewers) ── */}
+      <ProfileBackgroundEffects effect={backgroundEffect} />
+
+      {/* ── Ambient Background Color Bleed Throughout Whole Page ── */}
+      {profile?.banner_url && (
+        <div className="fixed inset-0 w-full h-full overflow-hidden pointer-events-none -z-10">
+          <img
+            src={profile.banner_url}
+            alt=""
+            className="w-full h-full object-cover opacity-[0.15] md:opacity-[0.25] blur-[100px] saturate-[2.5] transform scale-125"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/80 to-background/95" />
+        </div>
+      )}
 
       <main className={cn(
         "relative z-10 w-full",
-        !isDesktopApp && "md:pl-24" // Left padding for floating sidebar on web
+        !isDesktopApp && "md:pl-24"
       )}>
-        {/* Hero Banner */}
-        <div className="h-[300px] md:h-[400px] relative w-full overflow-hidden group">
+        
+        {/* ── Cinematic Hero Banner ── */}
+        <div className="h-[360px] md:h-[500px] relative w-full overflow-hidden group select-none">
           {profile?.banner_url ? (
             <img
               src={profile.banner_url}
               alt="Profile banner"
-              className="absolute inset-0 w-full h-full object-cover"
+              className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-[2s] ease-out group-hover:scale-[1.02]"
             />
           ) : (
-            <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-purple-500/20" />
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-background to-background" />
           )}
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/20 to-background" />
 
+          {/* Cinematic blending overlays */}
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent opacity-90 pointer-events-none" />
+          
           {/* Banner Picker Button - Only show for own profile */}
           {!isViewingOther && (
-            <AvatarPicker
+            <AvatarPickerSheet
               type="banner"
               currentImage={profile?.banner_url || undefined}
               trigger={
-                <button className="absolute top-4 right-4 px-4 py-2 rounded-lg bg-black/50 hover:bg-black/70 text-white flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
-                  <Camera className="w-4 h-4" />
-                  Change Banner
+                <button className="absolute top-6 right-6 px-4 py-2 rounded-full bg-black/40 hover:bg-black/60 text-white/90 text-xs font-bold flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 backdrop-blur-xl border border-white/20 shadow-2xl hover:scale-105 z-10">
+                  <Camera className="w-3.5 h-3.5" />
+                  Change Cover
                 </button>
               }
             />
           )}
+
+          {isViewingOther && (
+            <div className="absolute top-6 left-6 z-20">
+              <button
+                onClick={() => navigate(-1)}
+                className="group flex items-center gap-2 text-xs font-bold text-white/90 hover:text-white transition-all backdrop-blur-xl px-4 py-2 rounded-full bg-black/40 border border-white/20 shadow-xl hover:bg-black/60"
+              >
+                <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
+                <span>Back</span>
+              </button>
+            </div>
+          )}
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 md:px-8 -mt-32 relative pb-20">
-          {/* Back button when viewing other's profile */}
-          {isViewingOther && (
-            <button
-              onClick={() => navigate(-1)}
-              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              <span>Back</span>
-            </button>
-          )}
-
-          {/* Profile Header Card */}
+        {/* ── Profile Header Section ── */}
+        <div className="max-w-7xl mx-auto px-4 md:px-8 relative z-20 pb-20">
+          
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="flex flex-col md:flex-row gap-8 items-start"
+            className="flex flex-col xl:flex-row justify-between items-start xl:items-end gap-6 md:gap-10 -mt-20 md:-mt-24 mb-10"
           >
-            {/* Avatar Column */}
-            <div className="flex flex-col items-center md:items-start gap-4">
-              <div className="relative group">
-                <div className="w-32 h-32 md:w-48 md:h-48 rounded-full p-1 bg-background ring-4 ring-background/50 overflow-hidden shadow-2xl">
+            {/* Left side: Avatar and Core Details */}
+            <div className="flex flex-col md:flex-row items-center md:items-end gap-6 md:gap-8 w-full xl:w-auto">
+              
+              {/* Avatar Container */}
+              <div className="relative group shrink-0">
+                <div className="w-36 h-36 md:w-48 md:h-48 rounded-full overflow-hidden bg-background ring-[6px] md:ring-[8px] ring-background shadow-[0_0_40px_rgba(0,0,0,0.5)] border border-white/10 z-10 relative">
                   <Avatar className="w-full h-full">
-                    <AvatarImage src={profile?.avatar_url || undefined} className="object-cover" />
-                    <AvatarFallback className="bg-gradient-to-br from-primary to-purple-600 text-white text-5xl font-bold">
-                      {profile?.display_name?.[0]?.toUpperCase() || (isViewingOther ? 'U' : user?.email?.[0]?.toUpperCase()) || 'U'}
+                    <AvatarImage src={profile?.avatar_url || undefined} className="object-cover w-full h-full transition-transform duration-700 group-hover:scale-105" />
+                    <AvatarFallback className="bg-gradient-to-br from-primary to-purple-600 text-white text-5xl font-black uppercase">
+                      {profile?.display_name?.[0] || (isViewingOther ? 'U' : user?.email?.[0]) || 'U'}
                     </AvatarFallback>
                   </Avatar>
                 </div>
 
-                {/* Anime Avatar Picker - Only show for own profile */}
                 {!isViewingOther && (
-                  <AvatarPicker
+                  <AvatarPickerSheet
                     type="avatar"
                     currentImage={profile?.avatar_url || undefined}
                     trigger={
-                      <button className="absolute -bottom-2 -right-2 w-10 h-10 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center shadow-lg transition-all duration-200 hover:scale-110">
-                        <Sparkles className="w-5 h-5 text-primary-foreground" />
+                      <button className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-110 border-2 border-background z-20">
+                        <Sparkles className="w-4 h-4" />
                       </button>
                     }
                   />
                 )}
               </div>
 
-              {/* Quick Stats for Mobile */}
-              <div className="flex md:hidden gap-4 text-sm text-muted-foreground">
-                <div className="text-center">
-                  <div className="font-bold text-foreground text-lg">{formatWatchTime(stats.watchTimeSeconds)}</div>
-                  <div>Watch Time</div>
+              {/* User Details & Actions */}
+              <div className="flex flex-col items-center md:items-start text-center md:text-left w-full pb-2">
+                
+                {/* Header Name & Badges */}
+                <div className="flex items-center justify-center md:justify-start gap-3 flex-wrap mb-1">
+                  {(() => {
+                    const rankStyle = getRankNameStyle(profileRankScore);
+                    return (
+                      <h1 className="text-3xl md:text-5xl font-black tracking-tight drop-shadow-xl font-display">
+                        <span className={rankStyle.className} style={rankStyle.style}>
+                          {profile?.display_name || (profile?.username && profile?.username !== 'null' ? profile?.username : 'User')}
+                        </span>
+                      </h1>
+                    );
+                  })()}
+                  
+                  <UserBadges badges={profileBadges} size={22} />
                 </div>
-                <div className="text-center">
-                  <div className="font-bold text-foreground text-lg">{followStats?.followers || 0}</div>
-                  <div>Followers</div>
-                </div>
-                <div className="text-center">
-                  <div className="font-bold text-foreground text-lg">{followStats?.following || 0}</div>
-                  <div>Following</div>
-                </div>
-              </div>
-            </div>
 
-            {/* Info Column */}
-            <div className="flex-1 pt-2 md:pt-12 w-full">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-                <div>
-                  {isEditing && !isViewingOther ? (
-                    <div className="space-y-4 w-full max-w-md">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Display Name</Label>
-                          <Input
-                            value={displayName}
-                            onChange={(e) => setDisplayName(e.target.value)}
-                            className="bg-background/50 backdrop-blur-sm"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Username</Label>
-                          <Input
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                            placeholder="username"
-                            className="bg-background/50 backdrop-blur-sm"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Bio</Label>
-                        <Textarea
-                          value={bio}
-                          onChange={(e) => setBio(e.target.value)}
-                          placeholder="Tell us about yourself..."
-                          className="bg-background/50 backdrop-blur-sm resize-none"
-                          rows={3}
-                        />
-                      </div>
-                      <div className="flex gap-2">
-                        <Button onClick={handleSaveProfile} disabled={isSaving} className="gap-2">
-                          <Save className="w-4 h-4" />
-                          Save Changes
+                {/* Username & Rank Row */}
+                <div className="flex items-center justify-center md:justify-start gap-3 mb-5 flex-wrap">
+                  <span className="text-sm font-medium text-muted-foreground/80 hover:text-muted-foreground transition-colors">
+                    @{profile?.username && profile?.username !== 'null' ? profile.username : 'anonymous'}
+                  </span>
+                  <div className="w-1 h-1 rounded-full bg-white/20" />
+                  {/* One unified rank across anime + manga/manhwa/comic. */}
+                  <RankBadge score={profileRankScore} size="sm" />
+                </div>
+
+                {/* Sleek Action Buttons */}
+                <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 w-full">
+                  {isViewingOther ? (
+                    <>
+                      {user && (
+                        <Button
+                          onClick={() => isFollowing ? unfollow() : follow()}
+                          disabled={isFollowingLoading || checkingFollow}
+                          className={cn(
+                            "rounded-full h-9 px-6 font-bold text-xs transition-all shadow-xl",
+                            isFollowing 
+                              ? "bg-white/10 hover:bg-white/20 text-white border border-white/10" 
+                              : "bg-primary hover:bg-primary/90 text-primary-foreground hover:scale-105"
+                          )}
+                        >
+                          {isFollowing ? 'Following' : 'Follow'}
                         </Button>
-                        <Button variant="outline" onClick={() => setIsEditing(false)}>
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
+                      )}
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          const shareUrl = window.location.href;
+                          navigator.clipboard.writeText(shareUrl);
+                          toast.success('Profile link copied!');
+                        }}
+                        className="rounded-full h-9 px-5 bg-white/5 hover:bg-white/15 border border-white/10 text-white text-xs font-bold transition-all backdrop-blur-md"
+                      >
+                        <Share2 className="w-3.5 h-3.5 mr-2" /> Share
+                      </Button>
+                    </>
                   ) : (
                     <>
-                      {/* Row 1: Display name + role badges */}
-                      <div className="flex items-center gap-3 flex-wrap mb-2">
-                        {(() => {
-                          const rankStyle = getRankNameStyle(effectiveEpisodeCount);
-                          return (
-                            <h1 className="text-3xl md:text-5xl font-black tracking-tighter drop-shadow-sm">
-                              <span className={rankStyle.className} style={rankStyle.style}>
-                                {profile?.display_name || (profile?.username && profile?.username !== 'null' ? profile?.username : 'User')}
-                              </span>
-                            </h1>
-                          );
-                        })()}
-                        {profile?.role === 'admin' && (
-                          <span className="flex items-center gap-1 px-3 py-1 rounded-full text-[12px] font-bold bg-violet-500/20 text-violet-400 border border-violet-500/30">
-                            <ShieldCheck className="w-4 h-4" />
-                            ADMIN
-                          </span>
-                        )}
-                        {profile?.role === 'moderator' && (
-                          <span className="flex items-center gap-1 px-3 py-1 rounded-full text-[12px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                            <Shield className="w-4 h-4" />
-                            MODERATOR
-                          </span>
-                        )}
-                        {isViewingOther && publicProfile?.is_public && (
-                          <span title="Public Profile">
-                            <Globe className="w-5 h-5 text-green-500" />
-                          </span>
-                        )}
-                        {!isViewingOther && isAdmin && (
-                          <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary text-xs font-bold border border-primary/20 flex items-center gap-1">
-                            <Shield className="w-3 h-3" /> ADMIN
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Row 2: @username + rank badge + episode count */}
-                      <div className="flex items-center gap-3 flex-wrap mb-3">
-                        <div className="flex items-center gap-2 bg-background/30 backdrop-blur-sm px-3 py-1 rounded-full border border-white/5">
-                          <span className="text-sm font-medium text-muted-foreground/80">@{profile?.username && profile?.username !== 'null' ? profile.username : 'anonymous'}</span>
-                        </div>
-                        <RankBadge
-                          episodeCount={effectiveEpisodeCount}
-                          size="sm"
-                        />
-                        <span className="text-xs text-muted-foreground">
-                          {history?.length || 0} episodes watched
-                        </span>
-                      </div>
-                      {!isViewingOther && user && (
-                        <div className="text-muted-foreground mb-4 flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/5 text-xs font-medium">{user.email}</span>
-                        </div>
-                      )}
-                      {profile?.bio && (
-                        <p className="text-foreground/80 max-w-2xl leading-relaxed mb-4">
-                          {profile.bio}
-                        </p>
-                      )}
-
-                      {/* Social Links Display */}
-                      {profile?.social_links && (
-                        <div className="mb-6">
-                          <SocialLinksDisplay links={profile.social_links as SocialLinks} />
-                        </div>
-                      )}
-
-                      {/* Action buttons */}
-                      {isViewingOther ? (
-                        <div className="flex flex-wrap gap-3">
-                          {user && (
-                            <Button
-                              onClick={() => isFollowing ? unfollow() : follow()}
-                              disabled={isFollowingLoading || checkingFollow}
-                              variant={isFollowing ? "outline" : "default"}
-                              className="gap-2"
-                            >
-                              {isFollowing ? (
-                                <>
-                                  <UserMinus className="w-4 h-4" />
-                                  Unfollow
-                                </>
-                              ) : (
-                                <>
-                                  <UserPlus className="w-4 h-4" />
-                                  Follow
-                                </>
-                              )}
-                            </Button>
-                          )}
+                      <ProfileSettingsSheet
+                        trigger={
                           <Button
-                            variant="outline"
-                            onClick={() => {
-                              const shareUrl = window.location.href;
-                              navigator.clipboard.writeText(shareUrl);
-                              toast.success('Profile link copied!');
-                            }}
-                            className="gap-2 bg-background/50 backdrop-blur-sm hover:bg-background/80"
+                            variant="secondary"
+                            className="rounded-full h-9 px-5 bg-white/10 hover:bg-white/20 border border-white/10 text-white text-xs font-bold transition-all backdrop-blur-md hover:scale-105 shadow-xl"
                           >
-                            <Share2 className="w-4 h-4" />
-                            Share
+                            <Settings className="w-3.5 h-3.5 mr-2" /> Profile Settings
                           </Button>
-                        </div>
-                      ) : (
-                        <div className="flex flex-wrap gap-3">
-                          <Button variant="outline" onClick={() => setIsEditing(true)} className="gap-2 bg-background/50 backdrop-blur-sm hover:bg-background/80">
-                            <Edit2 className="w-4 h-4" />
-                            Edit Profile
+                        }
+                      />
+                      <SocialLinksEditor
+                        currentLinks={(ownProfile as any)?.social_links || {}}
+                        isPublic={ownProfile?.is_public ?? false}
+                        showWatchlist={(ownProfile as any)?.show_watchlist ?? true}
+                        showHistory={(ownProfile as any)?.show_history ?? true}
+                        trigger={
+                          <Button variant="secondary" className="rounded-full h-9 px-5 bg-white/5 hover:bg-white/15 border border-white/10 text-white/90 text-xs font-bold transition-all backdrop-blur-md shadow-xl">
+                            <Share2 className="w-3.5 h-3.5 mr-2" /> Social Links
                           </Button>
-                          <SocialLinksEditor
-                            currentLinks={(ownProfile as any)?.social_links || {}}
-                            isPublic={ownProfile?.is_public ?? false}
-                            showWatchlist={(ownProfile as any)?.show_watchlist ?? true}
-                            showHistory={(ownProfile as any)?.show_history ?? true}
-                            trigger={
-                              <Button variant="outline" className="gap-2 bg-background/50 backdrop-blur-sm hover:bg-background/80">
-                                <Share2 className="w-4 h-4" />
-                                Social & Privacy
-                              </Button>
-                            }
-                          />
-                          {isAdmin && (
-                            <Button
-                              variant="outline"
-                              onClick={() => navigate('/admin')}
-                              className="gap-2 bg-background/50 backdrop-blur-sm hover:bg-background/80 border-primary/50 text-primary"
-                            >
-                              <Settings className="w-4 h-4" />
-                              Admin Dashboard
-                            </Button>
-                          )}
-                          <Button variant="destructive" onClick={handleSignOut} className="gap-2">
-                            <LogOut className="w-4 h-4" />
-                            Sign Out
-                          </Button>
-
-                        </div>
+                        }
+                      />
+                      {isAdmin && (
+                        <Button
+                          variant="secondary"
+                          onClick={() => navigate('/admin')}
+                          className="rounded-full h-9 px-5 bg-primary/15 hover:bg-primary/25 border border-primary/20 text-primary text-xs font-bold transition-all backdrop-blur-md shadow-xl"
+                        >
+                          <Shield className="w-3.5 h-3.5 mr-2" /> Dashboard
+                        </Button>
                       )}
                     </>
                   )}
                 </div>
-
-                {/* Desktop Stats */}
-                <div className="hidden md:flex gap-8 p-6 rounded-2xl bg-background/40 backdrop-blur-md border border-white/5">
-                  <div className="text-center">
-                    <div className="text-2xl font-black text-primary">{followStats?.followers || 0}</div>
-                    <div className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Followers</div>
-                  </div>
-                  <div className="w-px bg-white/10" />
-                  <div className="text-center">
-                    <div className="text-2xl font-black text-primary">{followStats?.following || 0}</div>
-                    <div className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Following</div>
-                  </div>
-                  <div className="w-px bg-white/10" />
-                  <div className="text-center">
-                    <div className="text-2xl font-black text-foreground">{formatWatchTime(stats.watchTimeSeconds)}</div>
-                    <div className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Watch Time</div>
-                  </div>
-                  <div className="w-px bg-white/10" />
-                  <div className="text-center">
-                    <div className="text-2xl font-black text-green-500">{stats.completed}</div>
-                    <div className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Completed</div>
-                  </div>
-                </div>
               </div>
             </div>
+
+            {/* Right side: Sleek Stats Card (Desktop Only) */}
+            <div className="hidden xl:flex items-center gap-6 bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-[2rem] p-5 shadow-[0_8px_32px_rgba(0,0,0,0.3)] min-w-[380px] justify-between">
+              <div className="flex flex-col items-center px-2 flex-1">
+                <span className="text-2xl font-black text-white drop-shadow-md">{stats.completed}</span>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold mt-1">Anime</span>
+              </div>
+              <div className="w-px h-10 bg-white/10" />
+              <div className="flex flex-col items-center px-2 flex-1">
+                <span className="text-2xl font-black text-white drop-shadow-md">{mangaCounts.totalChapters}</span>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold mt-1">Chapters</span>
+              </div>
+              <div className="w-px h-10 bg-white/10" />
+              <div className="flex flex-col items-center px-2 flex-1">
+                <span className="text-2xl font-black text-white drop-shadow-md">{followStats?.followers || 0}</span>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold mt-1">Friends</span>
+              </div>
+              <div className="w-px h-10 bg-white/10" />
+              <div className="flex flex-col items-center px-2 flex-1">
+                <span className="text-2xl font-black text-white drop-shadow-md">{formatWatchTime(stats.watchTimeSeconds)}</span>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold mt-1">Time</span>
+              </div>
+            </div>
+
           </motion.div>
 
-          {/* Content Tabs */}
-          <div className="mt-12">
-            <Tabs defaultValue={showWatchlistTab ? "watchlist" : (showHistoryTab ? "history" : "forum")} className="space-y-8">
-              <TabsList className="bg-background/40 backdrop-blur-md p-1 border border-white/5 rounded-xl w-full md:w-auto flex overflow-x-auto">
+          {/* Bio & Social Links Section */}
+          <div className="flex flex-col md:flex-row gap-8 mb-10 w-full max-w-3xl">
+            <div className="w-full">
+              {profile?.bio && (
+                <p className="text-[15px] text-muted-foreground/90 leading-relaxed font-normal whitespace-pre-line mb-5">
+                  {profile.bio}
+                </p>
+              )}
+              {profile?.social_links && (
+                <div>
+                  <SocialLinksDisplay links={profile.social_links as SocialLinks} />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── Content Tabs ── */}
+          <div className="mt-4">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
+                  <TabsList
+                    className="
+                      bg-white/[0.03]
+                      backdrop-blur-2xl
+                      p-2
+                      border border-white/[0.08]
+                      rounded-full
+                      w-full
+                      md:w-auto
+                      mx-auto
+                      flex items-center justify-center
+                      gap-1.5
+                      overflow-x-auto
+                      overflow-y-hidden
+                      whitespace-nowrap
+                      shadow-xl
+                      no-scrollbar
+                    "
+                  >
+                <TabsTrigger
+                  value="overview"
+                  className="shrink-0 gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-5 py-2.5 text-sm font-bold whitespace-nowrap transition-all"
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                  Overview
+                </TabsTrigger>
                 {showWatchlistTab && (
-                  <TabsTrigger value="watchlist" className="flex-1 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg px-6">
+                  <TabsTrigger value="watchlist" className="flex-1 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-6 py-2.5 text-sm font-bold transition-all">
                     <List className="w-4 h-4" />
                     Watchlist
                   </TabsTrigger>
                 )}
                 {showWatchlistTab && (
-                  <TabsTrigger value="manga-readlist" className="flex-1 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg px-6">
+                  <TabsTrigger value="manga-readlist" className="flex-1 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-6 py-2.5 text-sm font-bold transition-all">
                     <BookOpen className="w-4 h-4" />
                     Manga Readlist
                   </TabsTrigger>
                 )}
                 {showHistoryTab && (
-                  <TabsTrigger value="history" className="flex-1 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg px-6">
+                  <TabsTrigger value="history" className="flex-1 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-6 py-2.5 text-sm font-bold transition-all">
                     <History className="w-4 h-4" />
                     History
                   </TabsTrigger>
                 )}
-                <TabsTrigger value="forum" className="flex-1 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg px-6">
-                  <MessageSquare className="w-4 h-4" />
-                  Forum Posts
+                <TabsTrigger value="vault" className="flex-1 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-6 py-2.5 text-sm font-bold transition-all">
+                  <Library className="w-4 h-4" />
+                  Vault
                 </TabsTrigger>
-                {!isViewingOther && (
-                  <TabsTrigger value="streaks" className="flex-1 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg px-6">
+                {(!isViewingOther || showHistoryTab) && (
+                  <TabsTrigger value="streaks" className="flex-1 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-6 py-2.5 text-sm font-bold transition-all">
                     <Flame className="w-4 h-4" />
                     Streaks
                   </TabsTrigger>
                 )}
               </TabsList>
 
-              {/* No data available message for public profiles with hidden data */}
               {isViewingOther && !showWatchlistTab && !showHistoryTab && (
-                <div className="text-center py-12 border-2 border-dashed border-white/5 rounded-2xl">
-                  <Lock className="w-12 h-12 mx-auto text-muted-foreground/30 mb-4" />
-                  <p className="text-muted-foreground">This user has chosen to keep their anime lists private.</p>
+                <div className="text-center py-16 border border-white/5 bg-white/[0.02] backdrop-blur-sm rounded-[2rem]">
+                  <Lock className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
+                  <p className="text-muted-foreground font-medium">This user has chosen to keep their anime lists private.</p>
                 </div>
               )}
 
+              <TabsContent value="overview" className="mt-8 focus-visible:outline-none">
+                <ProfileOverviewTab
+                  userId={profile?.user_id}
+                  username={profile?.username}
+                  isViewingOther={isViewingOther}
+                  isPublic={(profile as any)?.is_public ?? false}
+                  showCalendar={(profile as any)?.show_calendar ?? true}
+                  watchTimeSeconds={computedWatchTimeSeconds}
+                  episodesCount={effectiveEpisodeCount}
+                  completedAnimeCount={stats.completed}
+                  watchingAnimeCount={stats.watching}
+                  mangaCount={mangaCounts.manga}
+                  manhwaCount={mangaCounts.manhwa}
+                  comicsCount={mangaCounts.comics}
+                  totalChaptersRead={mangaCounts.totalChapters}
+                  readingTotals={readingTotals}
+                  planToWatchCount={stats.plan_to_watch}
+                  streakDays={viewedStreak?.currentStreak || 0}
+                  longestStreak={viewedStreak?.longestStreak || 0}
+                  totalDaysActive={viewedStreak?.totalDaysWatched || 0}
+                  commentCount={commentsCount}
+                  forumPostCount={forumPosts?.length || 0}
+                  forumUpvotes={forumUpvotes}
+                  reputationRate={reputationRate}
+                  reputationBreakdown={reputation.breakdown}
+                  leaderboardRank={userRank?.rank ?? null}
+                  totalRankedUsers={userRank?.totalUsers ?? null}
+                  followersCount={followStats?.followers || 0}
+                  followingCount={followStats?.following || 0}
+                  watchlist={watchlist || []}
+                  history={history || []}
+                  mangaReadlist={mangaReadlist || []}
+                  ratings={userRatings}
+                  commentDates={userCommentRows}
+                  favoriteCharacters={favoriteCharacters}
+                  favoriteCharactersLoading={loadingFavoriteCharacters}
+                  tasteProfile={tasteProfile}
+                  tasteProfileLoading={loadingTasteProfile}
+                  insights={overviewInsights}
+                  achievements={achievements}
+                  externalStats={externalStats}
+                  externalStatsLoading={externalStatsLoading}
+                  onNavigateTab={(tabKey) => setActiveTab(tabKey)}
+                />
+              </TabsContent>
+
               {showWatchlistTab && (
-                <TabsContent value="watchlist" className="mt-6">
-                  <GlassPanel className="p-6 md:p-8">
-                    <div className="flex items-center justify-between mb-8">
-                      <h2 className="text-2xl font-bold flex items-center gap-2">
-                        <List className="w-6 h-6 text-primary" />
-                        {isViewingOther ? 'Watchlist' : 'My Watchlist'}
-                      </h2>
-                      <span className="text-sm text-muted-foreground">
-                        {watchlist?.length || 0} items
-                      </span>
-                    </div>
-
-                    {loadingWatchlist ? (
-                      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                        {[...Array(6)].map((_, i) => (
-                          <div key={i} className="aspect-[3/4] bg-muted/50 rounded-xl animate-pulse" />
-                        ))}
-                      </div>
-                    ) : watchlist && watchlist.length > 0 ? (
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
-                        {watchlist.map((item) => {
-                          const statusInfo = STATUS_LABELS[item.status || 'plan_to_watch'];
-                          return (
-                            <motion.div
-                              initial={{ opacity: 0, scale: 0.9 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              key={item.id}
-                              className="group cursor-pointer relative"
-                              onClick={() => navigate(`/anime/${item.anime_id}`)}
-                            >
-                              <div className="relative aspect-[3/4] rounded-xl overflow-hidden mb-3 shadow-lg group-hover:shadow-primary/20 transition-all duration-300 ring-1 ring-white/10 group-hover:ring-primary/50">
-                                <img
-                                  src={getProxiedImageUrl(item.anime_poster || '/placeholder.svg')}
-                                  alt={item.anime_name}
-                                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                                  loading="lazy"
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-                                <div className={`absolute top-2 left-2 px-2 py-1 rounded-md backdrop-blur-md flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide ${statusInfo?.bg} ${statusInfo?.color} border border-white/5`}>
-                                  {statusInfo?.icon}
-                                  {statusInfo?.label}
-                                </div>
-                              </div>
-                              <h3 className="font-bold text-sm line-clamp-1 group-hover:text-primary transition-colors">
-                                {item.anime_name}
-                              </h3>
-                            </motion.div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="text-center py-20 border-2 border-dashed border-white/5 rounded-2xl">
-                        <List className="w-16 h-16 mx-auto text-muted-foreground/30 mb-4" />
-                        <h3 className="text-xl font-bold mb-2">{isViewingOther ? 'Watchlist is empty' : 'Your watchlist is empty'}</h3>
-                        <p className="text-muted-foreground mb-6">{isViewingOther ? 'This user hasn\'t added any anime yet.' : 'Start adding anime to track your progress!'}</p>
-                        {!isViewingOther && (
-                          <Button onClick={() => navigate('/')}>
-                            Browse Anime
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </GlassPanel>
+                <TabsContent value="watchlist" className="mt-8">
+                  <WatchlistTab
+                    watchlist={watchlist || []}
+                    loading={loadingWatchlist}
+                    isViewingOther={isViewingOther}
+                    onNavigate={navigate}
+                  />
                 </TabsContent>
               )}
 
               {showWatchlistTab && (
-                <TabsContent value="manga-readlist" className="mt-6">
-                  <GlassPanel className="p-6 md:p-8">
-                    <div className="flex items-center justify-between mb-8">
-                      <h2 className="text-2xl font-bold flex items-center gap-2">
-                        <BookOpen className="w-6 h-6 text-primary" />
-                        {isViewingOther ? 'Manga Readlist' : 'My Manga Readlist'}
-                      </h2>
-                      <span className="text-sm text-muted-foreground">
-                        {mangaReadlist?.length || 0} items
-                      </span>
-                    </div>
-
-                    {loadingMangaReadlist ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {[...Array(6)].map((_, i) => (
-                          <div key={i} className="h-28 bg-muted/50 rounded-xl animate-pulse" />
-                        ))}
-                      </div>
-                    ) : mangaReadlist && mangaReadlist.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {mangaReadlist.map((item: any) => {
-                          const status = MANGA_STATUS_LABELS[item.status || 'plan_to_read'] || MANGA_STATUS_LABELS.plan_to_read;
-                          const chapterLabel =
-                            item.last_chapter_number != null
-                              ? `Ch. ${item.last_chapter_number}`
-                              : item.last_chapter_title || 'Not started';
-
-                          return (
-                            <motion.button
-                              initial={{ opacity: 0, y: 12 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              whileHover={{ y: -2 }}
-                              key={item.id}
-                              onClick={() => navigate(`/manga/${item.manga_id}`)}
-                              className="text-left rounded-2xl border border-white/10 bg-background/20 hover:bg-background/40 transition-all overflow-hidden group"
-                            >
-                              <div className="p-4 flex gap-3 items-start">
-                                <div className="w-14 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-muted/30">
-                                  <img
-                                    src={getProxiedImageUrl(item.manga_poster || '/placeholder.svg')}
-                                    alt={item.manga_title}
-                                    className="w-full h-full object-cover"
-                                    loading="lazy"
-                                  />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <h3 className="font-bold line-clamp-1 group-hover:text-primary transition-colors">
-                                    {item.manga_title}
-                                  </h3>
-                                  <div className={`mt-1 inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${status.bg} ${status.color}`}>
-                                    {status.label}
-                                  </div>
-                                  <p className="text-xs text-muted-foreground mt-2 line-clamp-1">
-                                    {chapterLabel}
-                                  </p>
-                                  <p className="text-[11px] text-muted-foreground mt-1">
-                                    Page {(Number(item.last_page_index) || 0) + 1}
-                                  </p>
-                                </div>
-                              </div>
-                            </motion.button>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="text-center py-20 border-2 border-dashed border-white/5 rounded-2xl">
-                        <BookOpen className="w-16 h-16 mx-auto text-muted-foreground/30 mb-4" />
-                        <h3 className="text-xl font-bold mb-2">{isViewingOther ? 'Readlist is empty' : 'Your manga readlist is empty'}</h3>
-                        <p className="text-muted-foreground mb-6">
-                          {isViewingOther ? 'This user has not saved any manga yet.' : 'Save manga to your readlist from any manga details page.'}
-                        </p>
-                        {!isViewingOther && (
-                          <Button onClick={() => navigate('/search')}>
-                            Browse Manga
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </GlassPanel>
+                <TabsContent value="manga-readlist" className="mt-8">
+                  <MangaReadlistTab
+                    mangaReadlist={mangaReadlist || []}
+                    loading={loadingMangaReadlist}
+                    isViewingOther={isViewingOther}
+                    onNavigate={navigate}
+                  />
                 </TabsContent>
               )}
 
               {showHistoryTab && (
-                <TabsContent value="history" className="mt-6">
-                  <GlassPanel className="p-6 md:p-8">
-                    <h2 className="text-2xl font-bold mb-8 flex items-center gap-2">
-                      <History className="w-6 h-6 text-primary" />
-                      Activity History
-                    </h2>
-
-                    {loadingCombinedHistory ? (
-                      <div className="space-y-4">
-                        {[...Array(3)].map((_, i) => (
-                          <div key={i} className="h-24 bg-muted/50 rounded-xl animate-pulse" />
-                        ))}
-                      </div>
-                    ) : hasAnimeHistory || hasMangaHistory ? (
-                      <div className="space-y-6">
-                        {hasAnimeHistory && (
-                          <section>
-                            <div className="mb-3 flex items-center gap-2 px-1">
-                              <Play className="w-4 h-4 text-primary" />
-                              <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                                Anime Watching
-                              </h3>
-                            </div>
-
-                            <div className="space-y-3">
-                              {(() => {
-                                const groupedHistory: Record<string, any[]> = {};
-                                history?.forEach((item: any) => {
-                                  if (!groupedHistory[item.anime_id]) groupedHistory[item.anime_id] = [];
-                                  groupedHistory[item.anime_id].push(item);
-                                });
-
-                                return Object.entries(groupedHistory)
-                                  .sort(([, a], [, b]) => new Date(b[0].watched_at).getTime() - new Date(a[0].watched_at).getTime())
-                                  .map(([animeId, episodes], index) => (
-                                    <motion.div
-                                      initial={{ opacity: 0, y: 20 }}
-                                      animate={{ opacity: 1, y: 0 }}
-                                      transition={{ delay: index * 0.05 }}
-                                      key={animeId}
-                                      className="bg-background/20 rounded-2xl border border-white/5 overflow-hidden"
-                                    >
-                                      <div className="flex gap-4 p-4 items-center border-b border-white/5 bg-white/5">
-                                        <div className="w-12 h-16 rounded overflow-hidden flex-shrink-0">
-                                          <img
-                                            src={getProxiedImageUrl(episodes[0].anime_poster || '/placeholder.svg')}
-                                            alt={episodes[0].anime_name}
-                                            className="w-full h-full object-cover"
-                                          />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                          <h3 className="font-bold text-lg line-clamp-1">
-                                            {episodes[0].anime_name}
-                                          </h3>
-                                          <p className="text-xs text-muted-foreground">
-                                            {episodes.length} episodes watched
-                                          </p>
-                                        </div>
-                                      </div>
-                                      <div className="divide-y divide-white/5">
-                                        {episodes
-                                          .sort((a, b) => new Date(b.watched_at).getTime() - new Date(a.watched_at).getTime())
-                                          .map((item) => (
-                                            <div
-                                              key={item.id}
-                                              className="flex items-center gap-4 p-3 hover:bg-white/5 transition-colors cursor-pointer group"
-                                              onClick={() => navigate(`/watch/${encodeURIComponent(item.episode_id)}`)}
-                                            >
-                                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
-                                                {item.episode_number}
-                                              </div>
-                                              <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2">
-                                                  <span className="text-sm font-medium">Episode {item.episode_number}</span>
-                                                  <span className="text-xs text-muted-foreground">•</span>
-                                                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                                    <Clock className="w-3 h-3" />
-                                                    {formatDate(item.watched_at)}
-                                                  </span>
-                                                </div>
-                                                {item.duration_seconds && (
-                                                  <div className="w-32 h-1 bg-white/5 rounded-full mt-1.5 overflow-hidden">
-                                                    <div
-                                                      className="h-full bg-primary"
-                                                      style={{ width: `${Math.min(100, ((item.progress_seconds || 0) / item.duration_seconds) * 100)}%` }}
-                                                    />
-                                                  </div>
-                                                )}
-                                              </div>
-                                              <Play className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                                            </div>
-                                          ))}
-                                      </div>
-                                    </motion.div>
-                                  ));
-                              })()}
-                            </div>
-                          </section>
-                        )}
-
-                        {hasMangaHistory && (
-                          <section>
-                            <div className="mb-3 flex items-center gap-2 px-1">
-                              <BookOpen className="w-4 h-4 text-primary" />
-                              <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                                Manga Reading
-                              </h3>
-                            </div>
-
-                            <div className="space-y-2">
-                              {mangaHistoryEntries.map((item: any, index: number) => {
-                                const status =
-                                  MANGA_STATUS_LABELS[item.status || 'plan_to_read'] ||
-                                  MANGA_STATUS_LABELS.plan_to_read;
-                                const chapterLabel =
-                                  item.last_chapter_number != null
-                                    ? `Chapter ${item.last_chapter_number}`
-                                    : item.last_chapter_title || 'Reading progress updated';
-                                const chapterKey = String(item.last_chapter_key || '').trim();
-                                const nextPage = Math.max(0, Number(item.last_page_index || 0));
-
-                                return (
-                                  <motion.button
-                                    key={`manga-history-${item.id}`}
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: index * 0.03 }}
-                                    className="w-full text-left rounded-xl border border-white/10 bg-white/5 p-3 hover:bg-white/10 transition-colors"
-                                    onClick={() => {
-                                      if (chapterKey) {
-                                        navigate(`/manga/read/${item.manga_id}?chapterKey=${encodeURIComponent(chapterKey)}&page=${nextPage}`);
-                                        return;
-                                      }
-                                      navigate(`/manga/${item.manga_id}`);
-                                    }}
-                                  >
-                                    <div className="flex items-center gap-3">
-                                      <div className="w-10 h-14 rounded-md overflow-hidden bg-muted/30 flex-shrink-0">
-                                        <img
-                                          src={getProxiedImageUrl(item.manga_poster || '/placeholder.svg')}
-                                          alt={item.manga_title}
-                                          className="w-full h-full object-cover"
-                                          loading="lazy"
-                                        />
-                                      </div>
-
-                                      <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2">
-                                          <p className="font-semibold line-clamp-1">{item.manga_title}</p>
-                                          <span className={`rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${status.bg} ${status.color}`}>
-                                            {status.label}
-                                          </span>
-                                        </div>
-                                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                                          {chapterLabel}
-                                        </p>
-                                        <p className="text-[11px] text-muted-foreground mt-1">
-                                          {formatDistanceToNow(new Date(item.updated_at), { addSuffix: true })}
-                                        </p>
-                                      </div>
-
-                                      <BookOpen className="w-4 h-4 text-muted-foreground" />
-                                    </div>
-                                  </motion.button>
-                                );
-                              })}
-                            </div>
-                          </section>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-center py-20 border-2 border-dashed border-white/5 rounded-2xl">
-                        <History className="w-16 h-16 mx-auto text-muted-foreground/30 mb-4" />
-                        <h3 className="text-xl font-bold mb-2">No activity history</h3>
-                        <p className="text-muted-foreground mb-6">{isViewingOther ? 'This user has no watch or manga activity yet.' : 'Your anime and manga activity will appear here.'}</p>
-                        {!isViewingOther && (
-                          <Button onClick={() => navigate('/')}>
-                            Start Watching
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </GlassPanel>
+                <TabsContent value="history" className="mt-8">
+                  <HistoryTab
+                    history={history || []}
+                    mangaHistoryEntries={mangaHistoryEntries}
+                    loading={loadingCombinedHistory}
+                    isViewingOther={isViewingOther}
+                    onNavigate={navigate}
+                    formatDate={formatDate}
+                  />
                 </TabsContent>
               )}
 
-              {/* Forum Posts Tab */}
-              <TabsContent value="forum" className="mt-6">
-                <GlassPanel className="p-6 md:p-8">
-                  <div className="flex items-center justify-between mb-8">
-                    <h2 className="text-2xl font-bold flex items-center gap-2">
-                      <MessageSquare className="w-6 h-6 text-primary" />
-                      {isViewingOther ? 'Forum Posts' : 'My Forum Posts'}
-                    </h2>
-                  </div>
-
-                  {loadingForumPosts ? (
-                    <div className="text-center py-12 text-muted-foreground">Loading forum posts...</div>
-                  ) : forumPosts.length === 0 ? (
-                    <div className="text-center py-20 border-2 border-dashed border-white/5 rounded-2xl">
-                      <MessageSquare className="w-16 h-16 mx-auto text-muted-foreground/30 mb-4" />
-                      <h3 className="text-xl font-bold mb-2">No forum posts</h3>
-                      <p className="text-muted-foreground mb-6">{isViewingOther ? 'This user hasn\'t posted in the forum yet.' : 'Your forum posts will appear here.'}</p>
-                      {!isViewingOther && (
-                        <Button onClick={() => navigate('/community/forum/new')}>
-                          Go to Forum
-                        </Button>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {forumPosts.map((post: any) => (
-                        <Link
-                          key={post.id}
-                          to={post.is_approved === false ? '#' : `/community/forum/${post.id}`}
-                          className={cn("block", post.is_approved === false && "cursor-default")}
-                          onClick={(e) => {
-                            if (post.is_approved === false) {
-                              e.preventDefault();
-                            }
-                          }}
-                        >
-                          <div className={cn(
-                            "p-4 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 transition-colors",
-                            post.is_approved === false && "opacity-70 hover:bg-white/5"
-                          )}>
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <h3 className="font-bold text-lg line-clamp-2">
-                                    {post.title}
-                                  </h3>
-                                  {post.is_approved === false && !isViewingOther && (
-                                    <Badge variant="secondary" className="gap-1 text-xs bg-yellow-500/20 text-yellow-400">
-                                      <AlertCircle className="w-3 h-3" />
-                                      Pending
-                                    </Badge>
-                                  )}
-                                </div>
-                                <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
-                                  {post.content}
-                                </p>
-                                {post.image_url && (
-                                  <div className="mb-2">
-                                    <img
-                                      src={getProxiedImageUrl(post.image_url)}
-                                      alt="Forum post image"
-                                      className="w-16 h-16 object-cover rounded border border-white/10"
-                                    />
-                                  </div>
-                                )}
-                                <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                                  <span className="flex items-center gap-1">
-                                    <MessageSquare className="w-3 h-3" />
-                                    {post.comments_count || 0}
-                                  </span>
-                                  <span className="flex items-center gap-1">
-                                    <Eye className="w-3 h-3" />
-                                    {post.views_count || 0}
-                                  </span>
-                                  <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                </GlassPanel>
+              <TabsContent value="vault" className="mt-8">
+                <VaultTab
+                  userId={profile?.user_id}
+                  isViewingOther={isViewingOther}
+                  onNavigate={navigate}
+                />
               </TabsContent>
-              {!isViewingOther && (
-                <TabsContent value="streaks" className="mt-6">
-                  <WatchStreaks isOwnProfile={true} />
-                </TabsContent>
-              )}
-              {!isViewingOther && (
-                <TabsContent value="notifications" className="mt-6">
-                  <GlassPanel className="p-6 md:p-8">
-                    <div className="flex items-center justify-between mb-8">
-                      <h2 className="text-2xl font-bold flex items-center gap-2">
-                        <Bell className="w-6 h-6 text-primary" />
-                        Notifications
-                      </h2>
-                      {notifications.length > 0 && (
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => markAllAsRead.mutate()}
-                            disabled={unreadCount === 0 || markAllAsRead.isPending}
-                          >
-                            Mark all as read
-                          </Button>
-                        </div>
-                      )}
-                    </div>
 
-                    {notifications.length === 0 ? (
-                      <div className="text-center py-20 border-2 border-dashed border-white/5 rounded-2xl">
-                        <Bell className="w-16 h-16 mx-auto text-muted-foreground/30 mb-4" />
-                        <h3 className="text-xl font-bold mb-2">All caught up!</h3>
-                        <p className="text-muted-foreground">You have no new notifications.</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {notifications.map((notification) => (
-                          <div
-                            key={notification.id}
-                            className={cn(
-                              "p-4 rounded-xl border transition-all flex justify-between items-start gap-4",
-                              notification.read
-                                ? "bg-white/5 border-white/5 opacity-70"
-                                : "bg-primary/5 border-primary/20 shadow-lg shadow-primary/5"
-                            )}
-                          >
-                            <div className="flex-1 min-w-0" onClick={() => !notification.read && markAsRead.mutate(notification.id)}>
-                              <div className="flex items-center gap-2 mb-1">
-                                <h4 className="font-bold text-lg leading-tight">{notification.title}</h4>
-                                {!notification.read && (
-                                  <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                                )}
-                              </div>
-                              <p className="text-muted-foreground text-sm leading-relaxed mb-2 break-words">
-                                {notification.body}
-                              </p>
-                              <span className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground/50">
-                                {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
-                              </span>
-                            </div>
-                            <div className="flex gap-1 shrink-0">
-                              {!notification.read && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => markAsRead.mutate(notification.id)}
-                                  className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
-                                >
-                                  <Check className="w-4 h-4" />
-                                </Button>
-                              )}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => {
-                                  if (confirm('Delete notification?')) deleteNotification.mutate(notification.id);
-                                }}
-                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </GlassPanel>
+              {(!isViewingOther || showHistoryTab) && (
+                <TabsContent value="streaks" className="mt-8">
+                  <WatchStreaks
+                    isOwnProfile={!isViewingOther}
+                    rankScore={profileRankScore}
+                    streak={isViewingOther ? viewedStreak : undefined}
+                    stats={isViewingOther ? viewedStreakStats : undefined}
+                  />
                 </TabsContent>
               )}
             </Tabs>
@@ -1204,4 +820,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { moderateContent, getViolationMessage } from '@/lib/autoModeration';
+import { getRankTier } from '@/lib/rankUtils';
 
 export interface ForumPost {
   id: string;
@@ -26,6 +27,10 @@ export interface ForumPost {
   is_locked: boolean;
   is_spoiler: boolean;
   is_nsfw: boolean;
+  is_deleted?: boolean;
+  deleted_by?: string | null;
+  deleted_by_role?: string | null;
+  community_id?: string | null;
   upvotes: number;
   downvotes: number;
   comments_count: number;
@@ -39,28 +44,6 @@ export interface ForumPost {
     username: string | null;
   };
   user_vote?: 1 | -1 | null;
-}
-
-export interface ForumComment {
-  id: string;
-  post_id: string;
-  user_id: string;
-  parent_id?: string;
-  content: string;
-  is_spoiler: boolean;
-  is_pinned: boolean;
-  upvotes: number;
-  downvotes: number;
-  created_at: string;
-  updated_at: string;
-  profiles?: {
-    user_id: string;
-    display_name: string | null;
-    avatar_url: string | null;
-    username: string | null;
-  };
-  user_vote?: 1 | -1 | null;
-  replies?: ForumComment[];
 }
 
 // Fetch forum posts
@@ -197,75 +180,6 @@ export function useForumPost(postId: string) {
   });
 }
 
-// Fetch comments for a post
-export function useForumComments(postId: string) {
-  const { user } = useAuth();
-
-  return useQuery({
-    queryKey: ['forum_comments', postId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('forum_comments')
-        .select('*')
-        .eq('post_id', postId)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-      if (!data || data.length === 0) return [];
-
-      // Fetch profiles
-      const userIds = [...new Set(data.map(c => c.user_id))];
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('user_id, display_name, avatar_url, username')
-        .in('user_id', userIds);
-
-      const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
-
-      // Fetch user votes if logged in
-      const voteMap = new Map<string, 1 | -1>();
-      if (user && data.length > 0) {
-        const { data: votes } = await supabase
-          .from('forum_votes')
-          .select('comment_id, vote_type')
-          .eq('user_id', user.id)
-          .in('comment_id', data.map(c => c.id));
-
-        votes?.forEach(v => {
-          if (v.comment_id) voteMap.set(v.comment_id, v.vote_type as 1 | -1);
-        });
-      }
-
-      // Build comment tree
-      const comments = data.map(comment => ({
-        ...comment,
-        profiles: profileMap.get(comment.user_id) || null,
-        user_vote: voteMap.get(comment.id) || null,
-        replies: [],
-      })) as ForumComment[];
-
-      // Nest replies
-      const commentMap = new Map(comments.map(c => [c.id, c]));
-      const rootComments: ForumComment[] = [];
-
-      comments.forEach(comment => {
-        if (comment.parent_id) {
-          const parent = commentMap.get(comment.parent_id);
-          if (parent) {
-            if (!parent.replies) parent.replies = [];
-            parent.replies.push(comment);
-          }
-        } else {
-          rootComments.push(comment);
-        }
-      });
-
-      return rootComments;
-    },
-    enabled: !!postId,
-  });
-}
-
 // Create forum post
 export function useCreateForumPost() {
   const queryClient = useQueryClient();
@@ -303,8 +217,19 @@ export function useCreateForumPost() {
         throw new Error(getViolationMessage(allViolations));
       }
 
-      // Posts with images require admin approval
-      const requiresApproval = !!post.image_url;
+      // Posts with images require admin approval — but authors ranked above
+      // Chunin (rank > 3, i.e. Jonin+) bypass it. The rank proxy mirrors the
+      // feed's author_rank_score: episodes watched (watch_history row count).
+      let authorScore = 0;
+      try {
+        const { count } = await supabase
+          .from('watch_history')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id);
+        authorScore = count ?? 0;
+      } catch { /* fail-soft: treat as rank 0 */ }
+      const rankOk = getRankTier(authorScore).rank > 3;
+      const requiresApproval = !!post.image_url && !rankOk;
 
       const { data, error } = await supabase
         .from('forum_posts')
@@ -323,57 +248,6 @@ export function useCreateForumPost() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['forum_posts'] });
-    },
-  });
-}
-
-// Create forum comment
-export function useCreateForumComment() {
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
-
-  return useMutation({
-    mutationFn: async ({
-      postId,
-      content,
-      parentId,
-      isSpoiler = false,
-    }: {
-      postId: string;
-      content: string;
-      parentId?: string;
-      isSpoiler?: boolean;
-    }) => {
-      if (!user) throw new Error('Must be logged in');
-
-      // Auto-moderate content
-      const moderation = moderateContent(content);
-
-      if (!moderation.isAllowed) {
-        throw new Error(getViolationMessage(moderation.violations));
-      }
-
-      const { data, error } = await supabase
-        .from('forum_comments')
-        .insert({
-          user_id: user.id,
-          post_id: postId,
-          parent_id: parentId,
-          content: moderation.sanitizedContent,
-          is_spoiler: isSpoiler,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: async (_, variables) => {
-      // Refetch without scroll jump by using setQueryData instead of invalidate
-      await queryClient.refetchQueries({
-        queryKey: ['forum_comments', variables.postId],
-        type: 'active'
-      });
     },
   });
 }
@@ -446,42 +320,105 @@ export function useForumVote() {
   });
 }
 
-// Delete forum post
+// Edit a forum post (author only — RLS gates auth.uid() = user_id). Sets edited_at.
+export function useUpdateForumPost() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      content,
+      metadata,
+      flair,
+      is_spoiler,
+    }: {
+      id: string;
+      content?: string;
+      metadata?: Record<string, any>;
+      flair?: string | null;
+      is_spoiler?: boolean;
+    }) => {
+      if (!user) throw new Error('Must be logged in');
+
+      const patch: Record<string, any> = { edited_at: new Date().toISOString() };
+      if (content !== undefined) {
+        const moderation = moderateContent(content);
+        if (!moderation.isAllowed) throw new Error(getViolationMessage(moderation.violations));
+        patch.content = moderation.sanitizedContent;
+      }
+      if (metadata !== undefined) patch.metadata = metadata;
+      if (flair !== undefined) patch.flair = flair;
+      if (is_spoiler !== undefined) patch.is_spoiler = is_spoiler;
+
+      const { error } = await supabase
+        .from('forum_posts')
+        .update(patch as any)
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      return id;
+    },
+    onSuccess: (id) => {
+      queryClient.invalidateQueries({ queryKey: ['forum_posts'] });
+      queryClient.invalidateQueries({ queryKey: ['forum_post', id] });
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+    },
+  });
+}
+
+// Pin/unpin via SECURITY DEFINER RPC (moderator/admin gated server-side).
+export function useSetPinned() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ postId, pinned }: { postId: string; pinned: boolean }) => {
+      const { error } = await (supabase as any).rpc('set_post_pinned', {
+        p_post_id: postId,
+        p_pinned: pinned,
+      });
+      if (error) throw error;
+      return postId;
+    },
+    onSuccess: (postId) => {
+      queryClient.invalidateQueries({ queryKey: ['forum_posts'] });
+      queryClient.invalidateQueries({ queryKey: ['forum_post', postId] });
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+    },
+  });
+}
+
+// Delete forum post (role-aware soft-delete → tombstone). Routes through the
+// soft_delete_post RPC (authorizes author | community owner/mod | platform
+// staff, and stamps deleted_by_role for the tombstone). Falls back to a direct
+// soft-delete, then a hard delete, if the RPC isn't deployed yet.
 export function useDeleteForumPost() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (postId: string) => {
-      const { error } = await supabase
-        .from('forum_posts')
-        .delete()
-        .eq('id', postId);
+      const { error: rpcErr } = await (supabase as any).rpc('soft_delete_post', { p_post_id: postId });
+      if (!rpcErr) return;
 
-      if (error) throw error;
+      // RPC missing (migration not applied yet) — fall back to the direct write.
+      if (rpcErr.code === 'PGRST202' || /function .*soft_delete_post/i.test(rpcErr.message || '')) {
+        const { error } = await supabase
+          .from('forum_posts')
+          .update({ is_deleted: true, deleted_at: new Date().toISOString() } as any)
+          .eq('id', postId);
+        if (error) {
+          const { error: delErr } = await supabase.from('forum_posts').delete().eq('id', postId);
+          if (delErr) throw delErr;
+        }
+        return;
+      }
+      throw rpcErr;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['forum_posts'] });
-    },
-  });
-}
-
-// Delete forum comment
-export function useDeleteForumComment() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ commentId, postId }: { commentId: string; postId: string }) => {
-      const { error } = await supabase
-        .from('forum_comments')
-        .delete()
-        .eq('id', commentId);
-
-      if (error) throw error;
-      return postId;
-    },
-    onSuccess: (postId) => {
-      queryClient.invalidateQueries({ queryKey: ['forum_comments', postId] });
-      queryClient.invalidateQueries({ queryKey: ['forum_posts'] });
+      queryClient.invalidateQueries({ queryKey: ['forum_post'] });
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
     },
   });
 }
@@ -630,7 +567,52 @@ export function useUserForumPosts(userId?: string) {
       const { data, error } = await query;
 
       if (error) throw error;
-      return data as (ForumPost & { is_approved: boolean })[];
+
+      // Attach the author profile so the reused feed PostCard can render the
+      // header (author name / avatar / link). Every row here shares one user_id.
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('user_id, display_name, avatar_url, username')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      return (data || []).map((post) => ({
+        ...post,
+        profiles: profile || null,
+      })) as (ForumPost & { is_approved: boolean })[];
+    },
+    enabled: !!userId,
+  });
+}
+
+// Fetch a user's forum posts for STAFF surfaces — includes pending/unapproved
+// posts regardless of who is viewing (admin user page). Distinct queryKey so it
+// never collides with the own-profile-gated useUserForumPosts cache.
+export function useUserForumPostsStaff(userId?: string) {
+  return useQuery({
+    queryKey: ['user_forum_posts_staff', userId],
+    queryFn: async () => {
+      if (!userId) return [];
+
+      const { data, error } = await supabase
+        .from('forum_posts')
+        .select('*, is_approved')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('user_id, display_name, avatar_url, username')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      return (data || []).map((post) => ({
+        ...post,
+        profiles: profile || null,
+      })) as (ForumPost & { is_approved: boolean })[];
     },
     enabled: !!userId,
   });
@@ -669,44 +651,6 @@ export function usePinForumPost() {
     },
     onError: (error: Error) => {
       console.error('Failed to update pin status:', error);
-      // Toast error is handled in the component calling this
-      throw error;
-    },
-  });
-}
-
-// Pin/Unpin forum comment (admin only)
-export function usePinForumComment() {
-  const queryClient = useQueryClient();
-  const { user, isAdmin } = useAuth();
-
-  return useMutation({
-    mutationFn: async ({ commentId, postId, isPinned }: { commentId: string; postId: string; isPinned: boolean }) => {
-      if (!user || !isAdmin) throw new Error('Admin access required');
-
-      const { error } = await supabase
-        .from('forum_comments')
-        .update({ is_pinned: isPinned })
-        .eq('id', commentId);
-
-      if (error) throw error;
-
-      // Log admin action
-      await supabase.from('admin_logs').insert({
-        user_id: user.id,
-        action: isPinned ? 'pin_forum_comment' : 'unpin_forum_comment',
-        entity_type: 'forum_comment',
-        entity_id: commentId,
-      });
-
-      return postId;
-    },
-    onSuccess: (postId) => {
-      queryClient.invalidateQueries({ queryKey: ['forum_comments', postId] });
-      queryClient.invalidateQueries({ queryKey: ['admin_logs'] });
-    },
-    onError: (error: Error) => {
-      console.error('Failed to update comment pin status:', error);
       // Toast error is handled in the component calling this
       throw error;
     },

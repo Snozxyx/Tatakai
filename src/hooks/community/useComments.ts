@@ -5,6 +5,19 @@ import { toast } from 'sonner';
 import { moderateContent, getViolationMessage } from '@/lib/autoModeration';
 import { sanitizeComment } from '@/lib/sanitize';
 import { notifyComment } from '@/core/network/discord-webhook';
+import { sanitizeAttachments, type CommentAttachment } from '@/lib/commentMedia';
+import { sanitizeEmbeds, type CommentEmbed } from '@/lib/commentEmbeds';
+import { fetchCommentPolls, type CommentPoll } from './useCommentPolls';
+import { ugcErrorMessage } from '@/lib/ugcErrors';
+
+/** Usernames @-mentioned in a comment body (case preserved for exact lookup). */
+function extractMentions(content: string): string[] {
+  const out = new Set<string>();
+  const re = /@([a-zA-Z0-9_]{2,32})/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(content)) !== null) out.add(m[1]);
+  return [...out];
+}
 
 interface CommentProfile {
   display_name: string | null;
@@ -15,32 +28,55 @@ interface CommentProfile {
   total_episodes: number;
 }
 
+/** Every surface comments can attach to. episode_id stays anime-only. */
+export type CommentEntityType = 'anime' | 'manga' | 'playlist' | 'tier_list' | 'forum_post';
+
 interface Comment {
   id: string;
   user_id: string;
-  anime_id: string;
+  entity_type: CommentEntityType;
+  entity_id: string;
   episode_id: string | null;
   content: string;
   parent_id: string | null;
   likes_count: number;
   is_spoiler: boolean;
   is_pinned: boolean;
+  is_deleted?: boolean;
+  deleted_by?: string | null;
+  deleted_by_role?: string | null;
   created_at: string;
   updated_at: string;
+  attachments: CommentAttachment[];
+  mentions: string[];
+  embeds: CommentEmbed[];
+  poll?: CommentPoll | null;
   profile?: CommentProfile;
   user_liked?: boolean;
 }
 
-export function useComments(animeId: string | undefined, episodeId?: string) {
+/** A poll draft handed to useAddComment (options + optional close time). */
+export interface CommentPollDraft {
+  question?: string;
+  options: string[];
+  endsAt?: string | null;
+}
+
+export function useComments(
+  entityType: CommentEntityType | undefined,
+  entityId: string | undefined,
+  episodeId?: string,
+) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['comments', animeId, episodeId],
+    queryKey: ['comments', entityType, entityId, episodeId],
     queryFn: async () => {
       let query = supabase
         .from('comments')
         .select('*')
-        .eq('anime_id', animeId!)
+        .eq('entity_type', entityType!)
+        .eq('entity_id', entityId!)
         .is('parent_id', null)
         .order('created_at', { ascending: false });
 
@@ -72,21 +108,9 @@ export function useComments(animeId: string | undefined, episodeId?: string) {
         episodeCountMap.set(w.user_id, (episodeCountMap.get(w.user_id) || 0) + 1);
       });
 
-      // Merge manual achievement grants for accurate rank display
-      const ACHIEVEMENT_RANK_EPS: Record<string, number> = {
-        'filler-watcher': 0, 'genin': 5, 'chunin': 10, 'week-warrior': 20,
-        'plus-ultra': 35, 'pro-hero': 50, 'soul-reaper': 75, 'bankai': 100,
-        'survey-corps': 150, 'month-legend': 250, 'demon-slayer': 400, 'hashira': 600,
-      };
-      const { data: achievementRows } = await (supabase
-        .from('user_achievements' as any)
-        .select('user_id, achievement_id')
-        .in('user_id', userIds)) as any;
-      achievementRows?.forEach((row: any) => {
-        const granted = ACHIEVEMENT_RANK_EPS[row.achievement_id] ?? 0;
-        const current = episodeCountMap.get(row.user_id) || 0;
-        if (granted > current) episodeCountMap.set(row.user_id, granted);
-      });
+      // NOTE: rank is derived from the real watched-episode count only. We do NOT
+      // inflate it from manual achievement grants — doing so used to force e.g. a
+      // "hashira" holder to 600 eps (rank Hashira) over their true count (Bankai).
 
       // Check if user has liked each comment
       let likedIds = new Set<string>();
@@ -100,16 +124,30 @@ export function useComments(animeId: string | undefined, episodeId?: string) {
         likedIds = new Set(likes?.map(l => l.comment_id) || []);
       }
 
-      return comments.map(c => ({
+      // Batch-load any attached polls for this page of comments.
+      const pollMap = await fetchCommentPolls(comments.map(c => c.id), user?.id);
+
+      const mapped = comments.map(c => ({
         ...c,
+        is_pinned: !!(c as any).is_pinned,
+        attachments: sanitizeAttachments((c as any).attachments),
+        mentions: Array.isArray((c as any).mentions) ? (c as any).mentions : [],
+        embeds: sanitizeEmbeds((c as any).embeds),
+        poll: pollMap.get(c.id) ?? null,
         profile: {
           ...profileMap.get(c.user_id),
           total_episodes: episodeCountMap.get(c.user_id) || 0,
         },
         user_liked: likedIds.has(c.id),
       })) as Comment[];
+
+      // Pinned comments float to the top. `is_pinned` comes from an unapplied
+      // migration, so it's coerced to false when the column is absent; the sort
+      // is stable, preserving created_at-desc order within each group.
+      mapped.sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0));
+      return mapped;
     },
-    enabled: !!animeId,
+    enabled: !!entityType && !!entityId,
   });
 }
 
@@ -146,21 +184,8 @@ export function useReplies(parentId: string | undefined) {
         episodeCountMap.set(w.user_id, (episodeCountMap.get(w.user_id) || 0) + 1);
       });
 
-      // Merge manual achievement grants for accurate rank display
-      const ACHIEVEMENT_RANK_EPS: Record<string, number> = {
-        'filler-watcher': 0, 'genin': 5, 'chunin': 10, 'week-warrior': 20,
-        'plus-ultra': 35, 'pro-hero': 50, 'soul-reaper': 75, 'bankai': 100,
-        'survey-corps': 150, 'month-legend': 250, 'demon-slayer': 400, 'hashira': 600,
-      };
-      const { data: achievementRows2 } = await (supabase
-        .from('user_achievements' as any)
-        .select('user_id, achievement_id')
-        .in('user_id', userIds)) as any;
-      achievementRows2?.forEach((row: any) => {
-        const granted = ACHIEVEMENT_RANK_EPS[row.achievement_id] ?? 0;
-        const current = episodeCountMap.get(row.user_id) || 0;
-        if (granted > current) episodeCountMap.set(row.user_id, granted);
-      });
+      // NOTE: real watched-episode count only — see useComments for why manual
+      // achievement grants must not inflate the displayed rank.
 
       let likedIds = new Set<string>();
       if (user) {
@@ -173,8 +198,15 @@ export function useReplies(parentId: string | undefined) {
         likedIds = new Set(likes?.map(l => l.comment_id) || []);
       }
 
+      // Batch-load any attached polls for these replies.
+      const pollMap = await fetchCommentPolls(comments.map(c => c.id), user?.id);
+
       return comments.map(c => ({
         ...c,
+        attachments: sanitizeAttachments((c as any).attachments),
+        mentions: Array.isArray((c as any).mentions) ? (c as any).mentions : [],
+        embeds: sanitizeEmbeds((c as any).embeds),
+        poll: pollMap.get(c.id) ?? null,
         profile: {
           ...profileMap.get(c.user_id),
           total_episodes: episodeCountMap.get(c.user_id) || 0,
@@ -192,17 +224,25 @@ export function useAddComment() {
 
   return useMutation({
     mutationFn: async ({
-      animeId,
+      entityType,
+      entityId,
       episodeId,
       content,
       parentId,
       isSpoiler = false,
+      attachments = [],
+      embeds = [],
+      poll,
     }: {
-      animeId: string;
+      entityType: CommentEntityType;
+      entityId: string;
       episodeId?: string;
       content: string;
       parentId?: string;
       isSpoiler?: boolean;
+      attachments?: CommentAttachment[];
+      embeds?: CommentEmbed[];
+      poll?: CommentPollDraft | null;
     }) => {
       // Sanitize first
       const sanitized = sanitizeComment(content);
@@ -214,24 +254,75 @@ export function useAddComment() {
         throw new Error(getViolationMessage(moderation.violations));
       }
 
+      const cleanAttachments = sanitizeAttachments(attachments);
+      const cleanEmbeds = sanitizeEmbeds(embeds);
+      const pollOptions = (poll?.options ?? []).map(o => o.trim()).filter(Boolean);
+      const hasPoll = pollOptions.length >= 2;
+
+      // A comment must carry something — text, media, an embed, or a poll.
+      if (
+        !moderation.sanitizedContent.trim() &&
+        cleanAttachments.length === 0 &&
+        cleanEmbeds.length === 0 &&
+        !hasPoll
+      ) {
+        throw new Error('Comment cannot be empty');
+      }
+
+      // Resolve @mentions to auth user ids so the notify_on_comment() trigger can
+      // fan out mention notifications. Missing/unknown usernames simply drop out.
+      const usernames = extractMentions(moderation.sanitizedContent);
+      let mentionIds: string[] = [];
+      if (usernames.length > 0) {
+        const { data: mentioned } = await supabase
+          .from('profiles')
+          .select('user_id, username')
+          .in('username', usernames);
+        mentionIds = [...new Set((mentioned ?? []).map((m: any) => m.user_id))];
+      }
+
       const { data, error } = await supabase
         .from('comments')
         .insert({
           user_id: user!.id,
-          anime_id: animeId,
-          episode_id: episodeId,
+          entity_type: entityType,
+          entity_id: entityId,
+          // episode_id scopes a sub-thread: episode number for anime, canonical
+          // chapter number for manga (DB CHECK allows both).
+          episode_id: entityType === 'anime' || entityType === 'manga' ? (episodeId ?? null) : null,
           content: moderation.sanitizedContent,
           parent_id: parentId,
           is_spoiler: isSpoiler,
-        })
+          attachments: cleanAttachments as any,
+          mentions: mentionIds as any,
+          embeds: cleanEmbeds as any,
+        } as any)
         .select()
         .single();
 
       if (error) throw error;
+
+      // A poll is a second insert into the comment_polls side table, keyed on the
+      // comment we just created. RLS lets the comment's author attach it. If this
+      // fails the comment still stands — surface the error but don't unwind.
+      if (hasPoll && data?.id) {
+        const db = supabase as any;
+        const { error: pollError } = await db
+          .from('comment_polls')
+          .insert({
+            comment_id: data.id,
+            question: poll?.question?.trim() || '',
+            options: pollOptions,
+            created_by: user!.id,
+            ends_at: poll?.endsAt || null,
+          });
+        if (pollError) throw pollError;
+      }
+
       return data;
     },
     onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['comments', variables.animeId] });
+      queryClient.invalidateQueries({ queryKey: ['comments', variables.entityType, variables.entityId] });
       if (variables.parentId) {
         queryClient.invalidateQueries({ queryKey: ['replies', variables.parentId] });
       }
@@ -240,16 +331,41 @@ export function useAddComment() {
       // Notify Discord comment channel
       notifyComment({
         userName: user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'Anonymous',
-        animeName: variables.animeId,
+        animeName: `${variables.entityType}:${variables.entityId}`,
         episodeId: variables.episodeId,
         content: variables.content,
         isSpoiler: variables.isSpoiler,
       });
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to post comment');
+      toast.error(ugcErrorMessage(error) || error.message || 'Failed to post comment');
     },
   });
+}
+
+/**
+ * Soft-delete a comment so its row (and any thread structure hanging off it)
+ * survives as a role-labeled tombstone. Routes through the soft_delete_comment
+ * RPC (authorizes author | community owner/mod | platform staff, and stamps
+ * deleted_by_role). Falls back to a direct soft-delete, then a hard delete, if
+ * the RPC / columns aren't present yet (migration 20260924… not applied).
+ */
+async function softDeleteComment(commentId: string) {
+  const { error: rpcErr } = await (supabase as any).rpc('soft_delete_comment', { p_comment_id: commentId });
+  if (!rpcErr) return;
+
+  if (rpcErr.code === 'PGRST202' || /function .*soft_delete_comment/i.test(rpcErr.message || '')) {
+    const { error } = await supabase
+      .from('comments')
+      .update({ is_deleted: true, deleted_at: new Date().toISOString() } as any)
+      .eq('id', commentId);
+    if (error) {
+      const { error: delErr } = await supabase.from('comments').delete().eq('id', commentId);
+      if (delErr) throw delErr;
+    }
+    return;
+  }
+  throw rpcErr;
 }
 
 export function useDeleteComment() {
@@ -257,12 +373,7 @@ export function useDeleteComment() {
 
   return useMutation({
     mutationFn: async (commentId: string) => {
-      const { error } = await supabase
-        .from('comments')
-        .delete()
-        .eq('id', commentId);
-
-      if (error) throw error;
+      await softDeleteComment(commentId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['comments'] });
@@ -271,6 +382,63 @@ export function useDeleteComment() {
     },
     onError: () => {
       toast.error('Failed to delete comment');
+    },
+  });
+}
+
+/**
+ * Edit a comment's body and its attached media / embeds, and optionally drop an
+ * attached poll. Lets the author strip a GIF, shared post, playlist or poll
+ * after the fact (the composer only adds on create).
+ */
+export function useEditComment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      content,
+      isSpoiler,
+      attachments,
+      embeds,
+      removePoll,
+    }: {
+      id: string;
+      content: string;
+      isSpoiler?: boolean;
+      attachments?: CommentAttachment[];
+      embeds?: CommentEmbed[];
+      removePoll?: boolean;
+    }) => {
+      const sanitized = sanitizeComment(content);
+      const moderation = moderateContent(sanitized);
+      if (!moderation.isAllowed) throw new Error(getViolationMessage(moderation.violations));
+
+      const cleanAttachments = sanitizeAttachments(attachments ?? []);
+      const cleanEmbeds = sanitizeEmbeds(embeds ?? []);
+
+      const update: Record<string, any> = {
+        content: moderation.sanitizedContent,
+        attachments: cleanAttachments,
+        embeds: cleanEmbeds,
+        updated_at: new Date().toISOString(),
+      };
+      if (typeof isSpoiler === 'boolean') update.is_spoiler = isSpoiler;
+
+      const { error } = await supabase.from('comments').update(update).eq('id', id);
+      if (error) throw error;
+
+      if (removePoll) {
+        const db = supabase as any;
+        await db.from('comment_polls').delete().eq('comment_id', id);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['comments'] });
+      queryClient.invalidateQueries({ queryKey: ['replies'] });
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to update comment');
     },
   });
 }

@@ -1,9 +1,20 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Server, Play, Square, Copy, Users, Shield, Share2, Check, X, ExternalLink } from 'lucide-react';
+import { Play, Square, Copy, Users, Shield, Share2, Check, X, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { GlassPanel } from '@/components/ui/GlassPanel';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  SettingRow,
+  SettingsBadge,
+  SettingsSection,
+} from '@/components/settings/SettingsPrimitives';
 import { toast } from 'sonner';
 import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 
@@ -221,99 +232,94 @@ export function HomeServerSettings() {
   const primaryUrl = status.urls?.[0] || `http://127.0.0.1:${port}`;
 
   return (
-    <GlassPanel className="p-4 rounded-xl bg-muted/30 space-y-4">
-      <div className="flex items-start gap-3">
-        <div className="rounded-xl bg-primary/15 p-3 text-primary">
-          <Server className="h-5 w-5" />
+    <SettingsSection
+      title="Tatakai Home Server"
+      description="Share your download catalog so household devices can browse and watch — with optional consent approval."
+      bodyClassName="space-y-6"
+      action={
+        <div className="flex items-center gap-2">
+          <SettingsBadge tone={status.running ? 'success' : 'muted'}>
+            {status.running ? 'Running' : 'Stopped'}
+          </SettingsBadge>
+          {status.running ? (
+            <Button variant="outline" size="sm" disabled={busy} onClick={stop} className="gap-2">
+              <Square className="h-3.5 w-3.5" />
+              Stop
+            </Button>
+          ) : (
+            <Button size="sm" disabled={busy} onClick={start} className="gap-2">
+              <Play className="h-3.5 w-3.5" />
+              Start server
+            </Button>
+          )}
         </div>
-        <div>
-          <h3 className="text-lg font-bold">Tatakai Home Server</h3>
-          <p className="text-sm text-muted-foreground mt-1">
-            Share your download catalog so household devices can browse and watch — with optional consent approval.
-          </p>
-        </div>
-      </div>
+      }
+    >
+      <div className="flex flex-col">
 
-      <div className="flex flex-wrap items-center gap-3">
-        <span
-          className={`text-xs font-bold uppercase tracking-wider px-2 py-1 rounded-full ${
-            status.running ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/10 text-muted-foreground'
-          }`}
+        <SettingRow
+          title="Port"
+          description="TCP port the Home Server listens on."
+          control={
+            <Input
+              type="number"
+              value={port}
+              onChange={(e) => setPort(Number(e.target.value) || 8787)}
+              className="w-28 bg-white/5 border-white/10"
+            />
+          }
+        />
+        <SettingRow
+          title="Bind mode"
+          description="Which network interfaces the server accepts connections from."
+          control={(ids) => (
+            <Select value={bindMode} onValueChange={(v) => setBindMode(v as 'localhost' | 'lan' | 'all')}>
+              <SelectTrigger aria-labelledby={ids.labelId} aria-describedby={ids.descriptionId} className="h-9 w-52">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="localhost">Localhost only</SelectItem>
+                <SelectItem value="lan">LAN (recommended)</SelectItem>
+                <SelectItem value="all">All interfaces (explicit)</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        />
+        <SettingRow
+          title="Admin password"
+          icon={Shield}
+          description={status.passwordConfigured ? 'A password is set. Leave blank to keep it.' : 'Set a password before sharing.'}
         >
-          {status.running ? 'Running' : 'Stopped'}
-        </span>
-        {status.running ? (
-          <Button variant="outline" size="sm" disabled={busy} onClick={stop} className="gap-2">
-            <Square className="h-3.5 w-3.5" />
-            Stop
-          </Button>
-        ) : (
-          <Button size="sm" disabled={busy} onClick={start} className="gap-2">
-            <Play className="h-3.5 w-3.5" />
-            Start server
-          </Button>
-        )}
-        <Button variant="ghost" size="sm" disabled={busy} onClick={saveConfig}>
-          Save settings
-        </Button>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <label className="space-y-2 text-sm">
-          <span className="font-semibold">Port</span>
-          <Input type="number" value={port} onChange={(e) => setPort(Number(e.target.value) || 8787)} />
-        </label>
-        <label className="space-y-2 text-sm">
-          <span className="font-semibold">Bind mode</span>
-          <select
-            className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
-            value={bindMode}
-            onChange={(e) => setBindMode(e.target.value as 'localhost' | 'lan' | 'all')}
-          >
-            <option value="localhost">Localhost only</option>
-            <option value="lan">LAN (recommended)</option>
-            <option value="all">All interfaces (explicit)</option>
-          </select>
-        </label>
-        <label className="space-y-2 text-sm md:col-span-2">
-          <span className="font-semibold flex items-center gap-2">
-            <Shield className="h-4 w-4" /> Admin password
-          </span>
           <Input
             type="password"
             placeholder={status.passwordConfigured ? '•••••••• (leave blank to keep)' : 'Set a password before sharing'}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            className="bg-white/5 border-white/10"
           />
-        </label>
-      </div>
+        </SettingRow>
 
-      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-start gap-2">
-            <Share2 className="h-4 w-4 mt-0.5 text-primary" />
-            <div>
-              <div className="text-sm font-semibold">Share download catalog</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Other authenticated users can list your offline library and stream episodes.
-              </p>
-            </div>
-          </div>
-          <Switch checked={shareCatalog} onCheckedChange={setShareCatalog} />
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold">Require host consent</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Viewers must request access; you approve before they can watch.
-            </p>
-          </div>
-          <Switch checked={requireConsent} onCheckedChange={setRequireConsent} disabled={!shareCatalog} />
+        <SettingRow
+          tone="accent"
+          title="Share download catalog"
+          icon={Share2}
+          description="Other authenticated users can list your offline library and stream episodes."
+          control={<Switch checked={shareCatalog} onCheckedChange={setShareCatalog} aria-label="Share download catalog" />}
+        />
+        <SettingRow
+          title="Require host consent"
+          description="Viewers must request access; you approve before they can watch."
+          control={<Switch checked={requireConsent} onCheckedChange={setRequireConsent} disabled={!shareCatalog} aria-label="Require host consent" />}
+        />
+        <div className="pt-2">
+          <Button variant="outline" size="sm" disabled={busy} onClick={saveConfig}>
+            Save settings
+          </Button>
         </div>
       </div>
 
       {consentRequests.filter((r) => r.status === 'pending').length > 0 ? (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
+        <div className="rounded-xl border border-amber/30 bg-amber/5 p-4 space-y-3">
           <div className="text-sm font-semibold">Pending consent requests</div>
           {consentRequests
             .filter((r) => r.status === 'pending')
@@ -339,7 +345,7 @@ export function HomeServerSettings() {
       <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
         <div className="text-sm font-semibold">Connect from phone, TV, or browser</div>
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <code className="rounded bg-black/30 px-2 py-1">{primaryUrl}</code>
+          <code className="min-w-0 max-w-full break-all rounded bg-black/30 px-2 py-1">{primaryUrl}</code>
           <Button
             size="sm"
             variant="outline"
@@ -383,7 +389,7 @@ export function HomeServerSettings() {
               Enable only behind a reverse proxy (Caddy/nginx) with TLS.
             </p>
           </div>
-          <Switch checked={remoteEnabled} onCheckedChange={setRemoteEnabled} />
+          <Switch checked={remoteEnabled} onCheckedChange={setRemoteEnabled} aria-label="Enable remote access" />
         </div>
         <Input
           placeholder="https://home.example.com"
@@ -411,6 +417,6 @@ export function HomeServerSettings() {
           Save viewer
         </Button>
       </div>
-    </GlassPanel>
+    </SettingsSection>
   );
 }

@@ -1,15 +1,25 @@
 import { motion } from 'framer-motion';
-import { useWatchStreaks } from '@/hooks/user/useWatchStreaks';
+import { useWatchStreaks, type WatchStreak } from '@/hooks/user/useWatchStreaks';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { cn } from '@/lib/utils';
 import {
-  Flame, Trophy, Clock, Tv2, Star, Zap, Moon, Mountain,
+  Flame, Trophy, Clock, Tv2, Star, Zap, Moon, Mountain, Lock,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { getRankImageUrl, getRankNameStyle } from '@/lib/rankUtils';
+import { getRankImageUrl, getRankNameStyleForRank, getBadgeHoverClass, getRankBadges } from '@/lib/rankUtils';
+
+interface WatchStreaksStats {
+  totalEpisodes: number;
+  totalHours: number;
+}
 
 interface WatchStreaksProps {
   isOwnProfile?: boolean;
+  /** Unified rank score — drives the 16 rank badges. */
+  rankScore?: number;
+  /** Viewed-user data. When omitted, falls back to the signed-in user's hook. */
+  streak?: WatchStreak;
+  stats?: WatchStreaksStats;
 }
 
 function StreakIcon({ streak }: { streak: number }) {
@@ -20,28 +30,22 @@ function StreakIcon({ streak }: { streak: number }) {
   return <Flame className="w-8 h-8 text-orange-300" />;
 }
 
-const ACHIEVEMENT_RANK: Record<string, number> = {
-  'filler-watcher': 1,
-  'genin':          2,
-  'chunin':         3,
-  'week-warrior':   4,
-  'plus-ultra':     5,
-  'pro-hero':       6,
-  'soul-reaper':    7,
-  'bankai':         8,
-  'survey-corps':   9,
-  'month-legend':   10,
-  'demon-slayer':   11,
-  'hashira':        12,
-};
-
-const RANK_EPISODES = [0, 0, 5, 10, 20, 35, 50, 75, 100, 150, 250, 400, 600];
-
-export function WatchStreaks({ isOwnProfile = false }: WatchStreaksProps) {
-  const { streak, achievements, stats } = useWatchStreaks();
+export function WatchStreaks({
+  isOwnProfile = false,
+  rankScore,
+  streak: streakProp,
+  stats: statsProp,
+}: WatchStreaksProps) {
+  const own = useWatchStreaks();
   const navigate = useNavigate();
 
-  const unlockedCount = achievements.filter(a => a.unlocked).length;
+  // Prefer viewed-user data when provided; otherwise use the signed-in user's.
+  const streak = streakProp ?? own.streak;
+  const stats = statsProp ?? own.stats;
+  const score = rankScore ?? stats.totalEpisodes;
+
+  const badges = getRankBadges(score);
+  const unlockedCount = badges.filter((b) => b.unlocked).length;
 
   return (
     <div className="space-y-6">
@@ -93,14 +97,14 @@ export function WatchStreaks({ isOwnProfile = false }: WatchStreaksProps) {
         </GlassPanel>
       </div>
 
-      {/* Achievements */}
+      {/* Rank badges — one per rank tier (16). */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Trophy className="w-4 h-4 text-amber-400" />
-            <h3 className="font-display text-base font-bold">Achievements</h3>
+            <h3 className="font-display text-base font-bold">Rank Badges</h3>
             <span className="text-xs text-muted-foreground">
-              {unlockedCount}/{achievements.length}
+              {unlockedCount}/{badges.length}
             </span>
           </div>
           {isOwnProfile && (
@@ -118,78 +122,66 @@ export function WatchStreaks({ isOwnProfile = false }: WatchStreaksProps) {
           <motion.div
             className="h-full bg-gradient-to-r from-primary to-secondary rounded-full"
             initial={{ width: 0 }}
-            animate={{ width: `${(unlockedCount / achievements.length) * 100}%` }}
+            animate={{ width: `${(unlockedCount / badges.length) * 100}%` }}
             transition={{ duration: 1, ease: 'easeOut', delay: 0.2 }}
           />
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-          {achievements.map((achievement, i) => (
-            <motion.div
-              key={achievement.id}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: i * 0.04, duration: 0.2 }}
-            >
-              <GlassPanel
-                className={cn(
-                  'p-3 flex flex-col items-center gap-2 text-center relative overflow-hidden',
-                  !achievement.unlocked && 'opacity-40 grayscale',
-                  achievement.unlocked && 'border-border/40'
-                )}
+          {badges.map((badge, i) => {
+            const ns = getRankNameStyleForRank(badge.rank);
+            return (
+              <motion.div
+                key={badge.rank}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: i * 0.03, duration: 0.2 }}
               >
-                {achievement.unlocked && (
-                  <div className="absolute top-0 right-0 w-8 h-8 bg-primary/10 rounded-full -translate-y-3 translate-x-3 blur-md" />
-                )}
-                <img
-                  src={getRankImageUrl(ACHIEVEMENT_RANK[achievement.id] ?? 1)}
-                  alt={achievement.title}
-                  className="w-10 h-10 object-contain"
-                />
-                <div>
-                  {(() => {
-                    const rankNum = ACHIEVEMENT_RANK[achievement.id] ?? 1;
-                    const ns = getRankNameStyle(RANK_EPISODES[rankNum] ?? 0);
-                    return (
-                      <div
-                        className={cn('text-xs font-bold leading-tight', achievement.unlocked ? ns.className : '')}
-                        style={achievement.unlocked ? ns.style : {}}
-                      >
-                        {achievement.title}
+                <GlassPanel
+                  className={cn(
+                    'p-3 flex flex-col items-center gap-2 text-center relative overflow-hidden',
+                    !badge.unlocked && 'opacity-40 grayscale',
+                    badge.unlocked && cn('border-border/40', getBadgeHoverClass(badge.rank))
+                  )}
+                >
+                  {badge.unlocked && (
+                    <div className="absolute top-0 right-0 w-8 h-8 bg-[hsl(var(--profile-accent)/0.12)] rounded-full -translate-y-3 translate-x-3 blur-md" />
+                  )}
+                  <img
+                    src={getRankImageUrl(badge.rank)}
+                    alt={badge.name}
+                    className="w-10 h-10 object-contain"
+                  />
+                  <div>
+                    <div
+                      className={cn('text-xs font-bold leading-tight', badge.unlocked ? ns.className : '')}
+                      style={badge.unlocked ? ns.style : {}}
+                    >
+                      {badge.name}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
+                      {badge.description}
+                    </div>
+                  </div>
+                  {badge.unlocked ? (
+                    <div className="absolute top-2 right-2">
+                      <div className="w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center">
+                        <Star className="w-2.5 h-2.5 text-primary fill-primary" />
                       </div>
-                    );
-                  })()}
-                  <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
-                    {achievement.description}
-                  </div>
-                </div>
-                {/* Progress bar for locked achievements */}
-                {!achievement.unlocked && achievement.total && (
-                  <div className="w-full mt-1">
-                    <div className="h-1 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary/50 rounded-full transition-all"
-                        style={{ width: `${((achievement.progress || 0) / achievement.total) * 100}%` }}
-                      />
                     </div>
-                    <div className="text-[9px] text-muted-foreground mt-0.5">
-                      {achievement.progress}/{achievement.total}
+                  ) : (
+                    <div className="absolute top-2 right-2">
+                      <div className="w-4 h-4 rounded-full bg-background/60 border border-white/10 flex items-center justify-center">
+                        <Lock className="w-2.5 h-2.5 text-muted-foreground/60" />
+                      </div>
                     </div>
-                  </div>
-                )}
-                {achievement.unlocked && (
-                  <div className="absolute top-2 right-2">
-                    <div className="w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center">
-                      <Star className="w-2.5 h-2.5 text-primary fill-primary" />
-                    </div>
-                  </div>
-                )}
-              </GlassPanel>
-            </motion.div>
-          ))}
+                  )}
+                </GlassPanel>
+              </motion.div>
+            );
+          })}
         </div>
       </div>
     </div>
   );
 }
-

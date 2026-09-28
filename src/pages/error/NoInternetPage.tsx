@@ -26,11 +26,11 @@ const getVideoPath = (filename: string) => {
 
 // Video sources - local videos bundled with the app (in public/videos)
 const VIDEO_SOURCES = [
-  getVideoPath('videos/1.mp4'),
-  getVideoPath('videos/3.mp4'),
-  getVideoPath('videos/2.webm'),
-  getVideoPath('videos/5.mp4'),
-  getVideoPath('videos/6.mp4'),
+  getVideoPath('assets/video/1.mp4'),
+  getVideoPath('assets/video/3.mp4'),
+  getVideoPath('assets/video/2.webm'),
+  getVideoPath('assets/video/5.mp4'),
+  getVideoPath('assets/video/6.mp4'),
 ];
 
 // Text variations for the right side
@@ -101,7 +101,7 @@ export default function NoInternetPage({ isNative = false }: NoInternetPageProps
           <div className="mb-10">
             <div className="flex items-center gap-3 mb-8">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg overflow-hidden">
-                <img src="/tatakai-logo-square.png" alt="Tatakai logo" className="w-full h-full object-cover" />
+                <img src={`${import.meta.env.BASE_URL}assets/logo/tatakai-logo-square.png`} alt="Tatakai logo" className="w-full h-full object-cover" />
               </div>
               <h1 className="font-display text-3xl font-bold gradient-text">Tatakai</h1>
             </div>

@@ -1,0 +1,12 @@
+# electron-updater dev config.
+#
+# Lets `update:check` resolve a real GitHub feed while running unpackaged
+# (`npm run electron:dev`) so the updater flow is testable without producing a
+# full installer. electron-updater reads this file when
+# `autoUpdater.forceDevUpdateConfig = true` is set (see update-manager.cjs).
+#
+# Keep owner/repo in sync with the single source in update-manager.cjs
+# (GH_OWNER / GH_REPO) and the electron-builder `publish` block in package.json.
+provider: github
+owner: snozxyx
+repo: Tatakai

@@ -172,22 +172,83 @@ export function EmbedPlayer({ url, poster, language, referer, onError }: EmbedPl
    * nothing useful when they are the ones being framed. Going fullscreen on our
    * wrapper takes the iframe with it and works regardless of what the embed does.
    */
-  const toggleFullscreen = useCallback(() => {
+  const toggleFullscreen = useCallback(async () => {
     const node = containerRef.current;
     if (!node) return;
-    if (document.fullscreenElement) {
-      void document.exitFullscreen().catch(() => undefined);
-      return;
+
+    // In Electron the browser Fullscreen API on a DOM element is unreliable
+    // (frequently rejected), so drive the real window via IPC and use a
+    // position:fixed CSS class as the visual fullscreen. Mirrors the main
+    // VideoPlayer's approach so the embed behaves the same on desktop.
+    const bridge = (window as unknown as { electron?: { setFullscreen?: (v: boolean) => Promise<void> } }).electron;
+    const isElectron = !!bridge?.setFullscreen;
+    const currentlyFull = node.classList.contains("is-player-fullscreen") || document.fullscreenElement === node;
+
+    if (!currentlyFull) {
+      if (isElectron) {
+        node.classList.add("is-player-fullscreen");
+        setIsFullscreen(true);
+        try {
+          await bridge!.setFullscreen!(true);
+          document.documentElement.classList.add("app-fullscreen");
+        } catch {
+          // CSS fullscreen still applies even if the IPC call fails.
+        }
+      } else {
+        try {
+          await node.requestFullscreen();
+        } catch {
+          node.classList.add("is-player-fullscreen");
+          setIsFullscreen(true);
+        }
+      }
+    } else {
+      node.classList.remove("is-player-fullscreen");
+      setIsFullscreen(false);
+      if (isElectron) {
+        document.documentElement.classList.remove("app-fullscreen");
+        try {
+          await bridge!.setFullscreen!(false);
+        } catch {
+          // Ignore.
+        }
+      } else if (document.fullscreenElement) {
+        void document.exitFullscreen().catch(() => undefined);
+      }
     }
-    void node.requestFullscreen?.().catch((err) => {
-      console.warn("[EmbedPlayer] fullscreen request rejected:", err?.message || err);
-    });
   }, []);
 
   useEffect(() => {
     const onChange = () => setIsFullscreen(document.fullscreenElement === containerRef.current);
     document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
+
+    // Esc / OS chrome leaving fullscreen must clear the CSS-class fallback too.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && containerRef.current?.classList.contains("is-player-fullscreen")) {
+        containerRef.current.classList.remove("is-player-fullscreen");
+        document.documentElement.classList.remove("app-fullscreen");
+        setIsFullscreen(false);
+        const bridge = (window as unknown as { electron?: { setFullscreen?: (v: boolean) => Promise<void> } }).electron;
+        void bridge?.setFullscreen?.(false).catch(() => undefined);
+      }
+    };
+    const bridge = (window as unknown as {
+      electron?: { onFullscreenChanged?: (cb: (v: boolean) => void) => (() => void) | undefined };
+    }).electron;
+    const unsub = bridge?.onFullscreenChanged?.((isFull: boolean) => {
+      if (!isFull && containerRef.current?.classList.contains("is-player-fullscreen")) {
+        containerRef.current.classList.remove("is-player-fullscreen");
+        document.documentElement.classList.remove("app-fullscreen");
+        setIsFullscreen(false);
+      }
+    });
+
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      document.removeEventListener("keydown", onKey);
+      unsub?.();
+    };
   }, []);
 
   if (error) {
@@ -220,7 +281,7 @@ export function EmbedPlayer({ url, poster, language, referer, onError }: EmbedPl
   return (
     <div
       ref={containerRef}
-      className={`relative w-full bg-black ${isFullscreen ? "h-full" : "aspect-video"}`}
+      className={`video-player-container relative w-full bg-black ${isFullscreen ? "h-full" : "aspect-video"}`}
     >
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-black z-10">

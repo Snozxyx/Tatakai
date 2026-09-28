@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { UpdatePolicy, CreatePolicyForm } from '@/types/admin-dashboard';
+import { GitHubReleasesPanel } from './GitHubReleasesPanel';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -142,6 +143,18 @@ export function UpdateManagementPanel() {
     e.preventDefault();
     if (!isFormValid(form)) return;
     createMutation.mutate(form);
+  };
+
+  /**
+   * Seeds the create-policy form from a real GitHub release version and opens
+   * it, so an admin picks a published version instead of typing one blind.
+   */
+  const startPolicyForVersion = (version: string) => {
+    setForm({ ...INITIAL_FORM, target_version: version });
+    setFormError(null);
+    setShowForm(true);
+    // Bring the form (top of the panel) into view on smaller screens.
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // ------------------------------------------------------------------
@@ -470,6 +483,12 @@ export function UpdateManagementPanel() {
                 {policies.map(renderPolicyRow)}
               </div>
             )}
+
+      {/* GitHub releases browser — fetches versions, notes and assets straight
+          from the public Releases API. "Create policy" seeds the form above. */}
+      <div className="border-t border-white/5 pt-6">
+        <GitHubReleasesPanel onCreatePolicy={startPolicyForVersion} />
+      </div>
     </div>
   );
 }

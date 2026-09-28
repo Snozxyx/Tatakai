@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -9,26 +9,28 @@ import { Eye, EyeOff, Mail, Lock, User, Play, ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
 import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from '@/hooks/ui/useIsNativeApp';
 import { cn } from '@/lib/utils';
+import { TurnstileWidget, type TurnstileWidgetHandle } from '@/components/security/TurnstileWidget';
+import { isTurnstileEnabled } from '@/lib/security/turnstile';
 
 const emailSchema = z.string().email('Please enter a valid email');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
 
 // Random video backgrounds
 const VIDEO_SOURCES = [
-  './videos/1.mp4',
-  './videos/2.webm',
-  './videos/3.mp4',
-  './videos/5.mp4',
-  './videos/6.mp4',
-  `${window.location.origin}/videos/5.mp4`,
-  `${window.location.origin}/videos/6.mp4`,
+  './assets/video/1.mp4',
+  './assets/video/2.webm',
+  './assets/video/3.mp4',
+  './assets/video/5.mp4',
+  './assets/video/6.mp4',
+  `${window.location.origin}/assets/video/5.mp4`,
+  `${window.location.origin}/assets/video/6.mp4`,
 ];
 
 // Random text variations
 const TEXT_VARIATIONS = [
   {
-    title: "Your Gateway to Anime",
-    desc: "Stream thousands of anime titles, track your progress, and join a community of passionate fans."
+    title: "Your Gateway to Otaku Culture",
+    desc: "Track the anime and manga you love, build tier lists and playlists, and join a community of passionate fans."
   },
   {
     title: "Discover Anime Paradise",
@@ -59,6 +61,9 @@ export default function AuthPage() {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileWidgetHandle>(null);
+  const turnstileEnabled = isTurnstileEnabled();
 
   // Pick a random video on mount
   const randomVideoSrc = useMemo(() => {
@@ -97,30 +102,39 @@ export default function AuthPage() {
     e.preventDefault();
     
     if (!validateForm()) return;
-    
+
+    if (turnstileEnabled && !captchaToken) {
+      toast.error('Please complete the verification challenge');
+      return;
+    }
+
     setIsLoading(true);
-    
+
     try {
       if (isLogin) {
-        const { error } = await signIn(email, password);
+        const { error } = await signIn(email, password, captchaToken ?? undefined);
         if (error) {
           if (error.message.includes('Invalid login credentials')) {
             toast.error('Invalid email or password');
           } else {
             toast.error(error.message);
           }
+          turnstileRef.current?.reset();
+          setCaptchaToken(null);
         } else {
           toast.success('Welcome back!');
           navigate('/');
         }
       } else {
-        const { error } = await signUp(email, password, displayName);
+        const { error } = await signUp(email, password, displayName, captchaToken ?? undefined);
         if (error) {
           if (error.message.includes('already registered')) {
             toast.error('This email is already registered');
           } else {
             toast.error(error.message);
           }
+          turnstileRef.current?.reset();
+          setCaptchaToken(null);
         } else {
           toast.success('Account created! You can now sign in.');
           navigate('/');
@@ -160,7 +174,7 @@ export default function AuthPage() {
           <div className="mb-10">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg overflow-hidden">
-                <img src="/tatakai-logo-square.png" alt="Tatakai logo" className="w-full h-full object-cover" />
+                <img src={`${import.meta.env.BASE_URL}assets/logo/tatakai-logo-square.png`} alt="Tatakai logo" className="w-full h-full object-cover" />
               </div>
               <h1 className="font-display text-3xl font-bold gradient-text">Tatakai</h1>
             </div>
@@ -258,9 +272,20 @@ export default function AuthPage() {
               )}
             </div>
             
+            {turnstileEnabled && (
+              <TurnstileWidget
+                ref={turnstileRef}
+                action={isLogin ? 'login' : 'signup'}
+                onToken={setCaptchaToken}
+                onExpire={() => setCaptchaToken(null)}
+                onError={() => setCaptchaToken(null)}
+                className="flex justify-center"
+              />
+            )}
+
             <Button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || (turnstileEnabled && !captchaToken)}
               className="w-full h-12 bg-gradient-to-r from-primary to-secondary hover:opacity-90 font-semibold text-lg shadow-lg shadow-primary/25 transition-all hover:shadow-xl hover:shadow-primary/30"
             >
               {isLoading ? (
@@ -305,12 +330,19 @@ export default function AuthPage() {
               >
                 Privacy Policy
               </button>
-              , and{' '}
+              ,{' '}
               <button
                 onClick={() => navigate('/dmca')}
                 className="text-primary hover:underline"
               >
                 DMCA Policy
+              </button>
+              , and{' '}
+              <button
+                onClick={() => navigate('/community-guidelines')}
+                className="text-primary hover:underline"
+              >
+                Community Guidelines
               </button>
               .
             </p>

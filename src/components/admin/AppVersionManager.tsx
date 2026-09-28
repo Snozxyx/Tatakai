@@ -5,9 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Smartphone, AlertTriangle, Save, RefreshCw } from 'lucide-react';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 export function AppVersionManager() {
     const { data: config, isLoading, updateConfig, getConfigValue } = useAppConfig();
+    const confirm = useConfirm();
 
     // Local state for inputs
     const [minVersion, setMinVersion] = useState('');
@@ -29,8 +31,8 @@ export function AppVersionManager() {
         updateConfig.mutate({ key, value });
     };
 
-    const handleForceUpdate = () => {
-        if (confirm(`Are you sure you want to force all users to update to version ${__APP_VERSION__}? This will set the minimum supported version to ${__APP_VERSION__}.`)) {
+    const handleForceUpdate = async () => {
+        if (await confirm({ title: `Are you sure you want to force all users to update to version ${__APP_VERSION__}? This will set the minimum supported version to ${__APP_VERSION__}.`, destructive: true })) {
             updateConfig.mutate({ key: 'min_supported_version', value: __APP_VERSION__ });
             updateConfig.mutate({ key: 'latest_version', value: __APP_VERSION__ });
             setMinVersion(__APP_VERSION__);

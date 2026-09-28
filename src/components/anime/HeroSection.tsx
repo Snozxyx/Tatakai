@@ -53,8 +53,8 @@ export function HeroSection({ spotlight, spotlights = [] }: HeroSectionProps) {
         <div className="absolute inset-0 h-[400px] overflow-hidden">
           <img 
             src={getHighQualityImage(activeSpotlight.banner || activeSpotlight.poster)} 
-            alt="" 
-            fetchPriority="high"
+            alt=""
+            fetchpriority="high"
             decoding="async"
             className="w-full h-full object-cover scale-105 brightness-50"
           />

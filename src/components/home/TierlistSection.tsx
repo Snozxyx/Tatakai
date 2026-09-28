@@ -3,7 +3,6 @@ import { Sparkles, ArrowRight, ListOrdered } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { motion } from "framer-motion";
 import { TierListCard } from "@/components/tierlist/TierListCard";
 
 export function TierlistSection() {
@@ -23,15 +22,15 @@ export function TierlistSection() {
     if (!isLoading && (!tierlists || tierlists.length === 0)) return null;
 
     return (
-        <div className="mb-24">
-            <div className="flex items-center justify-between mb-8">
-                <h2 className="text-2xl font-bold flex items-center gap-3">
-                    <ListOrdered className="w-6 h-6 text-primary" />
+        <div>
+            <div className="flex items-center justify-between mb-6 px-2">
+                <h2 className="font-display text-2xl font-semibold tracking-tight flex items-center gap-2">
+                    <ListOrdered className="w-5 h-5 text-primary" />
                     Community Tier Lists
                 </h2>
                 <Link
                     to="/tierlists"
-                    className="text-sm font-bold text-primary flex items-center gap-1 hover:gap-2 transition-all"
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
                 >
                     View All <ArrowRight className="w-4 h-4" />
                 </Link>
@@ -43,16 +42,8 @@ export function TierlistSection() {
                         <div key={i} className="h-64 bg-muted/20 rounded-3xl animate-pulse" />
                     ))
                 ) : (
-                    tierlists?.map((list, index) => (
-                        <motion.div
-                            key={list.id}
-                            initial={{ opacity: 0, y: 20 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            transition={{ delay: index * 0.1 }}
-                            viewport={{ once: true }}
-                        >
-                            <TierListCard tierList={list} />
-                        </motion.div>
+                    tierlists?.map((list) => (
+                        <TierListCard key={list.id} tierList={list} />
                     ))
                 )}
             </div>

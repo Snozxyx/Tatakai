@@ -4,6 +4,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { getLocalContinueWatching, clearLocalContinueWatching } from '@/lib/localStorage';
 import { notifyUserCreated } from '@/core/network/discord-webhook';
+import { resolveStaffRoles } from '@/lib/roles';
 
 export interface Profile {
   id: string;
@@ -16,7 +17,9 @@ export interface Profile {
   is_banned?: boolean;
   ban_reason?: string | null;
   is_admin?: boolean;
+  is_moderator?: boolean;
   is_public?: boolean;
+  show_calendar?: boolean;
   mal_access_token?: string | null;
   mal_refresh_token?: string | null;
   mal_user_id?: string | null;
@@ -25,7 +28,7 @@ export interface Profile {
   anilist_access_token?: string | null;
   anilist_user_id?: string | null;
   anilist_username?: string | null;
-  showcase_anime?: any | null;
+  showcase_anime_ids?: string[] | null;
   is_premium?: boolean;
   role?: string;
   preferred_title_language?: 'romaji' | 'english' | 'native';
@@ -42,8 +45,10 @@ interface AuthContextType {
   isBanned: boolean;
   banReason: string | null;
   isLoading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, displayName?: string) => Promise<{ error: Error | null }>;
+  /** False until staff roles have been resolved for the current session. */
+  rolesResolved: boolean;
+  signIn: (email: string, password: string, captchaToken?: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, displayName?: string, captchaToken?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -85,11 +90,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isBanned, setIsBanned] = useState(false);
   const [banReason, setBanReason] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // `isLoading` covers the auth session only, and flips false before the profile query
+  // returns. Staff guards need to know when *roles* are settled, or they bounce a real
+  // admin on a cold load.
+  const [rolesResolved, setRolesResolved] = useState(false);
   const queryClient = useQueryClient();
 
   const fetchProfile = async (userId: string) => {
     // Skip fetching profile when offline
     if (!isOnline()) {
+      setRolesResolved(true);
       return;
     }
 
@@ -120,10 +130,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (profileData) {
         setProfile(profileData);
 
-        // Role detection
-        const role = profileData.role || 'user';
-        setIsAdmin(role === 'admin');
-        setIsModerator(role === 'moderator' || role === 'admin');
+        // Role detection — resolved through the database's own `has_role`, so the UI
+        // cannot disagree with what RLS actually grants. See `@/lib/roles`.
+        const { isAdmin: resolvedAdmin, isModerator: resolvedModerator } =
+          await resolveStaffRoles(supabase, userId, profileData);
+        setIsAdmin(resolvedAdmin);
+        setIsModerator(resolvedModerator);
 
         // Check if user is banned
         if (profileData.is_banned) {
@@ -142,6 +154,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (error) {
       console.warn('Profile bootstrap failed:', error);
+    } finally {
+      setRolesResolved(true);
     }
   };
 
@@ -155,6 +169,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Skip auth setup when offline - just set loading to false
     if (!isOnline()) {
       setIsLoading(false);
+      setRolesResolved(true);
       return;
     }
 
@@ -165,6 +180,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // Notify Discord when a new OAuth user signs up
         if (event === 'SIGNED_IN' && session?.user) {
+          // A new identity means the resolved roles are stale until the profile lands.
+          setRolesResolved(false);
           const u = session.user;
           const createdAt = new Date(u.created_at).getTime();
           const justCreated = Date.now() - createdAt < 30_000; // within 30s
@@ -218,6 +235,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setProfile(null);
           setIsAdmin(false);
           setIsModerator(false);
+          // Signed out: there is nothing left to resolve.
+          setRolesResolved(true);
         }
 
         setIsLoading(false);
@@ -237,9 +256,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (session?.user) {
           void fetchProfile(session.user.id);
+        } else {
+          setRolesResolved(true);
         }
       } catch (err) {
         console.error('[Auth] Initial session fetch failed:', err);
+        // Never leave a guard waiting forever on a failed bootstrap.
+        setRolesResolved(true);
       } finally {
         setIsLoading(false);
       }
@@ -248,12 +271,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const signIn = async (email: string, password: string, captchaToken?: string) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+      options: captchaToken ? { captchaToken } : undefined,
+    });
     return { error };
   };
 
-  const signUp = async (email: string, password: string, displayName?: string) => {
+  const signUp = async (email: string, password: string, displayName?: string, captchaToken?: string) => {
     const redirectUrl = `${window.location.origin}/`;
 
     const { error } = await supabase.auth.signUp({
@@ -264,6 +291,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         data: {
           display_name: displayName || email.split('@')[0],
         },
+        ...(captchaToken ? { captchaToken } : {}),
       },
     });
 
@@ -293,6 +321,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isBanned,
       banReason,
       isLoading,
+      rolesResolved,
       signIn,
       signUp,
       signOut,

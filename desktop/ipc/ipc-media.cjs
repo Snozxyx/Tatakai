@@ -23,8 +23,14 @@ module.exports = function registerMediaHandlers(ipcMain, app, logger) {
         const result = await service.extractSubtitle(url, trackIndex, outputPath);
         
         if (result.success) {
-            // Return the local file path which can be loaded via file:// protocol
-            return { success: true, url: `file:///${outputPath.replace(/\\/g, '/')}` };
+            try {
+                const content = await fs.promises.readFile(outputPath, 'utf8');
+                const dataUrl = `data:text/vtt;charset=utf-8,${encodeURIComponent(content)}`;
+                return { success: true, url: dataUrl };
+            } catch {
+                const normalizedPath = outputPath.replace(/\\/g, '/');
+                return { success: true, url: `tatakai-media:///${normalizedPath}` };
+            }
         }
         return result;
     });
@@ -35,7 +41,11 @@ module.exports = function registerMediaHandlers(ipcMain, app, logger) {
         const result = await service.extractAudioTrack(url, trackIndex, outputPath);
 
         if (result.success) {
-            return { success: true, url: `file:///${outputPath.replace(/\\/g, '/')}` };
+            // Serve via the tatakai-media:// custom protocol, not file:// — the
+            // renderer runs with webSecurity on and refuses to load file:/// local
+            // resources (same reason video/subtitles/posters go through this scheme).
+            const normalizedPath = outputPath.replace(/\\/g, '/');
+            return { success: true, url: `tatakai-media:///${normalizedPath}` };
         }
         return result;
     });

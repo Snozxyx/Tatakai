@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useMemo, useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Background } from '@/components/layout/Background';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -13,11 +14,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { AnalyticsDashboard } from '@/components/admin/AnalyticsDashboard';
-import { VideoServerManager } from '@/components/admin/VideoServerManager';
 import { IncidentManager } from '@/components/admin/IncidentManager';
 import { PopupBuilder } from '@/components/admin/PopupBuilder';
 import { ChangelogManager } from '@/components/admin/ChangelogManager';
 import { ContentModerationManager } from '@/components/admin/ContentModerationManager';
+import { CommentContent } from '@/components/comments/CommentContent';
+import { CommentAttachments } from '@/components/comments/CommentAttachments';
+import { CommentEmbeds } from '@/components/comments/CommentEmbeds';
+import { useRecentCommentsDetailed } from '@/hooks/user/useUserCommentsDetailed';
 import { AdminLogs } from '@/components/admin/AdminLogs';
 import { PendingForumPosts } from '@/components/admin/PendingForumPosts';
 import { PendingSuggestions } from '@/components/admin/PendingSuggestions';
@@ -25,19 +29,17 @@ import { WatchRoomManager } from '@/components/admin/WatchRoomsManager';
 import { AppVersionManager } from '@/components/admin/AppVersionManager';
 import { AppReleaseManager } from '@/components/admin/AppReleaseManager';
 import { ModerationLogs } from '@/components/admin/ModerationLogs';
-import { CustomSourceManager } from '@/components/admin/CustomSourceManager';
 import { ReportManager } from '@/components/admin/ReportManager';
-import { LanguageManager } from '@/components/admin/LanguageManager';
 import { AnalyticsActiveUsers } from '@/components/admin/AnalyticsActiveUsers';
-import { MarketplaceManager } from '@/components/admin/MarketplaceManager';
+import { NewsComposer } from '@/components/admin/NewsComposer';
+import { NewsManager } from '@/components/admin/NewsManager';
 import { RedirectManager } from '@/components/admin/RedirectManager';
 import { UserActivityLogs } from '@/components/admin/UserActivityLogs';
 import { AchievementManager } from '@/components/admin/AchievementManager';
-import { ExtensionManager } from '@/components/admin/ExtensionManager';
+import { BadgeManager } from '@/components/admin/BadgeManager';
 import { ApiAdminPanel } from '@/components/admin/ApiAdminPanel';
 // New panels — admin dashboard overhaul
 import { UserStatsPanel } from '@/components/admin/UserStatsPanel';
-import { ExtensionAnalyticsPanel } from '@/components/admin/ExtensionAnalyticsPanel';
 import { StreamingAnalyticsPanel } from '@/components/admin/StreamingAnalyticsPanel';
 import { PerformanceInsightsPanel } from '@/components/admin/PerformanceInsightsPanel';
 import { UpdateManagementPanel } from '@/components/admin/UpdateManagementPanel';
@@ -46,92 +48,92 @@ import { DeviceBanPanel } from '@/components/admin/DeviceBanPanel';
 import { IPBanPanel } from '@/components/admin/IPBanPanel';
 import { BanAuditLogPanel } from '@/components/admin/BanAuditLogPanel';
 import { BanTemplatesPanel } from '@/components/admin/BanTemplatesPanel';
-import { BulkBanToolbar } from '@/components/admin/BulkBanToolbar';
 import { LogViewerPanel } from '@/components/desktop/LogViewerPanel';
 import { useAdminMessages } from '@/hooks/admin/useAdminMessages';
-import { formatDistanceToNow } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
+import { cn } from '@/lib/utils';
+import { AdminNav } from '@/components/admin/AdminNav';
+import { buildAdminNav } from '@/components/admin/adminSections';
+import { StatTile } from '@/components/admin/StatTile';
+import { UserManagementTab } from '@/components/admin/UserManagementTab';
 import {
-  ArrowLeft, Shield, ShieldCheck, ShieldOff, ShieldAlert, Users, MessageSquare, Star, Search,
-  Trash2, Ban, CheckCircle, AlertTriangle, BarChart3, Send,
-  Settings, Power, Unlock, BellRing, Server, AlertCircle, Megaphone, History, Layers, FileText, Image, Radio, Menu, ChevronRight,
-  Globe, ShoppingBag, Lightbulb, Activity, ExternalLink,  
+  ArrowLeft, Shield, ShieldAlert, Users, MessageSquare, Star,
+  Trash2, Ban, AlertTriangle, BarChart3, Send,
+  Settings, Power, BellRing, Server, AlertCircle, History, Layers, FileText, Image, Radio, Menu, ChevronRight,
+  Inbox,
+  Globe, ShoppingBag, Lightbulb, Activity, ExternalLink,
 } from 'lucide-react';
-
-const navItems = [
-  { value: 'analytics', label: 'Analytics', icon: BarChart3, roles: ['admin', 'moderator'] },
-  { value: 'reports', label: 'User Reports', icon: ShieldAlert, roles: ['admin', 'moderator'], badge: 'reports' },
-  { value: 'suggestions', label: 'Suggestions', icon: Lightbulb, roles: ['admin', 'moderator'], badge: 'suggestions' },
-  { value: 'pending', label: 'Forum Moderation', icon: MessageSquare, roles: ['admin', 'moderator'], badge: 'posts' },
-  { value: 'submissions', label: 'Submissions', icon: Globe, roles: ['admin', 'moderator'], badge: 'posts' },
-  { value: 'languages', label: 'Languages', icon: Globe, roles: ['admin'] },
-  { value: 'users', label: 'Users', icon: Users, roles: ['admin', 'moderator'] },
-  { value: 'comments', label: 'Comments', icon: MessageSquare, roles: ['admin', 'moderator'] },
-  { value: 'content', label: 'Content', icon: Layers, roles: ['admin', 'moderator'] },
-  { value: 'watchrooms', label: 'Watch Rooms', icon: Radio, roles: ['admin', 'moderator'] },
-  { value: 'moderation', label: 'Staff Activity', icon: History, roles: ['admin', 'moderator'] },
-  { value: 'logs', label: 'Staff Logs', icon: FileText, roles: ['admin', 'moderator'] },
-  { value: 'popups', label: 'Popups & Ads', icon: Megaphone, roles: ['admin'] },
-  { value: 'incidents', label: 'Incidents', icon: AlertCircle, roles: ['admin'] },
-  { value: 'changelog', label: 'Changelog', icon: History, roles: ['admin'] },
-  { value: 'servers', label: 'Video Servers', icon: Server, roles: ['admin'] },
-  { value: 'api-admin', label: 'API Admin', icon: ExternalLink, roles: ['admin'] },
-  { value: 'settings', label: 'System', icon: Settings, roles: ['admin'] },
-  { value: 'achievements', label: 'Achievements', icon: Star, roles: ['admin', 'moderator'] },
-  { value: 'extensions', label: 'Extensions', icon: Star, roles: ['admin'] },
-  // Analytics expansion
-  { value: 'userstats', label: 'User Stats', icon: Activity, roles: ['admin', 'moderator'] },
-  { value: 'ext-analytics', label: 'Ext Analytics', icon: BarChart3, roles: ['admin'] },
-  { value: 'streaming', label: 'Streaming', icon: Radio, roles: ['admin'] },
-  { value: 'performance', label: 'Performance', icon: Activity, roles: ['admin'] },
-  // Ban management
-  { value: 'ban-management', label: 'Ban Management', icon: Ban, roles: ['admin'] },
-  { value: 'ban-audit', label: 'Ban Audit Log', icon: History, roles: ['admin', 'moderator'] },
-];
 
 export default function AdminPage() {
   const navigate = useNavigate();
   const isDesktopApp = useIsDesktopApp();
-  const { isAdmin, isModerator, profile, isLoading } = useAuth();
+  const { isAdmin, isModerator, profile, isLoading, rolesResolved } = useAuth();
   const queryClient = useQueryClient();
-  const [searchTerm, setSearchTerm] = useState('');
+  const confirm = useConfirm();
   const [messageTitle, setMessageTitle] = useState('');
   const [messageContent, setMessageContent] = useState('');
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  /**
+   * The notification panel's audience. Both halves are needed: the choice, and
+   * the handle to resolve when the choice is a single user.
+   */
+  const [notifyTarget, setNotifyTarget] = useState<'all' | 'user'>('all');
+  const [notifyRecipient, setNotifyRecipient] = useState('');
   const [messagingUserId, setMessagingUserId] = useState<string | null>(null);
-  const [banReason, setBanReason] = useState('');
-  const [showBanModal, setShowBanModal] = useState(false);
-  const [userToBan, setUserToBan] = useState<string | null>(null);
-  const role = isAdmin ? 'admin' : isModerator ? 'moderator' : null;
-  const allNavItems = [
-    ...navItems,
-    ...(isAdmin ? [{ value: 'updates', label: 'Updates', icon: Shield, roles: ['admin'] as string[] }] : []),
-    ...(isAdmin && isDesktopApp ? [{ value: 'crashes', label: 'Crash Reports', icon: ShieldAlert, roles: ['admin'] as string[] }] : []),
-    ...(isDesktopApp ? [{ value: 'desktop-logs', label: 'Desktop Logs', icon: FileText, roles: ['admin', 'moderator'] as string[] }] : []),
-  ];
-  const availableNavItems = allNavItems.filter(item => item.roles.includes(role as string));
-  const [activeTab, setActiveTab] = useState(availableNavItems[0]?.value || 'analytics');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { groups: navGroups, items: navSections } = useMemo(
+    () => buildAdminNav({ isAdmin, isModerator, isDesktopApp }),
+    [isAdmin, isModerator, isDesktopApp],
+  );
+
+  /**
+   * The open section lives in the query string, so a reload, a bookmark and a
+   * link from a colleague all land on the same panel. Thirty sections deep,
+   * re-finding one by hand after every refresh was the tax that made the old
+   * state-only version tiring to work in.
+   *
+   * Derived rather than stored: a slug that is unknown, or that this viewer's
+   * role cannot open, falls back to their first section instead of parking an
+   * empty pane — and the fallback re-resolves once the role query lands, which
+   * the old `useState` initialiser could not, having latched whatever the list
+   * looked like before roles were known.
+   */
+  const sectionParam = searchParams.get('section');
+  const activeTab =
+    sectionParam && navSections.some((item) => item.value === sectionParam)
+      ? sectionParam
+      : (navSections[0]?.value ?? 'analytics');
+
+  const setActiveTab = (value: string) => {
+    const next = new URLSearchParams(searchParams);
+    next.set('section', value);
+    // Replaced, not pushed: back should leave the dashboard, not walk through
+    // every section visited inside it.
+    setSearchParams(next, { replace: true });
+  };
+
+  /** Names the open section on the mobile trigger, which used to read "Dashboard Menu" whichever panel was showing. */
+  const activeLabel =
+    navSections.find((item) => item.value === activeTab)?.label ?? 'Dashboard Menu';
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [viewingActivityUserId, setViewingActivityUserId] = useState<string | null>(null);
-  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
-  const [broadcastMessage, setBroadcastMessage] = useState('');
-  const [broadcastTitle, setBroadcastTitle] = useState('');
-  const [selectedUsers, setSelectedUsers] = useState<{ id: string; display_name: string }[]>([]);
   const { deleteMessage } = useAdminMessages();
 
   const isStaff = isAdmin || isModerator;
 
-  // Redirect if not staff
+  // Redirect if not staff. `AdminRoute` is the real gate — it decides before this
+  // component mounts — and this is defence in depth for any future mount that bypasses
+  // it. It waits on `rolesResolved`, not `isLoading`, because the auth session settles
+  // before the profile query that carries staff status, so keying off `isLoading` alone
+  // bounces admins on a cold load.
+  //
+  // Deliberately no early `return null` here: the hooks below it would then run on some
+  // renders and not others, which is the "rendered fewer hooks than expected" crash.
   useEffect(() => {
-    if (!isLoading && !isStaff) {
+    if (!isLoading && rolesResolved && !isStaff) {
       navigate('/');
     }
-  }, [isLoading, isStaff, navigate]);
-
-  if (!isLoading && !isStaff) {
-    return null;
-  }
+  }, [isLoading, rolesResolved, isStaff, navigate]);
 
   // Fetch maintenance mode
   const { data: maintenanceMode } = useQuery({
@@ -145,22 +147,6 @@ export default function AdminPage() {
       return data as { id: string; is_active: boolean; message: string } | null;
     },
     enabled: isAdmin,
-  });
-
-  // Fetch users
-  const { data: users, isLoading: loadingUsers } = useQuery({
-    queryKey: ['admin_users'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
-
-      if (error) throw error;
-      return data;
-    },
-    enabled: isStaff,
   });
 
   // Total user count (not limited)
@@ -177,35 +163,39 @@ export default function AdminPage() {
     enabled: isStaff,
   });
 
-  // Fetch all comments
-  const { data: comments, isLoading: loadingComments } = useQuery({
-    queryKey: ['admin_comments'],
+  // Headline figures for the summary row. They are their own `head: true` counts
+  // because the two list queries above stop at 100 rows — counting those gave a
+  // "Banned users" tile that silently meant "banned among the 100 newest".
+  const { data: bannedUsersCount } = useQuery({
+    queryKey: ['admin_banned_count'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('comments')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
+      const { count, error } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_banned', true);
 
       if (error) throw error;
-
-      if (!data || data.length === 0) return [];
-
-      const userIds = [...new Set(data.map(c => c.user_id))];
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('user_id, display_name')
-        .in('user_id', userIds);
-
-      const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
-
-      return data.map(c => ({
-        ...c,
-        profile: profileMap.get(c.user_id),
-      }));
+      return count || 0;
     },
     enabled: isStaff,
   });
+
+  const { data: totalCommentsCount } = useQuery({
+    queryKey: ['admin_comments_count'],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('comments')
+        .select('*', { count: 'exact', head: true });
+
+      if (error) throw error;
+      return count || 0;
+    },
+    enabled: isStaff,
+  });
+
+  // Recent comments across the site, enriched with source title, deep-link,
+  // structured media (attachments/embeds/poll) and author profile.
+  const { comments: recentComments, isLoading: loadingComments } = useRecentCommentsDetailed(60);
 
   // Fetch sent messages
   const { data: sentMessages, isLoading: loadingSentMessages } = useQuery({
@@ -234,7 +224,7 @@ export default function AdminPage() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin_comments'] });
+      queryClient.invalidateQueries({ queryKey: ['recent-comments-detailed'] });
       toast.success('Comment deleted');
     },
     onError: () => {
@@ -266,67 +256,6 @@ export default function AdminPage() {
     },
   });
 
-  // Ban user mutation
-  const banUser = useMutation({
-    mutationFn: async ({ userId, reason }: { userId: string; reason: string }) => {
-      // Use the SQL RPC function for banning
-      const { error } = await supabase.rpc('ban_user', {
-        target_user_id: userId,
-        reason: reason,
-        duration_hours: null // null = permanent ban
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin_users'] });
-      toast.success('User banned successfully');
-      setShowBanModal(false);
-      setBanReason('');
-      setUserToBan(null);
-    },
-    onError: (error: any) => {
-      console.error('Ban error:', error);
-      toast.error(error.message || 'Failed to ban user');
-    },
-  });
-
-  // Unban user mutation
-  const unbanUser = useMutation({
-    mutationFn: async (userId: string) => {
-      // Use the SQL RPC function for unbanning
-      const { error } = await supabase.rpc('unban_user', {
-        target_user_id: userId
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin_users'] });
-      toast.success('User unbanned successfully');
-    },
-    onError: (error: any) => {
-      console.error('Unban error:', error);
-      toast.error(error.message || 'Failed to unban user');
-    },
-  });
-
-  // Toggle admin status mutation
-  const toggleAdmin = useMutation({
-    mutationFn: async ({ userId, makeAdmin }: { userId: string; makeAdmin: boolean }) => {
-      const { error } = await (supabase
-        .from('profiles')
-        .update({ is_admin: makeAdmin } as any)
-        .eq('user_id', userId) as any);
-      if (error) throw error;
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['admin_users'] });
-      toast.success(variables.makeAdmin ? 'User promoted to admin' : 'Admin privileges revoked');
-    },
-    onError: () => {
-      toast.error('Failed to update admin status');
-    },
-  });
-
   // Send message mutation
   const sendMessage = useMutation({
     mutationFn: async ({ title, content, recipientId }: { title: string; content: string; recipientId: string | null }) => {
@@ -347,7 +276,7 @@ export default function AdminPage() {
       toast.success('Message sent successfully');
       setMessageTitle('');
       setMessageContent('');
-      setSelectedUserId(null);
+      setNotifyRecipient('');
     },
     onError: (error: any) => {
       console.error('Failed to send message:', error);
@@ -358,24 +287,6 @@ export default function AdminPage() {
       } else {
         toast.error('Failed to send message: ' + (error?.message || 'Unknown error'));
       }
-    },
-  });
-
-  // Toggle moderator status mutation
-  const toggleModerator = useMutation({
-    mutationFn: async ({ userId, makeModerator }: { userId: string; makeModerator: boolean }) => {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ role: makeModerator ? 'moderator' : 'user' } as any)
-        .eq('user_id', userId);
-      if (error) throw error;
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['admin_users'] });
-      toast.success(variables.makeModerator ? 'User promoted to moderator' : 'Moderator privileges revoked');
-    },
-    onError: () => {
-      toast.error('Failed to update moderator status');
     },
   });
 
@@ -402,10 +313,37 @@ export default function AdminPage() {
     refetchInterval: 30000,
   });
 
-  const filteredUsers = users?.filter(u =>
-    u.display_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.username?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  /**
+   * Turns a typed username or id into the value `admin_messages.recipient_id`
+   * holds — `profiles.user_id`, the auth id space, which is what
+   * `useAdminMessages` matches a signed-in reader against. `profiles.id` is a
+   * different column and matching on it would address nobody.
+   *
+   * The "Specific User" option used to pass `null` down either branch, so every
+   * message sent from that panel went to every user on the site regardless of
+   * what was picked. Returns null when nothing matches, and the caller refuses
+   * to send rather than falling back to a broadcast.
+   *
+   * The id columns are typed `uuid`, so a non-uuid needle is only ever compared
+   * against `username` — asking Postgres to cast "someone" to a uuid fails the
+   * whole query.
+   */
+  const resolveRecipientId = async (raw: string): Promise<string | null> => {
+    const needle = raw.trim();
+    if (!needle) return null;
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(needle);
+    const rows = supabase.from('profiles').select('user_id').limit(1);
+    const { data, error } = isUuid
+      ? await rows.or(`user_id.eq.${needle},id.eq.${needle}`).maybeSingle()
+      : await rows.ilike('username', needle).maybeSingle();
+
+    if (error) {
+      console.error('Recipient lookup failed:', error);
+      return null;
+    }
+    return (data?.user_id as string | undefined) ?? null;
+  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -430,143 +368,123 @@ export default function AdminPage() {
       <Background />
       <Sidebar />
 
-      <main className={`relative z-10 ${isDesktopApp ? 'pl-6' : 'pl-6 md:pl-32'} pr-6 py-6 max-w-[1400px] mx-auto pb-24 md:pb-6`}>
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
+      <main className={cn('relative z-10 mx-auto max-w-[1800px] px-4 py-6 pb-24 sm:px-6 md:pb-6', isDesktopApp ? 'md:pl-6' : 'md:pl-32')}>
+        <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+          <div className="flex items-start gap-3">
             <button
+              type="button"
               onClick={() => navigate(-1)}
-              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Go back"
+              className="mt-1.5 rounded-full border border-white/[0.07] bg-white/[0.03] p-2 text-muted-foreground transition-colors hover:border-white/25 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="h-4 w-4" />
             </button>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-primary/20">
-                <Shield className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <h1 className="font-display text-2xl font-bold">Admin Dashboard</h1>
-                <p className="text-sm text-muted-foreground">Manage users and content</p>
-              </div>
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-primary">
+                {isAdmin ? 'Administrator' : 'Moderator'}
+              </p>
+              <h1 className="font-display mt-1.5 text-2xl font-black tracking-tight sm:text-[1.75rem]">
+                Admin Dashboard
+              </h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {navSections.length} sections · signed in as{' '}
+                {profile?.display_name || profile?.username || 'staff'}
+              </p>
             </div>
           </div>
 
-
-
-        </div >
+          {/* The status chip is also the way into the section that changes it, so
+              the state and its switch are never more than one click apart. */}
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('settings')}
+              className={cn(
+                'inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-bold uppercase tracking-widest transition-colors',
+                maintenanceMode?.is_active
+                  ? 'border-orange/30 bg-orange/10 text-orange hover:bg-orange/20'
+                  : 'border-primary/30 bg-primary/10 text-primary hover:bg-primary/20',
+              )}
+            >
+              <span className={cn('h-1.5 w-1.5 rounded-full', maintenanceMode?.is_active ? 'bg-orange' : 'animate-pulse bg-primary')} />
+              {maintenanceMode?.is_active ? 'Maintenance mode' : 'Site online'}
+            </button>
+          )}
+        </div>
 
         {/* Stats */}
-        < div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8" >
-          <GlassPanel className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/20">
-                <Users className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{totalUsersCount ?? (users?.length || 0)}</p>
-                <p className="text-xs text-muted-foreground">Total Users</p>
-              </div>
-            </div>
-          </GlassPanel>
-          <GlassPanel className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-secondary/20">
-                <MessageSquare className="w-5 h-5 text-secondary" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{comments?.length || 0}</p>
-                <p className="text-xs text-muted-foreground">Comments</p>
-              </div>
-            </div>
-          </GlassPanel>
-          <GlassPanel className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-destructive/20">
-                <Ban className="w-5 h-5 text-destructive" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{users?.filter((u: any) => u.is_banned).length || 0}</p>
-                <p className="text-xs text-muted-foreground">Banned Users</p>
-              </div>
-            </div>
-          </GlassPanel>
-          <GlassPanel className="p-4">
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-lg ${maintenanceMode?.is_active ? 'bg-orange-500/20' : 'bg-emerald-500/20'}`}>
-                <Power className={`w-5 h-5 ${maintenanceMode?.is_active ? 'text-orange-500' : 'text-emerald-500'}`} />
-              </div>
-              <div>
-                <p className="text-sm font-bold">{maintenanceMode?.is_active ? 'Maintenance' : 'Online'}</p>
-                <p className="text-xs text-muted-foreground">System Status</p>
-              </div>
-            </div>
-          </GlassPanel>
-        </div >
+        <div className="mb-8 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
+          <StatTile icon={Users} tone="primary" value={(totalUsersCount ?? 0).toLocaleString()} label="Total users" />
+          <StatTile icon={MessageSquare} tone="secondary" value={(totalCommentsCount ?? recentComments?.length ?? 0).toLocaleString()} label="Comments" />
+          <StatTile icon={Ban} tone="destructive" value={(bannedUsersCount ?? 0).toLocaleString()} label="Banned users" />
+          {/* The rail's badges each show one queue; this is the three of them
+              added up, so "is anything waiting on me?" is answerable without
+              walking the nav. System status moved to the header chip, which can
+              also open the section that toggles it. */}
+          <StatTile
+            icon={Inbox}
+            tone="amber"
+            value={(
+              (badgeCounts?.reports ?? 0) +
+              (badgeCounts?.suggestions ?? 0) +
+              (badgeCounts?.posts ?? 0)
+            ).toLocaleString()}
+            label="Awaiting review"
+          />
+        </div>
 
         {/* Main Content with Left Navigation */}
-        < Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col md:flex-row gap-8 relative" >
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          orientation="vertical"
+          className="relative flex flex-col gap-8 md:flex-row"
+        >
           {/* Mobile Navigation Toggle */}
-          < div className="md:hidden mb-6" >
+          <div className="mb-6 md:hidden">
             <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
               <SheetTrigger asChild>
-                <Button variant="outline" className="w-full justify-between h-14 px-6 bg-card/40 border-white/5 rounded-2xl">
-                  <div className="flex items-center gap-3">
-                    <Menu className="w-5 h-5 text-primary" />
-                    <span className="font-bold">Dashboard Menu</span>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                <Button variant="outline" className="h-14 w-full justify-between rounded-2xl border-white/[0.07] bg-white/[0.03] px-5">
+                  <span className="flex min-w-0 items-center gap-3">
+                    <Menu className="h-5 w-5 shrink-0 text-primary" />
+                    <span className="truncate font-bold">{activeLabel}</span>
+                  </span>
+                  <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-[300px] p-0 border-white/5 bg-background/95 backdrop-blur-xl">
-                <SheetHeader className="p-6 border-b border-white/5 text-left">
+              <SheetContent
+                side="left"
+                className="w-[320px] border-white/5 bg-background/95 p-0 backdrop-blur-xl"
+                // Radix focuses the first tabbable node on open — here the filter
+                // box, which on a phone means the keyboard covers the list the
+                // visitor opened the sheet to read.
+                onOpenAutoFocus={(event) => event.preventDefault()}
+              >
+                <SheetHeader className="border-b border-white/5 p-6 text-left">
                   <SheetTitle className="flex items-center gap-2">
-                    <Shield className="w-5 h-5 text-primary" />
+                    <Shield className="h-5 w-5 text-primary" />
                     Admin Panel
                   </SheetTitle>
                 </SheetHeader>
-                <div className="p-4 overflow-y-auto max-h-[calc(100vh-80px)]">
-                  <TabsList className="flex flex-col h-auto bg-transparent border-0 gap-1 p-0 w-full">
-                    {availableNavItems.map((item) => (
-                      <TabsTrigger
-                        key={item.value}
-                        value={item.value}
-                        onClick={() => setIsMenuOpen(false)}
-                        className="justify-start gap-3 px-4 py-3.5 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all flex-shrink-0"
-                      >
-                        <item.icon className="w-5 h-5" />
-                        <span className="font-medium">{item.label}</span>
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
+                <div className="max-h-[calc(100vh-88px)] overflow-y-auto p-4">
+                  <AdminNav
+                    groups={navGroups}
+                    badgeCounts={badgeCounts}
+                    onSelect={() => setIsMenuOpen(false)}
+                  />
                 </div>
               </SheetContent>
             </Sheet>
-          </div >
+          </div>
 
-          {/* Navigation Sidebar */}
-          < div className="hidden md:block md:w-64 lg:w-72 flex-shrink-0" >
-            <GlassPanel className="p-3 sticky top-6 overflow-x-auto no-scrollbar md:overflow-visible">
-              <TabsList className="flex flex-row md:flex-col h-auto bg-transparent border-0 gap-1 p-0 w-max md:w-full">
-                {availableNavItems.map((item) => {
-                  const badgeCount = item.badge ? (badgeCounts as any)?.[item.badge] : 0;
-                  return (
-                    <TabsTrigger
-                      key={item.value}
-                      value={item.value}
-                      className="justify-start gap-3 px-4 py-3 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all flex-shrink-0 relative"
-                    >
-                      <item.icon className="w-5 h-5" />
-                      <span className="font-medium">{item.label}</span>
-                      {badgeCount > 0 && (
-                        <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground animate-in zoom-in">
-                          {badgeCount > 99 ? '99+' : badgeCount}
-                        </span>
-                      )}
-                    </TabsTrigger>
-                  );
-                })}
-              </TabsList>
+          {/* Navigation Sidebar. Scrolls inside its own sticky box: the full list
+              is taller than a laptop viewport, and a sticky panel that overflows
+              simply hides its last rows. */}
+          <div className="hidden flex-shrink-0 md:block md:w-64 lg:w-72">
+            <GlassPanel className="sticky top-6 max-h-[calc(100vh-3rem)] overflow-y-auto rounded-3xl p-3">
+              <AdminNav groups={navGroups} badgeCounts={badgeCounts} />
             </GlassPanel>
-          </div >
+          </div>
 
           <div className="flex-1 min-w-0">
 
@@ -588,32 +506,19 @@ export default function AdminPage() {
               <PendingSuggestions />
             </TabsContent>
 
-            {/* Submissions Tab */}
-            <TabsContent value="submissions">
-              <MarketplaceManager />
-            </TabsContent>
-
-            {/* Languages Tab */}
-            <TabsContent value="languages">
-              <LanguageManager />
-            </TabsContent>
-
             {/* Achievements Tab */}
             <TabsContent value="achievements">
               <AchievementManager />
             </TabsContent>
 
-            {/* Extensions Tab */}
-            <TabsContent value="extensions">
-              <ExtensionManager />
+            {/* Badges Tab */}
+            <TabsContent value="badges">
+              <BadgeManager />
             </TabsContent>
 
             {/* Analytics expansion tabs */}
             <TabsContent value="userstats">
               <UserStatsPanel />
-            </TabsContent>
-            <TabsContent value="ext-analytics">
-              <ExtensionAnalyticsPanel />
             </TabsContent>
             <TabsContent value="streaming">
               <StreamingAnalyticsPanel />
@@ -646,229 +551,10 @@ export default function AdminPage() {
             </TabsContent>
 
             {/* Users Tab */}
-            <TabsContent value="users">
-              <GlassPanel className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="font-display text-xl font-semibold flex items-center gap-2">
-                    <Users className="w-5 h-5 text-primary" />
-                    Manage Users
-                  </h2>
-                  <div className="flex items-center gap-3">
-                    <Button
-                      onClick={() => setShowBroadcastModal(true)}
-                      className="flex items-center gap-2 bg-primary hover:bg-primary/90"
-                    >
-                      <Megaphone className="w-4 h-4" />
-                      Broadcast Message
-                    </Button>
-                    <div className="relative w-64">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search users..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 bg-muted/50"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bulk ban toolbar */}
-                <BulkBanToolbar
-                  selectedUsers={selectedUsers}
-                  onComplete={() => {
-                    setSelectedUsers([]);
-                    queryClient.invalidateQueries({ queryKey: ['admin_users'] });
-                  }}
-                />
-
-                {loadingUsers ? (
-                  <div className="text-center py-12 text-muted-foreground">Loading...</div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-border/50">
-                          <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground w-10">
-                            <input type="checkbox" className="rounded border-white/20"
-                              checked={selectedUsers.length > 0 && selectedUsers.length === filteredUsers?.length}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedUsers((filteredUsers ?? []).map((u: any) => ({ id: u.user_id, display_name: u.display_name || u.username || 'Unknown' })));
-                                } else {
-                                  setSelectedUsers([]);
-                                }
-                              }} />
-                          </th>
-                          <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">User</th>
-                          <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Username</th>
-                          <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
-                          <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Joined</th>
-                          <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredUsers?.map((user: any) => (
-                          <tr key={user.id} className={`border-b border-border/30 hover:bg-muted/30 transition-colors ${user.is_banned ? 'opacity-60' : ''}`}>
-                            <td className="py-3 px-4">
-                              <input type="checkbox" className="rounded border-white/20"
-                                checked={selectedUsers.some(s => s.id === user.user_id)}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setSelectedUsers(prev => [...prev, { id: user.user_id, display_name: user.display_name || user.username || 'Unknown' }]);
-                                  } else {
-                                    setSelectedUsers(prev => prev.filter(s => s.id !== user.user_id));
-                                  }
-                                }} />
-                            </td>
-                            <td className="py-3 px-4">
-                              <div className="flex items-center gap-3">
-                                <Link to={`/@${user.username || user.id}`} className="block group shrink-0">
-                                  {user.avatar_url ? (
-                                    <div className="w-10 h-10 rounded-full border-2 border-primary/20 overflow-hidden transition-transform group-hover:scale-105">
-                                      <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
-                                    </div>
-                                  ) : (
-                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-sm font-bold text-primary-foreground group-hover:scale-105 transition-transform">
-                                      {user.display_name?.[0]?.toUpperCase() || 'U'}
-                                    </div>
-                                  )}
-                                </Link>
-                                <div className="min-w-0">
-                                  <Link to={`/@${user.username || user.id}`} className="font-medium hover:text-primary transition-colors block truncate">
-                                    {user.display_name || 'Unknown'}
-                                  </Link>
-                                  <div className="flex items-center gap-1.5 mt-0.5">
-                                    {user.is_admin && (
-                                      <span className="px-1.5 py-0.5 rounded bg-primary/20 text-primary text-[10px] font-bold uppercase tracking-wider">Admin</span>
-                                    )}
-                                    {user.role === 'moderator' && (
-                                      <span className="px-1.5 py-0.5 rounded bg-secondary/20 text-secondary text-[10px] font-bold uppercase tracking-wider">Moderator</span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="py-3 px-4">
-                              <span className="text-muted-foreground font-mono text-xs">
-                                {user.username ? `@${user.username}` : '-'}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4">
-                              <div className="flex flex-col gap-1">
-                                {user.is_banned ? (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/20 text-destructive text-[10px] font-bold uppercase tracking-wider w-fit">
-                                    <Ban className="w-3 h-3" /> Banned
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-500 text-[10px] font-bold uppercase tracking-wider w-fit">
-                                    <CheckCircle className="w-3 h-3" /> Active
-                                  </span>
-                                )}
-                                {user.last_seen && (
-                                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                                    <div className={`w-1.5 h-1.5 rounded-full ${new Date().getTime() - new Date(user.last_seen).getTime() < 300000
-                                      ? 'bg-emerald-500 animate-pulse'
-                                      : 'bg-muted-foreground/30'
-                                      }`} />
-                                    {new Date().getTime() - new Date(user.last_seen).getTime() < 300000
-                                      ? 'Online'
-                                      : `Last seen ${formatDistanceToNow(new Date(user.last_seen), { addSuffix: true })}`}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="py-3 px-4 text-muted-foreground text-sm">
-                              {formatDate(user.created_at)}
-                            </td>
-                            <td className="py-3 px-4">
-                              <div className="flex items-center justify-end gap-2">
-                                {isAdmin && (
-                                  <>
-                                    {/* Moderator toggle button */}
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => toggleModerator.mutate({ userId: user.user_id, makeModerator: user.role !== 'moderator' })}
-                                      disabled={toggleModerator.isPending || user.is_admin}
-                                      className={user.role === 'moderator' ? "text-primary hover:text-primary" : "text-muted-foreground hover:text-primary"}
-                                      title={user.role === 'moderator' ? "Remove moderator" : "Make moderator"}
-                                    >
-                                      {user.role === 'moderator' ? <ShieldCheck className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
-                                    </Button>
-                                    {/* Admin toggle button */}
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => toggleAdmin.mutate({ userId: user.user_id, makeAdmin: !user.is_admin })}
-                                      disabled={toggleAdmin.isPending}
-                                      className={user.is_admin ? "text-primary hover:text-primary" : "text-muted-foreground hover:text-primary"}
-                                      title={user.is_admin ? "Remove admin" : "Make admin"}
-                                    >
-                                      {user.is_admin ? <ShieldCheck className="w-4 h-4" /> : <ShieldOff className="w-4 h-4" />}
-                                    </Button>
-                                  </>
-                                )}
-                                {isAdmin && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setMessagingUserId(user.user_id)}
-                                    className="text-primary hover:text-primary hover:bg-primary/10"
-                                    title="Send direct message"
-                                  >
-                                    <Send className="w-4 h-4" />
-                                  </Button>
-                                )}
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setViewingActivityUserId(user.user_id)}
-                                  className="text-secondary hover:text-secondary hover:bg-secondary/10"
-                                  title="View Activity"
-                                >
-                                  <Activity className="w-4 h-4" />
-                                </Button>
-                                {user.is_banned ? (
-                                  isAdmin && !user.is_admin && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => unbanUser.mutate(user.user_id)}
-                                      disabled={unbanUser.isPending}
-                                      className="text-emerald-500 hover:text-emerald-500"
-                                      title="Unban user"
-                                    >
-                                      <Unlock className="w-4 h-4" />
-                                    </Button>
-                                  )
-                                ) : (
-                                  (isAdmin || isModerator) && !user.is_admin && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => {
-                                        setUserToBan(user.user_id);
-                                        setShowBanModal(true);
-                                      }}
-                                      disabled={banUser.isPending}
-                                      className="text-destructive hover:text-destructive"
-                                      title="Ban user"
-                                    >
-                                      <Ban className="w-4 h-4" />
-                                    </Button>
-                                  )
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </GlassPanel>
-            </TabsContent>
+            <UserManagementTab
+              onMessageUser={setMessagingUserId}
+              onViewActivity={setViewingActivityUserId}
+            />
 
             {/* Comments Tab */}
             <TabsContent value="comments">
@@ -880,19 +566,22 @@ export default function AdminPage() {
 
                 {loadingComments ? (
                   <div className="text-center py-12 text-muted-foreground">Loading...</div>
-                ) : comments && comments.length > 0 ? (
+                ) : recentComments && recentComments.length > 0 ? (
                   <div className="space-y-4">
-                    {comments.map((comment: any) => (
+                    {recentComments.map((comment) => (
                       <div
                         key={comment.id}
                         className="p-4 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors"
                       >
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="font-medium">
-                                {comment.profile?.display_name || 'Unknown'}
-                              </span>
+                            <div className="flex items-center gap-2 mb-2 flex-wrap">
+                              <Link
+                                to={`/admin/user/${comment.user_id}`}
+                                className="font-medium hover:text-primary transition-colors"
+                              >
+                                {comment.author?.display_name || comment.author?.username || 'Unknown'}
+                              </Link>
                               {comment.is_spoiler && (
                                 <span className="px-2 py-0.5 rounded-full bg-orange/20 text-orange text-xs">
                                   Spoiler
@@ -902,10 +591,14 @@ export default function AdminPage() {
                                 {formatDate(comment.created_at)}
                               </span>
                             </div>
-                            <p className="text-sm text-foreground/80 mb-2">{comment.content}</p>
-                            <p className="text-xs text-muted-foreground">
-                              Anime: {comment.anime_id}
-                              {comment.episode_id && ` • Episode`}
+                            <CommentContent content={comment.content} clamp className="mb-2" />
+                            <CommentAttachments attachments={comment.attachments} className="mb-2" />
+                            <CommentEmbeds embeds={comment.embeds} poll={comment.poll} />
+                            <p className="text-xs text-muted-foreground mt-2">
+                              <Link to={comment.target} className="hover:text-primary transition-colors">
+                                {comment.title}
+                              </Link>
+                              {comment.hasEpisode && ' • Episode'}
                             </p>
                           </div>
                           <Button
@@ -936,11 +629,12 @@ export default function AdminPage() {
               </GlassPanel>
             </TabsContent>
 
-            {/* Custom Sources Tab */}
-            <TabsContent value="custom-sources">
-              <GlassPanel className="p-6">
-                <CustomSourceManager />
-              </GlassPanel>
+            {/* News Tab */}
+            <TabsContent value="news">
+              <div className="space-y-6">
+                <NewsComposer />
+                <NewsManager />
+              </div>
             </TabsContent>
 
             {/* Notifications Tab */}
@@ -977,31 +671,61 @@ export default function AdminPage() {
                           <label className="text-sm font-medium mb-1.5 block">Target Type</label>
                           <select
                             className="w-full bg-muted/30 border border-input rounded-md px-3 py-2 text-sm"
-                            onChange={(e) => setSelectedUserId(e.target.value === 'all' ? null : 'search')}
+                            value={notifyTarget}
+                            onChange={(e) => setNotifyTarget(e.target.value === 'user' ? 'user' : 'all')}
                           >
                             <option value="all">Broadcast (All Users)</option>
-                            <option value="individual">Specific User</option>
+                            <option value="user">Specific User</option>
                           </select>
                         </div>
-                        {selectedUserId === 'search' && (
+                        {notifyTarget === 'user' && (
                           <div>
-                            <label className="text-sm font-medium mb-1.5 block">User ID / Username</label>
-                            <Input placeholder="Enter ID..." className="bg-muted/30" />
+                            <label className="text-sm font-medium mb-1.5 block">Username or user ID</label>
+                            <Input
+                              placeholder="e.g. snozxyx"
+                              value={notifyRecipient}
+                              onChange={(e) => setNotifyRecipient(e.target.value)}
+                              className="bg-muted/30"
+                            />
                           </div>
                         )}
                       </div>
 
                       <Button
-                        onClick={() => sendMessage.mutate({
-                          title: messageTitle,
-                          content: messageContent,
-                          recipientId: selectedUserId === 'search' ? null : null // Needs proper ID lookup
-                        })}
-                        disabled={sendMessage.isPending || !messageTitle || !messageContent}
+                        onClick={async () => {
+                          if (notifyTarget === 'all') {
+                            sendMessage.mutate({
+                              title: messageTitle,
+                              content: messageContent,
+                              recipientId: null,
+                            });
+                            return;
+                          }
+                          const recipientId = await resolveRecipientId(notifyRecipient);
+                          if (!recipientId) {
+                            toast.error('No user matches that username or id');
+                            return;
+                          }
+                          sendMessage.mutate({
+                            title: messageTitle,
+                            content: messageContent,
+                            recipientId,
+                          });
+                        }}
+                        disabled={
+                          sendMessage.isPending ||
+                          !messageTitle ||
+                          !messageContent ||
+                          (notifyTarget === 'user' && !notifyRecipient.trim())
+                        }
                         className="w-full gap-2"
                       >
                         <Send className="w-4 h-4" />
-                        {sendMessage.isPending ? 'Sending...' : 'Send Broadcast'}
+                        {sendMessage.isPending
+                          ? 'Sending...'
+                          : notifyTarget === 'user'
+                            ? 'Send to user'
+                            : 'Send broadcast'}
                       </Button>
                     </div>
                   </GlassPanel>
@@ -1024,8 +748,8 @@ export default function AdminPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => {
-                                  if (confirm('Delete this notification?')) deleteMessage.mutate(msg.id);
+                                onClick={async () => {
+                                  if (await confirm({ title: 'Delete this notification?', destructive: true })) deleteMessage.mutate(msg.id);
                                 }}
                                 className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                               >
@@ -1046,13 +770,6 @@ export default function AdminPage() {
             <TabsContent value="popups">
               <GlassPanel className="p-6">
                 <PopupBuilder />
-              </GlassPanel>
-            </TabsContent>
-
-            {/* Video Servers Tab */}
-            <TabsContent value="servers">
-              <GlassPanel className="p-6">
-                <VideoServerManager />
               </GlassPanel>
             </TabsContent>
 
@@ -1150,43 +867,6 @@ export default function AdminPage() {
             </TabsContent>
           </div>
         </Tabs >
-
-        {/* Ban Modal */}
-        {
-          showBanModal && (
-            <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <GlassPanel className="p-6 max-w-md w-full">
-                <h3 className="font-display text-xl font-bold mb-4 flex items-center gap-2">
-                  <Ban className="w-5 h-5 text-destructive" />
-                  Ban User
-                </h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Reason for ban</label>
-                    <Textarea
-                      value={banReason}
-                      onChange={(e) => setBanReason(e.target.value)}
-                      placeholder="Enter reason for banning this user..."
-                      className="bg-muted/50"
-                    />
-                  </div>
-                  <div className="flex gap-3 justify-end">
-                    <Button variant="ghost" onClick={() => { setShowBanModal(false); setUserToBan(null); }}>
-                      Cancel
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      onClick={() => userToBan && banUser.mutate({ userId: userToBan, reason: banReason })}
-                      disabled={banUser.isPending}
-                    >
-                      {banUser.isPending ? 'Banning...' : 'Ban User'}
-                    </Button>
-                  </div>
-                </div>
-              </GlassPanel>
-            </div>
-          )
-        }
       </main >
 
       {/* User Activity Sheet */}
@@ -1254,93 +934,6 @@ export default function AdminPage() {
           </div>
         </SheetContent>
       </Sheet >
-
-      {/* Broadcast Modal */}
-      {showBroadcastModal && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <GlassPanel className="p-6 max-w-md w-full">
-            <h3 className="font-display text-xl font-bold mb-4 flex items-center gap-2">
-              <Megaphone className="w-5 h-5 text-primary" />
-              Broadcast Message to All Users
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Title</label>
-                <Input
-                  placeholder="Enter broadcast title..."
-                  value={broadcastTitle}
-                  onChange={(e) => setBroadcastTitle(e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Message</label>
-                <Textarea
-                  placeholder="Enter your message to all users..."
-                  value={broadcastMessage}
-                  onChange={(e) => setBroadcastMessage(e.target.value)}
-                  className="mt-1 min-h-[120px]"
-                />
-              </div>
-              <div className="flex gap-3 justify-end">
-                <Button variant="ghost" onClick={() => {
-                  setShowBroadcastModal(false);
-                  setBroadcastTitle('');
-                  setBroadcastMessage('');
-                }}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={async () => {
-                    try {
-                      // Get all users for notification
-                      const { data: users } = await supabase
-                        .from('profiles')
-                        .select('user_id')
-                        .neq('is_banned', true);
-
-                      if (!users || users.length === 0) {
-                        toast.error('No users found to notify');
-                        return;
-                      }
-
-                      // Create notifications for all users
-                      const notifications = users.map(user => ({
-                        user_id: user.user_id,
-                        title: broadcastTitle,
-                        body: broadcastMessage,
-                        data: { type: 'broadcast', sent_by: profile?.id || 'admin' },
-                        read: false,
-                        created_at: new Date().toISOString()
-                      }));
-
-                      const { error } = await supabase
-                        .from('notifications')
-                        .insert(notifications);
-
-                      if (error) throw error;
-
-                      // Invalidate all notification queries to refresh for all users
-                      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-
-                      toast.success(`Broadcast notification sent to ${users.length} users!`);
-                      setShowBroadcastModal(false);
-                      setBroadcastTitle('');
-                      setBroadcastMessage('');
-                    } catch (error) {
-                      console.error('Error sending broadcast notification:', error);
-                      toast.error('Failed to send broadcast notification');
-                    }
-                  }}
-                  disabled={!broadcastTitle || !broadcastMessage}
-                >
-                  Send Broadcast Notification
-                </Button>
-              </div>
-            </div>
-          </GlassPanel>
-        </div>
-      )}
     </div >
   );
 }

@@ -1,6 +1,6 @@
 import { Play, Flame } from "lucide-react";
 import { TrendingAnime } from "@/lib/api";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
 import Hls from "hls.js";
 import { buildPreferredAnimeRouteId } from "@/lib/animeIdMapping";
@@ -270,9 +270,9 @@ export function TrendingGrid({ animes }: TrendingGridProps) {
           <Flame className="w-5 h-5 text-orange" />
           Trending Now
         </h3>
-        <a href="/collections" className="text-sm text-muted-foreground hover:text-foreground transition-colors border-b border-transparent hover:border-foreground pb-0.5">
-          View All Collection
-        </a>
+        <Link to="/trending" className="text-sm text-muted-foreground hover:text-foreground transition-colors border-b border-transparent hover:border-foreground pb-0.5">
+          View All
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 grid-rows-2 gap-4 h-auto md:h-[600px]">

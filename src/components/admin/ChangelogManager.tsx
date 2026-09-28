@@ -14,8 +14,10 @@ import {
   History, Plus, X, Trash2, Loader2, Edit2, Eye, EyeOff, Star
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 export function ChangelogManager() {
+  const confirm = useConfirm();
   const [showForm, setShowForm] = useState(false);
   const [editingChangelog, setEditingChangelog] = useState<Changelog | null>(null);
   const [formData, setFormData] = useState({
@@ -93,7 +95,7 @@ export function ChangelogManager() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this changelog entry?')) return;
+    if (!(await confirm({ title: 'Are you sure you want to delete this changelog entry?', destructive: true }))) return;
     
     try {
       await deleteChangelog.mutateAsync(id);

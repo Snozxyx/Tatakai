@@ -23,12 +23,13 @@ const { enforcePayloadLimit } = require('../runtime/security/payload-guard.cjs')
 const { withCallTimeout, CALL_TIMEOUT_MS } = require('../runtime/security/timeout-guard.cjs');
 const { LocalProxyServer } = require('../runtime/proxy/local-proxy-server.cjs');
 const { WarpTunnel } = require('../runtime/warp/warp-tunnel.cjs');
-const { parseKaiFile, installKaiExtension } = require('../runtime/extension/kai-format.cjs');
+const { parseKaiFile, installKaiExtension, isValidExtensionId } = require('../runtime/extension/kai-format.cjs');
 const { createExtensionApiHost } = require('../runtime/extension-api-host/supervisor.cjs');
+const { createShareTunnel } = require('../runtime/share-tunnel/share-tunnel.cjs');
 
 // ── Tatakai API base URL ──────────────────────────────────────────────────────
-// Resolves to http://localhost:4001/api/v3 in dev, https://api.tatakai.me/api/v3 in prod.
-const TATAKAI_API_BASE = (process.env.VITE_BACKEND_ORIGIN || 'http://localhost:4001') + '/api/v3';
+// Resolves to https://api.tatakai.me/api/v3 (VITE_BACKEND_ORIGIN); no localhost fallback.
+const TATAKAI_API_BASE = (process.env.VITE_BACKEND_ORIGIN || 'https://api.tatakai.me') + '/api/v3';
 
 // ── Tatakai Extension Marketplace Public Key (Ed25519) ────────────────────────
 // This is the public key used to verify signatures on curated extensions.
@@ -101,6 +102,10 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
     // declares `apiServer` (and is `sideloaded`). Started by main.cjs after
     // extensions auto-load; reuses the same registry + localProxy singletons.
     const extensionApiHost = createExtensionApiHost();
+    // Host-hosted watch-party tunnel (Cloudflare quick tunnel over the loopback
+    // proxy). Started on demand via the `share:*` IPC handlers; stopped by
+    // main.cjs on quit. Reuses the same localProxy that serves /stream tokens.
+    const shareTunnel = createShareTunnel({ logger, app, path, fs });
     const warp = new WarpTunnel({ app, fs, path, logger });
     const auditPath = path.join(app.getPath('userData'), 'extension-audit.log');
     const appendAudit = (event, payload) => {
@@ -151,6 +156,14 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
                 type: manifest.type ?? null,
                 capabilities: Array.isArray(manifest.capabilities) ? manifest.capabilities : [],
                 apiServer: manifest.apiServer && typeof manifest.apiServer === 'object' ? manifest.apiServer : null,
+                customSources: Array.isArray(manifest.customSources) ? manifest.customSources : [],
+                // Phase 3: renderer-side bootstrap needs the declarative contributions,
+                // the trust flag (renderer code loads only for trusted extensions), and
+                // the ordering hint.
+                contributes: manifest.contributes && typeof manifest.contributes === 'object' ? manifest.contributes : null,
+                sideloaded: !!manifest.sideloaded,
+                signature: manifest.signature ?? null,
+                priority: typeof manifest.priority === 'number' ? manifest.priority : 100,
             };
         });
     });
@@ -170,6 +183,185 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
         };
     });
 
+    // ── share:* — host-hosted watch-party tunnel ──────────────────────────────
+    //
+    // WS2: the desktop host resolves a stream locally (toko + localProxy), then
+    // exposes the loopback proxy to the internet via a Cloudflare quick tunnel so
+    // every participant plays the host's single public URL, synced to the host
+    // clock. Hosting requires the bundled/PATH `cloudflared`; if it's missing the
+    // renderer falls back to a host-pasted manual URL.
+
+    // Start the tunnel targeting the loopback proxy. Returns { publicUrl } or
+    // { error } (e.g. cloudflared not found → renderer degrades to manual URL).
+    ipcMain.handle('share:start-tunnel', async () => {
+        try {
+            const proxyBase = await localProxy.ensureStarted();
+            const { publicUrl } = await shareTunnel.start(proxyBase);
+            return { publicUrl };
+        } catch (err) {
+            logger.warn(`[ShareTunnel] start failed: ${err?.message || err}`);
+            return { error: String(err?.message || err), status: shareTunnel.getStatus() };
+        }
+    });
+
+    ipcMain.handle('share:stop-tunnel', async () => {
+        try {
+            await shareTunnel.stop();
+            localProxy.clearShareSecret();
+            return { ok: true };
+        } catch (err) {
+            return { ok: false, error: String(err?.message || err) };
+        }
+    });
+
+    ipcMain.handle('share:get-status', async () => shareTunnel.getStatus());
+
+    // Publish a resolved stream to the party: register it as a persistent share
+    // source on the proxy, ensure the tunnel is up, and return the fully-formed
+    // public URLs (with the per-session share secret). The renderer writes these
+    // to the room row (share_stream_url / share_subtitle_url / share_active).
+    ipcMain.handle('share:publish-source', async (_event, payload) => {
+        try {
+            const streamUrl = String(payload?.streamUrl || '').trim();
+            if (!streamUrl) return { error: 'streamUrl is required' };
+            const headers = (payload && typeof payload.headers === 'object' && payload.headers) || {};
+            const subtitleUrl = String(payload?.subtitleUrl || '').trim();
+            const streamType = payload?.streamType
+                || (/\.m3u8(\?|$)/i.test(streamUrl) ? 'hls' : 'direct');
+
+            await localProxy.ensureStarted();
+            const proxyBase = localProxy.baseUrl();
+            const { publicUrl } = await shareTunnel.start(proxyBase);
+            const secret = localProxy.getShareSecret();
+            const q = `?s=${encodeURIComponent(secret)}`;
+
+            const { path: streamPath } = localProxy.registerShareSource({ url: streamUrl, headers });
+            const result = {
+                publicUrl,
+                shareStreamUrl: `${publicUrl}${streamPath}${q}`,
+                shareStreamType: streamType,
+                shareSubtitleUrl: null,
+            };
+
+            if (subtitleUrl) {
+                const { path: subPath } = localProxy.registerShareSource({ url: subtitleUrl, headers });
+                result.shareSubtitleUrl = `${publicUrl}${subPath}${q}`;
+            }
+
+            return result;
+        } catch (err) {
+            logger.warn(`[ShareTunnel] publish failed: ${err?.message || err}`);
+            return { error: String(err?.message || err), status: shareTunnel.getStatus() };
+        }
+    });
+
+    // Publish a LOCAL video file (device pick or offline-library episode) to the
+    // party. Serves the file's bytes off disk via the proxy (Range-supported),
+    // tunnels it, and returns the same public share-URL shape as
+    // share:publish-source. streamType is 'direct' (a plain file, never HLS).
+    // Security: the served path is fixed at registration — never derived from a
+    // request — so there is no path-traversal vector; non-loopback (tunnel)
+    // reads still require the per-session ?s=<secret> gate. The file path never
+    // leaves the host: participants only ever see the tunnel URL + token.
+    ipcMain.handle('share:publish-local-file', async (_event, payload) => {
+        try {
+            const filePath = String(payload?.path || '').trim();
+            if (!filePath) return { error: 'path is required' };
+            if (!fs.existsSync(filePath)) return { error: 'file not found' };
+            const stat = fs.statSync(filePath);
+            if (!stat.isFile()) return { error: 'not a file' };
+
+            await localProxy.ensureStarted();
+            const proxyBase = localProxy.baseUrl();
+            const { publicUrl } = await shareTunnel.start(proxyBase);
+            const secret = localProxy.getShareSecret();
+            const q = `?s=${encodeURIComponent(secret)}`;
+
+            const { path: streamPath } = localProxy.registerLocalFile({ path: filePath });
+            return {
+                publicUrl,
+                shareStreamUrl: `${publicUrl}${streamPath}${q}`,
+                // Loopback URL the host plays directly — same registered token, so
+                // identical bytes to what participants get over the tunnel, but no
+                // Cloudflare round-trip for the host's own playback. Loopback reads
+                // skip the ?s= gate, so no secret is appended here.
+                localStreamUrl: `${proxyBase}${streamPath}`,
+                shareStreamType: 'direct',
+                shareSubtitleUrl: null,
+                fileName: path.basename(filePath),
+            };
+        } catch (err) {
+            logger.warn(`[ShareTunnel] publish local file failed: ${err?.message || err}`);
+            return { error: String(err?.message || err), status: shareTunnel.getStatus() };
+        }
+    });
+
+    const extHostConfigPath = path.join(app.getPath('userData'), 'extension-host-config.json');
+    const readExtHostConfig = () => {
+        try {
+            if (fs.existsSync(extHostConfigPath)) {
+                return JSON.parse(fs.readFileSync(extHostConfigPath, 'utf8'));
+            }
+        } catch (_) { }
+        return {};
+    };
+    const writeExtHostConfig = (patch) => {
+        try {
+            const current = readExtHostConfig();
+            fs.writeFileSync(extHostConfigPath, JSON.stringify({ ...current, ...patch }, null, 2), 'utf8');
+        } catch (_) { }
+    };
+
+    ipcMain.handle('runtime:get-extension-api-port', async () => {
+        const saved = readExtHostConfig();
+        return {
+            port: extensionApiHost.getPort(),
+            configuredPort: saved.preferredPort || extensionApiHost.getConfiguredPort?.() || 8099,
+            defaultPort: 8099,
+            baseUrl: extensionApiHost.getBaseUrl(),
+        };
+    });
+
+    ipcMain.handle('runtime:set-extension-api-port', async (_event, newPort) => {
+        try {
+            const portNum = Number(newPort);
+            if (!portNum || portNum < 1024 || portNum > 65535) {
+                return { success: false, error: 'Port must be between 1024 and 65535' };
+            }
+            writeExtHostConfig({ preferredPort: portNum });
+            const result = await extensionApiHost.setPort(portNum);
+            return {
+                success: true,
+                port: result.port,
+                baseUrl: result.baseUrl,
+            };
+        } catch (err) {
+            logger.error('[ExtHost] Failed to change port:', err.message);
+            return { success: false, error: err.message };
+        }
+    });
+
+    // ── runtime:register-preview-proxy ────────────────────────────────────────
+    // Register a hover-preview stream with the in-app loopback proxy and hand
+    // back a 127.0.0.1 URL. The renderer resolves the preview source (its raw
+    // upstream URL + the provider's Referer/headers) and calls this so playback
+    // goes through the local proxy first — no cloud round-trip — replaying the
+    // headers the CDN needs. The renderer keeps the cloud-proxied URL as the
+    // fallback it switches to if this local URL fails.
+    ipcMain.handle('runtime:register-preview-proxy', async (_event, payload) => {
+        try {
+            const url = String(payload?.url || '').trim();
+            if (!/^https?:\/\//i.test(url)) return { success: false, error: 'invalid_url' };
+            const headers = payload?.headers && typeof payload.headers === 'object' ? payload.headers : {};
+            await localProxy.ensureStarted();
+            const proxied = localProxy.registerSource({ url, headers });
+            return { success: true, url: proxied };
+        } catch (err) {
+            logger.warn(`[Runtime] register-preview-proxy failed: ${err.message}`);
+            return { success: false, error: err.message };
+        }
+    });
+
     // ── runtime:resolve-sources ───────────────────────────────────────────────
     ipcMain.handle('runtime:resolve-sources', async (_event, payload) => {
         try {
@@ -183,14 +375,17 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
                 ? preferredExtensions.filter((id) => loaded.includes(id))
                 : loaded.slice(); // copy so we can mutate without affecting registry state
 
-            // Requirements: 13.1 — Toko-first ordering
-            // Splice tatakai.extension.toko to the front when present but not already first.
-            const TOKO_ID_RS = 'tatakai.extension.toko';
-            const tokoIdx = targetExtensionIds.indexOf(TOKO_ID_RS);
-            if (tokoIdx > 0) {
-                targetExtensionIds.splice(tokoIdx, 1);
-                targetExtensionIds.unshift(TOKO_ID_RS);
-            }
+            // Requirements: 13.1 — priority-ordered resolution (lower = earlier).
+            // Replaces the former hardcoded Toko-first splice: extensions declare
+            // `priority` in their manifest (default 100); the primary extension ships
+            // `priority: 0` to lead. Stable tiebreak preserves the registry order.
+            const origOrder = new Map(targetExtensionIds.map((id, i) => [id, i]));
+            targetExtensionIds.sort((a, b) => {
+                const pa = Number(registry.lookup(a)?.manifest?.priority ?? 100);
+                const pb = Number(registry.lookup(b)?.manifest?.priority ?? 100);
+                if (pa !== pb) return pa - pb;
+                return (origOrder.get(a) ?? 0) - (origOrder.get(b) ?? 0);
+            });
 
             if (targetExtensionIds.length === 0) {
                 appendAudit('runtime-source-fallback', { reason: 'no-loaded-extensions' });
@@ -245,9 +440,17 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
                 for (const src of rawResult) {
                     if (!src || typeof src !== 'object' || !src.url) continue;
                     const directUrl = String(src.url);
-                    const needsProxy = /^https?:\/\//i.test(directUrl) && src.headers && typeof src.headers === 'object';
+                    const isHttp = /^https?:\/\//i.test(directUrl);
+                    const hasCustomHeaders = src.headers && typeof src.headers === 'object';
+                    // WARP: when the tunnel is on and its policy routes this host,
+                    // force the source through the local proxy so the fetch egresses
+                    // via the proxy path (Cloudflare-bypass) instead of a direct
+                    // renderer request. This is what gives the WARP toggle a real,
+                    // observable effect for extension traffic.
+                    const warpRoute = isHttp && warp.routesExtensions(directUrl);
+                    const needsProxy = isHttp && (hasCustomHeaders || warpRoute);
                     const proxyUrl = needsProxy
-                        ? localProxy.registerSource({ url: directUrl, headers: src.headers })
+                        ? localProxy.registerSource({ url: directUrl, headers: src.headers || {} })
                         : directUrl;
                     merged.push({
                         url: proxyUrl,
@@ -424,69 +627,178 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
 
     // ── extension:invoke ──────────────────────────────────────────────────────
     ipcMain.handle('extension:invoke', async (_event, { extensionId, method, args }) => {
-        // ── Toko-specific IPC methods ─────────────────────────────────────────
+        // ── Capability-routed IPC methods (generic across extensions) ────────
         // Requirements: 12.1, 12.2, 12.3, 12.4, 12.5
-        const TOKO_ID = 'tatakai.extension.toko';
-        // The payload for Toko-specific methods is the first element of args
-        // (or args itself when it is not an array, mirroring caller convention).
+        // These are NOT tied to a specific extension id. Any loaded, non-kill-
+        // switched extension whose manifest advertises the matching capability
+        // answers here; we try each capable extension (priority-ordered) and use
+        // the first non-null result. This IPC path is the fallback for when the
+        // in-app extension-API host (the primary HTTP transport) has not come up.
+        //
+        // The payload for these methods is the first element of args (or args
+        // itself when it is not an array, mirroring caller convention).
         const tokoPayload = Array.isArray(args) ? args[0] : args;
 
-        if (method === 'getPreviewSource') {
-            try {
-                const tokoEntry = registry.lookup(TOKO_ID);
-                if (!tokoEntry) {
-                    return { success: false, error: 'toko_not_loaded' };
-                }
-                if (!fs.existsSync(tokoEntry.bundlePath)) {
-                    return { success: false, error: 'toko_not_loaded' };
-                }
-                await ensureExtensionFetchProxy();
-                const tokoCode = fs.readFileSync(tokoEntry.bundlePath, 'utf8');
-                await workerPool.getOrSpawn(TOKO_ID, tokoCode, tokoEntry.manifest);
-                const result = await workerPool.invoke(TOKO_ID, 'getPreviewSource', [tokoPayload]);
-                return { success: true, data: result };
-            } catch (err) {
-                logger.error('[Extension] getPreviewSource error:', err.message);
-                return { success: false, error: err.message };
+        const listCapabilityEntries = (cap) => {
+            const out = [];
+            for (const id of registry.listLoaded()) {
+                if (registry.isKillSwitched(id)) continue;
+                const entry = registry.lookup(id);
+                const caps = Array.isArray(entry?.manifest?.capabilities) ? entry.manifest.capabilities : [];
+                if (!caps.includes(cap)) continue;
+                if (!entry.bundlePath || !fs.existsSync(entry.bundlePath)) continue;
+                out.push({ id, entry });
             }
+            // Honor manifest priority so the primary extension answers first.
+            out.sort((a, b) =>
+                Number(a.entry?.manifest?.priority ?? 100) - Number(b.entry?.manifest?.priority ?? 100));
+            return out;
+        };
+
+        const invokeFirstCapable = async (cap, bundleMethod, payload) => {
+            const capable = listCapabilityEntries(cap);
+            if (capable.length === 0) return { success: false, error: 'no_capable_extension' };
+            await ensureExtensionFetchProxy();
+            let lastError = null;
+            for (const { id, entry } of capable) {
+                try {
+                    const code = fs.readFileSync(entry.bundlePath, 'utf8');
+                    await workerPool.getOrSpawn(id, code, entry.manifest);
+                    const result = await workerPool.invoke(id, bundleMethod, [payload]);
+                    if (result != null) return { success: true, data: result };
+                } catch (err) {
+                    lastError = err.message;
+                    logger.warn(`[Extension] ${bundleMethod} failed for ${id}: ${err.message}`);
+                }
+            }
+            return { success: false, error: lastError || 'no_result' };
+        };
+
+        if (method === 'getPreviewSource') {
+            return invokeFirstCapable('preview', 'getPreviewSource', tokoPayload);
         }
 
         if (method === 'getWebsiteEpisodeIndex') {
+            return invokeFirstCapable('websiteIndex', 'getWebsiteEpisodeIndex', tokoPayload);
+        }
+
+        // ── Manga IPC methods (generic across extensions) ─────────────────────
+        // Manga is NOT Toko-specific: any loaded extension whose manifest
+        // advertises the `manga`/`chapters` capability answers here. This IPC
+        // path is the fallback for when the in-app extension-API host (the
+        // primary HTTP transport) has not come up; it fans out across every
+        // manga-capable extension so 4-5 can contribute at once.
+        const listMangaExtensionEntries = () => {
+            const out = [];
+            for (const id of registry.listLoaded()) {
+                if (registry.isKillSwitched(id)) continue;
+                const entry = registry.lookup(id);
+                const caps = Array.isArray(entry?.manifest?.capabilities) ? entry.manifest.capabilities : [];
+                if (!caps.includes('manga') && !caps.includes('chapters')) continue;
+                if (!entry.bundlePath || !fs.existsSync(entry.bundlePath)) continue;
+                out.push({ id, entry });
+            }
+            return out;
+        };
+
+        if (method === 'getMangaChapters') {
             try {
-                const tokoEntry = registry.lookup(TOKO_ID);
-                if (!tokoEntry) {
-                    return { success: false, error: 'toko_not_loaded' };
-                }
-                if (!fs.existsSync(tokoEntry.bundlePath)) {
-                    return { success: false, error: 'toko_not_loaded' };
-                }
+                const mangaExts = listMangaExtensionEntries();
+                if (mangaExts.length === 0) return { chapters: [] };
                 await ensureExtensionFetchProxy();
-                const tokoCode = fs.readFileSync(tokoEntry.bundlePath, 'utf8');
-                await workerPool.getOrSpawn(TOKO_ID, tokoCode, tokoEntry.manifest);
-                const result = await workerPool.invoke(TOKO_ID, 'getWebsiteEpisodeIndex', [tokoPayload]);
-                return { success: true, data: result };
+
+                // The bundle returns nested MangaChapterEntry[] ({ number, title,
+                // volume, sources: [{ provider, chapterKey, ... }] }). The app
+                // runtime reads a FLAT `result.chapters` array (one row per
+                // source) and re-groups by number. Flatten here so the layers
+                // agree, carrying the real sub-provider name on each row.
+                const chapters = [];
+                const seenKeys = new Set();
+                for (const { id, entry } of mangaExts) {
+                    try {
+                        const code = fs.readFileSync(entry.bundlePath, 'utf8');
+                        await workerPool.getOrSpawn(id, code, entry.manifest);
+                        const result = await workerPool.invoke(id, 'getMangaChapters', [tokoPayload]);
+                        const entries = Array.isArray(result) ? result : (result?.chapters || result?.data || []);
+                        for (const ch of Array.isArray(entries) ? entries : []) {
+                            const sources = Array.isArray(ch?.sources) ? ch.sources : [];
+                            for (const src of sources) {
+                                if (!src?.chapterKey || seenKeys.has(src.chapterKey)) continue;
+                                seenKeys.add(src.chapterKey);
+                                chapters.push({
+                                    number: ch.number,
+                                    title: ch.title ?? null,
+                                    volume: ch.volume ?? null,
+                                    provider: src.provider ?? null,
+                                    chapterKey: src.chapterKey,
+                                    providerChapterId: src.providerChapterId ?? src.chapterKey,
+                                    language: src.language ?? null,
+                                    scanlator: src.scanlator ?? null,
+                                    releaseDate: src.releaseDate ?? null,
+                                });
+                            }
+                        }
+                    } catch (extErr) {
+                        logger.warn(`[Extension] getMangaChapters failed for ${id}:`, extErr.message);
+                    }
+                }
+                return { chapters };
             } catch (err) {
-                logger.error('[Extension] getWebsiteEpisodeIndex error:', err.message);
+                logger.error('[Extension] getMangaChapters error:', err.message);
                 return { success: false, error: err.message };
             }
         }
 
-        if (method === 'getMangaChapters') {
+        if (method === 'getMangaPages') {
             try {
-                const tokoEntry = registry.lookup(TOKO_ID);
-                if (!tokoEntry) {
-                    return { success: false, error: 'toko_not_loaded' };
-                }
-                if (!fs.existsSync(tokoEntry.bundlePath)) {
-                    return { success: false, error: 'toko_not_loaded' };
-                }
+                const mangaExts = listMangaExtensionEntries();
+                if (mangaExts.length === 0) return { pages: [] };
                 await ensureExtensionFetchProxy();
-                const tokoCode = fs.readFileSync(tokoEntry.bundlePath, 'utf8');
-                await workerPool.getOrSpawn(TOKO_ID, tokoCode, tokoEntry.manifest);
-                const result = await workerPool.invoke(TOKO_ID, 'getMangaChapters', [tokoPayload]);
-                return { success: true, data: result };
+
+                // A chapter is owned by exactly one extension; a non-owning one
+                // rejects the foreign chapterKey. Try each until one yields pages.
+                for (const { id, entry } of mangaExts) {
+                    let rawPages = [];
+                    try {
+                        const code = fs.readFileSync(entry.bundlePath, 'utf8');
+                        await workerPool.getOrSpawn(id, code, entry.manifest);
+                        const result = await workerPool.invoke(id, 'getMangaPages', [tokoPayload]);
+                        rawPages = Array.isArray(result) ? result : (result?.pages || []);
+                    } catch (extErr) {
+                        logger.warn(`[Extension] getMangaPages failed for ${id}:`, extErr.message);
+                        continue;
+                    }
+                    if (!Array.isArray(rawPages) || rawPages.length === 0) continue;
+
+                    // For Referer-locked CDNs the provider attaches `headers`;
+                    // register those with the local proxy so the reader loads a
+                    // hot-link-safe URL. Return the flat `{ pages }` shape.
+                    const pages = [];
+                    for (let idx = 0; idx < rawPages.length; idx++) {
+                        const p = rawPages[idx] || {};
+                        const imageUrl = String(p.imageUrl || '');
+                        if (!imageUrl) continue;
+                        let proxiedImageUrl = null;
+                        if (p.headers && typeof p.headers === 'object' && Object.keys(p.headers).length > 0) {
+                            try {
+                                proxiedImageUrl = localProxy.registerSource({ url: imageUrl, headers: p.headers });
+                            } catch (proxyErr) {
+                                logger.warn('[Extension] getMangaPages proxy register failed:', proxyErr.message);
+                            }
+                        }
+                        pages.push({
+                            pageNumber: Number.isFinite(p.pageNumber) ? p.pageNumber : idx + 1,
+                            imageUrl,
+                            proxiedImageUrl,
+                            width: p.width ?? null,
+                            height: p.height ?? null,
+                        });
+                    }
+                    if (pages.length > 0) return { pages };
+                }
+                return { pages: [] };
             } catch (err) {
-                logger.error('[Extension] getMangaChapters error:', err.message);
+                logger.error('[Extension] getMangaPages error:', err.message);
                 return { success: false, error: err.message };
             }
         }
@@ -557,6 +869,9 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
             const missing = required.filter((k) => manifest?.[k] == null || manifest?.[k] === '');
             if (missing.length > 0) return { success: false, error: `missing_fields:${missing.join(',')}` };
             const extensionId = String(manifest.id);
+            if (!isValidExtensionId(extensionId)) {
+                return { success: false, error: 'invalid_extension_id' };
+            }
             const extensionsDir = path.join(app.getPath('userData'), 'extensions', extensionId);
             if (!fs.existsSync(extensionsDir)) fs.mkdirSync(extensionsDir, { recursive: true });
             const normalizedManifest = { ...manifest, sideloaded: true };
@@ -584,6 +899,7 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
     });
 
     ipcMain.handle('network:set-warp-mode', async (_event, mode) => warp.setMode(mode));
+    ipcMain.handle('network:set-warp-routing', async (_event, flags) => warp.setRouting(flags || {}));
     ipcMain.handle('network:warp-route-decision', async (_event, url, context) => ({
         shouldRoute: warp.shouldRoute(url, context),
     }));
@@ -841,6 +1157,7 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
     // ── extension:get-kai-meta ────────────────────────────────────────────────    // Returns manifest + readme + icon for an already-installed extension.
     ipcMain.handle('extension:get-kai-meta', async (_event, extensionId) => {
         try {
+            if (!isValidExtensionId(extensionId)) return { success: false, error: 'invalid_extension_id' };
             const extDir = path.join(app.getPath('userData'), 'extensions', extensionId);
             if (!fs.existsSync(extDir)) return { success: false, error: 'not_installed' };
 
@@ -927,6 +1244,60 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
             return { success: true, source, truncated: false, totalBytes };
         } catch (err) {
             logger.error(`[Extension] get-source-code error (${extensionId}):`, err.message);
+            return { success: false, error: err.message };
+        }
+    });
+
+    // ── runtime:get-renderer-bundle ───────────────────────────────────────────
+    //
+    // Returns the full renderer ESM bundle for a TRUSTED extension so the renderer
+    // loader (src/core/extensions/rendererLoader.ts) can `import(blobURL)` it and
+    // call its `activate(ctx)`. Renderer code runs with app privileges, so this is
+    // hard-gated on the same trust check used to `require()` main-process bundles:
+    // the extension must be sideloaded OR carry a signature. Untrusted store
+    // extensions stay data-only.
+    //
+    // The path comes from `manifest.contributes.rendererEntry` (relative to the
+    // extension's bundle directory); path traversal outside that dir is rejected.
+    //
+    // Returns: { success: true, source } or { success: false, error }
+    ipcMain.handle('runtime:get-renderer-bundle', async (_event, extensionId) => {
+        try {
+            const entry = registry.lookup(extensionId);
+            if (!entry) return { success: false, error: 'Extension not loaded' };
+
+            const manifest = entry.manifest || {};
+            // Trust gate — renderer code executes with app privileges.
+            const trusted =
+                manifest.sideloaded === true ||
+                (typeof manifest.signature === 'string' && manifest.signature.length > 0);
+            if (!trusted) {
+                logger.warn(`[Extension] get-renderer-bundle refused (untrusted): ${extensionId}`);
+                return { success: false, error: 'Extension not trusted (renderer code requires sideloaded or signed)' };
+            }
+
+            const rendererEntry = manifest.contributes && manifest.contributes.rendererEntry;
+            if (!rendererEntry || typeof rendererEntry !== 'string') {
+                return { success: false, error: 'No renderer entry declared' };
+            }
+
+            // rendererEntry is relative to the bundle directory; guard traversal.
+            const bundleDir = path.dirname(entry.bundlePath);
+            const resolved = path.resolve(bundleDir, rendererEntry);
+            const resolvedDir = path.resolve(bundleDir);
+            if (resolved !== resolvedDir && !resolved.startsWith(resolvedDir + path.sep)) {
+                logger.warn(`[Extension] get-renderer-bundle traversal attempt: ${extensionId} → ${rendererEntry}`);
+                return { success: false, error: 'Invalid renderer entry path' };
+            }
+
+            if (!fs.existsSync(resolved)) {
+                return { success: false, error: 'Renderer bundle not found' };
+            }
+
+            const source = fs.readFileSync(resolved, 'utf8');
+            return { success: true, source };
+        } catch (err) {
+            logger.error(`[Extension] get-renderer-bundle error (${extensionId}):`, err.message);
             return { success: false, error: err.message };
         }
     });
@@ -1077,13 +1448,83 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
         console.log('[AutoLoad] Scan complete. Loaded extensions:', registry.listLoaded());
     }
 
+    // ── autoLoadInstalledExtensions ─────────────────────────────────────────────
+    //
+    // Scans the user-data extensions directory (where .kai installs are written)
+    // and registers any installed but not-yet-loaded extensions on startup.
+    //
+    // Path layout: <userData>/extensions/<id>/bundle.js and manifest.json
+    // (Note: differs from bundled dir which uses dist/bundle.js)
+    //
+    function autoLoadInstalledExtensions(fsArg, pathArg, loggerArg, appArg) {
+        const extensionsDir = pathArg.join(appArg.getPath('userData'), 'extensions');
+
+        console.log('[AutoLoadInstalled] Starting installed extensions scan:', extensionsDir);
+
+        let subdirs;
+        try {
+            subdirs = fsArg.readdirSync(extensionsDir);
+        } catch (err) {
+            if (err.code === 'ENOENT') {
+                console.log('[AutoLoadInstalled] No installed extensions dir');
+                return;
+            }
+            console.error('[AutoLoadInstalled] Cannot read extensions dir:', err);
+            return;
+        }
+
+        for (const dirName of subdirs) {
+            try {
+                const extDir = pathArg.join(extensionsDir, dirName);
+                const stat = fsArg.statSync(extDir);
+                if (!stat.isDirectory()) continue;
+
+                const bundlePath = pathArg.join(extDir, 'bundle.js');
+                const manifestPath = pathArg.join(extDir, 'manifest.json');
+
+                if (!fsArg.existsSync(bundlePath) || !fsArg.existsSync(manifestPath)) {
+                    console.warn('[AutoLoadInstalled] Skipping', dirName, '- missing files');
+                    continue;
+                }
+
+                const manifest = JSON.parse(fsArg.readFileSync(manifestPath, 'utf8'));
+                const extensionId = manifest.id;
+                if (!extensionId) {
+                    console.warn('[AutoLoadInstalled] Manifest missing id for', dirName);
+                    continue;
+                }
+
+                if (registry.isKillSwitched(extensionId)) {
+                    console.warn('[AutoLoadInstalled] Kill-switched, skipping:', extensionId);
+                    continue;
+                }
+
+                // Only register if not already loaded (bundled extensions take precedence)
+                if (registry.lookup(extensionId)) {
+                    console.log('[AutoLoadInstalled] Already registered:', extensionId);
+                    continue;
+                }
+
+                registry.register(extensionId, manifest, bundlePath);
+                console.log('[AutoLoadInstalled] ✅ Registered:', extensionId);
+                loggerArg.info(`[Toko] Auto-loaded installed extension ${manifest.id} v${manifest.version}`);
+            } catch (err) {
+                console.error('[AutoLoadInstalled] Unexpected error for', dirName, err);
+            }
+        }
+
+        console.log('[AutoLoadInstalled] Scan complete.');
+    }
+
     // Expose registry/workerPool and autoLoadBundledExtensions for main.cjs
     return {
         registry,
         workerPool,
         autoLoadBundledExtensions,
+        autoLoadInstalledExtensions,
         ensureExtensionFetchProxy,
         extensionApiHost, // Generic extension-API host — main.cjs starts/stops it
+        shareTunnel, // Watch-party Cloudflare tunnel — main.cjs stops it on quit
         localProxy, // Expose for debugging
     };
 };

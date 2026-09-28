@@ -1,8 +1,10 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
-import { existsSync, createReadStream } from 'node:fs';
+import { existsSync, createReadStream, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { matchEntityRoute } from './seo/routes.mjs';
+import { resolveMeta, renderTags, injectIntoHtml, SITE_ORIGIN } from './seo/inject.mjs';
 
 const port = Number(process.env.PORT || process.env.SERVER_PORT || 8088);
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -10,6 +12,9 @@ const rootDir = join(scriptDir, '..');
 const distDir = join(rootDir, 'dist');
 const viteBin = join(scriptDir, '..', 'node_modules', 'vite', 'bin', 'vite.js');
 const distIndex = join(distDir, 'index.html');
+
+/** Site default og:image, used when a matched entity has no image of its own. */
+const DEFAULT_OG_IMAGE = `${SITE_ORIGIN}/tatakaibanner.png`;
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -48,27 +53,73 @@ function runOrExit(command, args, stepName) {
 }
 
 function startStaticServer() {
+  // Read the built index once; per-entity meta is injected into a copy of this
+  // string on the SPA-fallback path. If it can't be read, injection is skipped
+  // (falls back to streaming the file) — the site still serves.
+  let baseIndexHtml = null;
+  try {
+    baseIndexHtml = readFileSync(distIndex, 'utf8');
+  } catch (err) {
+    console.warn('[ptero-start] Could not read index.html for SEO injection:', err.message);
+  }
+
   const server = createServer((req, res) => {
     const reqPath = (req.url || '/').split('?')[0];
     const cleanPath = normalize(reqPath).replace(/^([.][.][/\\])+/, '');
     const filePath = cleanPath === '/' ? distIndex : join(distDir, cleanPath.replace(/^[/\\]/, ''));
-    const fallbackPath = distIndex;
 
-    const targetPath = existsSync(filePath) ? filePath : fallbackPath;
-    const contentType = MIME_TYPES[extname(targetPath).toLowerCase()] || 'application/octet-stream';
+    // Real file on disk (assets, /index.html, favicon, …): stream it untouched.
+    if (existsSync(filePath)) {
+      const contentType = MIME_TYPES[extname(filePath).toLowerCase()] || 'application/octet-stream';
+      res.setHeader('Content-Type', contentType);
+      createReadStream(filePath)
+        .on('error', () => {
+          res.statusCode = 500;
+          res.end('Internal Server Error');
+        })
+        .pipe(res);
+      return;
+    }
 
-    res.setHeader('Content-Type', contentType);
-    createReadStream(targetPath)
-      .on('error', () => {
-        res.statusCode = 500;
-        res.end('Internal Server Error');
-      })
-      .pipe(res);
+    // SPA fallback: serve index.html, injecting per-entity meta for shareable
+    // routes so social crawlers get a tailored preview. Non-entity SPA routes
+    // (home, search, settings, …) serve the default meta unchanged.
+    void serveSpaFallback(reqPath, res, baseIndexHtml);
   });
 
   server.listen(port, '0.0.0.0', () => {
     console.log(`[ptero-start] Serving dist on http://0.0.0.0:${port}`);
   });
+}
+
+async function serveSpaFallback(reqPath, res, baseIndexHtml) {
+  res.setHeader('Content-Type', MIME_TYPES['.html']);
+
+  // No cached HTML (unreadable at startup): stream the file as a last resort.
+  if (baseIndexHtml == null) {
+    createReadStream(distIndex)
+      .on('error', () => {
+        res.statusCode = 500;
+        res.end('Internal Server Error');
+      })
+      .pipe(res);
+    return;
+  }
+
+  let html = baseIndexHtml;
+  try {
+    const match = matchEntityRoute(reqPath);
+    if (match) {
+      const meta = await resolveMeta(match);
+      if (meta) html = injectIntoHtml(baseIndexHtml, renderTags(meta, DEFAULT_OG_IMAGE));
+    }
+  } catch (err) {
+    // Any injection failure degrades to the default meta — never a 500.
+    console.warn('[ptero-start] SEO injection failed:', err?.message);
+    html = baseIndexHtml;
+  }
+
+  res.end(html);
 }
 
 if (existsSync(distIndex)) {

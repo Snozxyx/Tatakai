@@ -15,10 +15,16 @@ export function Skeleton({ className }: SkeletonProps) {
   );
 }
 
-export function CardSkeleton() {
+/**
+ * Stands in for a media card while it loads, so it has to keep the card's own
+ * 2:3 poster ratio (docs/Plans.md §2 — "Cards (improve polish and
+ * consistency)"); at 3:4 the row visibly grew when the real cards arrived.
+ * Callers pass width through `className`, which it used not to accept.
+ */
+export function CardSkeleton({ className }: SkeletonProps) {
   return (
-    <div className="glass-panel p-3 space-y-3">
-      <Skeleton className="w-full aspect-[3/4] rounded-2xl" />
+    <div className={cn("glass-panel p-3 space-y-3", className)}>
+      <Skeleton className="w-full aspect-[2/3] rounded-2xl" />
       <Skeleton className="h-4 w-3/4" />
       <Skeleton className="h-3 w-1/2" />
     </div>

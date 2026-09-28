@@ -46,7 +46,9 @@ export interface ParsedRelease {
 
 // ─── AniList GraphQL helpers ──────────────────────────────────────────────────
 
-const ANILIST_GRAPHQL_URL = "https://graphql.anilist.co";
+// Routed through the TatakaiAPI proxy (mirror-first) — see src/lib/anilist.ts.
+import { ANILIST_GRAPHQL_ENDPOINT } from "@/lib/api/backendOrigin";
+const ANILIST_GRAPHQL_URL = ANILIST_GRAPHQL_ENDPOINT;
 
 interface AniListMedia {
   id: number;

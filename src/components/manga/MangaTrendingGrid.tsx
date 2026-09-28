@@ -2,6 +2,7 @@ import { Flame } from "lucide-react";
 import { UnifiedMediaCardProps } from "@/components/UnifiedMediaCard";
 import { useNavigate } from "react-router-dom";
 import { getHighQualityImage } from "@/lib/api";
+import { HomeSectionHeading } from "@/components/home/HomeSectionHeading";
 
 interface MangaTrendingGridProps {
   items: UnifiedMediaCardProps["item"][];
@@ -61,12 +62,10 @@ export function MangaTrendingGrid({ items }: MangaTrendingGridProps) {
 
   return (
     <section className="mb-16 md:mb-24">
-      <div className="flex items-center gap-3 mb-8">
-        <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center border border-primary/30">
-          <Flame className="w-5 h-5 text-primary" />
-        </div>
-        <h2 className="text-2xl lg:text-3xl font-bold font-display tracking-tight">Hype & Trending</h2>
-      </div>
+      <HomeSectionHeading
+        icon={<Flame className="w-5 h-5 text-primary" />}
+        title="Hype & Trending"
+      />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 auto-rows-[200px] md:auto-rows-[240px]">
         {items.slice(0, 4).map((item, index) => (

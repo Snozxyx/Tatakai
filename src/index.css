@@ -39,6 +39,18 @@
 
     --radius: 1.25rem;
 
+    /* Per-profile ambient accent — overridden inline on the profile page from the
+       viewed profile's app_settings; falls back to --primary elsewhere. */
+    --profile-accent: var(--primary);
+
+    /* Watch2Together / isshoni ambient accent (magenta). Kept in sync with
+       ISSHONI_ACCENT in watchRoomShared.ts. Defined at :root — not just on the
+       room layout — so the accent still resolves inside Radix Sheet/Dialog
+       surfaces that portal to <body> (settings sheet, library & poll dialogs),
+       and so launch buttons elsewhere (e.g. the AnimePage "Watch Together"
+       button) can share the same token. */
+    --isshoni-accent: 327 82% 60%;
+
     /* Custom colors */
     --glass: 0 0% 7%;
     --glass-border: 0 0% 100%;
@@ -49,6 +61,11 @@
     --amber: 45 100% 50%;
     --amber-glow: 45 100% 60%;
     --orange: 25 95% 55%;
+    /* "Connected", "verified", "up to date" — the counterpart to --destructive.
+       Themes don't override it, same as --amber and --orange, so status colour
+       stays constant while the palette around it changes. */
+    --success: 152 69% 42%;
+    --success-foreground: 0 0% 100%;
 
     /* Premium Gradients */
     --gradient-mesh: radial-gradient(at 0% 0%, hsla(262, 83%, 58%, 0.15) 0px, transparent 50%),
@@ -106,6 +123,10 @@
     --sar: env(safe-area-inset-right);
     --sab: env(safe-area-inset-bottom);
     --sal: env(safe-area-inset-left);
+
+    /* Smooth in-page navigation (anchor jumps, programmatic scrolls).
+       Overridden to `auto` under prefers-reduced-motion / .reduce-motion. */
+    scroll-behavior: smooth;
   }
 }
 
@@ -291,23 +312,47 @@ html.high-contrast a {
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   }
 
+  /* Fine hairline light source along the top edge — the single most
+     "premium" detail on dark glass. The gradient overlay is pointer-events
+     none so it can't block interaction with children. */
+  .glass-panel::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 5%;
+    right: 5%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, hsl(var(--foreground) / 0.18), transparent);
+    pointer-events: none;
+  }
+
+  .glass-panel-hover:hover {
+    @apply border-white/10 bg-card/60 -translate-y-1;
+    box-shadow: 0 12px 40px -12px rgba(0, 0, 0, 0.6), 0 0 40px hsl(var(--primary) / 0.1);
+  }
+
+  /* Soft ambient background wash — used behind hero text and rail widgets. */
+  .ambient-orb {
+    @apply pointer-events-none absolute rounded-full blur-[90px];
+  }
+
   .glass-panel-translucent {
     @apply relative overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-xl;
     box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6);
   }
 
+  /* The single definition of the adult marker (see MediaCardBadges.tsx). Uses
+     the theme's destructive ramp rather than a raw rose. The pulse is left to
+     the global `prefers-reduced-motion: reduce` reset below rather than a
+     `motion-safe:` variant, which makes @apply emit a second, empty
+     `@keyframes pulse` that only loses to the real one by source order. */
   .badge-18plus {
-    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-600/90 text-white font-black text-[10px] tracking-wider uppercase border border-rose-400/50 shadow-lg shadow-rose-600/30 backdrop-blur-md animate-pulse;
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-destructive/90 text-destructive-foreground font-black text-[10px] tracking-wider uppercase border border-destructive/50 shadow-lg shadow-destructive/30 backdrop-blur-md animate-pulse;
   }
 
   .glass-panel-hover {
 
     @apply transition-all duration-500;
-  }
-
-  .glass-panel-hover:hover {
-    @apply border-border/50 bg-card/80 -translate-y-1;
-    box-shadow: 0 0 40px hsl(var(--primary) / 0.1);
   }
 
   .nav-icon {
@@ -371,6 +416,28 @@ html.high-contrast a {
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background: hsl(var(--muted));
     border-radius: 3px;
+  }
+
+  /* Five carousels and the settings tab rail already ask for this class; nothing
+     defined it, and no scrollbar plugin is installed, so it emitted no CSS. */
+  .scrollbar-hide {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Alias used by the profile tabs, community rails and forum sidebar. Same
+     intent as .scrollbar-hide — scroll horizontally without a visible bar. */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
   }
 }
 
@@ -441,6 +508,57 @@ body[data-theme='brutalist-concrete'] .gradient-text {
 
   50% {
     transform: translateY(-10px) rotate(1deg);
+  }
+}
+
+/* Profile background effects */
+@keyframes petal-fall {
+  0% {
+    transform: translate3d(0, -10vh, 0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--petal-drift, 40px), 110vh, 0) rotate(var(--petal-spin, 360deg));
+    opacity: 0;
+  }
+}
+
+@keyframes rain-fall {
+  0% {
+    transform: translate3d(0, -20vh, 0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translate3d(0, 120vh, 0);
+    opacity: 0;
+  }
+}
+
+@keyframes profile-sky-drift {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes profile-blackhole-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
   }
 }
 
@@ -563,7 +681,11 @@ body[data-theme='brutalist-concrete'] .gradient-text {
   animation: float-up 8s ease-in-out infinite;
 }
 
-/* Enhanced Video Subtitle Styling */
+/* Enhanced Video Subtitle Styling.
+ * NOTE: the desktop player (VideoPlayer.tsx) no longer renders subtitles natively —
+ * its <track>s run in "hidden" mode and cues are painted by a custom React overlay
+ * div, so the ::cue rules below are dead code for that player. They are kept because
+ * the mobile/other players may still rely on native ::cue rendering. */
 .video-with-subtitles::cue {
   background-color: rgba(0, 0, 0, 0.7);
   color: white;
@@ -683,6 +805,24 @@ body[data-theme='brutalist-concrete'] .gradient-text {
   font-size: 2.2em;
 }
 
+/* ── Desktop titlebar clearance for edge sheets ───────────────────────────────
+ * On Electron/Tauri the frameless window paints a 32px custom TitleBar at the
+ * very top (z above everything). Radix Sheets portal to <body> as position:fixed
+ * with inset-y-0 (left/right) or top-0 (top), so they slide UNDER the titlebar
+ * and cover the drag region + window controls. Offset them down 32px so the bar
+ * stays reachable. Body carries .desktop-app only in Electron/Tauri, so the web
+ * build is untouched. Two-token selector outspecifies Tailwind's h-full/top-0.
+ */
+.desktop-app [data-sheet-side="left"],
+.desktop-app [data-sheet-side="right"] {
+  top: 32px;
+  height: calc(100% - 32px);
+}
+
+.desktop-app [data-sheet-side="top"] {
+  top: 32px;
+}
+
 /* ── App fullscreen mode (Electron) ───────────────────────────────────────────
  * Applied to <html> when the player enters OS-level fullscreen via IPC.
  * Hides TitleBar, Sidebar, and all chrome so the video fills the entire screen.
@@ -708,6 +848,16 @@ body[data-theme='brutalist-concrete'] .gradient-text {
 /* Ensure the fullscreen player sits above everything */
 .app-fullscreen .is-player-fullscreen {
   z-index: 99999 !important;
+}
+
+/* ── Hide title bar (user preference) ─────────────────────────────────────────
+ * Applied to <html> when the "Hide title bar" toggle is on (persisted in
+ * localStorage as `tatakai_hide_titlebar`). Unlike .app-fullscreen this only
+ * hides the 32px custom title bar; the sidebar and other chrome stay put.
+ * MainLayout drops its `pt-8` titlebar clearance in tandem.
+ */
+.titlebar-hidden [data-titlebar] {
+  display: none !important;
 }
 
 /* Mobile subtitle adjustments */
@@ -928,6 +1078,81 @@ body.video-fullscreen {
   50% {
     box-shadow: 0 0 40px hsl(var(--primary) / 0.8);
   }
+}
+
+/* ========== PLAYER OVERHAUL: THEATER / AMBIENT / ANIME4K ========== */
+
+/* Theater mode — set on <html> as `.player-theater` from the player.
+ * Distinct from fullscreen: the content column just gets *wider* toward the
+ * viewport for a cinematic look; nothing is position:fixed here.
+ *
+ * WatchPage.tsx wraps its content in a single
+ *   <main class="... max-w-[1800px] mx-auto pr-4 md:pr-6 ...">
+ * and the <VideoPlayer> lives inside that column, so widening <main> widens the
+ * player with it. `html.player-theater main` (specificity 0,1,1) outranks the
+ * Tailwind `max-w-[1800px]` utility (0,1,0) without !important.
+ *
+ * Only the max-width cap and the right padding are touched. The left padding is
+ * left alone on purpose: WatchPage uses `md:pl-32` (non-desktop) to clear the
+ * fixed Sidebar rail, so shrinking it would slide content under the sidebar.
+ * Gated to md+ so the mobile layout is unaffected. */
+@media (min-width: 768px) {
+  html.player-theater main {
+    max-width: none;
+    padding-right: 1rem;
+  }
+}
+
+/* Media stack wrapper — holds the ambient glow, video, and Anime4K canvas.
+ * The ambient canvas uses transform+filter, which promotes it to its own
+ * compositing layer. Chromium does NOT clip a composited child against a
+ * rounded-corner `overflow:hidden` ancestor, so the blur used to bleed past the
+ * player edges. Forcing this wrapper to clip (overflow:hidden + its own paint
+ * containment) keeps the glow inside the player. */
+.player-media-stack {
+  overflow: hidden;
+  border-radius: inherit;
+  contain: paint;
+}
+
+/* Ambient mode — a small blurred canvas painted behind the <video>.
+ * Clipped by .player-media-stack above. */
+.player-ambient-glow {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: auto;
+  filter: blur(70px) saturate(1.6);
+  transform: scale(1.25);
+  opacity: 0.6;
+  pointer-events: none;
+  z-index: 0;
+  transition: opacity 300ms ease;
+}
+
+/* Keep the video painting above the ambient glow. The <video> is nested inside
+ * the gesture wrappers (not a direct child of .video-player-container), so the
+ * `.video-with-subtitles` selector is what actually matches; the direct-child
+ * selector is kept as a harmless belt-and-braces. Neither wrapper sets a z-index,
+ * so these values resolve in the container's stacking context. */
+.video-player-container > video,
+.video-with-subtitles {
+  position: relative;
+  z-index: 1;
+}
+
+/* Anime4K mode — a WebGL canvas showing the upscaled frame ON TOP of the still-
+ * decoding <video> (z 1), but below the subtitle overlay (z 30) and controls. */
+.player-anime4k-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  z-index: 2;
 }
 
 /* Smart TV specific video controls */
@@ -1392,27 +1617,61 @@ body[data-theme="harvest"] .glass-panel {
   }
 }
 
-/* Rank 1-2: Filler / Genin — plain */
-.rn-gray {
+@keyframes rn-glow-soft {
+  0%, 100% { text-shadow: 0 0 4px rgba(74, 222, 128, 0.35); }
+  50%      { text-shadow: 0 0 9px rgba(74, 222, 128, 0.7); }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Per-rank text effects (rn-1 .. rn-16). Each rank number has its
+   OWN effect, shared across all tracks (Anime/Manga/Manhwa/Comic).
+   Mapped by getRankClassForRank() in src/lib/rankUtils.ts.
+   ───────────────────────────────────────────────────────────── */
+
+/* Rank 1 — Filler Watcher: flat muted gray */
+.rn-1 {
   color: #6b7280;
   font-weight: 500;
 }
 
-.rn-gray2 {
+/* Rank 2 — Genin: lighter gray with a faint sheen */
+.rn-2 {
   color: #9ca3af;
   font-weight: 500;
+  text-shadow: 0 0 4px rgba(156, 163, 175, 0.4);
 }
 
-/* Rank 3-4: Chunin / Jonin — nature green pulse */
-.rn-nature {
+/* Rank 3 — Chunin: solid green, steady soft glow */
+.rn-3 {
   color: #4ade80;
   font-weight: 600;
-  animation: rn-pulse 2.5s ease-in-out infinite;
-  text-shadow: 0 0 6px rgba(74, 222, 128, 0.5);
+  animation: rn-glow-soft 3s ease-in-out infinite;
 }
 
-/* Rank 5-6: Plus Ultra / Pro Hero — frost ice */
-.rn-frost {
+/* Rank 4 — Jonin: emerald gradient pulse */
+.rn-4 {
+  background: linear-gradient(90deg, #22c55e, #86efac, #16a34a, #22c55e);
+  background-size: 300% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+  animation: rn-scroll 3s ease-in-out infinite, rn-pulse 2.5s ease-in-out infinite;
+}
+
+/* Rank 5 — Plus Ultra: teal scroll */
+.rn-5 {
+  background: linear-gradient(90deg, #2dd4bf, #99f6e4, #14b8a6, #2dd4bf);
+  background-size: 300% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+  animation: rn-scroll 3s ease-in-out infinite;
+}
+
+/* Rank 6 — Pro Hero: cyan frost with ice glow */
+.rn-6 {
   background: linear-gradient(90deg, #67e8f9, #e0f2fe, #a5f3fc, #67e8f9);
   background-size: 300% auto;
   -webkit-background-clip: text;
@@ -1422,19 +1681,41 @@ body[data-theme="harvest"] .glass-panel {
   animation: rn-scroll 3s ease-in-out infinite, rn-ice-glow 2.5s ease-in-out infinite;
 }
 
-/* Rank 7-8: Soul Reaper / Bankai — spectral blue ghost */
-.rn-spectral {
+/* Rank 7 — Soul Reaper: spectral blue ghost */
+.rn-7 {
   background: linear-gradient(90deg, #60a5fa, #c7d2fe, #818cf8, #ddd6fe, #60a5fa);
   background-size: 300% auto;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   font-weight: 700;
-  animation: rn-scroll 2.8s ease-in-out infinite, rn-spectral 2s ease-in-out infinite;
+  animation: rn-scroll 2.8s ease-in-out infinite, rn-spectral 2.4s ease-in-out infinite;
 }
 
-/* Rank 9-10: Survey Corps / Titan Shifter — electric crackle */
-.rn-electric {
+/* Rank 8 — Bankai: deeper spectral, faster glow */
+.rn-8 {
+  background: linear-gradient(90deg, #3b82f6, #a5b4fc, #6366f1, #c7d2fe, #3b82f6);
+  background-size: 350% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 800;
+  animation: rn-scroll 2.4s ease-in-out infinite, rn-spectral 1.6s ease-in-out infinite;
+}
+
+/* Rank 9 — Survey Corps: indigo/violet scroll */
+.rn-9 {
+  background: linear-gradient(90deg, #818cf8, #c4b5fd, #6366f1, #a78bfa, #818cf8);
+  background-size: 400% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 800;
+  animation: rn-scroll 2.2s ease-in-out infinite;
+}
+
+/* Rank 10 — Titan Shifter: electric crackle */
+.rn-10 {
   background: linear-gradient(90deg, #818cf8, #fbbf24, #a78bfa, #fde047, #818cf8);
   background-size: 400% auto;
   -webkit-background-clip: text;
@@ -1444,8 +1725,8 @@ body[data-theme="harvest"] .glass-panel {
   animation: rn-scroll-f 1.5s ease-in-out infinite, rn-electric 0.9s ease-in-out infinite;
 }
 
-/* Rank 11: Demon Slayer — demonic purple-red corruption */
-.rn-demon {
+/* Rank 11 — Demon Slayer: demonic purple-red corruption */
+.rn-11 {
   background: linear-gradient(90deg, #a855f7, #ef4444, #dc2626, #a855f7);
   background-size: 300% auto;
   -webkit-background-clip: text;
@@ -1455,9 +1736,9 @@ body[data-theme="harvest"] .glass-panel {
   animation: rn-scroll 2s ease-in-out infinite, rn-demon 1.8s ease-in-out infinite;
 }
 
-/* Rank 12-13: Hashira / Sage Mode — sakura gold shimmer */
-.rn-sakura {
-  background: linear-gradient(90deg, #f472b6, #fde68a, #fb7185, #fbbf24, #f472b6);
+/* Rank 12 — Hashira: pink-rose scroll with glow */
+.rn-12 {
+  background: linear-gradient(90deg, #f472b6, #fbcfe8, #fb7185, #f9a8d4, #f472b6);
   background-size: 400% auto;
   -webkit-background-clip: text;
   background-clip: text;
@@ -1467,8 +1748,20 @@ body[data-theme="harvest"] .glass-panel {
   filter: drop-shadow(0 0 6px rgba(244, 114, 182, 0.7));
 }
 
-/* Rank 14: Dragon Slayer — animated fire */
-.rn-fire {
+/* Rank 13 — Sage Mode: sakura + gold shimmer */
+.rn-13 {
+  background: linear-gradient(90deg, #f472b6, #fde68a, #fb7185, #fbbf24, #f472b6);
+  background-size: 400% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 800;
+  animation: rn-scroll-f 1.8s ease-in-out infinite;
+  filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.6));
+}
+
+/* Rank 14 — Dragon Slayer: animated fire */
+.rn-14 {
   background: linear-gradient(90deg, #ff4500, #ff8c00, #ffd700, #ff6600, #ef4444, #ff4500);
   background-size: 400% auto;
   -webkit-background-clip: text;
@@ -1478,8 +1771,8 @@ body[data-theme="harvest"] .glass-panel {
   animation: rn-scroll-f 1s linear infinite, rn-fire 1.2s ease-in-out infinite;
 }
 
-/* Rank 15: Super Saiyan — gold lightning burst */
-.rn-saiyan {
+/* Rank 15 — Super Saiyan: gold lightning burst */
+.rn-15 {
   background: linear-gradient(90deg, #fef08a, #facc15, #ffffff, #fb923c, #facc15, #fef08a);
   background-size: 400% auto;
   -webkit-background-clip: text;
@@ -1490,8 +1783,8 @@ body[data-theme="harvest"] .glass-panel {
   animation: rn-scroll-f 0.7s linear infinite, rn-saiyan 0.6s ease-in-out infinite;
 }
 
-/* Rank 16: One Punch — holographic prismatic rainbow */
-.rn-onepunch {
+/* Rank 16 — One Punch: holographic prismatic rainbow */
+.rn-16 {
   background: linear-gradient(90deg,
       #ff0080, #ff4500, #ffd700, #00ff80, #0080ff, #8000ff, #ff0080);
   background-size: 500% auto;
@@ -1502,4 +1795,244 @@ body[data-theme="harvest"] .glass-panel {
   letter-spacing: 0.05em;
   animation: rn-scroll 1.2s linear infinite;
   filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.6));
+}
+
+/* ─────────────────────────────────────────────────────────────
+   COMMUNITY AMBIENT + CARD LAYER (feed overhaul, 2026-09)
+   ───────────────────────────────────────────────────────────── */
+
+/* Two independent orbs (primary/secondary) drifting very slowly behind
+   the community feed. The transform-only animation avoids repainting the
+   blur and the 26s/30s periods are long enough to feel ambient rather than
+   "animated". */
+@keyframes community-aurora {
+  0%   { transform: translate3d(0, 0, 0) rotate(0deg); }
+  50%  { transform: translate3d(-3%, 4%, 0) rotate(180deg); }
+  100% { transform: translate3d(0, 0, 0) rotate(360deg); }
+}
+.community-aurora-primary {
+  animation: community-aurora 26s ease-in-out infinite;
+}
+.community-aurora-secondary {
+  animation: community-aurora 32s ease-in-out infinite reverse;
+}
+
+/* Card / glass layer used across the community rail and feed panels —
+   slightly warmer than .glass-panel, with a hairline top light and a
+   gentler shadow. */
+.community-card {
+  @apply relative overflow-hidden rounded-[1.5rem] border border-white/[0.06] bg-white/[0.025] backdrop-blur-2xl transition-colors duration-300;
+  box-shadow:
+    0 1px 1px 0 rgba(0, 0, 0, 0.2),
+    0 12px 40px -12px rgba(0, 0, 0, 0.55);
+}
+.community-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 4%;
+  right: 4%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, hsl(var(--foreground) / 0.14), transparent);
+  pointer-events: none;
+}
+.community-card-hover {
+  @apply transition-all duration-300 ease-out;
+}
+.community-card-hover:hover {
+  @apply border-white/[0.12] bg-white/[0.04] -translate-y-0.5;
+  box-shadow:
+    0 2px 4px 0 rgba(0, 0, 0, 0.25),
+    0 16px 48px -16px rgba(0, 0, 0, 0.7),
+    0 0 32px hsl(var(--primary) / 0.07);
+}
+
+/* High-contrast foreground wash used for hero headlines. */
+.hero-gradient-text {
+  background: linear-gradient(to right, #fff 0%, rgba(255, 255, 255, 0.75) 55%, rgba(255, 255, 255, 0.5) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+[class*="bh-"] { transition: transform .28s cubic-bezier(.2,.8,.2,1), box-shadow .28s ease, border-color .28s ease; }
+[class*="bh-"]:hover img { transition: transform .3s cubic-bezier(.2,.8,.2,1), filter .3s ease; }
+
+/* Tactile press feedback for interactive cards/tiles. Subtle by design — pairs
+   with the existing `bh-*` hover so a card lifts on hover and settles on tap.
+   Timing is killed by the global reduce-motion / fast-animations resets. */
+.tk-pressable { transition: transform .16s cubic-bezier(.2,.8,.2,1); }
+.tk-pressable:active { transform: scale(.98); }
+
+/* Page-enter fade for top-level section changes. Uses a keyframe (no `forwards`)
+   so no transform lingers on the element at rest — nothing to break `position:
+   fixed` descendants once it settles. Global reduce-motion reset makes it
+   instant automatically. Keyed by path segment in AppRoutes so navigating
+   within a section (episode → episode, reader pages) never replays or remounts. */
+@keyframes route-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.route-enter { animation: route-enter .22s cubic-bezier(0.4, 0, 0.2, 1); }
+
+/* One-shot celebration burst — particles fly out from an origin, then fade.
+   Direction/rotation are per-particle CSS vars (same pattern as `petal-fall`).
+   No `forwards`, so nothing lingers; global reduce-motion reset makes it instant
+   (particles finish at opacity 0 → invisible, i.e. no celebration for those users). */
+@keyframes celebrate-pop {
+  0%   { opacity: 0; transform: translate3d(0, 0, 0) scale(.4) rotate(0deg); }
+  12%  { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(var(--burst-x, 0), var(--burst-y, -70px), 0) scale(1) rotate(var(--burst-rot, 120deg)); }
+}
+
+/* ── Easter-egg action effects ────────────────────────────────────────────
+   Barrel roll: the whole <body> spins once (the classic "do a barrel roll").
+   Applied for ~1s then removed; the trigger sets overflow:hidden on <html> so
+   the corners of the rotating page don't spawn scrollbars. */
+@keyframes egg-barrel-roll { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+.egg-barrel-roll { animation: egg-barrel-roll 1s ease-in-out; transform-origin: 50% 50%; }
+
+/* Kamehameha: a brief impact shake on the app root + a blue→white energy
+   flash overlay. Both are one-shot and self-remove. */
+@keyframes egg-shake {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  20% { transform: translate3d(-8px, 4px, 0); }
+  40% { transform: translate3d(8px, -4px, 0); }
+  60% { transform: translate3d(-6px, -3px, 0); }
+  80% { transform: translate3d(6px, 3px, 0); }
+}
+.egg-shake { animation: egg-shake .5s cubic-bezier(.36, .07, .19, .97); }
+@keyframes egg-flash { 0% { opacity: 0; } 15% { opacity: .85; } 100% { opacity: 0; } }
+.egg-flash-overlay {
+  position: fixed; inset: 0; z-index: 9997; pointer-events: none;
+  background: radial-gradient(circle at 50% 55%, rgba(147,197,253,.9), rgba(255,255,255,.55) 40%, transparent 75%);
+  animation: egg-flash .7s ease-out forwards;
+}
+
+/* 1 — Filler Watcher: quiet lift */
+.bh-1:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(107,114,128,.30); }
+.bh-1:hover img { transform: scale(1.08); }
+
+/* 2 — Genin: lift + gentle tilt */
+.bh-2:hover { transform: translateY(-3px) rotate(-2deg); box-shadow: 0 8px 20px rgba(156,163,175,.35); }
+.bh-2:hover img { transform: scale(1.08); }
+
+/* 3 — Chunin: green pulse */
+.bh-3:hover { box-shadow: 0 0 18px rgba(74,222,128,.45); }
+.bh-3:hover img { animation: bh-pulse .7s ease-in-out infinite; }
+
+/* 4 — Jonin: emerald bob */
+.bh-4:hover { box-shadow: 0 8px 22px rgba(34,197,94,.4); }
+.bh-4:hover img { animation: bh-bob .9s ease-in-out infinite; }
+
+/* 5 — Plus Ultra: teal scale + ring */
+.bh-5:hover { transform: scale(1.04); box-shadow: 0 0 22px rgba(45,212,191,.5); }
+.bh-5:hover img { transform: scale(1.12); }
+
+/* 6 — Pro Hero: cyan frost shine */
+.bh-6:hover { box-shadow: 0 0 24px rgba(103,232,249,.55); }
+.bh-6:hover img { animation: bh-shine 1s ease-in-out infinite; }
+
+/* 7 — Soul Reaper: spectral float */
+.bh-7:hover { box-shadow: 0 10px 26px rgba(96,165,250,.5); }
+.bh-7:hover img { animation: bh-float 1.4s ease-in-out infinite; }
+
+/* 8 — Bankai: blue wobble */
+.bh-8:hover { box-shadow: 0 0 24px rgba(59,130,246,.55); }
+.bh-8:hover img { animation: bh-wobble .6s ease-in-out infinite; }
+
+/* 9 — Survey Corps: indigo 3D tilt */
+.bh-9:hover { transform: perspective(400px) rotateX(8deg) rotateY(-8deg) translateY(-2px); box-shadow: 0 12px 28px rgba(99,102,241,.5); }
+.bh-9:hover img { transform: scale(1.1); }
+
+/* 10 — Titan Shifter: electric jitter */
+.bh-10:hover { box-shadow: 0 0 26px rgba(251,191,36,.55); }
+.bh-10:hover img { animation: bh-jitter .18s steps(2) infinite; }
+
+/* 11 — Demon Slayer: demonic flare */
+.bh-11:hover { box-shadow: 0 0 30px rgba(239,68,68,.6); }
+.bh-11:hover img { animation: bh-flare .8s ease-in-out infinite; filter: drop-shadow(0 0 6px rgba(220,38,38,.8)); }
+
+/* 12 — Hashira: pink pop */
+.bh-12:hover { transform: scale(1.06) translateY(-2px); box-shadow: 0 0 30px rgba(244,114,182,.6); }
+.bh-12:hover img { animation: bh-pop .5s ease-in-out; transform: scale(1.14); }
+
+/* 13 — Sage Mode: sakura/gold shimmer */
+.bh-13:hover { box-shadow: 0 0 30px rgba(251,191,36,.55); }
+.bh-13:hover img { animation: bh-swing 1s ease-in-out infinite; filter: drop-shadow(0 0 8px rgba(251,191,36,.7)); }
+
+/* 14 — Dragon Slayer: fire flicker */
+.bh-14:hover { box-shadow: 0 0 34px rgba(255,102,0,.65); }
+.bh-14:hover img { animation: bh-flicker .5s ease-in-out infinite; filter: drop-shadow(0 0 10px rgba(255,69,0,.9)); }
+
+/* 15 — Super Saiyan: gold burst */
+.bh-15:hover { transform: scale(1.05); box-shadow: 0 0 40px rgba(250,204,21,.75); }
+.bh-15:hover img { animation: bh-burst .7s ease-in-out infinite; filter: drop-shadow(0 0 12px rgba(255,255,255,.9)); }
+
+/* 16 — One Punch: prismatic spin */
+.bh-16:hover { box-shadow: 0 0 40px rgba(255,255,255,.6); }
+.bh-16:hover img { animation: bh-spin 2s linear infinite; filter: drop-shadow(0 0 12px rgba(255,0,128,.6)); }
+
+@keyframes bh-pulse   { 0%,100% { transform: scale(1.05); } 50% { transform: scale(1.15); } }
+@keyframes bh-bob     { 0%,100% { transform: translateY(0) scale(1.08); } 50% { transform: translateY(-4px) scale(1.08); } }
+@keyframes bh-shine   { 0%,100% { transform: scale(1.08); filter: brightness(1); } 50% { transform: scale(1.12); filter: brightness(1.4); } }
+@keyframes bh-float   { 0%,100% { transform: translateY(0) scale(1.08); } 50% { transform: translateY(-5px) scale(1.1); } }
+@keyframes bh-wobble  { 0%,100% { transform: rotate(-5deg) scale(1.08); } 50% { transform: rotate(5deg) scale(1.08); } }
+@keyframes bh-jitter  { 0% { transform: translate(-1px,1px) scale(1.08); } 100% { transform: translate(1px,-1px) scale(1.1); } }
+@keyframes bh-flare   { 0%,100% { transform: scale(1.08); filter: brightness(1) drop-shadow(0 0 6px rgba(220,38,38,.8)); } 50% { transform: scale(1.14); filter: brightness(1.5) drop-shadow(0 0 12px rgba(239,68,68,1)); } }
+@keyframes bh-pop     { 0% { transform: scale(1); } 60% { transform: scale(1.22); } 100% { transform: scale(1.14); } }
+@keyframes bh-swing   { 0%,100% { transform: rotate(-6deg) scale(1.08); } 50% { transform: rotate(6deg) scale(1.08); } }
+@keyframes bh-flicker { 0%,100% { transform: scale(1.1); filter: brightness(1.1) drop-shadow(0 0 8px rgba(255,69,0,.9)); } 25% { transform: scale(1.14) skewX(-3deg); } 50% { transform: scale(1.08); filter: brightness(1.6) drop-shadow(0 0 14px rgba(255,140,0,1)); } 75% { transform: scale(1.13) skewX(3deg); } }
+@keyframes bh-burst   { 0%,100% { transform: scale(1.08); filter: brightness(1.2); } 50% { transform: scale(1.18); filter: brightness(1.8); } }
+@keyframes bh-spin    { from { transform: rotate(0) scale(1.1); } to { transform: rotate(360deg) scale(1.1); } }
+
+/* ============================================================
+   BADGE ANIMATION — shimmering ring for animated badges
+   (booster, premium-pro/ultra, and select collectibles)
+   ============================================================ */
+@keyframes badge-shimmer {
+  0%, 100% { box-shadow: 0 0 4px 0 rgba(255, 255, 255, 0.25); }
+  50%      { box-shadow: 0 0 10px 2px rgba(255, 255, 255, 0.6); }
+}
+
+.badge-animated {
+  animation: badge-shimmer 2s ease-in-out infinite;
+}
+
+.badge-animated img {
+  animation: badge-float 3s ease-in-out infinite;
+}
+
+@keyframes badge-float {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50%      { transform: translateY(-1px) scale(1.05); }
+}
+
+/* Rarity ambient behind badge hover tooltips: legendary/mythic spin a conic
+   gradient; lower tiers gently pulse a radial wash. */
+@keyframes badge-ambient-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes badge-ambient-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50%      { opacity: 0.75; transform: scale(1.1); }
+}
+/* Skip layout/paint for sections far off-screen. Huge win for long feeds. */
+.home-section {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 520px; /* approximate section height, prevents scrollbar jumping */
+}
+
+/* Cheap, GPU-only entrance animation (replaces per-card framer-motion) */
+@keyframes fade-up {
+  from { opacity: 0; transform: translate3d(0, 12px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+.animate-fade-up {
+  animation: fade-up 0.45s cubic-bezier(0.33, 1, 0.68, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up { animation: none; }
 }

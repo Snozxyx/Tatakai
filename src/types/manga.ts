@@ -65,6 +65,8 @@ export interface MangaDetail {
   status: string;
   genres: string[];
   themes: string[];
+  /** Raw source format (AniList MANGA/MANHWA/MANHUA/OEL/ONE_SHOT/NOVEL). Used to classify the reading track. */
+  format?: string | null;
   origin: string | null;
   originLanguage: string | null;
   adult: boolean;
@@ -94,6 +96,16 @@ export interface MangaDetail {
   staff?: StaffMember[];
   relations?: MediaRelation[];
   externalLinks?: ExternalLink[];
+  /** Provenance + raw catalog columns (admin content editor / "in DB" badge). */
+  tatakaiId?: string | null;
+  sourceApi?: string | null;
+  inDb?: boolean;
+  bannerImage?: string | null;
+  coverImageMedium?: string | null;
+  meanScore?: number | null;
+  favourites?: number | null;
+  rating?: string | null;
+  trailerUrl?: string | null;
 }
 
 export interface MangaDetailResponse {

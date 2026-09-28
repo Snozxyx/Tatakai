@@ -230,23 +230,27 @@ export default function PublicProfilePage() {
               </div>
             </div>
 
-            {/* Showcase Anime */}
-            {(profile as any).showcase_anime && (profile as any).showcase_anime.length > 0 && (
+            {/* Showcase Anime
+              *
+              * Reads `showcase_anime_ids`, the column `usePublicProfile` actually
+              * selects. This read `showcase_anime`, which exists in no migration, so
+              * the block never rendered. The column is a `text[]` of ids — titles and
+              * posters are not stored, so the card is the id until something resolves
+              * them. Nothing writes the column yet either: `useUpdateShowcaseAnime`
+              * has no call site, so there is no picker to populate it.
+              */}
+            {Array.isArray((profile as any).showcase_anime_ids) && (profile as any).showcase_anime_ids.length > 0 && (
               <div className="mt-6 pt-6 border-t border-muted">
                 <h3 className="text-sm font-medium text-muted-foreground mb-3">Showcase</h3>
                 <div className="flex gap-3 overflow-x-auto pb-2">
-                  {(profile as any).showcase_anime.map((anime: any, i: number) => (
+                  {(profile as any).showcase_anime_ids.map((animeId: string) => (
                     <Link
-                      key={i}
-                      to={`/anime/${anime.id}`}
+                      key={animeId}
+                      to={`/anime/${animeId}`}
                       className="flex-shrink-0 group"
                     >
-                      <div className="w-20 h-28 rounded-lg overflow-hidden">
-                        <img
-                          src={anime.image}
-                          alt={anime.title}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform"
-                        />
+                      <div className="w-20 h-28 rounded-lg overflow-hidden bg-muted flex items-center justify-center">
+                        <Play className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
                       </div>
                     </Link>
                   ))}

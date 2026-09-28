@@ -12,7 +12,9 @@ import { ArrowLeft, Send, AlertTriangle, MessageCircle, HelpCircle, Star, FileTe
 import { useToast } from '@/hooks/ui/use-toast';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { supabase } from '@/integrations/supabase/client';
+import { uploadUserMedia } from '@/lib/userMedia';
+import { imageFileFromTransfer, dragHasFiles } from '@/lib/imageIntake';
+import { cn } from '@/lib/utils';
 import {
   Select,
   SelectContent,
@@ -35,6 +37,7 @@ export default function ForumNewPostPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
 
   // Redirect if not logged in
   if (!user) {
@@ -44,8 +47,10 @@ export default function ForumNewPostPage() {
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (file) acceptImageFile(file);
+  };
 
+  const acceptImageFile = (file: File) => {
     // Validate file type
     if (!file.type.startsWith('image/')) {
       toast({ title: 'Please select an image file', variant: 'destructive' });
@@ -74,21 +79,8 @@ export default function ForumNewPostPage() {
   };
 
   const uploadImage = async (file: File): Promise<string> => {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${user!.id}-${Date.now()}.${fileExt}`;
-    const filePath = `forum_images/${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('forum')
-      .upload(filePath, file);
-
-    if (uploadError) throw uploadError;
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('forum')
-      .getPublicUrl(filePath);
-
-    return publicUrl;
+    const { url } = await uploadUserMedia(file, user!.id, 'forum_image');
+    return url;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -251,7 +243,26 @@ export default function ForumNewPostPage() {
                 ) : (
                   <label
                     htmlFor="image-upload"
-                    className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-white/20 rounded-lg cursor-pointer hover:bg-white/5 transition-colors"
+                    onDragOver={(e) => {
+                      if (!dragHasFiles(e.dataTransfer)) return;
+                      e.preventDefault();
+                      setDragActive(true);
+                    }}
+                    onDragLeave={(e) => {
+                      if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                      setDragActive(false);
+                    }}
+                    onDrop={(e) => {
+                      if (!dragHasFiles(e.dataTransfer)) return;
+                      e.preventDefault();
+                      setDragActive(false);
+                      const file = imageFileFromTransfer(e.dataTransfer);
+                      if (file) acceptImageFile(file);
+                    }}
+                    className={cn(
+                      'flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer transition-colors',
+                      dragActive ? 'border-primary/60 bg-primary/10' : 'border-white/20 hover:bg-white/5',
+                    )}
                   >
                     <div className="flex flex-col items-center justify-center pt-5 pb-6">
                       <Upload className="w-10 h-10 mb-3 text-muted-foreground" />

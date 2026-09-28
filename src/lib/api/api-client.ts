@@ -3,8 +3,14 @@ import type { EpisodeData, EpisodeServer, HomeData, StreamingData } from "@/type
 import { getHighQualityImage } from "@/lib/api/proxy-utils";
 import { fetchJikanEpisodes } from "@/core/content/jikan-client";
 import { fetchAniZipMapping } from "@/lib/mapping/anizip";
+import { resolveApiV3Base } from "@/lib/api/backendOrigin";
 
-export const TATAKAI_API_URL = import.meta.env.VITE_TATAKAI_API_URL || "https://api.tatakai.app/api/v3";
+// Canonical backend `/api/v3` base. Resolves VITE_BACKEND_ORIGIN → origin of
+// VITE_TATAKAI_API_URL → http page origin (see backendOrigin.ts). The former
+// hardcoded "https://api.tatakai.app" fallback was a dead host, so any build
+// without VITE_TATAKAI_API_URL set (incl. the desktop app://) sent playback
+// dispatch to nowhere.
+export const TATAKAI_API_URL = resolveApiV3Base();
 
 const GENRE_ALIASES: Record<string, string> = {
   "slice-of-life": "Slice of Life",

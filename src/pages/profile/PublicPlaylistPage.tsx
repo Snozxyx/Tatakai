@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Loader2, Share2 } from 'lucide-react';
 import { getProxiedImageUrl } from '@/lib/api';
+import { resolveBackendOrigin } from '@/lib/api/backendOrigin';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { Seo } from '@/components/seo/Seo';
 
 function normalizeOwnerName(value: unknown): string | null {
   if (typeof value !== 'string') return null;
@@ -75,7 +77,7 @@ export default function PublicPlaylistPage() {
       setOwnerName('Unknown');
 
       try {
-        const response = await fetch(`/api/public/playlists/${encodeURIComponent(shareSlug)}`);
+        const response = await fetch(`${resolveBackendOrigin()}/api/public/playlists/${encodeURIComponent(shareSlug)}`);
         const data = await response.json();
         const nextPlaylist = data?.data ?? null;
 
@@ -134,6 +136,16 @@ export default function PublicPlaylistPage() {
 
   return (
     <div className={embed ? 'bg-transparent p-4' : 'min-h-screen bg-background text-foreground p-6'}>
+      {!embed && (
+        <Seo
+          title={name || 'Playlist'}
+          description={share_description || `A playlist with ${playlist_items.length} titles on Tatakai.`}
+          image={playlist_items[0]?.anime_poster || undefined}
+          canonicalPath={`/p/${shareSlug}`}
+          kind="website"
+          suffix=" — Tatakai Playlist"
+        />
+      )}
       <div className={embed ? 'max-w-full' : 'max-w-4xl mx-auto'}>
         <div className="flex items-center justify-between mb-4">
           <div>

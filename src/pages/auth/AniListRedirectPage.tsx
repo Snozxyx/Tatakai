@@ -1,6 +1,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSettingsModal } from '@/contexts/SettingsModalContext';
 import { exchangeAniListCode } from '@/lib/externalIntegrations';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -10,6 +11,7 @@ import { GlassPanel } from '@/components/ui/GlassPanel';
 export default function AniListRedirectPage() {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
+    const { openSettings } = useSettingsModal();
     const { user, isLoading: authLoading, refreshProfile } = useAuth();
     const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
     const [error, setError] = useState<string | null>(null);
@@ -54,7 +56,7 @@ export default function AniListRedirectPage() {
                 await refreshProfile();
                 setStatus('success');
                 toast.success('Successfully linked AniList!');
-                setTimeout(() => navigate('/settings?tab=integrations'), 2000);
+                setTimeout(() => { navigate('/', { replace: true }); openSettings('integrations'); }, 2000);
             } catch (err: any) {
                 console.error('AniList Exchange Error:', err);
                 setStatus('error');
@@ -91,7 +93,7 @@ export default function AniListRedirectPage() {
                         <h1 className="text-2xl font-bold">Authentication Failed</h1>
                         <p className="text-destructive font-medium">{error}</p>
                         <button
-                            onClick={() => navigate('/settings?tab=integrations')}
+                            onClick={() => { navigate('/', { replace: true }); openSettings('integrations'); }}
                             className="mt-4 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
                         >
                             Back to Settings

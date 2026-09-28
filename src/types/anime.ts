@@ -1,4 +1,4 @@
-import type { MediaRelation, StaffMember, ExternalLink } from "@/core/content/types";
+import type { MediaRelation, StaffMember, ExternalLink, MediaTag } from "@/core/content/types";
 
 export interface Episode {
   sub: number;
@@ -15,6 +15,8 @@ export interface SpotlightAnime {
   rank: number;
   otherInfo: string[];
   episodes: Episode;
+  /** AniList 18+ flag, propagated from `TatakaiMedia.isAdult` for content-safety. */
+  isAdult?: boolean;
 }
 
 export interface TrendingAnime {
@@ -22,6 +24,7 @@ export interface TrendingAnime {
   name: string;
   poster: string;
   rank: number;
+  isAdult?: boolean;
 }
 
 export interface TopAnime {
@@ -32,6 +35,7 @@ export interface TopAnime {
   episodes: Episode;
   malId?: number;
   anilistId?: number;
+  isAdult?: boolean;
 }
 
 export interface AnimeCard {
@@ -45,6 +49,8 @@ export interface AnimeCard {
   episodes: Episode;
   malId?: number;
   anilistId?: number;
+  isAdult?: boolean;
+  year?: number;
 }
 
 export interface HomeData {
@@ -65,6 +71,8 @@ export interface HomeData {
 }
 
 export interface AnimeInfo {
+  /** AniList 18+ flag, propagated from `TatakaiMedia.isAdult`; drives the warn-before-open gate. */
+  isAdult?: boolean;
   info: {
     id: string;
     name: string;
@@ -100,6 +108,7 @@ export interface AnimeInfo {
   moreInfo: {
     aired: string;
     genres: string[];
+    tags?: MediaTag[];
     status: string;
     studios: string;
     duration: string;

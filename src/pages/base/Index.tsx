@@ -4,7 +4,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { Header } from "@/components/layout/Header";
 import { useIsNativeApp, useIsDesktopApp } from "@/hooks/ui/useIsNativeApp";
-import { updateDiscordRpc } from "@/lib/discordRpc";
+import { setBrowsingRpc } from "@/lib/discordRpc";
 import { useIsMobile } from "@/hooks/ui/use-mobile";
 import { Capacitor } from '@capacitor/core';
 import { cn } from "@/lib/utils";
@@ -16,27 +16,37 @@ import { GenreCloud } from "@/components/anime/GenreCloud";
 import { AnimeGrid } from "@/components/anime/AnimeGrid";
 import { ContinueWatching } from "@/components/anime/ContinueWatching";
 import { LocalContinueWatching } from "@/components/anime/LocalContinueWatching";
-import { PlaylistSection } from "@/components/anime/PlaylistSection";
 import { UpcomingAnimeSection } from "@/components/anime/UpcomingAnimeSection";
 import { InfiniteHomeSections } from "@/components/anime/InfiniteHomeSections";
 import { MobileInfiniteHomeSections } from "@/components/anime/MobileInfiniteHomeSections";
-import { TrendingForumSection } from "@/components/anime/TrendingForumSection";
-import { WatchRoomSection } from "@/components/home/WatchRoomSection";
 import { HeroSkeleton, CardSkeleton } from "@/components/ui/skeleton-custom";
 import { AIRecommendationBanner } from "@/components/anime/AIRecommendationBanner";
-import { TierlistSection } from "@/components/home/TierlistSection";
+import { CommunitySection } from "@/components/home/CommunitySection";
+import { Reveal } from "@/components/ui/Reveal";
 import { ReviewPopup } from "@/components/ui/ReviewPopup";
-import { LanguagesSection } from "@/components/anime/LanguagesSection";
-import { ReleaseV5Banner } from "@/components/layout/MangaBanner";
+import {  ReleaseV6Banner } from "@/components/layout/MangaBanner";
 import { IndexMangaShowcase } from "@/components/manga/IndexMangaShowcase";
 import { LastReadMangaSection } from "@/components/manga/LastReadMangaSection";
 import { Heart, Sparkles } from "lucide-react";
 import { DiscordSection } from "@/components/home/DiscordSection";
 import { DownloadSection } from "@/components/home/DownloadSection";
 import { AppDownloadBanner } from "@/components/layout/AppDownloadBanner";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { BecauseYouWatched } from "@/components/anime/BecauseYouWatched";
 import { TorrentSessionBanner } from "@/components/home/TorrentSessionBanner";
+import { ExtensionSlot } from "@/core/extensions/ExtensionSlot";
+
+/**
+ * Home sections wrapped for a smooth scroll-in. The margin reset mirrors the
+ * container's `[&>section]:!mb-0` so nesting a section inside the reveal <div>
+ * doesn't reintroduce the component's own bottom margin (spacing stays owned by
+ * the container's `space-y`).
+ */
+const RevealSection = ({ children, delay }: { children: ReactNode; delay?: number }) => (
+  <Reveal delay={delay} className="[&>section]:!mb-0 [&>div]:!mb-0">
+    {children}
+  </Reveal>
+);
 
 const Index = () => {
   const { data, isLoading, error } = useHomeData();
@@ -46,12 +56,12 @@ const Index = () => {
   const isMobileApp = Capacitor.isNativePlatform();
   const showInfiniteEarly = isMobile || isMobileApp;
   const [showDeferredSections, setShowDeferredSections] = useState(false);
-  
+
   // Show sidebar on desktop (web or app), but not on mobile (web or app)
   const showSidebar = !isMobile && !isMobileApp;
 
   useEffect(() => {
-    updateDiscordRpc('Browsing Anime', 'Main Menu');
+    setBrowsingRpc('Anime');
   }, []);
 
   useEffect(() => {
@@ -92,10 +102,8 @@ const Index = () => {
         <Header />
         <div className="hidden md:block h-4 lg:h-6" aria-hidden />
 
-        {/* Quick-action buttons: mood picker + random anime */}
-        {/* <div className="flex items-center gap-3 mb-4 flex-wrap mt-4">
-          <AnimeRoulette trendingAnimes={data?.trendingAnimes} />
-        </div> */}
+        {/* Extension mount point — top of home. */}
+        <ExtensionSlot slotId="home-top" />
 
         {isLoading ? (
           <>
@@ -107,8 +115,8 @@ const Index = () => {
             </div>
           </>
         ) : data ? (
-          <>
-            {/* Hero - Spotlight Anime */}
+          <div className="space-y-14 md:space-y-20 [&>section]:!mb-0 [&>div]:!mb-0">
+            {/* Hero — Spotlight */}
             {data.spotlightAnimes.length > 0 && (
               <HeroSection
                 spotlight={data.spotlightAnimes[0]}
@@ -116,105 +124,72 @@ const Index = () => {
               />
             )}
 
-            <ReleaseV5Banner />
+            <ReleaseV6Banner />
 
-
-
-
-
-            {/* Continue Watching - Database backed for logged in users */}
+            {/* ── Pick up where you left off ── */}
             <ContinueWatching />
-
-            {/* Continue Watching - LocalStorage for guests */}
             <LocalContinueWatching />
-            
-            {/* Torrent Sessions - Desktop only */}
             <TorrentSessionBanner />
-
             <LastReadMangaSection />
 
-            {/* My Playlists */}
-            <PlaylistSection />
-
-            {/* Latest Episodes */}
-            <LatestEpisodes animes={data.latestEpisodeAnimes} />
-            {/* Trending Grid */}
-            <TrendingGrid animes={data.trendingAnimes} />
+            {/* ── Fresh & trending ── */}
+            <RevealSection><LatestEpisodes animes={data.latestEpisodeAnimes} /></RevealSection>
+            <RevealSection><TrendingGrid animes={data.trendingAnimes} /></RevealSection>
 
             {showDeferredSections ? (
               <>
-                {/* Because You Watched — Personalised recommendations */}
-                <BecauseYouWatched className="mb-12" />
+                {/* ── Made for you ── */}
+                <RevealSection><BecauseYouWatched /></RevealSection>
+                <RevealSection><AIRecommendationBanner /></RevealSection>
 
-                {/* Last manga/manhwa/comics progress */}
-                <IndexMangaShowcase />
+                {/* ── Rankings & curated ── */}
+                <RevealSection>
+                  <TopAnimeSection
+                    today={data.top10Animes.today}
+                    week={data.top10Animes.week}
+                    month={data.top10Animes.month}
+                  />
+                </RevealSection>
+                <RevealSection><UpcomingAnimeSection /></RevealSection>
+                <RevealSection>
+                  <AnimeGrid
+                    animes={data.mostPopularAnimes.slice(0, 6)}
+                    title="Most Popular"
+                    icon={<Heart className="w-5 h-5 text-destructive fill-destructive" />}
+                  />
+                </RevealSection>
+                <RevealSection>
+                  <AnimeGrid
+                    animes={data.mostFavoriteAnimes.slice(0, 6)}
+                    title="Most Favorite"
+                    icon={<Sparkles className="w-5 h-5 text-amber" />}
+                  />
+                </RevealSection>
 
-                <AIRecommendationBanner />
+                {/* ── Explore across media ── */}
+                <RevealSection><IndexMangaShowcase /></RevealSection>
+                <RevealSection><GenreCloud genres={data.genres} /></RevealSection>
 
-                {/* Languages Section */}
-                <LanguagesSection />
+                {/* ── Community ── */}
+                <RevealSection><CommunitySection /></RevealSection>
 
-                <TierlistSection />
+                {/* ── Get more out of Tatakai ── */}
+                <RevealSection><DiscordSection /></RevealSection>
 
-                {/* Upcoming Anime - From Jikan API */}
-                <UpcomingAnimeSection />
-
-                {/* Top 10 Anime */}
-                <TopAnimeSection
-                  today={data.top10Animes.today}
-                  week={data.top10Animes.week}
-                  month={data.top10Animes.month}
-                />
-
-                {/* Join Discord */}
-                <div className="mb-12">
-                  <DiscordSection />
-                </div>
-
-                {/* Download Desktop App */}
-                <div className="mb-24">
-                  <DownloadSection />
-                </div>
-
-                {/* Most Popular */}
-                <AnimeGrid
-                  animes={data.mostPopularAnimes.slice(0, 6)}
-                  title="Most Popular"
-                  icon={<Heart className="w-5 h-5 text-destructive fill-destructive" />}
-                />
-
-                {/* Genre Cloud */}
-                <GenreCloud genres={data.genres} />
-
-                {/* Trending Forum Discussions */}
-                <TrendingForumSection />
-
-                {/* Watch Together Rooms */}
-                <WatchRoomSection />
-
-                {/* Most Favorite */}
-                <AnimeGrid
-                  animes={data.mostFavoriteAnimes.slice(0, 6)}
-                  title="Most Favorite"
-                  icon={<Sparkles className="w-5 h-5 text-amber" />}
-                />
-
-                {/* Infinite Scrolling Genre Sections */}
-                {showInfiniteEarly && <MobileInfiniteHomeSections />}
-                {!showInfiniteEarly && <InfiniteHomeSections />}
-
-                <ReviewPopup />
+                {/* Infinite genre feed */}
+                {showInfiniteEarly ? <MobileInfiniteHomeSections /> : <InfiniteHomeSections />}
               </>
             ) : (
-              <div className="mt-12 space-y-6" aria-hidden>
-                <div className="h-28 rounded-2xl bg-white/5 animate-pulse" />
-                <div className="h-52 rounded-2xl bg-white/5 animate-pulse" />
-              </div>
+              <div className="min-h-[60vh]" aria-hidden />
             )}
-          </>
+          </div>
         ) : null}
+
+        {/* Extension mount point — bottom of home. */}
+        <ExtensionSlot slotId="home-bottom" />
       </main>
 
+      {showDeferredSections && data && <ReviewPopup />}
       {!showSidebar && <MobileNav />}
       <AppDownloadBanner />
     </div>

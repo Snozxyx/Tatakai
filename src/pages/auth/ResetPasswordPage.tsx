@@ -66,7 +66,7 @@ export default function ResetPasswordPage() {
 
           {/* Logo */}
             <div className="text-center mb-6">
-            <img src="/tatakai-logo.png" alt="Tatakai Logo" className="mx-auto h-52 w-282 transition-transform duration-300 hover:scale-105 hover:drop-shadow-lg" />
+            <img src={`${import.meta.env.BASE_URL}assets/logo/tatakai-logo.png`} alt="Tatakai Logo" className="mx-auto h-52 w-282 transition-transform duration-300 hover:scale-105 hover:drop-shadow-lg" />
             </div>
 
           {/* Reset Form */}

@@ -16,6 +16,7 @@ const FOOTER_LINKS = {
   ],
   Support: [
     { label: 'Community', path: '/community' },
+    { label: 'Community Guidelines', path: '/community-guidelines' },
     { label: 'Terms of Service', path: '/terms' },
     { label: 'Privacy Policy', path: '/privacy' },
     { label: 'DMCA', path: '/dmca' },
@@ -46,8 +47,8 @@ export function Footer() {
               </h2>
             </Link>
             <p className="text-muted-foreground leading-relaxed max-w-md text-lg font-medium">
-              The next generation anime streaming platform. 
-              Sleek, fast, and community-driven.
+              The extension-based otaku community.
+              Track anime and manga, build tier lists and playlists, and connect with fellow fans.
             </p>
             <div className="flex items-center gap-4">
               {SOCIAL_LINKS.map((social) => (

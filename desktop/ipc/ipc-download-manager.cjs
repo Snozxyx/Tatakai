@@ -21,14 +21,15 @@
  */
 
 const ffmpeg = require('fluent-ffmpeg');
-const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
+// Resolved to the unpacked binary in a packaged build (app.asar → app.asar.unpacked).
+const { ffmpegPath } = require('../services/ffmpeg-paths.cjs');
 const axios = require('axios');
 const pathMod = require('path');
 const fsMod = require('fs');
 const { DownloadStorageManager } = require('../runtime/download/storage-manager.cjs');
 const { TorrentFacade } = require('../runtime/torrent/facade.cjs');
 
-ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+if (ffmpegPath) ffmpeg.setFfmpegPath(ffmpegPath);
 
 const activeProcesses = new Map();
 
@@ -79,6 +80,63 @@ async function downloadFile(url, outputPath, options = {}) {
     });
 }
 
+/**
+ * hls.js picks the top rendition adaptively for playback, but ffmpeg given a
+ * MASTER playlist selects a variant by its own default (often the first-listed,
+ * i.e. the LOWEST quality) → the player-button download looks worse than what
+ * was on screen. So when the input is a master m3u8, resolve it to the
+ * highest-bandwidth variant media playlist and hand ffmpeg *that*. Best-effort:
+ * any failure falls back to the original URL (ffmpeg still downloads, just at
+ * its default rendition), so this never regresses a working download.
+ */
+async function resolveBestHlsVariant(url, headers = {}) {
+    try {
+        if (!/\.m3u8(\?|$)/i.test(url)) return url;
+        const res = await axios.get(url, {
+            timeout: 15000,
+            responseType: 'text',
+            transformResponse: [(d) => d],
+            maxRedirects: 5,
+            headers: {
+                'User-Agent': headers['User-Agent'] || headers['user-agent'] ||
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept': '*/*',
+                ...headers,
+            },
+            validateStatus: (s) => s >= 200 && s < 400,
+        });
+        const text = String(res.data || '');
+        if (!text.includes('#EXT-X-STREAM-INF')) return url; // already a media playlist
+        const finalUrl = res.request?.res?.responseUrl || url; // resolve relative URIs against the redirected master
+        const lines = text.split(/\r?\n/);
+        let best = null; // { bandwidth, height, uri }
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line.startsWith('#EXT-X-STREAM-INF:')) continue;
+            const bw = Number((line.match(/[,:]BANDWIDTH=(\d+)/) || [])[1] || 0);
+            const height = Number((line.match(/RESOLUTION=\d+x(\d+)/) || [])[1] || 0);
+            // The URI is the next non-comment, non-empty line.
+            let uri = '';
+            for (let j = i + 1; j < lines.length; j++) {
+                const cand = lines[j].trim();
+                if (!cand || cand.startsWith('#')) continue;
+                uri = cand;
+                break;
+            }
+            if (!uri) continue;
+            if (!best || bw > best.bandwidth || (bw === best.bandwidth && height > best.height)) {
+                best = { bandwidth: bw, height, uri };
+            }
+        }
+        if (!best) return url;
+        const resolved = new URL(best.uri, finalUrl).href;
+        console.log(`[download] HLS master → best variant ${best.height || '?'}p (${Math.round(best.bandwidth / 1000)}kbps)`);
+        return resolved;
+    } catch (_) {
+        return url; // network/parse failure → let ffmpeg handle the master directly
+    }
+}
+
 function cancelFfmpeg(episodeId) {
     const proc = activeProcesses.get(episodeId);
     if (proc) {
@@ -92,6 +150,19 @@ function cancelFfmpeg(episodeId) {
 }
 
 async function downloadEpisode({ url, output, headers = {}, onProgress, episodeId }) {
+    // Fail fast on a bad input/output rather than letting ffmpeg emit the
+    // opaque "Unable to find a suitable output format for ''" (empty output).
+    const inputUrlRaw = typeof url === 'string' ? url.trim() : '';
+    if (!inputUrlRaw || !/^(https?|file):/i.test(inputUrlRaw)) {
+        throw new Error(`No valid stream URL to download (got "${String(url).slice(0, 80)}")`);
+    }
+    if (!output || !String(output).trim()) {
+        throw new Error('Internal error: empty download output path');
+    }
+    // Upgrade a master HLS playlist to its highest-quality variant before ffmpeg
+    // sees it (best-effort; falls back to the original URL on any failure).
+    const inputUrl = await resolveBestHlsVariant(inputUrlRaw, headers);
+
     return new Promise((resolve, reject) => {
         const dir = pathMod.dirname(output);
         if (!fsMod.existsSync(dir)) fsMod.mkdirSync(dir, { recursive: true });
@@ -110,14 +181,22 @@ async function downloadEpisode({ url, output, headers = {}, onProgress, episodeI
         const tempOutput = `${normalizedOutput}.tmp`;
         if (fsMod.existsSync(tempOutput)) fsMod.unlinkSync(tempOutput);
 
-        const command = ffmpeg(url);
+        const command = ffmpeg(inputUrl);
         const userAgent =
             headers['User-Agent'] ||
             headers['user-agent'] ||
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
 
         const inputOptions = ['-user_agent', userAgent, '-analyzeduration', '10000000', '-probesize', '10000000'];
-        const headerEntries = Object.entries(headers).filter(([k]) => !k.toLowerCase().includes('user-agent'));
+        // Referer gets ffmpeg's dedicated option; only the *remaining* headers go
+        // into the -headers blob (a Referer inside -headers is redundant and the
+        // CRLF blob is the fiddlier path, so keep it minimal).
+        const refererVal = headers['Referer'] || headers['referer'];
+        if (refererVal) inputOptions.push('-referer', String(refererVal));
+        const headerEntries = Object.entries(headers).filter(([k]) => {
+            const lk = k.toLowerCase();
+            return lk !== 'user-agent' && lk !== 'referer';
+        });
         if (headerEntries.length > 0) {
             inputOptions.push('-headers', `${headerEntries.map(([k, v]) => `${k}: ${v}`).join('\r\n')}\r\n`);
         }
@@ -136,13 +215,29 @@ async function downloadEpisode({ url, output, headers = {}, onProgress, episodeI
         ]);
         command.output(tempOutput);
 
+        // Captured on 'start' so a failure can report the exact command ffmpeg ran
+        // (this is what surfaces an empty/garbled output target when it happens).
+        let startedCmd = '';
+        command.on('start', (cmdLine) => {
+            startedCmd = String(cmdLine || '');
+        });
+
         let lastProgress = 0;
         let lastProgressTime = Date.now();
         let downloadStartTime = Date.now();
         let hasReceivedData = false;
         let totalDuration = 0;
+        // Keep a rolling tail of ffmpeg stderr so a bare "exit code 1" carries the
+        // real reason (404/403 from the source, "no audio stream", codec errors …)
+        // instead of an opaque message the renderer can't act on.
+        const stderrTail = [];
 
         command.on('stderr', (line) => {
+            const trimmed = String(line || '').trim();
+            if (trimmed) {
+                stderrTail.push(trimmed);
+                if (stderrTail.length > 12) stderrTail.shift();
+            }
             if (line.includes('Duration:')) {
                 hasReceivedData = true;
                 const match = line.match(/Duration: (\d{2}):(\d{2}):(\d{2})/);
@@ -218,6 +313,18 @@ async function downloadEpisode({ url, output, headers = {}, onProgress, episodeI
                 } catch (_) { /* empty */ }
             }
             activeProcesses.delete(episodeId);
+            const tail = stderrTail.filter((l) => /error|failed|invalid|denied|403|404|not found|no such|unable|could not/i.test(l));
+            const detail = (tail.length ? tail : stderrTail).slice(-3).join(' | ');
+            if (detail && !String(err.message || '').includes(detail)) {
+                err.message = `${err.message} — ${detail}`;
+            }
+            // Surface an "Unable to find a suitable output format for ''" class of
+            // failure with the exact ffmpeg command, so an empty/garbled output or
+            // input target is diagnosable from the renderer's error alone.
+            if (/suitable output format|invalid argument/i.test(String(err.message || '')) && startedCmd) {
+                console.error('[download] ffmpeg failed. Command was:', startedCmd);
+                err.message = `${err.message} [cmd: ${startedCmd.slice(0, 300)}]`;
+            }
             reject(err);
         });
 
@@ -409,40 +516,107 @@ module.exports = function registerDownloadManager(ipcMain, app, fs, path, logger
                     // Forward torrent:progress events as download-progress to the renderer.
                     // We match by sessionId once start() resolves.
                     let torrentSessionId = null;
+                    // Guard so the done→finalize move runs once (progress keeps ticking).
+                    let finalized = false;
 
                     const progressHandler = (progressEvent) => {
                         if (torrentSessionId && progressEvent.sessionId !== torrentSessionId) return;
                         const win = getMainWindow();
                         if (win && !win.isDestroyed()) {
+                            const dl = Number(progressEvent.downloadSpeed) || 0;
+                            const ul = Number(progressEvent.uploadSpeed) || 0;
                             win.webContents.send('download-progress', {
                                 episodeId,
                                 percent: progressEvent.progress ?? 0,
-                                speed: progressEvent.downloadSpeed
-                                    ? `${(progressEvent.downloadSpeed / (1024 * 1024)).toFixed(1)} MB/s`
+                                speed: dl
+                                    ? `${(dl / (1024 * 1024)).toFixed(1)} MB/s`
                                     : '',
                                 eta: progressEvent.eta != null ? formatTime(progressEvent.eta) : '',
+                                // Raw swarm stats for the titlebar widget (down/up/peers/ratio).
+                                dlSpeedBps: dl,
+                                upSpeedBps: ul,
+                                downloadedBytes: Number(progressEvent.downloaded) || 0,
+                                uploadedBytes: Number(progressEvent.uploaded) || 0,
+                                ratio: typeof progressEvent.ratio === 'number' ? progressEvent.ratio : undefined,
                                 seeders: progressEvent.seeders,
                                 leechers: progressEvent.leechers,
                                 numPeers: progressEvent.numPeers,
                             });
                         }
 
-                        // When the torrent reports done, emit download-completed
-                        if (progressEvent.done && torrentSessionId && progressEvent.sessionId === torrentSessionId) {
-                            try {
-                                void torrentFacade.stop(torrentSessionId, { destroyStore: false });
-                            } catch (_) {}
-                            cleanup();
-                            const win = getMainWindow();
-                            if (win && !win.isDestroyed()) {
-                                win.webContents.send('download-completed', {
-                                    episodeId,
-                                    path: resolvedDownloadPath,
-                                    sessionId: torrentSessionId,
-                                });
-                            }
-                            processQueue();
+                        // When the torrent reports done, move the finished file
+                        // into the library as a single copy, then emit completed.
+                        if (progressEvent.done && torrentSessionId && progressEvent.sessionId === torrentSessionId && !finalized) {
+                            finalized = true;
+                            void finalizeTorrentDownload();
                         }
+                    };
+
+                    // Fold the completed torrent into ONE library file. Previously the
+                    // torrent data stayed in the torrent cache while the library only
+                    // held a manifest → the "downloading in 2 locations" bug. Now:
+                    //  • a fresh download (file under the library root) is moved to
+                    //    Episode_N.<ext> and the manifest is pointed at it;
+                    //  • a reused streaming torrent (file still in the stream cache)
+                    //    is left in place and the download simply points at it —
+                    //    no re-download, no second copy, playback uninterrupted.
+                    const finalizeTorrentDownload = async () => {
+                        let finalPath = resolvedDownloadPath;
+                        let fileSize = 0;
+                        try {
+                            const fp = await torrentFacade.getFilePath(torrentSessionId);
+                            const srcPath = fp && fp.success ? fp.path : null;
+                            if (srcPath && fs.existsSync(srcPath)) {
+                                const underLibrary = path
+                                    .resolve(srcPath)
+                                    .startsWith(path.resolve(resolvedDownloadPath));
+                                if (underLibrary) {
+                                    const ext = path.extname(srcPath) || '.mp4';
+                                    const dest = path.join(animeDir, `Episode_${episodeNumber}${ext}`);
+                                    if (path.resolve(dest) !== path.resolve(srcPath)) {
+                                        try {
+                                            fs.renameSync(srcPath, dest);
+                                        } catch (_) {
+                                            // Cross-volume/locked → copy then drop the source.
+                                            fs.copyFileSync(srcPath, dest);
+                                            try { fs.unlinkSync(srcPath); } catch (_) {}
+                                        }
+                                    }
+                                    finalPath = dest;
+                                    // Point the manifest at the real file (was hardcoded .mp4).
+                                    try {
+                                        const mf = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+                                        const i = (mf.episodes || []).findIndex((e) => e.id === episodeId);
+                                        if (i !== -1) {
+                                            mf.episodes[i].file = path.basename(dest);
+                                            fs.writeFileSync(manifestPath, JSON.stringify(mf, null, 2));
+                                        }
+                                    } catch (_) {}
+                                } else {
+                                    // Reused stream-cache torrent — point at it, don't copy.
+                                    finalPath = srcPath;
+                                }
+                                try { fileSize = fs.statSync(finalPath).size; } catch (_) {}
+                            }
+                        } catch (e) {
+                            logger.warn('[Download] Torrent finalize/move failed:', e.message);
+                        }
+                        // Stop seeding but keep the file (destroyStore:false) — the file
+                        // is now the single library copy (moved) or the shared cache copy.
+                        try {
+                            await torrentFacade.stop(torrentSessionId, { destroyStore: false });
+                        } catch (_) {}
+                        cleanup();
+                        const win = getMainWindow();
+                        if (win && !win.isDestroyed()) {
+                            win.webContents.send('download-completed', {
+                                episodeId,
+                                path: finalPath,
+                                size: fileSize,
+                                sessionId: torrentSessionId,
+                            });
+                        }
+                        processQueue();
                     };
 
                     const cleanup = () => {

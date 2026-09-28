@@ -82,8 +82,45 @@ jobs:
         env:
           PATH: /bin:/usr/bin:/usr/local/bin:$PATH
 
+      # ELECTRON_BUILD=true makes vite emit base:'./' so assets resolve under
+      # file:// in the packaged app (without it, base is '/' and the packaged
+      # renderer loads a blank page).
       - name: Build Vite app
-        run: npx cross-env NODE_ENV=production vite build
+        run: npx cross-env NODE_ENV=production ELECTRON_BUILD=true vite build
+
+      # Render the Tatakai-branded NSIS installer graphics (Windows installer UI)
+      # from brand tokens with sharp (already a dep) → build/*.bmp. Referenced by
+      # the nsis block in package.json; generated here so the binary BMPs stay out
+      # of git and the installer art is reproducible. Harmless/unused on mac+linux.
+      - name: Generate installer assets
+        run: node scripts/generate-installer-assets.cjs
+
+      # Bundle the per-platform `cloudflared` binary for host-hosted watch-party
+      # tunnels. Downloaded here (not committed) so ~50MB binaries stay out of
+      # git; electron-builder ships it via extraResources (from resources/bin).
+      - name: Download cloudflared (watch-party tunnel binary)
+        shell: bash
+        run: |
+          set -e
+          mkdir -p resources/bin
+          BASE="https://github.com/cloudflare/cloudflared/releases/latest/download"
+          case "${{ matrix.platform }}" in
+            win)
+              curl -fL "$BASE/cloudflared-windows-amd64.exe" -o resources/bin/cloudflared.exe
+              ;;
+            linux)
+              curl -fL "$BASE/cloudflared-linux-amd64" -o resources/bin/cloudflared
+              chmod +x resources/bin/cloudflared
+              ;;
+            mac)
+              ARCH=$(uname -m)
+              if [ "$ARCH" = "arm64" ]; then A=arm64; else A=amd64; fi
+              curl -fL "$BASE/cloudflared-darwin-${A}.tgz" -o /tmp/cloudflared.tgz
+              tar -xzf /tmp/cloudflared.tgz -C resources/bin
+              chmod +x resources/bin/cloudflared
+              ;;
+          esac
+          ls -la resources/bin
 
       # Tag push → publish to GitHub Release (creates latest.yml for electron-updater)
       # workflow_dispatch with publish → also publish
@@ -92,6 +129,10 @@ jobs:
         run: npx electron-builder --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Ship unsigned for now: never auto-discover a macOS signing identity.
+          # Signing/notarization activate when CSC_LINK / APPLE_* secrets are set
+          # and this is removed — see docs/DESKTOP_SIGNING.md.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
       - name: Debug — list `dist_electron` contents
         shell: bash

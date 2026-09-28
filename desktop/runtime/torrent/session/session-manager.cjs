@@ -21,7 +21,7 @@ const { EventEmitter } = require('events');
 const { TorrentCacheManager } = require('../cache/cache-manager.cjs');
 const { prioritizePlaybackPieces, prioritizeSeekPoint } = require('./piece-prioritizer.cjs');
 const { waitForPrebuffer } = require('../streaming/stream-bridge.cjs');
-const { startRemuxJob } = require('../streaming/hls-remux.cjs');
+const { startRemuxJob, summarizeFfmpegError, ATTEMPT_COUNT } = require('../streaming/hls-remux.cjs');
 const { matchTorrentFilesToEpisode } = require('../naming/episode-matcher.cjs');
 const { parseReleaseName } = require('../naming/release-parser.cjs');
 const { detectBatchTorrentLayout } = require('../naming/batch-detector.cjs');
@@ -57,8 +57,7 @@ const EXTRA_TRACKERS = [
     // Top tier HTTP Trackers (great fallback if UDP is blocked by ISP/router)
     'http://tracker.gbitt.info:80/announce',
     'http://tracker.ipv6tracker.ru:80/announce',
-    'http://nyaa.tracker.wf:7777/announce',
-    
+
     // WebSocket (WebRTC) Trackers
     'wss://tracker.openwebtorrent.com',
     'wss://tracker.btorrent.xyz',
@@ -76,7 +75,28 @@ const DEFAULT_TORRENT_SETTINGS = {
     cleanupMaxCacheGb: 50,
     cleanupMaxAgeHours: 72,
     cleanupOnPlaybackEnd: true,
+    // Generic public trackers plus any URLs the user adds here. Content-neutral:
+    // trackers only help peer discovery for a magnet the user already supplied.
+    customTrackers: [],
 };
+
+const TRACKER_URL_RE = /^(udp|https?|wss):\/\/.+/i;
+
+/** Validate, trim, dedupe and cap a user-supplied tracker announce list. */
+function sanitizeCustomTrackers(value) {
+    if (!Array.isArray(value)) return [];
+    const out = [];
+    const seen = new Set();
+    for (const raw of value) {
+        const url = String(raw || '').trim();
+        if (!url || !TRACKER_URL_RE.test(url)) continue;
+        if (seen.has(url)) continue;
+        seen.add(url);
+        out.push(url);
+        if (out.length >= 50) break;
+    }
+    return out;
+}
 
 function safeNumber(value, fallback = 0) {
     const n = Number(value);
@@ -132,10 +152,11 @@ class TorrentSessionManager extends EventEmitter {
         this._activeTranscodes = new Set();
         this._sessionTranscodes = new Map(); // sessionId -> Set<ChildProcess>
 
-        this._defaultTrackers = EXTRA_TRACKERS.slice();
-
         this._settingsPath = this._path.join(this._app.getPath('userData'), 'torrent-settings.json');
         this._torrentSettings = this._loadSettings();
+
+        // Built-in generic trackers + user custom trackers (recomputed on update).
+        this._defaultTrackers = this._computeTrackers();
 
         this._cache = new TorrentCacheManager({
             app: this._app,
@@ -179,12 +200,25 @@ class TorrentSessionManager extends EventEmitter {
             cleanupMaxCacheGb,
             cleanupMaxAgeHours,
             cleanupOnPlaybackEnd: input.cleanupOnPlaybackEnd == null ? DEFAULT_TORRENT_SETTINGS.cleanupOnPlaybackEnd : Boolean(input.cleanupOnPlaybackEnd),
+            customTrackers: sanitizeCustomTrackers(input.customTrackers),
         };
+    }
+
+    /**
+     * Effective announce list: the built-in generic public trackers plus any
+     * user-supplied custom trackers. Recomputed whenever settings change so a
+     * newly added tracker applies to subsequently started torrents.
+     */
+    _computeTrackers() {
+        return [...EXTRA_TRACKERS, ...sanitizeCustomTrackers(this._torrentSettings?.customTrackers)];
     }
 
     updateTorrentSettings(next = {}) {
         const sanitized = this._sanitizeSettings({ ...this._torrentSettings, ...(next || {}) });
         this._torrentSettings = sanitized;
+        // Custom trackers may have changed — recompute the effective announce list
+        // so subsequently started/reannounced torrents pick them up.
+        this._defaultTrackers = this._computeTrackers();
         try {
             this._fs.writeFileSync(this._settingsPath, JSON.stringify(sanitized, null, 2));
         } catch (err) {
@@ -638,17 +672,22 @@ class TorrentSessionManager extends EventEmitter {
         const localUrl = isComplete && localPath ? this._toFileUrl(localPath) : '';
 
         const wantsAudio = options?.audioTrackIndex != null;
-        const isMkv = /\.(mkv|webm)$/i.test(String(file?.name || ''));
+        const name = String(file?.name || '');
+        // WebM is the Matroska subset Chromium actually demuxes; a general `.mkv`
+        // is not playable by `<video>` at any completion level, which is why the
+        // old "it's finished, hand over the raw URL" shortcut below is limited to
+        // WebM. Sending a finished MKV straight to the element produced exactly
+        // the reported failure: a `<video>` that never renders a frame.
+        const isMkv = /\.mkv$/i.test(name);
+        const isWebm = /\.webm$/i.test(name);
         const shouldHls = Boolean(wantsAudio || isMkv);
 
-        // When the torrent is fully downloaded and we only need HLS because it's
-        // MKV (not because the user selected a specific audio track), bypass HLS
-        // and return the direct URL. The WebTorrent HTTP server supports range
-        // requests, giving the player full native seeking capability.
-        if (isComplete && shouldHls && !wantsAudio) {
+        // A completed WebM needs no repackaging: the WebTorrent HTTP server
+        // answers range requests, so the element gets native seeking for free.
+        if (isComplete && isWebm && !wantsAudio) {
             return {
                 success: true,
-                url: rawUrl,
+                url: localUrl || rawUrl,
                 rawUrl: localUrl || rawUrl,
                 infoHash: torrent.infoHash,
                 name: file?.name || torrent.name,
@@ -665,7 +704,15 @@ class TorrentSessionManager extends EventEmitter {
             const jobs = this._hlsJobs.get(sessionId);
             let job = jobs.get(variantKey);
 
-            if (!job) {
+            /**
+             * Launch one remux pass and take ownership of its process.
+             *
+             * Kept local because every call site has to do the same three
+             * things — register for cleanup, track it as an active transcode,
+             * and drop it from that set on exit — and forgetting any one of
+             * them leaks an ffmpeg process past the session.
+             */
+            const launch = (attempt) => {
                 const inputUrl = isComplete && localPath ? localPath : rawUrl;
                 const started = startRemuxJob({
                     app: this._app,
@@ -673,32 +720,69 @@ class TorrentSessionManager extends EventEmitter {
                     sessionId,
                     inputUrl,
                     audioTrackIndex,
+                    attempt,
                 });
-                job = {
+                const next = {
                     proc: started.proc,
                     url: started.url,
                     manifestPath: started.manifestPath,
                     startedAt: Date.now(),
                     audioTrackIndex,
+                    attempt: started.attempt,
+                    attemptKey: started.attemptKey,
+                    attemptLabel: started.attemptLabel,
+                    stderr: started.stderr,
                 };
-                jobs.set(variantKey, job);
-                // track for cleanup via existing transcode kill logic
+                jobs.set(variantKey, next);
+
                 if (!this._sessionTranscodes.has(sessionId)) this._sessionTranscodes.set(sessionId, new Set());
                 this._sessionTranscodes.get(sessionId).add(started.proc);
                 this._activeTranscodes.add(started.proc);
-
                 started.proc.on('exit', () => {
                     this._activeTranscodes.delete(started.proc);
                 });
-            }
+
+                return next;
+            };
+
+            if (!job) job = launch(0);
 
             const ready = this._fs.existsSync(job.manifestPath);
             if (!ready) {
                 const running = job.proc && job.proc.exitCode == null;
-                if (!running) {
-                    return { success: false, error: 'transcode_error', transcode: { status: 'error' } };
+                if (running) {
+                    return { success: false, error: 'transcode_not_ready', transcode: { status: 'running' } };
                 }
-                return { success: false, error: 'transcode_not_ready', transcode: { status: 'running' } };
+
+                // ffmpeg exited without writing a playlist. The dead job used to
+                // stay in the map, so every retry re-read the same corpse and the
+                // session reported `transcode_error` until the app restarted —
+                // with no indication of why. Report the muxer's own complaint and
+                // fall through to the next, more compatible strategy: an audio
+                // codec MP4 cannot carry is by far the most common cause and a
+                // plain audio re-encode fixes it outright.
+                const detail = summarizeFfmpegError(job.stderr?.() || '');
+                const failedAttempt = Number(job.attempt ?? 0);
+                this._logger?.warn?.(
+                    `[Torrent] HLS ${job.attemptLabel || 'remux'} failed for ${sessionId}: ${detail || 'no output'}`,
+                );
+
+                jobs.delete(variantKey);
+                if (failedAttempt + 1 < ATTEMPT_COUNT) {
+                    launch(failedAttempt + 1);
+                    return {
+                        success: false,
+                        error: 'transcode_not_ready',
+                        transcode: { status: 'running', recoveredFrom: detail },
+                    };
+                }
+
+                return {
+                    success: false,
+                    error: 'transcode_error',
+                    detail: detail || undefined,
+                    transcode: { status: 'error', detail: detail || undefined },
+                };
             }
 
             return {

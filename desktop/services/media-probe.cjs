@@ -1,16 +1,17 @@
 'use strict';
 
 const ffmpeg = require('fluent-ffmpeg');
-const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
 const path = require('path');
 const fs = require('fs');
+// Resolved to the unpacked binary in a packaged build (app.asar → app.asar.unpacked).
+const { ffmpegPath, ffprobePath } = require('./ffmpeg-paths.cjs');
 
-const ffmpegPath = ffmpegInstaller.path;
-ffmpeg.setFfmpegPath(ffmpegPath);
+if (ffmpegPath) {
+    ffmpeg.setFfmpegPath(ffmpegPath);
+}
 
-// Try to set ffprobe path by looking in the same directory as ffmpeg
-const ffprobePath = ffmpegPath.replace(/ffmpeg(\.exe)?$/i, 'ffprobe$1');
-if (fs.existsSync(ffprobePath)) {
+// ffprobe ships beside ffmpeg when present; guard on existence.
+if (ffprobePath && fs.existsSync(ffprobePath)) {
     ffmpeg.setFfprobePath(ffprobePath);
 }
 

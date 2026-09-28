@@ -4,6 +4,8 @@
  * Uses PKCE flow for security.
  */
 
+import { resolveApiV3Base } from '@/lib/api/backendOrigin';
+
 const MAL_CLIENT_ID = import.meta.env.VITE_MAL_CLIENT_ID;
 const REDIRECT_URI = import.meta.env.VITE_MAL_REDIRECT_URI || (
     typeof window !== 'undefined'
@@ -36,13 +38,18 @@ function generateRandomString(length: number) {
  * Generates the MAL authorization URL.
  * Also stores the code_verifier in localStorage for later use.
  */
-export function getMalAuthUrl() {
+const MAL_REDIRECT_STORAGE_KEY = 'mal_redirect_uri';
+
+export function getMalAuthUrl(redirectUriOverride?: string) {
     if (!MAL_CLIENT_ID) {
         throw new Error('Missing VITE_MAL_CLIENT_ID');
     }
-    if (!REDIRECT_URI) {
+    const redirectUri = redirectUriOverride || REDIRECT_URI;
+    if (!redirectUri) {
         throw new Error('Missing VITE_MAL_REDIRECT_URI or window location context');
     }
+    // Persist so exchangeMalCode sends the identical redirect_uri (required by MAL).
+    localStorage.setItem(MAL_REDIRECT_STORAGE_KEY, redirectUri);
 
     const codeVerifier = generateRandomString(128);
     localStorage.setItem('mal_code_verifier', codeVerifier);
@@ -58,7 +65,7 @@ export function getMalAuthUrl() {
         code_challenge: codeChallenge,
         code_challenge_method: 'plain',
         state: generateRandomString(16),
-        redirect_uri: REDIRECT_URI,
+        redirect_uri: redirectUri,
     });
 
     return `https://myanimelist.net/v1/oauth2/authorize?${params.toString()}`;
@@ -73,6 +80,7 @@ export async function exchangeMalCode(code: string) {
     if (!codeVerifier) {
         throw new Error('Missing code_verifier');
     }
+    const redirectUri = localStorage.getItem(MAL_REDIRECT_STORAGE_KEY) || REDIRECT_URI;
 
     const { supabase } = await import('@/integrations/supabase/client');
     const { data: { session } } = await supabase.auth.getSession();
@@ -83,7 +91,7 @@ export async function exchangeMalCode(code: string) {
 
     console.debug('[MAL Auth] Calling TatakaiAPI exchange...');
 
-    const response = await fetch('/api/v3/sync/exchange', {
+    const response = await fetch(`${resolveApiV3Base()}/sync/exchange`, {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${session.access_token}`,
@@ -93,7 +101,7 @@ export async function exchangeMalCode(code: string) {
             integration: 'mal',
             code,
             codeVerifier,
-            redirectUri: REDIRECT_URI,
+            redirectUri,
         })
     });
 
@@ -120,6 +128,7 @@ export async function exchangeMalCode(code: string) {
     console.debug('[MAL Auth] TatakaiAPI exchange success:', data);
 
     localStorage.removeItem('mal_code_verifier');
+    localStorage.removeItem(MAL_REDIRECT_STORAGE_KEY);
     return data;
 }
 
@@ -260,7 +269,7 @@ export async function updateMalAnimeStatus(
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) throw new Error('Not authenticated');
 
-    const response = await fetch('/api/v3/sync/single-sync', {
+    const response = await fetch(`${resolveApiV3Base()}/sync/single-sync`, {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${session.access_token}`,
@@ -495,7 +504,7 @@ export async function updateMalMangaStatus(
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) throw new Error('Not authenticated');
 
-    const response = await fetch('/api/v3/sync/single-sync', {
+    const response = await fetch(`${resolveApiV3Base()}/sync/single-sync`, {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${session.access_token}`,

@@ -450,5 +450,21 @@ export function useCombinedSourcesWithRefetch(
     return fallbackRefetch();
   }, [streamReload, fallbackRefetch]);
 
-  return { data, isLoading, isFetching, error, refetch };
+  // Additive diagnostics so callers can explain an empty server list instead
+  // of a dead "No servers found" — distinguishes "toko host unreachable /
+  // namespace not mounted" from "resolution ran but returned zero sources"
+  // from "not enabled (missing anilistId/name/episode)". WatchPage ignores it.
+  const diagnostics = {
+    streamEnabled,
+    phase: stream.phase,
+    baseResolved: stream.baseResolved,
+    namespaceMounted: stream.namespaceMounted,
+    hasBaseUrl: !!stream.baseUrl,
+    streamUnavailable,
+    usingFallback: useFallback,
+    sourceCount: stream.sources.length,
+    providerStatus: stream.providerStatus,
+  };
+
+  return { data, isLoading, isFetching, error, refetch, diagnostics };
 }

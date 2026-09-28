@@ -1,8 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Shield, CheckCircle2, XCircle, RefreshCw, ExternalLink, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, XCircle, RefreshCw, ExternalLink, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import {
+  SettingRow,
+  SettingsBadge,
+  SettingsSection,
+} from '@/components/settings/SettingsPrimitives';
 import { toast } from 'sonner';
 import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 
@@ -87,125 +92,97 @@ export function FlareSolverrSettings() {
   if (!isDesktop) return null;
 
   return (
-    <div className="p-5 rounded-xl bg-muted/30 border border-white/5 space-y-5">
-      <div className="flex items-start gap-3">
-        <div className="rounded-xl bg-orange-500/15 p-2.5 text-orange-400 shrink-0 mt-0.5">
-          <Shield className="h-5 w-5" />
-        </div>
-        <div>
-          <h3 className="font-bold text-base">FlareSolverr</h3>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Use an external FlareSolverr instance to bypass Cloudflare-protected sources. Requires{' '}
-            <button
-              type="button"
-              className="text-primary underline underline-offset-2 hover:text-primary/80"
-              onClick={() =>
-                (window as any).electron?.openExternal?.(
-                  'https://github.com/FlareSolverr/FlareSolverr#installation',
-                )
-              }
-            >
-              FlareSolverr
-            </button>{' '}
-            to be running separately.
-          </p>
-        </div>
-      </div>
+    <SettingsSection
+      title="FlareSolverr"
+      description="Route Cloudflare-blocked requests through an external FlareSolverr instance. Requires a FlareSolverr server running separately."
+      bodyClassName="space-y-5"
+      action={
+        <Switch checked={enabled} onCheckedChange={setEnabled} aria-label="Enable FlareSolverr" />
+      }
+    >
+      <div className="flex flex-col">
 
-      {/* Enable toggle */}
-      <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-background/50 border border-white/5">
-        <div>
-          <p className="font-medium text-sm">Enable FlareSolverr</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Route Cloudflare-blocked requests through FlareSolverr</p>
-        </div>
-        <Switch checked={enabled} onCheckedChange={setEnabled} />
-      </div>
-
-      {/* URL config */}
-      <div className="space-y-1.5">
-        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          FlareSolverr URL
-        </label>
-        <div className="flex gap-2">
-          <Input
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="http://localhost:8191/v1"
-            className="font-mono text-sm bg-background/50 border-white/10"
-            disabled={!enabled}
-          />
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!enabled || isTesting}
-            onClick={handleTest}
-            className="shrink-0 gap-1.5"
-          >
-            {isTesting ? (
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-            ) : available === true ? (
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-            ) : available === false ? (
-              <XCircle className="w-3.5 h-3.5 text-destructive" />
-            ) : (
-              <RefreshCw className="w-3.5 h-3.5" />
+        <SettingRow
+          title="FlareSolverr URL"
+          description="Address of your running FlareSolverr instance."
+        >
+          <div className="space-y-1.5">
+            <div className="flex gap-2">
+              <Input
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="http://localhost:8191/v1"
+                className="font-mono text-sm bg-white/5 border-white/10"
+                disabled={!enabled}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!enabled || isTesting}
+                onClick={handleTest}
+                className="shrink-0 gap-1.5"
+              >
+                {isTesting ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : available === true ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-success" />
+                ) : available === false ? (
+                  <XCircle className="w-3.5 h-3.5 text-destructive" />
+                ) : (
+                  <RefreshCw className="w-3.5 h-3.5" />
+                )}
+                Test
+              </Button>
+            </div>
+            {available === true && (
+              <SettingsBadge tone="success">Reachable at {url}</SettingsBadge>
             )}
-            Test
-          </Button>
-        </div>
-        {available === true && (
-          <p className="text-xs text-emerald-500 flex items-center gap-1.5 mt-1">
-            <CheckCircle2 className="w-3 h-3" /> Reachable at {url}
-          </p>
-        )}
-        {available === false && (
-          <p className="text-xs text-destructive flex items-center gap-1.5 mt-1">
-            <XCircle className="w-3 h-3" /> Not reachable — ensure FlareSolverr is running
-          </p>
-        )}
-      </div>
+            {available === false && (
+              <SettingsBadge tone="danger">Not reachable — is FlareSolverr running?</SettingsBadge>
+            )}
+          </div>
+        </SettingRow>
 
-      {/* Bypass mode */}
-      <div className="space-y-1.5">
-        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          Bypass Mode
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {(['playwright', 'flaresolverr', 'embedded'] as BypassMode[]).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setBypassMode(mode)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
-                bypassMode === mode
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'border-white/10 bg-white/5 text-muted-foreground hover:text-foreground hover:bg-white/10'
-              }`}
-            >
-              {mode === 'playwright' ? 'Playwright (Default)' : mode === 'flaresolverr' ? 'External FlareSolverr' : 'Embedded'}
-            </button>
-          ))}
-        </div>
-        <p className="text-xs text-muted-foreground">
-          {bypassMode === 'playwright'
-            ? 'Uses the built-in Playwright browser to solve challenges — no external dependency.'
-            : bypassMode === 'flaresolverr'
-            ? 'Routes through your external FlareSolverr instance at the URL above.'
-            : 'Uses the bundled embedded FlareSolverr (start it from the button in Developer Tools).'}
-        </p>
+        <SettingRow
+          title="Bypass mode"
+          description={
+            bypassMode === 'playwright'
+              ? 'Uses the built-in Playwright browser to solve challenges — no external dependency.'
+              : bypassMode === 'flaresolverr'
+              ? 'Routes through your external FlareSolverr instance at the URL above.'
+              : 'Uses the bundled embedded FlareSolverr (start it from the button in Developer Tools).'
+          }
+        >
+          <div className="flex flex-wrap gap-2">
+            {(['playwright', 'flaresolverr', 'embedded'] as BypassMode[]).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setBypassMode(mode)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
+                  bypassMode === mode
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'border-white/10 bg-white/5 text-muted-foreground hover:text-foreground hover:bg-white/10'
+                }`}
+              >
+                {mode === 'playwright' ? 'Playwright (Default)' : mode === 'flaresolverr' ? 'External FlareSolverr' : 'Embedded'}
+              </button>
+            ))}
+          </div>
+        </SettingRow>
       </div>
 
       {enabled && bypassMode === 'flaresolverr' && available === false && (
-        <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
-          <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-          <p className="text-xs text-amber-200">
+        <div className="flex items-start gap-2 p-3 rounded-xl bg-amber/10 border border-amber/20">
+          <AlertTriangle className="w-4 h-4 text-amber shrink-0 mt-0.5" />
+          <p className="text-xs text-amber">
             FlareSolverr is enabled but unreachable. Requests will fall back to Playwright. Start FlareSolverr
             and click Test to verify.
           </p>
         </div>
       )}
 
-      <div className="flex items-center gap-3 pt-1">
+      <div className="flex items-center gap-3">
         <Button
           size="sm"
           onClick={handleSave}
@@ -225,6 +202,6 @@ export function FlareSolverrSettings() {
           Installation guide
         </a>
       </div>
-    </div>
+    </SettingsSection>
   );
 }

@@ -1,4 +1,5 @@
 import { fetchViaChain } from "@/core/network/proxyChain";
+import { getAllActiveProxyUrls, getActiveStreamingProxySnapshot } from "@/hooks/user/useProxySettings";
 
 export interface StreamResolutionOptions {
   streamUrl: string;
@@ -6,6 +7,8 @@ export interface StreamResolutionOptions {
   userAgent?: string;
   preferredUrl?: string;
   proxyPassword?: string;
+  /** Ordered referer alternates supplied by the extension (best-first). */
+  refererCandidates?: string[];
 }
 
 export interface StreamProxyConfig {
@@ -27,9 +30,19 @@ const CONFIG: StreamProxyConfig = {
 export function isLoopbackProxyUrl(value: string): boolean {
   try {
     const parsed = new URL(value);
-    return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+    return (
+      parsed.hostname === 'localhost' ||
+      parsed.hostname === '127.0.0.1' ||
+      parsed.hostname === '0.0.0.0' ||
+      parsed.hostname === '::1'
+    );
   } catch {
-    return false;
+    return (
+      value.includes('localhost:') ||
+      value.includes('127.0.0.1:') ||
+      value.includes('0.0.0.0:') ||
+      value.includes('::1')
+    );
   }
 }
 
@@ -43,6 +56,11 @@ export function isMokoProxyUrl(value: string): boolean {
 }
 
 export function resolveSingleStreamProxyBase(): string {
+  const userProxy = getActiveStreamingProxySnapshot();
+  if (userProxy?.url && !isLoopbackProxyUrl(userProxy.url)) {
+    return userProxy.url.replace(/\/$/, '');
+  }
+
   const explicitProxyBase = String(
     import.meta.env.VITE_SINGLE_STREAM_PROXY_URL ||
       import.meta.env.VITE_STREAM_PROXY_URL ||
@@ -66,6 +84,12 @@ export function buildProxyBaseCandidates(): string[] {
     if (!candidates.includes(normalized)) candidates.push(normalized);
   };
 
+  // Add all user configured active proxies first
+  try {
+    const userProxies = getAllActiveProxyUrls();
+    userProxies.forEach(add);
+  } catch (_) { }
+
   add(resolveSingleStreamProxyBase());
 
   if (typeof window !== 'undefined') {
@@ -78,7 +102,11 @@ export function buildProxyBaseCandidates(): string[] {
   return candidates;
 }
 
-export function buildRefererCandidatesForStream(streamUrl: string, primaryReferer?: string): string[] {
+export function buildRefererCandidatesForStream(
+  streamUrl: string,
+  primaryReferer?: string,
+  extraCandidates?: string[],
+): string[] {
   const candidates: string[] = [];
   const add = (value?: string) => {
     const raw = String(value || '').trim();
@@ -91,7 +119,10 @@ export function buildRefererCandidatesForStream(streamUrl: string, primaryRefere
     }
   };
 
+  // Primary referer first, then the extension-supplied alternates in order.
+  // The proxy is content-agnostic: these are the only referers it will try.
   add(primaryReferer);
+  (extraCandidates || []).forEach(add);
 
   return candidates.slice(0, 8);
 }
@@ -102,13 +133,14 @@ export function buildProxyCandidateUrls(
   userAgent?: string,
   preferredUrl?: string,
   proxyPassword?: string,
+  refererCandidates?: string[],
 ): string[] {
   if (!/^https?:/i.test(streamUrl) || isLoopbackProxyUrl(streamUrl)) {
     return preferredUrl ? [preferredUrl] : [streamUrl];
   }
 
   const bases = buildProxyBaseCandidates();
-  const referers = buildRefererCandidatesForStream(streamUrl, referer);
+  const referers = buildRefererCandidatesForStream(streamUrl, referer, refererCandidates);
   const password = proxyPassword || CONFIG.password;
 
   const results: string[] = [];
@@ -136,7 +168,8 @@ export async function resolvePlayableStream(options: StreamResolutionOptions): P
     options.referer,
     options.userAgent,
     options.preferredUrl,
-    options.proxyPassword
+    options.proxyPassword,
+    options.refererCandidates
   );
 
   for (const url of candidates) {

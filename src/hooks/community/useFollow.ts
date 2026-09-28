@@ -4,6 +4,51 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { analytics } from '@/core/analytics/AnalyticsService';
 
+export interface FollowUser {
+  user_id: string;
+  username: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+  banner_url: string | null;
+}
+
+/**
+ * The follower / following list for a user (docs/Plans.md §5 "Social Connections
+ * → dedicated pages"). `user_follows` stores auth user ids, which are
+ * `profiles.user_id` — see [[tatakai-two-id-spaces-in-profiles]]; joining on
+ * `profiles.id` would return no rows.
+ */
+export function useFollowList(targetUserId: string | undefined, type: 'followers' | 'following') {
+  return useQuery<FollowUser[]>({
+    queryKey: ['followList', type, targetUserId],
+    queryFn: async () => {
+      if (!targetUserId) return [];
+      // followers: people who follow target (following_id = target) → follower_id
+      // following: people target follows (follower_id = target) → following_id
+      const matchColumn = type === 'followers' ? 'following_id' : 'follower_id';
+      const idColumn = type === 'followers' ? 'follower_id' : 'following_id';
+
+      const { data: rows, error } = await supabase
+        .from('user_follows')
+        .select(idColumn)
+        .eq(matchColumn, targetUserId);
+      if (error) throw error;
+
+      const ids = [...new Set((rows ?? []).map((r: any) => r[idColumn]).filter(Boolean))];
+      if (ids.length === 0) return [];
+
+      const { data: profiles, error: profErr } = await supabase
+        .from('profiles')
+        .select('user_id, username, display_name, avatar_url, banner_url')
+        .in('user_id', ids);
+      if (profErr) throw profErr;
+
+      return (profiles ?? []) as FollowUser[];
+    },
+    enabled: !!targetUserId,
+  });
+}
+
 export function useFollow(targetUserId?: string) {
   const { user } = useAuth();
   const queryClient = useQueryClient();

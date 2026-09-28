@@ -14,6 +14,7 @@ export const CSP_POLICY = {
     "'unsafe-eval'", // Required for some libraries
     'https://www.googletagmanager.com',
     'https://www.google-analytics.com',
+    'https://challenges.cloudflare.com', // Cloudflare Turnstile widget
   ],
   'style-src': [
     "'self'",
@@ -31,6 +32,8 @@ export const CSP_POLICY = {
   ],
   'connect-src': [
     "'self'",
+    "https://*.waifu.im",
+    "https://cdn.nekosia.cat",
     'https://*.supabase.co',
     'https://*.tatakai.me',
     'https://*.datadoghq.com',
@@ -39,7 +42,8 @@ export const CSP_POLICY = {
     'https://api.jikan.moe',
     'https://api.trace.moe',
     'https://graphql.anilist.co',
-    'https://api.myanimelist.net'
+    'https://api.myanimelist.net',
+    'https://challenges.cloudflare.com', // Cloudflare Turnstile siteverify handshake
   ],
   'media-src': [
     "'self'",
@@ -49,6 +53,7 @@ export const CSP_POLICY = {
   'frame-src': [
     "'self'",
     'https://*.supabase.co',
+    'https://challenges.cloudflare.com', // Cloudflare Turnstile challenge iframe
   ],
   'worker-src': [
     "'self'",

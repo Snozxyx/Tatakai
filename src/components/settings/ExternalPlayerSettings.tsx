@@ -7,6 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { useVideoSettings } from '@/hooks/media/useVideoSettings';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { SettingsSection, SettingRow } from '@/components/settings/SettingsPrimitives';
 
 interface ExternalPlayer {
   id: string;
@@ -120,17 +121,10 @@ export function ExternalPlayerSettings() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3 mb-2">
-        <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
-          <MonitorPlay className="w-5 h-5" />
-        </div>
-        <div>
-          <h3 className="font-medium text-foreground">External Player</h3>
-          <p className="text-xs text-muted-foreground">Open streams directly in MPV, VLC, or MPC-HC</p>
-        </div>
-      </div>
-
+    <SettingsSection
+      title="External Player"
+      description="Open streams directly in MPV, VLC, or MPC-HC"
+    >
       {players.length === 0 ? (
         <div className="p-4 rounded-xl bg-muted/20 border border-border text-sm text-muted-foreground text-center">
           No supported external players detected on your system.
@@ -232,25 +226,22 @@ export function ExternalPlayerSettings() {
 
              {/* Auto-launch toggle */}
              {selectedPath && (
-                <div className="flex items-center justify-between p-4 rounded-2xl bg-primary/5 border border-primary/10 shadow-inner">
-                   <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-xl bg-primary/20">
-                         <Zap className="w-4 h-4 text-primary" />
-                      </div>
-                      <div>
-                         <h4 className="text-sm font-bold tracking-tight">Launch Automatically</h4>
-                         <p className="text-[10px] text-muted-foreground">Always use external player when a stream starts</p>
-                      </div>
-                   </div>
-                   <Switch 
-                     checked={settings.alwaysUseExternalPlayer}
-                     onCheckedChange={(checked) => updateSetting('alwaysUseExternalPlayer', checked)}
-                   />
-                </div>
+                <SettingRow
+                  tone="accent"
+                  icon={Zap}
+                  title="Launch Automatically"
+                  description="Always use external player when a stream starts"
+                  control={
+                    <Switch
+                      checked={settings.alwaysUseExternalPlayer}
+                      onCheckedChange={(checked) => updateSetting('alwaysUseExternalPlayer', checked)}
+                    />
+                  }
+                />
              )}
           </div>
         </div>
       )}
-    </div>
+    </SettingsSection>
   );
 }

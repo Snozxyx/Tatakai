@@ -173,18 +173,30 @@ export function useUserTierLists(userId?: string) {
         console.error('Failed to fetch user tier lists:', error);
         throw error;
       }
-      
+
       // Fetch profile separately
       const { data: profile } = await supabase
         .from('profiles')
         .select('display_name, avatar_url, username')
         .eq('user_id', targetUserId)
         .single();
-      
+
+      // Resolve which of these lists the viewer has liked (drives the filled heart)
+      let likedIds = new Set<string>();
+      if (user && data && data.length > 0) {
+        const { data: likes } = await supabase
+          .from('tier_list_likes')
+          .select('tier_list_id')
+          .eq('user_id', user.id)
+          .in('tier_list_id', data.map((t) => t.id));
+        likedIds = new Set(likes?.map((l) => l.tier_list_id) || []);
+      }
+
       // Map title to name for component compatibility
       return (data || []).map((t) => ({
         ...normalizeTierListRow(t),
         profiles: profile || null,
+        user_liked: likedIds.has(t.id),
       })) as unknown as TierList[];
     },
     enabled: !!targetUserId,
@@ -422,7 +434,36 @@ export function useLikeTierList() {
         }
       }
     },
-    onSuccess: () => {
+    // Optimistically flip the heart + count so the click has instant feedback,
+    // regardless of whether the denormalized likes_count trigger has run.
+    onMutate: async ({ tierListId, liked }) => {
+      await queryClient.cancelQueries({ queryKey: ['tier_lists'] });
+      await queryClient.cancelQueries({ queryKey: ['tier_list'] });
+
+      const previousLists = queryClient.getQueriesData<TierList[]>({ queryKey: ['tier_lists'] });
+      const previousSingles = queryClient.getQueriesData<TierList>({ queryKey: ['tier_list'] });
+
+      const nextLikeState = !liked;
+      const delta = liked ? -1 : 1;
+      const patch = (list: TierList): TierList =>
+        list.id === tierListId
+          ? { ...list, user_liked: nextLikeState, likes_count: Math.max(0, (list.likes_count || 0) + delta) }
+          : list;
+
+      queryClient.setQueriesData<TierList[]>({ queryKey: ['tier_lists'] }, (old) =>
+        Array.isArray(old) ? old.map(patch) : old
+      );
+      queryClient.setQueriesData<TierList>({ queryKey: ['tier_list'] }, (old) =>
+        old && old.id === tierListId ? patch(old) : old
+      );
+
+      return { previousLists, previousSingles };
+    },
+    onError: (_error, _variables, context) => {
+      context?.previousLists?.forEach(([key, data]) => queryClient.setQueryData(key, data));
+      context?.previousSingles?.forEach(([key, data]) => queryClient.setQueryData(key, data));
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['tier_lists'] });
       queryClient.invalidateQueries({ queryKey: ['tier_list'] });
     },

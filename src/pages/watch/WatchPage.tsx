@@ -1838,7 +1838,10 @@ export default function WatchPage() {
     }
 
     const baseHeaders: { Referer?: string; "User-Agent"?: string } = (sourceDataForPlayback?.headers || {}) as { Referer?: string; "User-Agent"?: string };
-    const variants = getRefererVariants(baseHeaders?.Referer);
+    // The extension ships an ordered, per-CDN referer list on the source itself;
+    // prefer it over the neutral origin-only guess so the right site is tried first.
+    const candidateReferers = (selectedSource as any)?.refererCandidates as string[] | undefined;
+    const variants = candidateReferers?.length ? candidateReferers : getRefererVariants(baseHeaders?.Referer);
     const chosenReferer = variants[Math.min(refererRetryIndex, Math.max(0, variants.length - 1))];
 
     return {
@@ -1846,7 +1849,7 @@ export default function WatchPage() {
       Referer: chosenReferer || baseHeaders?.Referer,
       "User-Agent": baseHeaders?.["User-Agent"],
     };
-  }, [sourceDataForPlayback?.headers?.Referer, sourceDataForPlayback?.headers?.["User-Agent"], refererRetryIndex, torrentPlaybackSource]);
+  }, [sourceDataForPlayback?.headers?.Referer, sourceDataForPlayback?.headers?.["User-Agent"], (selectedSource as any)?.refererCandidates, refererRetryIndex, torrentPlaybackSource]);
 
   const playbackCandidateSource = useMemo(() => {
     if (torrentPlaybackSource) return torrentPlaybackSource;
@@ -2407,7 +2410,9 @@ export default function WatchPage() {
     });
 
     // Retry the same server with alternate referers for m3u8 before server switch.
-    const refererVariants = getRefererVariants(activePlaybackHeaders?.Referer);
+    // Prefer the extension-supplied candidate list; fall back to neutral origins.
+    const candidateReferers = (activePlaybackSource as any)?.refererCandidates as string[] | undefined;
+    const refererVariants = candidateReferers?.length ? candidateReferers : getRefererVariants(activePlaybackHeaders?.Referer);
     if (!isExpiredStream && !isCodecBufferFailure && (activePlaybackSource?.isM3U8 || activePlaybackSource?.url?.includes(".m3u8")) && refererRetryIndex < refererVariants.length - 1) {
       pendingPlaybackCommitRef.current = true;
       setRefererRetryIndex((v) => v + 1);
@@ -2864,6 +2869,9 @@ export default function WatchPage() {
                   episodeTitle={currentEpisode?.title || (isOfflineMode ? offlineManifest?.episodes.find((e: any) => e.id === decodedEpisodeId)?.title : undefined)}
                   episodeId={decodedEpisodeId}
                   onEpisodeEnd={handleEpisodeEnd}
+                  nextEpisodeTitle={nextEpisode?.title || undefined}
+                  nextEpisodeNumber={nextEpisode?.number ?? undefined}
+                  nextEpisodeThumbnail={animeData?.info.poster || undefined}
                   isTimelineLocked={torrentTimelineLocked}
                   timelineLockReason="Torrent seeking unlocks after the file has fully downloaded and verified."
                   hideTimelineUi={Boolean(torrentSessionId && !torrentVerified)}

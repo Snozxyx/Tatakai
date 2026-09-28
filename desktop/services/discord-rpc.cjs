@@ -23,7 +23,11 @@ function createDiscordRpc({ logger, clientId }) {
                 void setActivity(details, state, extra);
                 return;
             }
-            void setActivity('Browsing Anime', 'Main Menu');
+            // On first connect show a minimal idle presence.
+            void setActivity('On Tatakai', 'Just opened the app', {
+                largeImageKey: 'logo',
+                largeImageText: 'Tatakai — Otaku Community',
+            });
         });
         rpc.on('disconnected', () => {
             rpcReady = false;
@@ -37,6 +41,19 @@ function createDiscordRpc({ logger, clientId }) {
         });
     }
 
+    /**
+     * @param {string} details  - First (bold) line shown by Discord.
+     * @param {string} state    - Second line.
+     * @param {Object} extra    - Optional rich fields.
+     * @param {Date}   [extra.startTime]
+     * @param {Date}   [extra.endTime]
+     * @param {string} [extra.largeImageKey]
+     * @param {string} [extra.largeImageText]
+     * @param {string} [extra.smallImageKey]
+     * @param {string} [extra.smallImageText]
+     * @param {Array}  [extra.buttons]          - Up to 2 {label, url} objects.
+     * @param {boolean}[extra.instance]
+     */
     async function setActivity(details, state, extra = {}) {
         if (!rpc) return;
 
@@ -46,24 +63,38 @@ function createDiscordRpc({ logger, clientId }) {
             return;
         }
 
+        /** @type {Record<string, any>} */
         const activity = {
-            details: details || 'Browsing Anime',
-            state: state || 'In Main Menu',
-            largeImageKey: 'logo',
-            largeImageText: 'Tatakai - Watch Anime Online',
-            instance: false,
-            buttons: [{ label: 'Watch with me!', url: 'https://tatakai.me' }],
+            details: details || 'On Tatakai',
+            state: state || '',
+            largeImageKey: normalizedExtra.largeImageKey || 'logo',
+            largeImageText: normalizedExtra.largeImageText || 'Tatakai — Otaku Community',
+            instance: normalizedExtra.instance === true,
         };
 
+        // Timestamps
         if (normalizedExtra.startTime) {
             activity.startTimestamp = normalizedExtra.startTime;
-        } else if (!('startTime' in normalizedExtra)) {
-            activity.startTimestamp = new Date();
+        }
+        if (normalizedExtra.endTime) {
+            activity.endTimestamp = normalizedExtra.endTime;
         }
 
-        if (normalizedExtra.endTime) activity.endTimestamp = normalizedExtra.endTime;
-        if (normalizedExtra.smallImageKey) activity.smallImageKey = normalizedExtra.smallImageKey;
-        if (normalizedExtra.smallImageText) activity.smallImageText = normalizedExtra.smallImageText;
+        // Small image
+        if (normalizedExtra.smallImageKey) {
+            activity.smallImageKey = normalizedExtra.smallImageKey;
+        }
+        if (normalizedExtra.smallImageText) {
+            activity.smallImageText = normalizedExtra.smallImageText;
+        }
+
+        // Buttons — Discord accepts up to 2.
+        if (Array.isArray(normalizedExtra.buttons) && normalizedExtra.buttons.length > 0) {
+            activity.buttons = normalizedExtra.buttons.slice(0, 2).map((btn) => ({
+                label: String(btn.label || 'Visit').slice(0, 32),
+                url: String(btn.url || 'https://tatakai.me'),
+            }));
+        }
 
         try {
             await rpc.setActivity(activity);
@@ -72,6 +103,11 @@ function createDiscordRpc({ logger, clientId }) {
         }
     }
 
+    /**
+     * Truly clear the activity. The renderer calls this on logout / page-leave.
+     * We call `rpc.clearActivity()` and do NOT fall back to a stub presence —
+     * the user's Discord profile should show nothing, not "Browsing Anime".
+     */
     async function clearActivity() {
         pendingRpcActivity = null;
         if (!rpc || !rpcReady) return;
@@ -80,7 +116,6 @@ function createDiscordRpc({ logger, clientId }) {
         } catch (err) {
             logger.warn('Discord RPC clearActivity failed', err);
         }
-        void setActivity('Browsing Anime', 'Main Menu');
     }
 
     function registerIpc(ipcMain) {

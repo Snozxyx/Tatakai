@@ -13,6 +13,7 @@ import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { upsertLocalTorrentSessionHistory } from '@/lib/localStorage';
+import { ANILIST_GRAPHQL_ENDPOINT } from '@/lib/api/backendOrigin';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface MagnetAlignmentModalProps {
@@ -164,7 +165,7 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
 
       const runSearch = async (name: string) => {
         if (!name) return [];
-        const res = await fetch(`https://graphql.anilist.co`, {
+        const res = await fetch(ANILIST_GRAPHQL_ENDPOINT, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

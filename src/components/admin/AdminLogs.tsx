@@ -9,6 +9,7 @@ import { getProxiedImageUrl } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/ui/use-toast';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 export function AdminLogs() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -16,6 +17,7 @@ export function AdminLogs() {
   const { data: logs, isLoading } = useAdminLogs(200);
   const deleteMutation = useDeleteAdminLogs();
   const { toast } = useToast();
+  const confirm = useConfirm();
 
   const filteredLogs = logs?.filter((log) => {
     const searchLower = searchTerm.toLowerCase();
@@ -52,7 +54,7 @@ export function AdminLogs() {
     }
 
     const confirmMsg = `Delete ${filteredLogs.length} logs? This action cannot be undone.`;
-    if (!confirm(confirmMsg)) return;
+    if (!(await confirm({ title: confirmMsg, destructive: true }))) return;
 
     const ids = filteredLogs.map((l) => l.id);
     try {
@@ -66,7 +68,7 @@ export function AdminLogs() {
   const handleCleanupOld = async () => {
     const cutoff = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
     const confirmMsg = 'Delete logs older than 2 days? This action cannot be undone.';
-    if (!confirm(confirmMsg)) return;
+    if (!(await confirm({ title: confirmMsg, destructive: true }))) return;
 
     try {
       await deleteMutation.mutateAsync({ created_before: cutoff });

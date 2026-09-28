@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { SettingsSection, SettingRow } from '@/components/settings/SettingsPrimitives';
+
 
 import {
     Dialog,
@@ -22,10 +23,6 @@ import {
     FileText,
     RotateCcw,
     AlertTriangle,
-    Laptop,
-    Settings2,
-    PlayCircle,
-    Cpu,
     Terminal,
     FolderUp,
 } from 'lucide-react';
@@ -43,25 +40,33 @@ import { DebridSettingsPanel } from '@/components/settings/DebridSettingsPanel';
 import { TorrentSettings } from '@/components/settings/TorrentSettings';
 import { HomeServerSettings } from '@/components/settings/HomeServerSettings';
 import { FlareSolverrSettings } from '@/components/settings/FlareSolverrSettings';
-import { isDiscordRpcEnabled } from '@/lib/discordRpc';
+import { getDiscordRpcSettings, saveDiscordRpcSettings, type DiscordRpcSettings } from '@/lib/discordRpc';
 
 import { useIsNativeApp } from '@/hooks/ui/useIsNativeApp';
+import { useUpdateState, resetUpdateState } from '@/core/update/update-monitor';
+import { installUpdateNow } from '@/core/update/useUpdateOrchestrator';
 
 export function DesktopSettings() {
     const isNative = useIsNativeApp();
+
+    // The update lifecycle is owned by one app-lifetime store (fed by the Dynamic
+    // Island's orchestrator), so the panel and the island never disagree — and a
+    // background download that finished before this page mounted still shows the
+    // correct "Restart to Install" state.
+    const update = useUpdateState();
+    const isDownloading = update.phase === 'downloading';
+    const updateReady = update.phase === 'downloaded';
+    const downloadProgress = update.progress;
+    const updateAvailable =
+        update.version &&
+        (update.phase === 'available' || update.phase === 'downloading' || update.phase === 'downloaded')
+            ? { version: update.version }
+            : null;
 
     const [downloadPath, setDownloadPath] = useState<string>('');
     const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
     const [devMode, setDevMode] = useState(false);
     const [autoLaunch, setAutoLaunch] = useState(false);
-
-    const [updateAvailable, setUpdateAvailable] = useState<any>(null);
-
-    const [downloadProgress, setDownloadProgress] = useState<number>(0);
-
-    const [isDownloading, setIsDownloading] = useState(false);
-
-    const [updateReady, setUpdateReady] = useState(false);
 
     const [systemInfo, setSystemInfo] = useState<any>(null);
 
@@ -80,7 +85,7 @@ export function DesktopSettings() {
     const [isDebugOpen, setIsDebugOpen] = useState(false);
 
     const [warpLog, setWarpLog] = useState<Array<any>>([]);
-    const [discordRpcEnabled, setDiscordRpcEnabled] = useState(() => isDiscordRpcEnabled());
+    const [rpcSettings, setRpcSettings] = useState<DiscordRpcSettings>(() => getDiscordRpcSettings());
 
     const handleExportLogs = async () => {
         if (!isNative) return;
@@ -149,46 +154,27 @@ export function DesktopSettings() {
                 (window as any).electron.onUpdaterEvent;
 
             if (onUpdaterEvent) {
+                // State lives in the shared update-monitor store (see the derived
+                // values above); this listener only fires the user-facing toasts
+                // and clears the local "checking" spinner for the manual button.
                 onUpdaterEvent((data: any) => {
-                    console.log('Updater event:', data);
-
                     switch (data.type) {
-                        case 'update-available':
-                            setUpdateAvailable(data.info);
+                        case 'available':
+                        case 'mandatory-update':
+                        case 'downloading':
+                        case 'downloaded':
                             setIsCheckingUpdate(false);
                             break;
 
-                        case 'update-not-available':
-                            setUpdateAvailable(null);
+                        case 'not-available':
                             setIsCheckingUpdate(false);
-
-                            toast.success(
-                                'You are using the latest version'
-                            );
-                            break;
-
-                        case 'download-progress':
-                            setIsDownloading(true);
-                            setDownloadProgress(
-                                data.progress.percent
-                            );
-                            break;
-
-                        case 'update-downloaded':
-                            setIsDownloading(false);
-                            setUpdateReady(true);
-
-                            toast.success(
-                                'Update downloaded. Ready to install.'
-                            );
+                            toast.success('You are using the latest version');
                             break;
 
                         case 'error':
                             setIsCheckingUpdate(false);
-                            setIsDownloading(false);
-
                             toast.error(
-                                `Updater error: ${data.error}`
+                                `Updater error: ${data.message || 'unknown error'}`
                             );
                             break;
                     }
@@ -275,26 +261,21 @@ export function DesktopSettings() {
     const handleCheckUpdate = async () => {
         setIsCheckingUpdate(true);
 
-        setUpdateAvailable(null);
-
-        setUpdateReady(false);
+        // Clear the shared store so a fresh cycle starts clean.
+        resetUpdateState();
 
         try {
             const result = await (
                 window as any
-            ).electron.checkForUpdates();
+            ).electron.updateCheck('stable');
 
-            if (result.status === 'dev-mode') {
-                setIsCheckingUpdate(false);
-
-                toast.info(
-                    'Update check skipped in developer mode'
-                );
-            } else if (result.status === 'error') {
+            if (result?.error) {
                 setIsCheckingUpdate(false);
 
                 toast.error(`Check failed: ${result.error}`);
             }
+            // Success / availability is reported asynchronously via the
+            // `updater-event` broadcast handled above; nothing else to do here.
         } catch (error) {
             console.error(error);
 
@@ -305,13 +286,12 @@ export function DesktopSettings() {
     };
 
     const handleDownloadUpdate = () => {
-        (window as any).electron.downloadUpdate();
-
-        setIsDownloading(true);
+        // Download progress flows through the shared store via `updater-event`.
+        (window as any).electron.updateDownload();
     };
 
     const handleQuitAndInstall = () => {
-        (window as any).electron.quitAndInstall();
+        installUpdateNow();
     };
 
     const handleAutoLaunchToggle = async (
@@ -398,601 +378,323 @@ export function DesktopSettings() {
     if (!isNative) return null;
 
     return (
-        <GlassPanel className="p-6">
-            <h2 className="font-display text-xl font-semibold mb-8 flex items-center gap-2">
-                <Laptop className="w-5 h-5 text-primary" />
-                Desktop Application
-            </h2>
-
-            <div className="space-y-8">
-                {/* GENERAL */}
-                <section className="space-y-4">
-                    <div className="flex items-center gap-2">
-                        <Settings2 className="w-4 h-4 text-primary" />
-
-                        <h3 className="font-semibold">General</h3>
-                    </div>
-
-                    {(window as any).electron?.setAutoLaunch && (
-                        <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30">
-                            <div>
-                                <p className="font-medium">
-                                    Launch at Startup
-                                </p>
-
-                                <p className="text-sm text-muted-foreground">
-                                    Automatically start Tatakai
-                                    when you log in
-                                </p>
-                            </div>
-
+        <div className="space-y-8">
+            {/* GENERAL */}
+            <SettingsSection title="General" bodyClassName="space-y-1">
+                {(window as any).electron?.setAutoLaunch && (
+                    <SettingRow
+                        title="Launch at Startup"
+                        description="Automatically start Tatakai when you log in"
+                        control={
                             <Switch
                                 checked={autoLaunch}
-                                onCheckedChange={
-                                    handleAutoLaunchToggle
-                                }
+                                onCheckedChange={handleAutoLaunchToggle}
                             />
+                        }
+                    />
+                )}
+
+                <SettingRow
+                    title="Download Location"
+                    description="Episodes will be saved to this folder organized by anime title."
+                >
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex-1 min-w-[10rem] px-3 py-2 rounded-md bg-background/50 border border-border text-sm font-mono truncate">
+                            {downloadPath || 'Default'}
                         </div>
-                    )}
-
-                    <div className="p-4 rounded-xl bg-muted/30">
-                        <label className="text-sm font-medium mb-3 block">
-                            Download Location
-                        </label>
-
-                        <div className="flex gap-2">
-                            <div className="flex-1 px-3 py-2 rounded-md bg-background/50 border border-border text-sm font-mono truncate">
-                                {downloadPath || 'Default'}
-                            </div>
-
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() =>
-                                    (window as any).electron.openPath(
-                                        downloadPath
-                                    )
-                                }
-                                title="Open Folder"
-                            >
-                                <ExternalLink className="w-4 h-4" />
-                            </Button>
-
-                            <Button
-                                variant="outline"
-                                onClick={handleSelectDirectory}
-                            >
-                                <FolderOpen className="w-4 h-4 mr-2" />
-                                Change
-                            </Button>
-                        </div>
-
-                        <p className="text-xs text-muted-foreground mt-2">
-                            Episodes will be saved to this
-                            folder organized by anime title.
-                        </p>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="shrink-0"
+                            onClick={() => (window as any).electron.openPath(downloadPath)}
+                            title="Open Folder"
+                        >
+                            <ExternalLink className="w-4 h-4" />
+                        </Button>
+                        <Button variant="outline" className="shrink-0" onClick={handleSelectDirectory}>
+                            <FolderOpen className="w-4 h-4 mr-2" />
+                            Change
+                        </Button>
                     </div>
-                </section>
+                </SettingRow>
+            </SettingsSection>
 
-                {/* PLAYBACK */}
-                <section className="space-y-4">
-                    <div className="flex items-center gap-2">
-                        <PlayCircle className="w-4 h-4 text-primary" />
+            <ExternalPlayerSettings />
 
-                        <h3 className="font-semibold">
-                            Playback & Streaming
-                        </h3>
-                    </div>
+            <DebridSettingsPanel />
 
-                    <div className="p-4 rounded-xl bg-muted/30">
-                        <ExternalPlayerSettings />
-                    </div>
+            <TorrentSettings />
 
-                    <div className="p-4 rounded-xl bg-muted/30">
-                        <DebridSettingsPanel />
-                    </div>
+            <HomeServerSettings />
 
-                    <div className="p-4 rounded-xl bg-muted/30">
-                        <TorrentSettings />
-                    </div>
+            <FlareSolverrSettings />
 
-                    <div className="p-4 rounded-xl bg-muted/30 space-y-4">
-                        <div className="flex items-center justify-between gap-4">
-                            <div>
-                                <p className="font-medium">Discord Rich Presence</p>
-                                <p className="text-xs text-muted-foreground">
-                                    Show what you are watching in Discord
-                                </p>
-                            </div>
+            <CountryPolicyPanel />
+
+            <SettingsSection
+                title="Discord Rich Presence"
+                description="Show what you are watching in Discord"
+                action={
+                    <Switch
+                        checked={rpcSettings.enabled}
+                        onCheckedChange={(checked) => {
+                            const next = { ...rpcSettings, enabled: checked };
+                            setRpcSettings(next);
+                            saveDiscordRpcSettings(next);
+                            if (!checked && (window as any).electron?.clearRPC) {
+                                (window as any).electron.clearRPC();
+                            }
+                            toast.success(checked ? 'Discord RPC enabled' : 'Discord RPC disabled');
+                        }}
+                    />
+                }
+                bodyClassName="space-y-1"
+            >
+                {rpcSettings.enabled && (
+                    [
+                        { key: 'showAnimeTitle', label: 'Anime title', desc: 'e.g. "Watching Solo Leveling"' },
+                        { key: 'showEpisode',    label: 'Episode number', desc: 'e.g. "Episode 8"' },
+                        { key: 'showSeason',     label: 'Season number', desc: 'e.g. "S2 • Episode 8"' },
+                        { key: 'showLanguage',   label: 'Language / dub info', desc: 'e.g. "English Dub"' },
+                        { key: 'showProgress',   label: 'Playback progress', desc: 'Elapsed / remaining timestamps' },
+                        { key: 'showButtons',    label: '"View on Tatakai" button', desc: 'Adds a clickable link to the presence' },
+                    ] as Array<{ key: keyof DiscordRpcSettings; label: string; desc: string }>
+                ).map(({ key, label, desc }) => (
+                    <SettingRow
+                        key={key}
+                        title={label}
+                        description={desc}
+                        control={
                             <Switch
-                                checked={discordRpcEnabled}
+                                checked={rpcSettings[key] as boolean}
                                 onCheckedChange={(checked) => {
-                                    setDiscordRpcEnabled(checked);
-                                    try {
-                                        localStorage.setItem('tatakai_discord_rpc', String(checked));
-                                    } catch {
-                                        /* ignore */
-                                    }
-                                    if (!checked && (window as any).electron?.clearRPC) {
-                                        (window as any).electron.clearRPC();
-                                    }
-                                    toast.success(checked ? 'Discord RPC enabled' : 'Discord RPC disabled');
+                                    const next = { ...rpcSettings, [key]: checked };
+                                    setRpcSettings(next);
+                                    saveDiscordRpcSettings(next);
                                 }}
                             />
-                        </div>
-                    </div>
+                        }
+                    />
+                ))}
+            </SettingsSection>
 
-                    <HomeServerSettings />
-
-                    <FlareSolverrSettings />
-
-                    <div className="p-4 rounded-xl bg-muted/30">
-                        <CountryPolicyPanel />
-                    </div>
-                </section>
-
-                {/* SYSTEM */}
-                <section className="space-y-4">
-                    <div className="flex items-center gap-2">
-                        <Cpu className="w-4 h-4 text-primary" />
-
-                        <h3 className="font-semibold">System</h3>
-                    </div>
-
-                    {/* Updates */}
-                    <div className="p-4 rounded-xl bg-muted/30">
-                        <div className="flex items-center justify-between">
-                            <div className="flex-1 mr-4">
-                                <p className="font-medium">
-                                    Current Version:
-                                    v{__APP_VERSION__}
-                                </p>
-
-                                <p className="text-xs text-muted-foreground">
-                                    You are on the stable channel
-                                </p>
-
-                                {updateAvailable && (
-                                    <p className="text-xs text-green-500 mt-1 flex items-center gap-1">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-
-                                        Update available:
-                                        v{updateAvailable.version}
-                                    </p>
-                                )}
-
-                                {downloadProgress > 0 &&
-                                    isDownloading && (
-                                        <div className="mt-2 w-full bg-muted rounded-full h-1.5 overflow-hidden">
-                                            <div
-                                                className="bg-primary h-full transition-all duration-300"
-                                                style={{
-                                                    width: `${downloadProgress}%`,
-                                                }}
-                                            />
-                                        </div>
+            {/* SYSTEM */}
+            <SettingsSection title="System" bodyClassName="space-y-1">
+                <SettingRow
+                    title={`Current version — v${__APP_VERSION__}`}
+                    description="You are on the stable channel"
+                    control={
+                        <div className="flex gap-2">
+                            {updateReady ? (
+                                <Button onClick={handleQuitAndInstall} className="bg-success text-white hover:bg-success/90">
+                                    Restart to Install
+                                </Button>
+                            ) : updateAvailable && !isDownloading ? (
+                                <Button onClick={handleDownloadUpdate}>
+                                    Download v{updateAvailable.version}
+                                </Button>
+                            ) : (
+                                <Button onClick={handleCheckUpdate} disabled={isCheckingUpdate || isDownloading}>
+                                    {isCheckingUpdate ? (
+                                        <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Checking...</>
+                                    ) : isDownloading ? (
+                                        <><Download className="w-4 h-4 mr-2 animate-bounce" />{Math.round(downloadProgress)}%</>
+                                    ) : (
+                                        'Check for Updates'
                                     )}
-                            </div>
-
-                            <div className="flex gap-2">
-                                {updateReady ? (
-                                    <Button
-                                        onClick={
-                                            handleQuitAndInstall
-                                        }
-                                        className="bg-green-600 hover:bg-green-700"
-                                    >
-                                        Restart to Install
-                                    </Button>
-                                ) : updateAvailable &&
-                                  !isDownloading ? (
-                                    <Button
-                                        onClick={
-                                            handleDownloadUpdate
-                                        }
-                                    >
-                                        Download v
-                                        {
-                                            updateAvailable.version
-                                        }
-                                    </Button>
-                                ) : (
-                                    <Button
-                                        onClick={
-                                            handleCheckUpdate
-                                        }
-                                        disabled={
-                                            isCheckingUpdate ||
-                                            isDownloading
-                                        }
-                                    >
-                                        {isCheckingUpdate ? (
-                                            <>
-                                                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                                                Checking...
-                                            </>
-                                        ) : isDownloading ? (
-                                            <>
-                                                <Download className="w-4 h-4 mr-2 animate-bounce" />
-                                                {Math.round(
-                                                    downloadProgress
-                                                )}
-                                                %
-                                            </>
-                                        ) : (
-                                            'Check for Updates'
-                                        )}
-                                    </Button>
-                                )}
-                            </div>
+                                </Button>
+                            )}
                         </div>
-                    </div>
-
-                    {/* System Info */}
-                    {systemInfo && (
-                        <div className="p-4 rounded-xl bg-muted/30">
-                            <p className="font-medium mb-3">
-                                System Information
-                            </p>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between text-sm">
-                                        <span className="text-muted-foreground">
-                                            App Version
-                                        </span>
-
-                                        <Badge variant="secondary">
-                                            {systemInfo.version}
-                                        </Badge>
-                                    </div>
-
-                                    <div className="flex items-center justify-between text-sm">
-                                        <span className="text-muted-foreground">
-                                            Platform
-                                        </span>
-
-                                        <span className="font-mono">
-                                            {
-                                                systemInfo.platform
-                                            }{' '}
-                                            (
-                                            {
-                                                systemInfo.arch
-                                            }
-                                            )
-                                        </span>
-                                    </div>
-
-                                    <div className="flex items-center justify-between text-sm">
-                                        <span className="text-muted-foreground">
-                                            Electron
-                                        </span>
-
-                                        <span className="font-mono">
-                                            v
-                                            {
-                                                systemInfo.electronVersion
-                                            }
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between text-sm">
-                                        <span className="text-muted-foreground">
-                                            CPU Cores
-                                        </span>
-
-                                        <span className="font-mono">
-                                            {systemInfo.cpus}
-                                        </span>
-                                    </div>
-
-                                    <div className="flex items-center justify-between text-sm">
-                                        <span className="text-muted-foreground">
-                                            Total RAM
-                                        </span>
-
-                                        <span className="font-mono">
-                                            {
-                                                systemInfo.totalMemory
-                                            }{' '}
-                                            GB
-                                        </span>
-                                    </div>
-
-                                    <div className="flex items-center justify-between text-sm">
-                                        <span className="text-muted-foreground">
-                                            Free RAM
-                                        </span>
-
-                                        <span className="font-mono">
-                                            {
-                                                systemInfo.freeMemory
-                                            }{' '}
-                                            GB
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
+                    }
+                >
+                    {updateAvailable && (
+                        <p className="text-xs text-success flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+                            Update available: v{updateAvailable.version}
+                        </p>
+                    )}
+                    {downloadProgress > 0 && isDownloading && (
+                        <div className="mt-2 w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                            <div className="bg-primary h-full transition-all duration-300" style={{ width: `${downloadProgress}%` }} />
                         </div>
                     )}
-                </section>
+                </SettingRow>
 
-                {/* DEVELOPER */}
-                <section className="space-y-4">
-                    <div className="flex items-center gap-2">
-                        <Terminal className="w-4 h-4 text-primary" />
-
-                        <h3 className="font-semibold">
-                            Developer Tools
-                        </h3>
-                    </div>
-
-                    <div className="p-4 rounded-xl bg-muted/30">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="font-medium">
-                                    Developer Mode
-                                </p>
-
-                                <p className="text-sm text-muted-foreground">
-                                    Enable advanced debugging
-                                    features
-                                </p>
-                            </div>
-
-                            <Switch
-                                checked={devMode}
-                                onCheckedChange={setDevMode}
-                            />
-                        </div>
-
-                        {devMode && (
-                            <div className="mt-4 pt-4 border-t border-border">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="font-medium">
-                                            Application Logs
-                                        </p>
-
-                                        <p className="text-sm text-muted-foreground">
-                                            Export logs for
-                                            troubleshooting
-                                        </p>
-                                    </div>
-
-                                    <Button
-                                        variant="outline"
-                                        onClick={
-                                            handleExportLogs
-                                        }
-                                    >
-                                        <FileText className="w-4 h-4 mr-2" />
-                                        Export Logs
-                                    </Button>
+                {systemInfo && (
+                    <SettingRow title="System information">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-muted-foreground">App Version</span>
+                                    <Badge variant="secondary">{systemInfo.version}</Badge>
+                                </div>
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-muted-foreground">Platform</span>
+                                    <span className="font-mono">{systemInfo.platform} ({systemInfo.arch})</span>
+                                </div>
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-muted-foreground">Electron</span>
+                                    <span className="font-mono">v{systemInfo.electronVersion}</span>
                                 </div>
                             </div>
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-muted-foreground">CPU Cores</span>
+                                    <span className="font-mono">{systemInfo.cpus}</span>
+                                </div>
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-muted-foreground">Total RAM</span>
+                                    <span className="font-mono">{systemInfo.totalMemory} GB</span>
+                                </div>
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-muted-foreground">Free RAM</span>
+                                    <span className="font-mono">{systemInfo.freeMemory} GB</span>
+                                </div>
+                            </div>
+                        </div>
+                    </SettingRow>
+                )}
+            </SettingsSection>
+
+            {/* DEVELOPER */}
+            <SettingsSection title="Developer Tools" bodyClassName="space-y-1">
+                <SettingRow
+                    title="Developer Mode"
+                    description="Enable advanced debugging features"
+                    control={<Switch checked={devMode} onCheckedChange={setDevMode} />}
+                />
+
+                {devMode && (
+                    <SettingRow
+                        title="Application Logs"
+                        description="Export logs for troubleshooting"
+                        control={
+                            <Button variant="outline" onClick={handleExportLogs}>
+                                <FileText className="w-4 h-4 mr-2" />
+                                Export Logs
+                            </Button>
+                        }
+                    />
+                )}
+
+                <SettingRow
+                    title="Runtime Diagnostics"
+                    description="Local runtime/proxy events"
+                    control={
+                        <Button variant="ghost" size="sm" onClick={() => setRuntimeEvents([])}>
+                            Clear
+                        </Button>
+                    }
+                >
+                    <div className="max-h-44 overflow-auto rounded-md border border-border/50 bg-background/50">
+                        {runtimeEvents.length === 0 ? (
+                            <div className="p-3 text-xs text-muted-foreground">No runtime events yet.</div>
+                        ) : (
+                            <ul className="divide-y divide-border/40">
+                                {runtimeEvents.map((evt, idx) => (
+                                    <li key={`${evt.type}-${idx}`} className="p-2 text-xs">
+                                        <div className="font-mono text-primary">{evt.type}</div>
+                                        <div className="text-muted-foreground">
+                                            {evt.ts ? new Date(evt.ts).toLocaleTimeString() : 'now'}
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
                         )}
                     </div>
+                </SettingRow>
 
-                    {/* Runtime Diagnostics */}
-                    <div className="p-4 rounded-xl bg-muted/30 space-y-3">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="font-medium">
-                                    Runtime Diagnostics
-                                </p>
-
-                                <p className="text-sm text-muted-foreground">
-                                    Local runtime/proxy events
-                                </p>
-                            </div>
-
+                <SettingRow
+                    title="Extension Audit Log & Sideloading"
+                    description="Sideload custom modules or view load/invoke/error events"
+                    control={
+                        <div className="flex items-center gap-2">
                             <Button
-                                variant="ghost"
                                 size="sm"
-                                onClick={() =>
-                                    setRuntimeEvents([])
-                                }
+                                variant="outline"
+                                onClick={() => setIsDebugOpen(true)}
+                                className="h-9 px-4 rounded-xl bg-primary/10 border-primary/30 text-primary hover:bg-primary/20 hover:border-primary/50 text-xs font-bold gap-1.5"
                             >
-                                Clear
+                                <Terminal className="w-4 h-4" />
+                                Test Toko Extension
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setIsSideloadOpen(true)}
+                                className="h-9 px-4 rounded-xl bg-primary/10 border-primary/30 text-primary hover:bg-primary/20 hover:border-primary/50 text-xs font-bold gap-1.5"
+                            >
+                                <FolderUp className="w-4 h-4" />
+                                Sideload Extension
                             </Button>
                         </div>
+                    }
+                >
+                    <div className="max-h-40 overflow-auto rounded-md border border-border/50 bg-background/50">
+                        {extensionAudit.length === 0 ? (
+                            <div className="p-3 text-xs text-muted-foreground">No audit entries.</div>
+                        ) : (
+                            <ul className="divide-y divide-border/40">
+                                {extensionAudit.slice(0, 20).map((evt, idx) => (
+                                    <li key={`${evt.event}-${idx}`} className="p-2 text-xs">
+                                        <div className="font-mono text-primary">{evt.event}</div>
+                                        <div className="text-muted-foreground">
+                                            {evt.extensionId ? `ext=${evt.extensionId} · ` : ''}
+                                            {evt.ts ? new Date(evt.ts).toLocaleTimeString() : ''}
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                </SettingRow>
 
-                        <div className="max-h-44 overflow-auto rounded-md border border-border/50 bg-background/50">
-                            {runtimeEvents.length === 0 ? (
-                                <div className="p-3 text-xs text-muted-foreground">
-                                    No runtime events yet.
+                <SettingRow
+                    title="WARP Routing Log"
+                    description="Recent route decisions"
+                >
+                    <div className="max-h-36 overflow-auto rounded-md border border-border/50 bg-background/50">
+                        {warpLog.length === 0 ? (
+                            <div className="p-3 text-xs text-muted-foreground">No routing entries.</div>
+                        ) : (
+                            <ul className="divide-y divide-border/40">
+                                {warpLog.slice(0, 20).map((evt, idx) => (
+                                    <li key={`${evt.host}-${idx}`} className="p-2 text-xs">
+                                        <div className="font-mono text-primary">{evt.host || 'unknown-host'}</div>
+                                        <div className="text-muted-foreground">
+                                            {evt.routed ? 'routed via warp' : 'direct'} · {evt.mode || 'auto'}
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                </SettingRow>
+            </SettingsSection>
+                
+
+            {/* DANGER ZONE */}
+            {(window as any).electron?.resetAppData && (
+                <SettingsSection title="Danger Zone">
+                    <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20">
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                                <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
+                                <div>
+                                    <p className="font-medium text-destructive">Reset Application</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Clear all settings, cache, and downloaded content
+                                    </p>
                                 </div>
-                            ) : (
-                                <ul className="divide-y divide-border/40">
-                                    {runtimeEvents.map(
-                                        (evt, idx) => (
-                                            <li
-                                                key={`${evt.type}-${idx}`}
-                                                className="p-2 text-xs"
-                                            >
-                                                <div className="font-mono text-primary">
-                                                    {evt.type}
-                                                </div>
-
-                                                <div className="text-muted-foreground">
-                                                    {evt.ts
-                                                        ? new Date(
-                                                              evt.ts
-                                                          ).toLocaleTimeString()
-                                                        : 'now'}
-                                                </div>
-                                            </li>
-                                        )
-                                    )}
-                                </ul>
-                            )}
+                            </div>
+                            <Button variant="destructive" onClick={() => setShowResetDialog(true)}>
+                                <RotateCcw className="w-4 h-4 mr-2" />
+                                Reset App
+                            </Button>
                         </div>
                     </div>
-
-                    {/* Extension Audit */}
-                    <div className="p-4 rounded-xl bg-muted/30 space-y-3">
-                        <div className="flex items-center justify-between gap-3">
-                            <div>
-                                <p className="font-medium">
-                                    Extension Audit Log & Sideloading
-                                </p>
-
-                                <p className="text-sm text-muted-foreground">
-                                    Sideload custom modules or view load/invoke/error events
-                                </p>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => setIsDebugOpen(true)}
-                                    className="h-9 px-4 rounded-xl bg-primary/10 border-primary/30 text-primary hover:bg-primary/20 hover:border-primary/50 text-xs font-bold gap-1.5"
-                                >
-                                    <Terminal className="w-4 h-4" />
-                                    Test Toko Extension
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => setIsSideloadOpen(true)}
-                                    className="h-9 px-4 rounded-xl bg-primary/10 border-primary/30 text-primary hover:bg-primary/20 hover:border-primary/50 text-xs font-bold gap-1.5"
-                                >
-                                    <FolderUp className="w-4 h-4" />
-                                    Sideload Extension
-                                </Button>
-                            </div>
-                        </div>
-
-                        <div className="max-h-40 overflow-auto rounded-md border border-border/50 bg-background/50">
-                            {extensionAudit.length === 0 ? (
-                                <div className="p-3 text-xs text-muted-foreground">
-                                    No audit entries.
-                                </div>
-                            ) : (
-                                <ul className="divide-y divide-border/40">
-                                    {extensionAudit
-                                        .slice(0, 20)
-                                        .map((evt, idx) => (
-                                            <li
-                                                key={`${evt.event}-${idx}`}
-                                                className="p-2 text-xs"
-                                            >
-                                                <div className="font-mono text-primary">
-                                                    {evt.event}
-                                                </div>
-
-                                                <div className="text-muted-foreground">
-                                                    {evt.extensionId
-                                                        ? `ext=${evt.extensionId} · `
-                                                        : ''}
-                                                    {evt.ts
-                                                        ? new Date(
-                                                              evt.ts
-                                                          ).toLocaleTimeString()
-                                                        : ''}
-                                                </div>
-                                            </li>
-                                        ))}
-                                </ul>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Warp Log */}
-                    <div className="p-4 rounded-xl bg-muted/30 space-y-3">
-                        <div>
-                            <p className="font-medium">
-                                WARP Routing Log
-                            </p>
-
-                            <p className="text-sm text-muted-foreground">
-                                Recent route decisions
-                            </p>
-                        </div>
-
-                        <div className="max-h-36 overflow-auto rounded-md border border-border/50 bg-background/50">
-                            {warpLog.length === 0 ? (
-                                <div className="p-3 text-xs text-muted-foreground">
-                                    No routing entries.
-                                </div>
-                            ) : (
-                                <ul className="divide-y divide-border/40">
-                                    {warpLog
-                                        .slice(0, 20)
-                                        .map((evt, idx) => (
-                                            <li
-                                                key={`${evt.host}-${idx}`}
-                                                className="p-2 text-xs"
-                                            >
-                                                <div className="font-mono text-primary">
-                                                    {evt.host ||
-                                                        'unknown-host'}
-                                                </div>
-
-                                                <div className="text-muted-foreground">
-                                                    {evt.routed
-                                                        ? 'routed via warp'
-                                                        : 'direct'}{' '}
-                                                    ·{' '}
-                                                    {evt.mode ||
-                                                        'auto'}
-                                                </div>
-                                            </li>
-                                        ))}
-                                </ul>
-                            )}
-                        </div>
-                    </div>
-                </section>
-
-                {/* DANGER ZONE */}
-                {(window as any).electron?.resetAppData && (
-                    <section className="space-y-4">
-                        <div className="flex items-center gap-2">
-                            <AlertTriangle className="w-4 h-4 text-destructive" />
-
-                            <h3 className="font-semibold text-destructive">
-                                Danger Zone
-                            </h3>
-                        </div>
-
-                        <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <AlertTriangle className="w-5 h-5 text-destructive" />
-
-                                    <div>
-                                        <p className="font-medium text-destructive">
-                                            Reset Application
-                                        </p>
-
-                                        <p className="text-sm text-muted-foreground">
-                                            Clear all settings,
-                                            cache, and downloaded
-                                            content
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <Button
-                                    variant="destructive"
-                                    onClick={() =>
-                                        setShowResetDialog(true)
-                                    }
-                                >
-                                    <RotateCcw className="w-4 h-4 mr-2" />
-                                    Reset App
-                                </Button>
-                            </div>
-                        </div>
-                    </section>
-                )}
-            </div>
+                </SettingsSection>
+            )}
 
             {/* RESET DIALOG */}
             <Dialog
@@ -1071,6 +773,6 @@ export function DesktopSettings() {
                     onClose={() => setIsDebugOpen(false)}
                 />
             )}
-        </GlassPanel>
+        </div>
     );
 }

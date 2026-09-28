@@ -87,6 +87,15 @@ function createCrashService(deps) {
       return
     }
 
+    // Pre-create the Crashpad database layout before the native handler starts.
+    // On Windows, Crashpad stat()s a per-report `attachments\<uuid>` folder it
+    // never creates, spamming stderr with
+    //   GetFileAttributes ...\Crashpad\attachments\<uuid>: (0x2)
+    // Materialising an empty folder for every known report keeps those paths
+    // valid. Honest caveat: a crash minted after this runs can still emit the
+    // warning once for its fresh uuid — this reduces, not guarantees.
+    _prepareCrashDumpsDir()
+
     if (!dsn) {
       // Req 2.6: DSN is missing — warn and start in local-only mode.
       console.warn(
@@ -114,34 +123,85 @@ function createCrashService(deps) {
     })
   }
 
-  // ── checkPreviousCrashes() ─────────────────────────────────────────────────
+  // ── _prepareCrashDumpsDir() (private) ──────────────────────────────────────
 
+  /**
+   * Ensures the Crashpad database directory and its `attachments` subfolder
+   * exist, and pre-creates a per-report `attachments/<uuid>` folder for every
+   * report Crashpad already has on disk. Best-effort — never throws.
+   *
+   * Why per-report folders: on Windows the native Crashpad handler stat()s
+   * `attachments\<report-uuid>` for each report in its database as it starts,
+   * even when no attachments were ever registered. Every missing folder spams
+   * stderr with
+   *   GetFileAttributes ...\Crashpad\attachments\<uuid>: (0x2)
+   * on *every* launch. Materialising an (empty) folder per known report makes
+   * those stat()s succeed and silences the noise. We deliberately do NOT prune
+   * empty folders here — an empty folder is exactly what suppresses the error.
+   * New crashes minted after this runs may still emit the warning once for their
+   * fresh uuid, so this reduces rather than eliminates.
+   */
+  function _prepareCrashDumpsDir() {
+    let crashDumpsDir
+    try {
+      crashDumpsDir = app ? app.getPath('crashDumps') : null
+    } catch (_err) {
+      crashDumpsDir = null
+    }
+    if (!crashDumpsDir) return
+
+    try {
+      const attachmentsDir = path.join(crashDumpsDir, 'attachments')
+      fs.mkdirSync(attachmentsDir, { recursive: true })
+
+      // Collect report uuids from the Crashpad database. Reports live as
+      // `<uuid>.dmp` under `reports/` (and legacy layouts under `completed/`,
+      // `pending/`, `new/`); the uuid is the filename stem.
+      const uuids = new Set()
+      for (const sub of ['reports', 'completed', 'pending', 'new']) {
+        let entries
+        try {
+          entries = fs.readdirSync(path.join(crashDumpsDir, sub))
+        } catch (_) {
+          continue // subdir may not exist yet
+        }
+        for (const entry of entries) {
+          const stem = entry.replace(/\.[^.]+$/, '') // strip .dmp/.meta/etc
+          if (/^[0-9a-fA-F-]{16,}$/.test(stem)) uuids.add(stem)
+        }
+      }
+
+      // Materialise an empty attachment folder for each known report.
+      for (const uuid of uuids) {
+        try {
+          fs.mkdirSync(path.join(attachmentsDir, uuid), { recursive: true })
+        } catch (_) { /* ignore individual failures */ }
+      }
+    } catch (_err) {
+      // Directory prep is a best-effort cosmetic fix — swallow any error.
+    }
+  }
+
+  // ── checkPreviousCrashes() ─────────────────────────────────────────────────
   /**
    * Checks whether a crash report from the previous session exists.
    * Must be called inside `app.on('ready')` after the main window is available.
    *
-   * When a crash report is found:
-   *   - Shows a native dialog asking the user if they want to submit the report
-   *   - If the user consents: uploads the report metadata to the configured endpoint
-   *   - Logs the crash details via LogService
-   *   - Sends an IPC push `crash:previous` to the renderer for the admin panel
+   * When a crash report is found it is auto-forwarded (metadata only — no dumps,
+   * no PII) to the tatakaiapi crash-ingest endpoint, which fans it out to the
+   * Supabase crash_reports table and the Discord webhook server-side. It is also
+   * logged via LogService and pushed to the renderer over the `crash:previous`
+   * IPC for the admin panel. There is no native consent dialog (silent auto-send).
    *
    * @param {Electron.BrowserWindow} mainWindow  - The main BrowserWindow instance.
    * @param {import('./_types.cjs').LogService}  logger - LogService instance for structured logging.
-   * @param {{ dialog?: object, uploadEndpoint?: string }} [opts] - Optional overrides for testing.
+   * @param {{ uploadEndpoint?: string }} [opts] - Optional overrides for testing.
    */
   function checkPreviousCrashes(mainWindow, logger, opts) {
     if (!crashReporter) {
       if (logger) logger.warn('[CrashService] crashReporter unavailable — skipping checkPreviousCrashes()')
       return
     }
-
-    // Resolve dialog — allow injection for tests
-    const electronDialog =
-      (opts && opts.dialog) ||
-      (() => {
-        try { return require('electron').dialog } catch (_) { return null }
-      })()
 
     let report
     try {
@@ -166,38 +226,27 @@ function createCrashService(deps) {
       })
     }
 
-    // Show native crash report dialog (async so it doesn't block the ready handler)
-    if (electronDialog) {
-      setImmediate(async () => {
-        try {
-          const { response } = await electronDialog.showMessageBox(mainWindow || null, {
-            type: 'error',
-            title: 'Tatakai crashed',
-            message: 'It looks like Tatakai crashed during your last session.',
-            detail:
-              'Would you like to send a crash report to the developers?\n\n' +
-              'This report contains technical information that helps us fix bugs. ' +
-              'No personal data or media files are included.\n\n' +
-              `Crash ID: ${report.id || 'unknown'}\n` +
-              `Time: ${new Date(reportDate).toLocaleString()}`,
-            buttons: ['Send Crash Report', 'No Thanks'],
-            defaultId: 0,
-            cancelId: 1,
-            noLink: true,
-          })
-
-          if (response === 0) {
-            // User consented — upload report metadata
-            await _uploadCrashReport({ id: report.id, date: reportDate, path: report.path }, opts, logger)
-            if (logger) logger.info('[CrashService] Crash report submitted by user')
-          } else {
-            if (logger) logger.info('[CrashService] User declined crash report submission')
-          }
-        } catch (err) {
-          if (logger) logger.warn('[CrashService] Failed to show crash dialog', { error: String(err) })
-        }
-      })
+    // Auto-forward (metadata only — no dumps, no PII) on next launch. There is
+    // no native consent dialog: the previous dialog's wording already promised
+    // "no personal data or media files", so we send the same metadata silently.
+    // Fire-and-forget so the ready handler is never blocked, and failures never
+    // reach the main process.
+    const meta = {
+      id: report.id,
+      date: reportDate,
+      path: report.path,
+      app_version: (() => { try { return require('electron').app.getVersion() } catch (_) { return 'unknown' } })(),
+      platform: process.platform,
+      arch: process.arch,
+      node_version: process.versions.node,
+      electron_version: process.versions.electron,
     }
+    setImmediate(async () => {
+      // The endpoint (tatakaiapi) fans out to Supabase + Discord server-side, so
+      // the desktop only has to make this one upload — no client-side webhook.
+      await _uploadCrashReport(meta, opts, logger)
+      if (logger) logger.info('[CrashService] Crash metadata auto-forwarded', { id: report.id })
+    })
 
     // Always notify the renderer via IPC (for the admin CrashReportPanel)
     try {
@@ -216,29 +265,36 @@ function createCrashService(deps) {
   // ── _uploadCrashReport() (private) ────────────────────────────────────────
 
   /**
-   * Uploads crash report metadata to the configured endpoint.
-   * Uses a Supabase Edge Function or any HTTPS endpoint injected via opts.uploadEndpoint.
-   * Fails silently — a failed upload should never crash the main process.
+   * Uploads crash report metadata to the tatakaiapi crash-ingest route, which
+   * inserts it into the Supabase `crash_reports` table via the service-role
+   * client (see tatakaiapi/src/routes/crash.ts). The desktop app never holds a
+   * Supabase key — the write is brokered server-side.
+   *
+   * Endpoint resolution (first non-empty wins):
+   *   1. opts.uploadEndpoint (tests)
+   *   2. process.env.CRASH_REPORT_ENDPOINT (explicit override)
+   *   3. `${VITE_BACKEND_ORIGIN}/api/v3/crash` — same convention the runtime IPC
+   *      uses (desktop/ipc/ipc-runtime.cjs), defaulting to the local dev API.
+   * Fails silently — a failed upload must never crash the main process.
    *
    * @param {{ id: string, date: string, path: string }} report
    * @param {{ uploadEndpoint?: string }} [opts]
    * @param {object} [logger]
    */
   async function _uploadCrashReport(report, opts, logger) {
+    const apiBase = (process.env.VITE_BACKEND_ORIGIN || 'http://localhost:4001').replace(/\/+$/, '')
     const endpoint =
       (opts && opts.uploadEndpoint) ||
       process.env.CRASH_REPORT_ENDPOINT ||
-      null
-
-    if (!endpoint) {
-      // No endpoint configured — log locally only
-      if (logger) logger.info('[CrashService] No CRASH_REPORT_ENDPOINT set; crash metadata logged locally only')
-      return
-    }
+      `${apiBase}/api/v3/crash`
 
     try {
-      const https = require('https')
-      const url = require('url')
+      // WHATWG URL (url.parse() is deprecated — DEP0169).
+      const parsed = new URL(endpoint)
+      // Pick the transport by protocol so both the local dev API (http) and a
+      // production origin (https) work without extra config.
+      const transport = parsed.protocol === 'http:' ? require('http') : require('https')
+      const defaultPort = parsed.protocol === 'http:' ? 80 : 443
       const body = JSON.stringify({
         id: report.id,
         date: report.date,
@@ -250,12 +306,11 @@ function createCrashService(deps) {
       })
 
       await new Promise((resolve, reject) => {
-        const parsed = url.parse(endpoint)
-        const req = https.request(
+        const req = transport.request(
           {
             hostname: parsed.hostname,
-            path: parsed.path,
-            port: parsed.port || 443,
+            path: `${parsed.pathname}${parsed.search}`,
+            port: parsed.port || defaultPort,
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -276,6 +331,7 @@ function createCrashService(deps) {
         req.write(body)
         req.end()
       })
+      if (logger) logger.info('[CrashService] Crash metadata uploaded', { endpoint, id: report.id })
     } catch (err) {
       if (logger) logger.warn('[CrashService] Failed to upload crash report', { error: String(err) })
     }

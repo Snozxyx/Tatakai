@@ -57,7 +57,7 @@ const FEATURES = [
   {
     icon: <Star className="w-5 h-5" />,
     title: 'Anime Search',
-    desc:  'Look up any anime or character with rich embeds. Direct links to watch on Tatakai.',
+    desc:  'Look up any anime or character with rich embeds. Direct links to open on Tatakai.',
     color: 'text-orange-400',
     bg:    'bg-orange-400/10 border-orange-400/20',
   },

@@ -1,9 +1,12 @@
 'use strict';
 
 const http = require('http');
+const fs = require('fs');
+const fsp = require('fs/promises');
+const path = require('path');
 const { URL } = require('url');
 const crypto = require('crypto');
-const { bypassCloudflare, cookiesToHeader, cleanup } = require('./cloudflare-bypass.cjs');
+const { bypassCloudflare, cookiesToHeader, cleanup, clearSession, isChallengeResponse } = require('./cloudflare-bypass.cjs');
 const { FlareSolverrClient } = require('./flaresolverr-client.cjs');
 const { EmbeddedFlareSolverr } = require('./embedded-flaresolverr.cjs');
 
@@ -32,7 +35,37 @@ const CLOUDFLARE_DOMAINS = new Set([
     'reanime.to',
     'reanime.net',
     'anikoto.to',
+    // Manga sites (Toko) fronted by Cloudflare — the worker-path proxy applies
+    // the same challenge bypass so `getChapters`/`getPages` reach them.
+    'weebcentral.com',
+    'nelomanga.com',
+    'toongod.org',
+    'www.toongod.org',
+    'mangadot.net',
+    'www.mangadot.net',
+    'mangaball.net',
+    'www.mangaball.net',
+    // mangaball serves pages/images off rotating Pokémon-themed CDN hosts.
+    'bulbasaur.poke-black-and-white.net',
+    'heracross.red-and-blue.net',
+    'api.comick.dev',
 ]);
+
+// Local video file extensions → MIME. mp4/webm/ogg play in a browser <video>
+// (so cross-device watch-party participants can watch them); mkv/avi/mov are
+// served faithfully but only play where the client has a demuxer for them
+// (the host's desktop always does).
+const LOCAL_VIDEO_MIME = {
+    '.mp4': 'video/mp4',
+    '.m4v': 'video/x-m4v',
+    '.webm': 'video/webm',
+    '.ogv': 'video/ogg',
+    '.ogg': 'video/ogg',
+    '.mkv': 'video/x-matroska',
+    '.mov': 'video/quicktime',
+    '.avi': 'video/x-msvideo',
+    '.ts': 'video/mp2t',
+};
 
 class LocalProxyServer {
     constructor(logger, onEvent) {
@@ -41,6 +74,7 @@ class LocalProxyServer {
         this._server = null;
         this._port = null;
         this._tokenMap = new Map();
+        this._shareSecret = null; // minted lazily; gates public (tunneled) /stream
         this._cloudflareBypassEnabled = true; // Re-enabled after URL fixes
         this._flaresolverr = new FlareSolverrClient(logger, { enabled: false }); // External FlareSolverr (disabled by default)
         this._embeddedFlaresolverr = new EmbeddedFlareSolverr(logger); // Embedded FlareSolverr
@@ -192,6 +226,7 @@ class LocalProxyServer {
         this._server = null;
         this._port = null;
         this._tokenMap.clear();
+        this._shareSecret = null;
         
         // Cleanup Cloudflare bypass resources
         try {
@@ -214,19 +249,86 @@ class LocalProxyServer {
         });
     }
 
-    registerSource({ url, headers }) {
+    registerSource({ url, headers, persistent = false, relative = false }) {
         const token = crypto.randomBytes(16).toString('hex');
         this._tokenMap.set(token, {
             url,
             headers: headers && typeof headers === 'object' ? headers : {},
             createdAt: Date.now(),
+            persistent: !!persistent,
         });
-        // cleanup old tokens (15m)
+        // cleanup old tokens (15m) — never purge persistent share tokens, so a
+        // long movie streamed to a watch party doesn't 410 mid-session.
         const cutoff = Date.now() - 15 * 60 * 1000;
         for (const [k, v] of this._tokenMap.entries()) {
+            if (v?.persistent) continue;
             if ((v?.createdAt || 0) < cutoff) this._tokenMap.delete(k);
         }
-        return `${this.baseUrl()}/stream/${token}`;
+        // A relative `/stream/<token>` resolves against whatever origin the
+        // client fetched from — the loopback base for the single-user player,
+        // the Cloudflare tunnel host for a remote watch-party participant.
+        return relative ? `/stream/${token}` : `${this.baseUrl()}/stream/${token}`;
+    }
+
+    /**
+     * Register a persistent share-root source (host-hosted watch party) and
+     * return `{ token, path }`. The caller builds the public tunnel URL from
+     * `path` plus the share secret.
+     */
+    registerShareSource({ url, headers }) {
+        const ref = this.registerSource({ url, headers, persistent: true, relative: true });
+        const token = ref.slice('/stream/'.length);
+        return { token, path: ref };
+    }
+
+    /**
+     * Register a local video FILE (host's device or the offline library) as a
+     * persistent share source. Unlike registerSource, the token serves bytes off
+     * disk with Range support instead of proxying an upstream fetch. The path is
+     * fixed at registration and never derived from the request, so there is no
+     * traversal vector. Returns `{ token, path }`; the caller builds the public
+     * tunnel URL from `path` plus the share secret.
+     */
+    registerLocalFile({ path: filePath }) {
+        const abs = String(filePath || '').trim();
+        if (!abs) throw new Error('registerLocalFile: path required');
+        const token = crypto.randomBytes(16).toString('hex');
+        this._tokenMap.set(token, {
+            localPath: abs,
+            createdAt: Date.now(),
+            persistent: true,
+        });
+        return { token, path: `/stream/${token}` };
+    }
+
+    /**
+     * Per-session secret required on public (tunneled) /stream requests, so a
+     * guessed tunnel URL alone can't pull the host's stream. Loopback requests
+     * (the single-user player) never need it. Minted lazily and reused for the
+     * proxy's lifetime.
+     */
+    getShareSecret() {
+        if (!this._shareSecret) {
+            this._shareSecret = crypto.randomBytes(24).toString('hex');
+        }
+        return this._shareSecret;
+    }
+
+    clearShareSecret() {
+        this._shareSecret = null;
+    }
+
+    /**
+     * A request arrives over loopback (the local player) rather than the public
+     * Cloudflare tunnel. cloudflared always connects from 127.0.0.1, so the
+     * socket address can't tell them apart — the Host header can: a tunneled
+     * request carries the public `*.trycloudflare.com` host, a direct one
+     * carries `127.0.0.1:<port>` / `localhost`.
+     */
+    _isLoopbackRequest(req) {
+        const host = String(req.headers?.host || '').toLowerCase();
+        const name = host.split(':')[0].replace(/^\[|\]$/g, '');
+        return name === '127.0.0.1' || name === 'localhost' || name === '::1' || name === '';
     }
 
     /**
@@ -256,6 +358,12 @@ class LocalProxyServer {
             'access-control-allow-headers': 'Range, Content-Type, Accept, Origin, Authorization, X-Requested-With',
             'access-control-expose-headers': '*',
             'access-control-max-age': '86400',
+            // The renderer and this loopback proxy are different origins, so every
+            // proxied subresource is a cross-site load. CDNs that omit CORP (atsu)
+            // or send `same-site`/`same-origin` (hotlink-locked hosts) make Chrome
+            // block the `<img>`/media load with ERR_BLOCKED_BY_RESPONSE.NotSameSite.
+            // We front the fetch, so advertise the resource as cross-origin-usable.
+            'cross-origin-resource-policy': 'cross-origin',
             ...(extra || {}),
         };
     }
@@ -275,12 +383,24 @@ class LocalProxyServer {
         res.end(body);
     }
 
-    _rewritePlaylistUrls(playlistText, playlistUrl, sourceHeaders) {
+    _rewritePlaylistUrls(playlistText, playlistUrl, sourceHeaders, opts = {}) {
         const base = new URL(playlistUrl);
+        const persistent = !!opts.persistent;
+        const shareQuery = opts.shareQuery || '';
         const rewriteUrl = (targetUrl) => {
             try {
                 const resolved = new URL(String(targetUrl || '').trim(), base).href;
-                return this.registerSource({ url: resolved, headers: sourceHeaders });
+                // Emit origin-relative `/stream/<token>` so the reference resolves
+                // against whichever origin fetched the playlist (loopback player
+                // or tunnel participant). Append the share secret when we're
+                // serving over the tunnel so child segments pass the /stream gate.
+                const ref = this.registerSource({
+                    url: resolved,
+                    headers: sourceHeaders,
+                    persistent,
+                    relative: true,
+                });
+                return `${ref}${shareQuery}`;
             } catch (_) {
                 return targetUrl;
             }
@@ -350,6 +470,12 @@ class LocalProxyServer {
             if (hop.has(name)) return;
             if (name === 'content-encoding') return;
             if (name === 'content-length' && wasDecoded) return;
+            // `_corsHeaders` owns every CORS/cross-origin-policy header below. An
+            // upstream copy (often differently-cased, e.g. atsu's per-origin
+            // `Access-Control-Allow-Origin`) would survive `Object.assign` as a
+            // second header of the same name and let the browser honour the
+            // restrictive value — so drop the upstream ones here.
+            if (name.startsWith('access-control-') || name.startsWith('cross-origin-')) return;
             passHeaders[key] = value;
         });
         Object.assign(passHeaders, this._corsHeaders());
@@ -493,6 +619,57 @@ class LocalProxyServer {
             clearTimeout(timeoutId);
         }
 
+        // A cached cf_clearance can go stale between solves (Cloudflare rotates it,
+        // or the failure cooldown handed us nothing). When the upstream answers with
+        // a challenge instead of the asset, drop the session and re-solve once with a
+        // forced refresh — otherwise we'd forward the challenge HTML as the "page".
+        // Only the Playwright path self-solves; the FlareSolverr modes own their own
+        // challenge handling. We only peek on the challenge status codes so ordinary
+        // 200 image bytes are never buffered.
+        if (
+            needsBypass &&
+            this._bypassMode !== 'flaresolverr' &&
+            this._bypassMode !== 'embedded' &&
+            [403, 503, 429].includes(upstream.status)
+        ) {
+            const peeked = Buffer.from(await upstream.arrayBuffer());
+            const originalHeaders = upstream.headers;
+            if (isChallengeResponse(upstream.status, peeked.toString('utf8'))) {
+                this._logger.warn(`[LocalProxy] Stale Cloudflare clearance for ${target.hostname}; re-solving`);
+                clearSession(target.hostname);
+                try {
+                    const result = await bypassCloudflare(targetUrl, this._logger, { forceRefresh: true });
+                    const retryHeaders = { ...requestHeaders };
+                    // Overwrite Cookie outright so the stale cf_clearance we just
+                    // merged in is gone, not appended alongside the fresh one.
+                    const cookieHeader = cookiesToHeader(result.cookies);
+                    if (cookieHeader) retryHeaders['Cookie'] = cookieHeader;
+                    if (result.userAgent) retryHeaders['User-Agent'] = result.userAgent;
+
+                    const retryController = new AbortController();
+                    const retryTimeoutId = setTimeout(() => retryController.abort(), 30_000);
+                    try {
+                        upstream = await fetch(target, {
+                            method,
+                            headers: retryHeaders,
+                            body,
+                            redirect: 'follow',
+                            signal: retryController.signal,
+                        });
+                    } finally {
+                        clearTimeout(retryTimeoutId);
+                    }
+                } catch (err) {
+                    this._logger.warn(`[LocalProxy] Cloudflare re-solve failed for ${target.hostname}: ${err.message}`);
+                    // Re-solve failed — forward the challenge body we already drained.
+                    upstream = new Response(peeked, { status: 403, headers: originalHeaders });
+                }
+            } else {
+                // A genuine 4xx/5xx from the origin, not a wall — replay the drained body.
+                upstream = new Response(peeked, { status: upstream.status, headers: originalHeaders });
+            }
+        }
+
         this._emit('runtime-proxy-extension-fetch', {
             status: upstream.status,
             method,
@@ -540,10 +717,89 @@ class LocalProxyServer {
         throw lastErr;
     }
 
+    /**
+     * Serve a local video file with HTTP Range support so seeking works in the
+     * player. The path is the one fixed at registerLocalFile() time — never
+     * taken from the request — so a token can only ever read its own file.
+     */
+    async _serveLocalFile(req, res, filePath) {
+        let stat;
+        try {
+            stat = await fsp.stat(filePath);
+        } catch (_) {
+            this._endWithStatus(res, 404, 'file not found');
+            return;
+        }
+        if (!stat.isFile()) {
+            this._endWithStatus(res, 404, 'not a file');
+            return;
+        }
+
+        const total = stat.size;
+        const ext = path.extname(filePath).toLowerCase();
+        const contentType = LOCAL_VIDEO_MIME[ext] || 'application/octet-stream';
+        const method = String(req.method || 'GET').toUpperCase();
+
+        // Parse a single "bytes=start-end" range; ignore anything more exotic.
+        let start = 0;
+        let end = total - 1;
+        let isRange = false;
+        const range = req.headers.range;
+        if (range) {
+            const m = /^bytes=(\d*)-(\d*)$/.exec(String(range).trim());
+            if (m) {
+                const s = m[1] === '' ? NaN : Number(m[1]);
+                const e = m[2] === '' ? NaN : Number(m[2]);
+                if (Number.isFinite(s)) {
+                    start = s;
+                    end = Number.isFinite(e) ? e : total - 1;
+                } else if (Number.isFinite(e)) {
+                    // suffix range: last N bytes
+                    start = Math.max(0, total - e);
+                    end = total - 1;
+                }
+                isRange = true;
+            }
+            if (isRange && (start > end || start >= total)) {
+                res.writeHead(416, this._corsHeaders({
+                    'content-range': `bytes */${total}`,
+                    'content-type': 'text/plain; charset=utf-8',
+                }));
+                res.end('range not satisfiable');
+                return;
+            }
+        }
+
+        const chunkSize = isRange ? end - start + 1 : total;
+        const headers = this._corsHeaders({
+            'content-type': contentType,
+            'content-length': String(chunkSize),
+            'accept-ranges': 'bytes',
+            'cache-control': 'no-store',
+        });
+        if (isRange) headers['content-range'] = `bytes ${start}-${end}/${total}`;
+
+        res.writeHead(isRange ? 206 : 200, headers);
+        if (method === 'HEAD') {
+            res.end();
+            return;
+        }
+
+        const stream = fs.createReadStream(filePath, isRange ? { start, end } : {});
+        stream.on('error', (err) => {
+            this._logger?.error?.('[LocalProxy] local file read error:', err.message);
+            if (!res.headersSent) this._endWithStatus(res, 500, 'file read error');
+            else res.destroy();
+        });
+        res.on('close', () => stream.destroy());
+        stream.pipe(res);
+    }
+
     async _handleRequest(req, res) {
         try {
             const rawUrl = req.url || '/';
             const parsed = new URL(rawUrl, this.baseUrl());
+            const isLoopback = this._isLoopbackRequest(req);
 
             // Preflight. A `<track>` element never sends one, but hls.js does as
             // soon as a request carries a non-simple header (Range on a seek,
@@ -556,6 +812,13 @@ class LocalProxyServer {
             }
 
             if (parsed.pathname === '/proxy') {
+                // `/proxy?url=` is an open fetch — an SSRF vector. It's only for
+                // the local extension host, so refuse it over the public tunnel;
+                // public callers can reach nothing but /stream/<token>.
+                if (!isLoopback) {
+                    this._endWithStatus(res, 403, 'forbidden');
+                    return;
+                }
                 const targetUrl = parsed.searchParams.get('url');
                 if (!targetUrl) {
                     this._endWithStatus(res, 400, 'missing target url');
@@ -569,13 +832,29 @@ class LocalProxyServer {
                 this._endWithStatus(res, 404, 'not found');
                 return;
             }
+            // A public (tunneled) stream read must carry the per-session share
+            // secret, so a guessed tunnel URL alone can't pull the host's stream.
+            // Loopback reads (the single-user player) are exempt.
+            if (!isLoopback) {
+                const provided = parsed.searchParams.get('s');
+                if (!this._shareSecret || provided !== this._shareSecret) {
+                    this._endWithStatus(res, 403, 'forbidden');
+                    return;
+                }
+            }
             const token = match[1];
             const entry = this._tokenMap.get(token);
-            if (!entry || !entry.url) {
+            if (!entry || (!entry.url && !entry.localPath)) {
                 this._emit('runtime-proxy-miss', { token });
                 // 410 rather than 404: the token was valid, it aged out of
                 // `_tokenMap` (15m). The player re-requests sources on this.
                 this._endWithStatus(res, 410, 'stream token expired');
+                return;
+            }
+
+            // Local file share source: serve bytes off disk with Range support.
+            if (entry.localPath) {
+                await this._serveLocalFile(req, res, entry.localPath);
                 return;
             }
 
@@ -687,7 +966,14 @@ class LocalProxyServer {
 
             if (isPlaylist) {
                 const playlistText = await upstream.text();
-                const rewritten = this._rewritePlaylistUrls(playlistText, entry.url, entry.headers || {});
+                // Child references inherit the parent's persistence, and carry
+                // the share secret only when this playlist was fetched over the
+                // tunnel (so the single-user loopback path stays secret-free).
+                const shareQuery = isLoopback ? '' : `?s=${encodeURIComponent(this.getShareSecret())}`;
+                const rewritten = this._rewritePlaylistUrls(playlistText, entry.url, entry.headers || {}, {
+                    persistent: !!entry.persistent,
+                    shareQuery,
+                });
                 const body = Buffer.from(rewritten, 'utf8');
                 res.writeHead(upstream.status, this._corsHeaders({
                     'content-type': 'application/vnd.apple.mpegurl',

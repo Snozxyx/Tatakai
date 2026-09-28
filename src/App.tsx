@@ -2,24 +2,34 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, HashRouter } from "react-router-dom";
 import { Capacitor } from '@capacitor/core';
 import { AuthProvider } from "@/contexts/AuthContext";
+import { BackendStatusProvider } from "@/contexts/BackendStatusContext";
+import { SettingsModalProvider } from "@/contexts/SettingsModalContext";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { queryClient } from "@/lib/queryClient";
 import MainLayout from "@/layouts/MainLayout";
 import AppRoutes from "@/routes/AppRoutes";
+import { DesktopDeepLinkBridge } from "@/components/desktop/DesktopDeepLinkBridge";
+import { LightboxProvider } from "@/components/media/ImageLightbox";
 import { toast } from "sonner";
 import { useEffect } from "react";
 
 
 const App = () => {
-  // Detect if running in Electron/file:// protocol
-  const isElectron = window.location.protocol === 'file:';
+  // Packaged desktop serves the renderer from a non-web scheme (app://tatakai.me/index.html
+  // now, file:// as a fallback). On those origins the initial pathname is "/index.html", which
+  // matches no route and lands on the 404 page under BrowserRouter. HashRouter ignores the
+  // served pathname and resolves the empty hash to "/" (the home page), so use it whenever we
+  // are NOT on a real http(s) web origin.
+  const isWebOrigin =
+    window.location.protocol === 'http:' || window.location.protocol === 'https:';
+  const useHashRouter = !isWebOrigin;
 
   const routerFutureFlags = {
     v7_startTransition: true,
     v7_relativeSplatPath: true,
   };
 
-  const Router = isElectron ? HashRouter : BrowserRouter;
+  const Router = useHashRouter ? HashRouter : BrowserRouter;
 
   useEffect(() => {
     const runtime = (window as any).tatakaiRuntime;
@@ -95,15 +105,22 @@ const App = () => {
   
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-          <TooltipProvider>
-            <Router future={routerFutureFlags}>
-              <MainLayout>
-                <AppRoutes />
-              </MainLayout>
-            </Router>
-          </TooltipProvider>
-      </AuthProvider>
+      <BackendStatusProvider>
+        <AuthProvider>
+            <TooltipProvider>
+              <Router future={routerFutureFlags}>
+                <DesktopDeepLinkBridge />
+                <SettingsModalProvider>
+                  <LightboxProvider>
+                    <MainLayout>
+                      <AppRoutes />
+                    </MainLayout>
+                  </LightboxProvider>
+                </SettingsModalProvider>
+              </Router>
+            </TooltipProvider>
+        </AuthProvider>
+      </BackendStatusProvider>
     </QueryClientProvider>
   );
 };

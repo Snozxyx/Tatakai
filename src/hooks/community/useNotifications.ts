@@ -41,6 +41,20 @@ async function showNativeNotification(notification: Notification) {
     }
 }
 
+// Surface a desktop notification as an in-app toast instead of a native OS
+// notification. The old transport (`window.electron.notify` → main-process
+// `new Notification`) has been removed in favour of our own popup UI. Mobile
+// already gets a real OS notification via showNativeNotification, so skip the
+// toast there to avoid a duplicate; web + desktop get the in-app popup.
+function showDesktopNotification(notification: Notification) {
+    try {
+        if (Capacitor.isNativePlatform()) return;
+        toast(notification.title, { description: notification.body });
+    } catch (error) {
+        console.warn('Failed to show desktop notification:', error);
+    }
+}
+
 // Simple hash function for string IDs
 declare global {
     interface String {
@@ -82,9 +96,10 @@ export function useNotifications() {
             }, (payload) => {
                 queryClient.invalidateQueries({ queryKey: ['notifications', user.id] });
                 
-                // Show native notification on mobile
+                // Show native notification on mobile (Capacitor) and desktop (Electron)
                 if (payload.new) {
                     showNativeNotification(payload.new as Notification);
+                    showDesktopNotification(payload.new as Notification);
                 }
             })
             .on('postgres_changes', {

@@ -4,6 +4,55 @@ All notable changes to Tatakai are documented here.
 
 ---
 
+## [6.0.0] - 2026-09-27
+
+**Tatakai V6 — Major Platform Overhaul & Architecture Redesign.** This is the
+largest release since launch. It reworks the extension system, the manga stack,
+offline/desktop resilience, community, watch-together, recommendations, and the
+admin/moderation surface. Highlights below; see the in-app changelog
+(Settings → Changelog) for the user-facing summary.
+
+### Added
+- **Extension Ecosystem** — Most advanced features are now delivered as modular extensions. A single extension can contribute:
+  - Anime **streaming sources** and **manga** chapter/page sources (Node data plane)
+  - **Custom sources** — fully isolated read/watch verticals mounted at `/x/:ns/:sourceId` (`custom-source-v1`)
+  - **Themes**, **analytics** sinks, background **services**, and platform **modules**
+  - **React pages and UI slots** (renderer code plane, trust-gated)
+  - Multiple extensions run simultaneously, resolved by `priority`; ships with the `aurora` reference extension and `.kai` packaging
+- **Manga Reader Rebuild** — comick-style reader with per-device display settings and keybinds, progress persistence, and dual comment systems (global + per-chapter)
+- **Manga Offline Downloads** — download-all-chapters and offline reading via a single Offline Library page; main-process downloader (preserves source request headers that are dropped across IPC), Dexie v5 `offlineChapters` store, `tatakai-media://` serving, and Dynamic Island manga rows + activity pills
+- **In-App Extension-API Manga Host** — reading is HTTP-primary through an in-app extension-API host (`/api/v3/<ns>/manga/{chapters,pages}`), generic across any manga-capable extension, with an IPC fallback; pages routed via `subProviderToNamespace`
+- **Continue Watching / Netflix-style Sync** — cross-device resume, downloads, auto-download, list import, richer AnimeInfo, and a release calendar
+- **Watch2Together Rebuild** — host-hosted streaming over a Cloudflare tunnel, hashed-password room RPCs, and a redesigned ambient watch room
+- **Community Feed Platform** — `/community` rebuilt feed-first with posts, polls, and rich embeds
+- **Recommendations Engine** — in-house hybrid recommender plus a SQL collaborative-filtering model, replacing the previous non-reproducible pipeline
+- **Ranks & Badges** — unified **Mitsu** rank (weighted score across anime + manga, per-rank `rn-1..16` animated name effects) and collectible **Chikra** badges with rarity tiers; reading contribution uses a chapter-sum proxy
+- **Extension Result Cache** — persistent, union-merge SWR cache so revisited anime servers and manga chapters render instantly; fresh-authoritative per provider, no-drop, with a `VITE_ENABLE_EXT_RESULT_CACHE` kill-switch
+- **Admin / Moderation / News Overhaul** — rebuilt admin and moderation tooling with automod, Turnstile challenges, a news surface, and broad analytics instrumentation
+- **AvatarPickerSheet** — right-side avatar picker
+
+### Changed
+- **Desktop Offline Resilience** — additive, graceful offline degradation: `BackendStatusContext` tri-state, `ProtectedRoute` offline whitelist, and an `OfflineBanner`
+- **Desktop Memory Footprint** — main-process disk-cache cap and deferred runtime services reduce RAM use
+- **Playlists** — visual upgrade; four separate comment systems unified into one polymorphic comments table, with per-item `media_format`
+- **Integrations** — AniList/MAL account linking moved to secure server-side OAuth exchange; desktop uses `tatakai://` deep-link OAuth
+- **Positioning / Copy** — Tatakai is presented as an extension-based otaku community and companion app (no "watch free / stream online" framing)
+- **Code Structure** — largest pages split into presentational + logic modules (AdminPage → `UserManagementTab` + `StatTile`, with more to follow)
+
+### Fixed
+- **Manga Source Routing** — page/chapter requests route correctly across extension namespaces; header loss across IPC no longer breaks protected image fetches
+- **Streaming Source Mapping** — Toko-family providers mapped to Watch-page servers; Animepahe/Anikoto m3u8 and play-page resolution fixes; multilingual dub providers and FlixCloud resolution
+
+### Security
+- **Extension Trust Model** — renderer (code-plane) contributions run with app privileges behind an explicit trust/sideloading gate; data-plane contributions are sandboxed to the Node host
+- **Moderation** — Turnstile challenges and automod added to abuse-prone surfaces
+
+### Notes (V5 → V6)
+- **V6 landing commit**: `1b9ec88` — *feat: Tatakai V6 — Major Platform Overhaul and Architecture Redesign*
+- Extension system documentation lives in [`docs/extension/`](docs/extension/README.md); broader architecture and feature docs are in [`docs/`](docs/README.md)
+
+---
+
 ## [5.2.0] - 2026-04-20
 
 ### Added

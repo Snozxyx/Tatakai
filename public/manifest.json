@@ -1,7 +1,7 @@
 {
-  "name": "Tatakai - Watch Anime Online",
+  "name": "Tatakai — Otaku Community",
   "short_name": "Tatakai",
-  "description": "Watch your favorite anime online for free in HD quality. Stream the latest anime episodes, movies, and series with English subtitles and dub.",
+  "description": "Tatakai is an extension-based otaku community. Track the anime and manga you love, build tier lists and playlists, share your taste, and connect with fellow fans.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#09090b",
@@ -52,8 +52,8 @@
     }
   ],
   "categories": [
-    "entertainment",
-    "video"
+    "social",
+    "entertainment"
   ],
   "lang": "en-US",
   "dir": "ltr",
@@ -61,13 +61,13 @@
   "prefer_related_applications": false,
   "screenshots": [
     {
-      "src": "/tatakai-logo-square.png",
+      "src": "/assets/logo/tatakai-logo-square.png",
       "sizes": "540x720",
       "type": "image/png",
       "form_factor": "narrow"
     },
     {
-      "src": "/tatakai-logo-square.png",
+      "src": "/assets/logo/tatakai-logo-square.png",
       "sizes": "720x540",
       "type": "image/png",
       "form_factor": "wide"
@@ -81,7 +81,7 @@
       "url": "/",
       "icons": [
         {
-          "src": "/tatakai-logo-square.png",
+          "src": "/assets/logo/tatakai-logo-square.png",
           "sizes": "192x192"
         }
       ]
@@ -89,11 +89,11 @@
     {
       "name": "Search",
       "short_name": "Search",
-      "description": "Search anime",
+      "description": "Search anime & manga",
       "url": "/search",
       "icons": [
         {
-          "src": "/tatakai-logo-square.png",
+          "src": "/assets/logo/tatakai-logo-square.png",
           "sizes": "192x192"
         }
       ]
@@ -105,7 +105,7 @@
       "url": "/offline-library",
       "icons": [
         {
-          "src": "/tatakai-logo-square.png",
+          "src": "/assets/logo/tatakai-logo-square.png",
           "sizes": "192x192"
         }
       ]

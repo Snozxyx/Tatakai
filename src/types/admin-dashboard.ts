@@ -44,6 +44,14 @@ export interface CrashReport {
   id: string;
   date: string;   // ISO 8601 timestamp from crash service
   path: string;   // path to crash dump file
+  // Persisted metadata (present on rows read from the crash_reports table;
+  // absent on the live onCrashPrevious IPC feed). Metadata only — no dumps/PII.
+  app_version?: string | null;
+  platform?: string | null;
+  arch?: string | null;
+  node_version?: string | null;
+  electron_version?: string | null;
+  source?: 'live' | 'persisted';
 }
 
 // ---------------------------------------------------------------------------
@@ -97,7 +105,6 @@ export interface StreamingMetrics {
   totalSessions: number;
   peakConcurrent: number;          // max count in any 1-hour bucket
   durationBuckets: { label: string; count: number }[];
-  providerBreakdown: { provider: string; count: number }[];
 }
 
 export interface DownloadMetrics {

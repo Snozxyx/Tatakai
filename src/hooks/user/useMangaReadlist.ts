@@ -17,6 +17,8 @@ export interface MangaReadlistItem {
   manga_poster: string | null;
   mal_id: number | null;
   anilist_id: number | null;
+  /** Content format: 'manga' | 'manhwa' | 'comic' | 'unknown'. Drives reading-track ranks. */
+  format: string;
   status: MangaReadlistStatus;
   last_chapter_key: string | null;
   last_chapter_number: number | null;
@@ -25,6 +27,12 @@ export interface MangaReadlistItem {
   last_language: string | null;
   last_page_index: number;
   total_pages: number | null;
+  /** Namespace of the runtime extension that served the last page (resume fidelity). */
+  last_extension_id: string | null;
+  /** Scanlation group of the last-read source, so resume returns to the same group. */
+  last_scanlator: string | null;
+  /** Opaque page identifier within the chapter (page number as string today). */
+  last_page_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -35,6 +43,7 @@ export interface UpsertMangaReadlistInput {
   mangaPoster?: string | null;
   malId?: number | null;
   anilistId?: number | null;
+  format?: string | null;
   status?: MangaReadlistStatus;
   lastChapterKey?: string | null;
   lastChapterNumber?: number | null;
@@ -43,6 +52,9 @@ export interface UpsertMangaReadlistInput {
   lastLanguage?: string | null;
   lastPageIndex?: number;
   totalPages?: number | null;
+  lastExtensionId?: string | null;
+  lastScanlator?: string | null;
+  lastPageId?: string | null;
   silentToast?: boolean;
 }
 
@@ -71,6 +83,14 @@ const isExplicitReadlistStatus = (status: unknown): boolean => {
 const normalizeString = (value: unknown) => {
   const normalized = String(value || '').trim();
   return normalized.length > 0 ? normalized : null;
+};
+
+const VALID_FORMATS = ['manga', 'manhwa', 'comic', 'unknown'] as const;
+
+/** Normalize a stored/incoming format to one of the four allowed values. */
+const normalizeFormat = (value: unknown): string => {
+  const v = String(value || '').trim().toLowerCase();
+  return (VALID_FORMATS as readonly string[]).includes(v) ? v : 'unknown';
 };
 
 const toPositiveIntOrNull = (value: unknown) => {
@@ -147,6 +167,7 @@ const getLocalMangaReadlist = (): MangaReadlistItem[] => {
         manga_poster: normalizeString(row?.manga_poster),
         mal_id: toPositiveIntOrNull(row?.mal_id),
         anilist_id: toPositiveIntOrNull(row?.anilist_id),
+        format: normalizeFormat(row?.format),
         status: normalizeStatus(row?.status),
         last_chapter_key: normalizeString(row?.last_chapter_key),
         last_chapter_number: Number.isFinite(Number(row?.last_chapter_number))
@@ -157,6 +178,9 @@ const getLocalMangaReadlist = (): MangaReadlistItem[] => {
         last_language: normalizeString(row?.last_language),
         last_page_index: clampPageIndex(row?.last_page_index),
         total_pages: Number.isFinite(Number(row?.total_pages)) ? Number(row.total_pages) : null,
+        last_extension_id: normalizeString(row?.last_extension_id),
+        last_scanlator: normalizeString(row?.last_scanlator),
+        last_page_id: normalizeString(row?.last_page_id),
         created_at: String(row?.created_at || safeNow()),
         updated_at: String(row?.updated_at || safeNow()),
       }))
@@ -191,6 +215,7 @@ const upsertLocalMangaReadlist = (input: UpsertMangaReadlistInput): MangaReadlis
     manga_poster: normalizeString(input.mangaPoster),
     mal_id: nextMalId,
     anilist_id: nextAniListId,
+    format: normalizeFormat(input.format ?? existing?.format),
     status: normalizeStatus(input.status || existing?.status || 'plan_to_read'),
     last_chapter_key: normalizeString(input.lastChapterKey ?? existing?.last_chapter_key),
     last_chapter_number:
@@ -208,6 +233,9 @@ const upsertLocalMangaReadlist = (input: UpsertMangaReadlistInput): MangaReadlis
       input.totalPages !== undefined && Number.isFinite(Number(input.totalPages))
         ? Number(input.totalPages)
         : existing?.total_pages ?? null,
+    last_extension_id: normalizeString(input.lastExtensionId ?? existing?.last_extension_id),
+    last_scanlator: normalizeString(input.lastScanlator ?? existing?.last_scanlator),
+    last_page_id: normalizeString(input.lastPageId ?? existing?.last_page_id),
     created_at: existing?.created_at || now,
     updated_at: now,
   };
@@ -335,9 +363,14 @@ export function useUpsertMangaReadlist() {
         user_id: user.id,
         manga_id: mangaId,
         manga_title: mangaTitle,
-        manga_poster: normalizeString(input.mangaPoster),
+        // Don't null a stored cover on an upsert that arrives without one (see the
+        // matching guard in useSaveMangaReadingProgress).
+        ...(normalizeString(input.mangaPoster) ? { manga_poster: normalizeString(input.mangaPoster) } : {}),
         mal_id: malId,
         anilist_id: anilistId,
+        // Only send format when explicitly provided, so we never overwrite a known
+        // classification with 'unknown' on a progress upsert. DB default is 'unknown'.
+        ...(input.format != null ? { format: normalizeFormat(input.format) } : {}),
         status: normalizeStatus(input.status || 'plan_to_read'),
         last_chapter_key: normalizeString(input.lastChapterKey),
         last_chapter_number:
@@ -352,6 +385,9 @@ export function useUpsertMangaReadlist() {
           input.totalPages !== undefined && Number.isFinite(Number(input.totalPages))
             ? Number(input.totalPages)
             : null,
+        last_extension_id: normalizeString(input.lastExtensionId),
+        last_scanlator: normalizeString(input.lastScanlator),
+        last_page_id: normalizeString(input.lastPageId),
         updated_at: safeNow(),
       };
 
@@ -485,9 +521,15 @@ export function useSaveMangaReadingProgress() {
         user_id: user.id,
         manga_id: mangaId,
         manga_title: mangaTitle,
-        manga_poster: normalizeString(input.mangaPoster),
+        // Only overwrite the cover when we actually have one. The debounced page
+        // tracker in the reader upserts progress before `useMangaDetail` resolves,
+        // so an unguarded `manga_poster: null` here wiped the poster an earlier
+        // save had stored — that's why Continue Reading showed placeholder icons.
+        // Same "don't clobber a known value with a blank" rule as `format` above.
+        ...(normalizeString(input.mangaPoster) ? { manga_poster: normalizeString(input.mangaPoster) } : {}),
         mal_id: malIdToPersist,
         anilist_id: anilistIdToPersist,
+        ...(input.format != null ? { format: normalizeFormat(input.format) } : {}),
         status: statusToPersist,
         last_chapter_key: normalizeString(input.lastChapterKey),
         last_chapter_number:
@@ -502,6 +544,9 @@ export function useSaveMangaReadingProgress() {
           input.totalPages !== undefined && Number.isFinite(Number(input.totalPages))
             ? Number(input.totalPages)
             : null,
+        last_extension_id: normalizeString(input.lastExtensionId),
+        last_scanlator: normalizeString(input.lastScanlator),
+        last_page_id: normalizeString(input.lastPageId),
         updated_at: safeNow(),
       };
 
@@ -585,6 +630,94 @@ export function usePublicMangaReadlist(
       }
 
       return (data || []) as MangaReadlistItem[];
+    },
+    enabled: !!userId && isPublic && showWatchlist,
+  });
+}
+
+/**
+ * Chapter-sum proxy per reading track, for rank computation.
+ *
+ * There is no cumulative "chapters read" log — the only per-manga signal is
+ * `last_chapter_number` (the furthest chapter reached). We SUM that grouped by
+ * `format` as a proxy for reading volume. This UNDER-COUNTS: re-reads, dropped
+ * series, and multi-arc manga read out of order aren't reflected, and a row with
+ * a null/zero `last_chapter_number` contributes nothing. Format='unknown' rows
+ * are excluded (they can't be attributed to a track).
+ *
+ * Classification is by the stored `format` column ONLY — never by chapter/volume
+ * counts (manga/anime ids collide across types; project memory
+ * `tatakai-manga-mapping-cross-type-id-collisions`).
+ */
+export interface ReadingTrackTotals {
+  manga: number;
+  manhwa: number;
+  comic: number;
+}
+
+const EMPTY_READING_TOTALS: ReadingTrackTotals = { manga: 0, manhwa: 0, comic: 0 };
+
+function sumChaptersByFormat(rows: MangaReadlistItem[]): ReadingTrackTotals {
+  const totals: ReadingTrackTotals = { manga: 0, manhwa: 0, comic: 0 };
+  for (const row of rows) {
+    const fmt = normalizeFormat(row.format);
+    if (fmt === 'manga' || fmt === 'manhwa' || fmt === 'comic') {
+      const n = Number(row.last_chapter_number);
+      if (Number.isFinite(n) && n > 0) totals[fmt] += n;
+    }
+  }
+  return totals;
+}
+
+/** Reading-track chapter totals for the signed-in user (all statuses). */
+export function useReadingTrackTotals() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['reading-track-totals', user?.id || 'guest'],
+    queryFn: async (): Promise<ReadingTrackTotals> => {
+      if (!user) return { ...EMPTY_READING_TOTALS };
+
+      const { data, error } = await supabase
+        .from('manga_readlist')
+        .select('format,last_chapter_number')
+        .eq('user_id', user.id);
+
+      if (error) {
+        if (isMissingTableError(error)) {
+          return sumChaptersByFormat(getLocalMangaReadlist());
+        }
+        throw error;
+      }
+
+      return sumChaptersByFormat((data || []) as MangaReadlistItem[]);
+    },
+    enabled: !!user,
+  });
+}
+
+/** Reading-track chapter totals for another (public) profile. */
+export function usePublicReadingTrackTotals(
+  userId: string | undefined,
+  isPublic: boolean,
+  showWatchlist: boolean = true,
+) {
+  return useQuery({
+    queryKey: ['public-reading-track-totals', userId],
+    queryFn: async (): Promise<ReadingTrackTotals> => {
+      if (!userId) return { ...EMPTY_READING_TOTALS };
+
+      const { data, error } = await supabase
+        .from('manga_readlist')
+        .select('format,last_chapter_number')
+        .eq('user_id', userId);
+
+      if (error) {
+        if (isMissingTableError(error)) return { ...EMPTY_READING_TOTALS };
+        throw error;
+      }
+
+      return sumChaptersByFormat((data || []) as MangaReadlistItem[]);
     },
     enabled: !!userId && isPublic && showWatchlist,
   });

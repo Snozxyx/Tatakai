@@ -2,6 +2,14 @@ import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tansta
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
+// Explicit, non-secret column list for `watch_rooms` reads. The
+// 20260924000001 migration revokes table-level SELECT and grants column-level
+// SELECT on every column EXCEPT `password_hash`. PostgREST expands `select('*')`
+// to all columns (including password_hash), which the role can't read -> 403.
+// Selecting these columns explicitly keeps the hash server-side and works.
+export const WATCH_ROOM_COLUMNS =
+    'id,name,host_id,anime_id,anime_title,anime_poster,episode_id,episode_number,episode_title,category,access_type,current_time_seconds,is_playing,is_active,max_participants,created_at,updated_at,expires_at,scheduled_start_at,manual_subtitle_url,manual_stream_url,manual_stream_type,selected_server,share_stream_url,share_stream_type,share_subtitle_url,share_active,share_host_platform';
+
 export interface WatchRoom {
     id: string;
     name: string;
@@ -115,9 +123,14 @@ export function useInfinitePublicWatchRooms() {
         queryKey: ['watch-rooms-public-infinite'],
         queryFn: async ({ pageParam = 0 }) => {
             const pageSize = 12;
+            // Opportunistic reap of idle (>5 min) rooms, first page only, so the
+            // public list hides dead rooms without a scheduler. No-op pre-migration.
+            if (pageParam === 0) {
+                try { await (supabase as any).rpc('close_inactive_watch_rooms'); } catch { /* unapplied */ }
+            }
             const { data: rooms, error } = await supabase
                 .from('watch_rooms')
-                .select('*')
+                .select(WATCH_ROOM_COLUMNS)
                 .eq('is_active', true)
                 .in('access_type', ['public', 'password'])
                 .order('created_at', { ascending: false })
@@ -164,9 +177,11 @@ export function usePublicWatchRooms() {
     return useQuery({
         queryKey: ['watch-rooms-public'],
         queryFn: async () => {
+            // Opportunistic reap of idle (>5 min) rooms; no-op pre-migration.
+            try { await (supabase as any).rpc('close_inactive_watch_rooms'); } catch { /* unapplied */ }
             const { data: rooms, error } = await supabase
                 .from('watch_rooms')
-                .select('*')
+                .select(WATCH_ROOM_COLUMNS)
                 .eq('is_active', true)
                 .in('access_type', ['public', 'password'])
                 .order('created_at', { ascending: false })
@@ -215,7 +230,7 @@ export function useUserWatchRooms() {
 
             const { data: rooms, error } = await supabase
                 .from('watch_rooms')
-                .select('*')
+                .select(WATCH_ROOM_COLUMNS)
                 .eq('host_id', user.id)
                 .eq('is_active', true)
                 .order('created_at', { ascending: false })
@@ -255,7 +270,7 @@ export function useWatchRoom(roomId: string | undefined) {
 
             const { data: room, error } = await supabase
                 .from('watch_rooms')
-                .select('*')
+                .select(WATCH_ROOM_COLUMNS)
                 .eq('id', roomId)
                 .single();
 
@@ -305,6 +320,11 @@ export function useRoomMessages(roomId: string | undefined) {
             return data as RoomMessage[];
         },
         enabled: !!roomId,
+        // Realtime postgres_changes is best-effort and RLS-gated, so a viewer can
+        // miss inserts they never get a change event for (chat appears "stuck").
+        // Poll as a safety net so every client converges within a few seconds.
+        refetchInterval: 3000,
+        refetchOnWindowFocus: true,
     });
 }
 
@@ -631,36 +651,39 @@ export function useCreateRoom() {
         mutationFn: async (input: CreateRoomInput) => {
             if (!user) throw new Error('Must be logged in');
 
+            // Room creation goes through a SECURITY DEFINER RPC that hashes the
+            // password server-side; password_hash is never sent from the client.
             const { data: room, error } = await supabase
-                .from('watch_rooms')
-                .insert({
-                    name: input.name,
-                    host_id: user.id,
-                    access_type: input.access_type,
-                    password_hash: input.password || null, // In production, hash this
-                    anime_id: input.anime_id || null,
-                    anime_title: input.anime_title || null,
-                    anime_poster: input.anime_poster || null,
-                    episode_id: input.episode_id || null,
-                    episode_number: input.episode_number || null,
-                    episode_title: input.episode_title || null,
-                    category: input.category || 'sub',
-                    max_participants: input.max_participants || 10,
-                    scheduled_start_at: input.scheduled_start_at || null,
-                    is_playing: !input.scheduled_start_at,
+                .rpc('create_watch_room', {
+                    p_name: input.name,
+                    p_access_type: input.access_type,
+                    p_password: input.password || null,
+                    p_anime_id: input.anime_id || null,
+                    p_anime_title: input.anime_title || null,
+                    p_anime_poster: input.anime_poster || null,
+                    p_episode_id: input.episode_id || null,
+                    p_episode_number: input.episode_number ?? null,
+                    p_episode_title: input.episode_title || null,
+                    p_category: input.category || 'sub',
+                    p_max_participants: input.max_participants || 10,
+                    p_scheduled_start_at: input.scheduled_start_at || null,
+                    p_manual_subtitle_url: input.manual_subtitle_url || null,
+                    p_manual_stream_url: input.manual_stream_url || null,
                 })
                 .select()
                 .single();
 
             if (error) throw error;
 
-            // Auto-join as host
-            await supabase.from('watch_room_participants').insert({
-                room_id: room.id,
-                user_id: user.id,
-                display_name: profile?.display_name || profile?.username || 'Host',
-                avatar_url: profile?.avatar_url,
-                is_host: true,
+            // create_watch_room() already inserts the host into
+            // watch_room_participants (ON CONFLICT DO NOTHING). Refresh the
+            // placeholder name/avatar with the real profile via the host
+            // self-join RPC — a direct client insert here would hit the
+            // cross-table "Host can self-join their room" RLS check and fail.
+            await supabase.rpc('host_self_join_watch_room', {
+                p_room_id: room.id,
+                p_display_name: profile?.display_name || profile?.username || 'Host',
+                p_avatar_url: profile?.avatar_url || null,
             });
 
             return room as WatchRoom;
@@ -680,47 +703,77 @@ export function useJoinRoom() {
         mutationFn: async ({ roomId, password }: { roomId: string; password?: string }) => {
             if (!user) throw new Error('Must be logged in');
 
-            // Check if room exists and validate password if needed
-            const { data: room, error: roomError } = await supabase
-                .from('watch_rooms')
-                .select('*')
-                .eq('id', roomId)
+            // Joining goes through a SECURITY DEFINER RPC that verifies the
+            // password, enforces capacity, and inserts the participant. The
+            // password check cannot be bypassed by inserting a participant row
+            // directly (RLS only permits a host to self-join).
+            const { data: room, error } = await supabase
+                .rpc('join_watch_room', {
+                    p_room_id: roomId,
+                    p_password: password || null,
+                    p_display_name: profile?.display_name || profile?.username || 'Guest',
+                    p_avatar_url: profile?.avatar_url || null,
+                })
+                .select()
                 .single();
-
-            if (roomError || !room) throw new Error('Room not found');
-            if (!room.is_active) throw new Error('Room is no longer active');
-
-            if (room.access_type === 'password' && room.password_hash) {
-                if (!password || password !== room.password_hash) {
-                    throw new Error('Invalid password');
-                }
-            }
-
-            // Check participant count
-            const { count } = await supabase
-                .from('watch_room_participants')
-                .select('*', { count: 'exact', head: true })
-                .eq('room_id', roomId);
-
-            if (count && count >= room.max_participants) {
-                throw new Error('Room is full');
-            }
-
-            // Join room
-            const { error } = await supabase.from('watch_room_participants').upsert({
-                room_id: roomId,
-                user_id: user.id,
-                display_name: profile?.display_name || profile?.username || 'Guest',
-                avatar_url: profile?.avatar_url,
-                is_host: false,
-                last_seen_at: new Date().toISOString(),
-            }, { onConflict: 'room_id,user_id' });
 
             if (error) throw error;
 
             return room as WatchRoom;
         },
         onSuccess: (_, { roomId }) => {
+            queryClient.invalidateQueries({ queryKey: ['watch-room-participants', roomId] });
+        },
+    });
+}
+
+// Host self-join. create_watch_room() adds the host to watch_room_participants
+// on creation, but a host re-entering a room they left (or an older room) is not
+// a participant — which hides the chat input and, via the participant-gated
+// message SELECT policy, makes messages appear not to load. This goes through
+// the host_self_join_watch_room() SECURITY DEFINER RPC rather than a direct
+// insert: the "Host can self-join their room" RLS policy gates the insert on a
+// cross-table EXISTS over watch_rooms (subject to watch_rooms' own RLS + column
+// grants), which fails when the host cannot see their own room row. The RPC
+// verifies host ownership server-side and bypasses that check, working for
+// every access type without a password. Idempotent (ON CONFLICT in the RPC).
+export function useHostSelfJoin() {
+    const queryClient = useQueryClient();
+    const { user, profile } = useAuth();
+
+    return useMutation({
+        mutationFn: async (roomId: string) => {
+            if (!user) throw new Error('Must be logged in');
+
+            const { error } = await supabase.rpc('host_self_join_watch_room', {
+                p_room_id: roomId,
+                p_display_name: profile?.display_name || profile?.username || 'Host',
+                p_avatar_url: profile?.avatar_url || null,
+            });
+
+            if (!error) return;
+
+            // The RPC may be absent (its migration is unapplied on this DB). Fall
+            // back to a direct upsert — the "Host can self-join their room" INSERT
+            // policy permits it for the room owner. create_watch_room() usually
+            // already seats the host, so this only matters for legacy rooms.
+            const { error: upsertError } = await supabase
+                .from('watch_room_participants')
+                .upsert(
+                    {
+                        room_id: roomId,
+                        user_id: user.id,
+                        display_name: profile?.display_name || profile?.username || 'Host',
+                        avatar_url: profile?.avatar_url || null,
+                        is_host: true,
+                        last_seen_at: new Date().toISOString(),
+                    },
+                    { onConflict: 'room_id,user_id' }
+                );
+
+            if (upsertError) throw upsertError;
+        },
+        onSuccess: (_, roomId) => {
             queryClient.invalidateQueries({ queryKey: ['watch-room-participants', roomId] });
         },
     });
@@ -812,8 +865,15 @@ export function useCloseRoom() {
 
             if (error) throw error;
         },
-        onSuccess: () => {
+        onSuccess: (_, roomId) => {
+            // Every surface that lists rooms filters on is_active, so all of them
+            // must drop the just-closed room — not only the legacy public list.
             queryClient.invalidateQueries({ queryKey: ['watch-rooms-public'] });
+            queryClient.invalidateQueries({ queryKey: ['watch-rooms-public-infinite'] });
+            queryClient.invalidateQueries({ queryKey: ['watch-rooms-user'] });
+            queryClient.invalidateQueries({ queryKey: ['watch-rooms-admin-all'] });
+            queryClient.invalidateQueries({ queryKey: ['watch-room', roomId] });
+            queryClient.invalidateQueries({ queryKey: ['feed'] });
         },
     });
 }
@@ -867,9 +927,12 @@ export function useAllWatchRooms() {
     return useQuery({
         queryKey: ['watch-rooms-admin-all'],
         queryFn: async () => {
+            // Opportunistic reap: close rooms idle > 5 min so the admin list
+            // (30s poll) stays fresh without a scheduler. No-op pre-migration.
+            try { await (supabase as any).rpc('close_inactive_watch_rooms'); } catch { /* unapplied */ }
             const { data: rooms, error } = await supabase
                 .from('watch_rooms')
-                .select('*')
+                .select(WATCH_ROOM_COLUMNS)
                 .order('created_at', { ascending: false })
                 .limit(100);
 
@@ -916,39 +979,25 @@ export function useAdminDeleteRoom() {
         mutationFn: async (roomId: string) => {
             if (!user || !isAdmin) throw new Error('Admin access required');
 
-            // Delete all messages first
-            await supabase
-                .from('watch_room_messages')
-                .delete()
-                .eq('room_id', roomId);
-
-            // Delete all participants
-            await supabase
-                .from('watch_room_participants')
-                .delete()
-                .eq('room_id', roomId);
-
-            // Delete the room
-            const { error } = await supabase
-                .from('watch_rooms')
-                .delete()
-                .eq('id', roomId);
+            // Client-side deletes are blocked by the host-only RLS DELETE policy,
+            // so a non-host admin's delete silently affected 0 rows. Route through
+            // the SECURITY DEFINER RPC, which verifies admin server-side, cascades
+            // the child tables, and writes the admin_logs entry itself.
+            const { error } = await supabase.rpc('admin_delete_watch_room', {
+                p_room_id: roomId,
+            });
 
             if (error) throw error;
 
-            // Log admin action
-            await supabase.from('admin_logs').insert({
-                user_id: user.id,
-                action: 'delete_watch_room',
-                entity_type: 'watch_room',
-                entity_id: roomId,
-            });
-
             return roomId;
         },
-        onSuccess: () => {
+        onSuccess: (roomId) => {
             queryClient.invalidateQueries({ queryKey: ['watch-rooms-admin-all'] });
             queryClient.invalidateQueries({ queryKey: ['watch-rooms-public'] });
+            queryClient.invalidateQueries({ queryKey: ['watch-rooms-public-infinite'] });
+            queryClient.invalidateQueries({ queryKey: ['watch-rooms-user'] });
+            queryClient.invalidateQueries({ queryKey: ['watch-room', roomId] });
+            queryClient.invalidateQueries({ queryKey: ['feed'] });
             queryClient.invalidateQueries({ queryKey: ['admin_logs'] });
         },
         onError: (error: Error) => {

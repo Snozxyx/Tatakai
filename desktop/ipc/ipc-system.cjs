@@ -1,6 +1,5 @@
 'use strict';
 
-const { Notification } = require('electron');
 const pathMod = require('path');
 const extPlayer = require('../services/external-player.cjs');
 const { adBlocker } = require('../security/ad-blocker.cjs');
@@ -20,16 +19,6 @@ module.exports = function registerSystemHandlers(ipcMain, app, dialog, autoUpdat
 
     ipcMain.on('log', (_event, { level, message, data }) => {
         if (logger[level]) logger[level](message, data);
-    });
-
-    ipcMain.on('notify', (_event, { title, body }) => {
-        const iconDev = pathMod.join(__dirname, '../resources/icon.png');
-        const iconProd = pathMod.join(process.resourcesPath, 'resources/icon.png');
-        new Notification({
-            title: title || 'Tatakai',
-            body,
-            icon: isDev ? iconDev : iconProd,
-        }).show();
     });
 
     // ── External links ─────────────────────────────────────────────────────────
@@ -58,6 +47,13 @@ module.exports = function registerSystemHandlers(ipcMain, app, dialog, autoUpdat
         win.isMaximized() ? win.unmaximize() : win.maximize();
     });
     ipcMain.on('window-close', () => getMainWindow()?.close());
+    ipcMain.handle('window:is-maximized', () => {
+        try {
+            return !!getMainWindow()?.isMaximized();
+        } catch (_) {
+            return false;
+        }
+    });
     ipcMain.on('open-devtools', () => {
         const win = getMainWindow();
         if (win?.webContents) win.webContents.openDevTools();
@@ -149,9 +145,40 @@ module.exports = function registerSystemHandlers(ipcMain, app, dialog, autoUpdat
     });
 
     // ── Auto-launch ───────────────────────────────────────────────────────────
+    // Windows/macOS use the native login-item API. On Linux that call is a no-op,
+    // so we manage a freedesktop autostart entry (~/.config/autostart) by hand.
+    const linuxAutostartFile = () =>
+        pathMod.join(require('os').homedir(), '.config', 'autostart', 'tatakai.desktop');
+
+    function setLinuxAutostart(enabled) {
+        const file = linuxAutostartFile();
+        if (!enabled) {
+            if (fs.existsSync(file)) fs.unlinkSync(file);
+            return;
+        }
+        const execPath = process.execPath;
+        const iconPath = pathMod.join(pathMod.dirname(execPath), 'resources', 'icon.png');
+        const content = [
+            '[Desktop Entry]',
+            'Type=Application',
+            'Name=Tatakai',
+            `Exec=${execPath}`,
+            `Icon=${iconPath}`,
+            'Terminal=false',
+            'X-GNOME-Autostart-enabled=true',
+            'Comment=Start Tatakai at login',
+        ].join('\n') + '\n';
+        fs.mkdirSync(pathMod.dirname(file), { recursive: true });
+        fs.writeFileSync(file, content, 'utf8');
+    }
+
     ipcMain.handle('set-auto-launch', async (_event, enabled) => {
         try {
-            app.setLoginItemSettings({ openAtLogin: enabled, path: process.execPath });
+            if (process.platform === 'linux') {
+                setLinuxAutostart(Boolean(enabled));
+            } else {
+                app.setLoginItemSettings({ openAtLogin: enabled, path: process.execPath });
+            }
             return { success: true };
         } catch (err) {
             logger.error('Set auto-launch failed:', err);
@@ -161,6 +188,9 @@ module.exports = function registerSystemHandlers(ipcMain, app, dialog, autoUpdat
 
     ipcMain.handle('get-auto-launch', async () => {
         try {
+            if (process.platform === 'linux') {
+                return { success: true, enabled: fs.existsSync(linuxAutostartFile()) };
+            }
             return { success: true, enabled: app.getLoginItemSettings().openAtLogin };
         } catch (err) {
             logger.error('Get auto-launch failed:', err);
@@ -204,6 +234,117 @@ module.exports = function registerSystemHandlers(ipcMain, app, dialog, autoUpdat
         app.quit();
     });
 
+    // ── Drive & App Storage Diagnostics ───────────────────────────────────────
+    function getDirectorySize(dirPath) {
+        let total = 0;
+        try {
+            if (!fs.existsSync(dirPath)) return 0;
+            const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+            for (const entry of entries) {
+                const fullPath = path.join(dirPath, entry.name);
+                try {
+                    if (entry.isDirectory()) {
+                        total += getDirectorySize(fullPath);
+                    } else if (entry.isFile()) {
+                        total += fs.statSync(fullPath).size;
+                    }
+                } catch (_) { }
+            }
+        } catch (_) { }
+        return total;
+    }
+
+    function getDriveInfo(targetPath) {
+        try {
+            if (fs.statfsSync) {
+                const resolved = path.resolve(targetPath || app.getPath('userData'));
+                const stats = fs.statfsSync(resolved);
+                const total = Number(stats.blocks) * Number(stats.bsize);
+                const free = Number(stats.bavail) * Number(stats.bsize);
+                const root = path.parse(resolved).root || resolved;
+                return { root, totalBytes: total, freeBytes: free, usedBytes: Math.max(0, total - free) };
+            }
+        } catch (_) { }
+        return { root: 'System Drive', totalBytes: 0, freeBytes: 0, usedBytes: 0 };
+    }
+
+    ipcMain.handle('system:get-storage-info', async (_event, customDownloadsPath, customTorrentCachePath) => {
+        try {
+            const userData = app.getPath('userData');
+            const defaultDownloads = path.join(app.getPath('videos'), 'Tatakai');
+            const downloadsPath = customDownloadsPath && typeof customDownloadsPath === 'string'
+                ? customDownloadsPath
+                : defaultDownloads;
+
+            const defaultTorrentCache = path.join(userData, 'torrent_cache');
+            const torrentCachePath = customTorrentCachePath && typeof customTorrentCachePath === 'string'
+                ? customTorrentCachePath
+                : defaultTorrentCache;
+
+            const appCachePath = path.join(userData, 'Cache');
+
+            const [downloadsSize, torrentCacheSize, appCacheSize] = [
+                getDirectorySize(downloadsPath),
+                getDirectorySize(torrentCachePath),
+                getDirectorySize(appCachePath),
+            ];
+
+            const driveInfo = getDriveInfo(downloadsPath);
+
+            return {
+                success: true,
+                drive: driveInfo,
+                appStorage: {
+                    downloadsSize,
+                    torrentCacheSize,
+                    appCacheSize,
+                    totalAppBytes: downloadsSize + torrentCacheSize + appCacheSize,
+                },
+                paths: {
+                    downloadsPath,
+                    torrentCachePath,
+                    appCachePath,
+                },
+            };
+        } catch (err) {
+            logger.error('[Storage] get-storage-info failed:', err);
+            return { success: false, error: err.message };
+        }
+    });
+
+    ipcMain.handle('system:clear-storage-category', async (_event, category, customPath) => {
+        try {
+            const userData = app.getPath('userData');
+            let targetDir = null;
+
+            if (category === 'torrent_cache') {
+                targetDir = customPath || path.join(userData, 'torrent_cache');
+            } else if (category === 'video_downloads') {
+                targetDir = customPath || path.join(app.getPath('videos'), 'Tatakai');
+            } else if (category === 'app_cache') {
+                targetDir = path.join(userData, 'Cache');
+            }
+
+            if (!targetDir || !fs.existsSync(targetDir)) {
+                return { success: true, message: 'Directory already empty or not found' };
+            }
+
+            const entries = fs.readdirSync(targetDir);
+            for (const entry of entries) {
+                try {
+                    const full = path.join(targetDir, entry);
+                    fs.rmSync(full, { recursive: true, force: true });
+                } catch (_) { }
+            }
+
+            logger.info(`[Storage] Cleared storage category: ${category} at ${targetDir}`);
+            return { success: true, category };
+        } catch (err) {
+            logger.error(`[Storage] Failed to clear category ${category}:`, err);
+            return { success: false, error: err.message };
+        }
+    });
+
     ipcMain.handle('reset-app', async () => {
         try {
             const { canceled } = await dialog.showMessageBox(getMainWindow(), {
@@ -239,42 +380,53 @@ module.exports = function registerSystemHandlers(ipcMain, app, dialog, autoUpdat
         }
     });
 
-    // ── Auto-updater ──────────────────────────────────────────────────────────
-    autoUpdater.logger = logger;
-    autoUpdater.autoDownload = false;
-
-    if (!isDev) {
-        autoUpdater.setFeedURL({ provider: 'github', owner: 'snozxyx', repo: 'Tatakai' });
-        autoUpdater.requestHeaders = { 'X-Client-Id': appCID };
-    }
-
-    ipcMain.handle('check-for-updates', async () => {
-        if (isDev) return { status: 'dev-mode' };
+    // ── Memory profile & reclaim ────────────────────────────────────────────────
+    // The renderer's memory-profile selector mirrors its choice here so main.cjs
+    // can read it at the next launch and set V8's old-space cap. We only persist
+    // the JSON; the cap can't change on a running V8.
+    const MEMORY_PROFILE_FILE = path.join(app.getPath('userData'), 'memory-profile.json');
+    ipcMain.handle('system:set-memory-profile', async (_event, profile) => {
         try {
-            const result = await autoUpdater.checkForUpdates();
-            return { status: 'checked', result };
+            if (profile !== 'low' && profile !== 'balanced' && profile !== 'unlimited') {
+                return { success: false, error: 'invalid-profile' };
+            }
+            fs.writeFileSync(MEMORY_PROFILE_FILE, JSON.stringify({ profile }), 'utf8');
+            logger.info(`[Memory] Persisted profile=${profile} (applies next launch)`);
+            return { success: true, profile, needsRestart: true };
         } catch (err) {
-            logger.error('Update check failed:', err);
-            return { status: 'error', error: err.message };
+            logger.error('[Memory] Failed to persist memory profile:', err);
+            return { success: false, error: err.message };
         }
     });
 
-    ipcMain.handle('download-update', () => autoUpdater.downloadUpdate());
-    ipcMain.handle('quit-and-install', () => autoUpdater.quitAndInstall());
+    // "Free memory now" main-side half: close idle Cloudflare Chromium contexts
+    // immediately and force a GC (V8 is launched with --expose-gc by main.cjs).
+    ipcMain.handle('system:reclaim-memory', async () => {
+        let contextsClosed = 0;
+        try {
+            const cfBypass = require('../runtime/proxy/cloudflare-bypass.cjs');
+            if (typeof cfBypass.reclaimIdleContexts === 'function') {
+                contextsClosed = await cfBypass.reclaimIdleContexts(0);
+            }
+        } catch (err) {
+            logger.warn('[Memory] CF context reclaim failed:', err.message);
+        }
+        let gcRan = false;
+        try {
+            if (typeof global.gc === 'function') {
+                global.gc();
+                gcRan = true;
+            }
+        } catch (_) { /* gc not exposed */ }
+        logger.info(`[Memory] reclaim: contextsClosed=${contextsClosed} gc=${gcRan}`);
+        return { success: true, contextsClosed, gcRan };
+    });
 
-    autoUpdater.on('update-available', (info) => {
-        getMainWindow()?.webContents.send('updater-event', { type: 'update-available', info });
-    });
-    autoUpdater.on('update-not-available', (info) => {
-        getMainWindow()?.webContents.send('updater-event', { type: 'update-not-available', info });
-    });
-    autoUpdater.on('download-progress', (progress) => {
-        getMainWindow()?.webContents.send('updater-event', { type: 'download-progress', progress });
-    });
-    autoUpdater.on('update-downloaded', (info) => {
-        getMainWindow()?.webContents.send('updater-event', { type: 'update-downloaded', info });
-    });
-    autoUpdater.on('error', (err) => {
-        getMainWindow()?.webContents.send('updater-event', { type: 'error', error: err.message });
-    });
+    // ── Auto-updater ──────────────────────────────────────────────────────────
+    // Ownership of the electron-updater singleton (feed URL, X-Client-Id header,
+    // event broadcasting, and the update:* IPC channels) lives entirely in
+    // desktop/services/update-manager.cjs. The legacy duplicate that used to sit
+    // here emitted a second, differently-shaped `updater-event` on the same
+    // channel — it was removed to collapse to a single modern payload shape.
+    // `autoUpdater` remains a positional parameter for call-site compatibility.
 };

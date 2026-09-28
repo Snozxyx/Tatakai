@@ -36,6 +36,9 @@ export enum FeatureFlag {
   /** Phase 3 – Smart download manager for offline viewing */
   DOWNLOAD_MANAGER = 'download_manager',
 
+  /** Phase 3 – Manga chapter downloads for fully offline reading (desktop only) */
+  MANGA_DOWNLOAD = 'manga_download',
+
   /** Phase 3 – AI subtitle translation (ONNX opus-mt) */
   AI_SUBTITLE_TRANSLATION = 'ai_subtitle_translation',
 
@@ -88,6 +91,7 @@ const FLAG_DEFAULTS: Record<FeatureFlag, boolean> = {
   [FeatureFlag.VOICE_SEARCH]: false,
   [FeatureFlag.TATAKAI_NEURAL]: false,
   [FeatureFlag.DOWNLOAD_MANAGER]: true,
+  [FeatureFlag.MANGA_DOWNLOAD]: true,
   [FeatureFlag.AI_SUBTITLE_TRANSLATION]: false,
   [FeatureFlag.EXTENSION_SCRAPING]: false,
   [FeatureFlag.WARP_TUNNEL]: false,

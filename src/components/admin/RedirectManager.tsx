@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Trash2, Plus, ExternalLink, Link as LinkIcon, Loader2, Save, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 interface Redirect {
     id: string;
@@ -17,6 +18,7 @@ interface Redirect {
 
 export function RedirectManager() {
     const queryClient = useQueryClient();
+    const confirm = useConfirm();
     const [isAdding, setIsAdding] = useState(false);
     const [newRedirect, setNewRedirect] = useState({ slug: '', target_url: '' });
 
@@ -174,8 +176,8 @@ export function RedirectManager() {
                                         variant="ghost"
                                         size="icon"
                                         className="h-9 w-9 p-0 rounded-lg hover:text-destructive text-muted-foreground"
-                                        onClick={() => {
-                                            if (confirm('Delete this redirect?')) deleteRedirect.mutate(r.id);
+                                        onClick={async () => {
+                                            if (await confirm({ title: 'Delete this redirect?', destructive: true })) deleteRedirect.mutate(r.id);
                                         }}
                                     >
                                         <Trash2 className="w-4 h-4" />

@@ -81,3 +81,20 @@ export function inferAnimeAdultFlag(anime: any): boolean {
   });
 }
 
+/**
+ * Drop mature anime from a discovery/home/feed list unless the user has opted to
+ * see mature media everywhere. `pick` maps each item to the object
+ * `inferAnimeAdultFlag` inspects (defaults to the item itself), so it works on
+ * `AnimeCard[]`, `PosterItem[]`, `TatakaiMedia[]`, etc. When `showAdult` is true
+ * the list is returned untouched.
+ */
+export function filterAdultAnime<T>(
+  list: T[] | null | undefined,
+  showAdult: boolean,
+  pick: (item: T) => any = (item) => item,
+): T[] {
+  if (!Array.isArray(list)) return [];
+  if (showAdult) return list;
+  return list.filter((item) => !inferAnimeAdultFlag(pick(item)));
+}
+

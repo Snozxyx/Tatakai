@@ -6,8 +6,6 @@ const { parseReleaseName } = require('../runtime/torrent/naming/release-parser.c
 module.exports = function registerTorrentHandlers(ipcMain, app, fs, path, logger, getMainWindow) {
     const facade = new TorrentFacade({ app, fs, path, logger, getMainWindow });
 
-    ipcMain.handle('torrent:search', async (_event, options) => facade.search(options));
-
     ipcMain.handle('torrent:start', async (_event, infoHash, options) => {
         if (infoHash && typeof infoHash === 'object' && !Array.isArray(infoHash)) {
             const payload = infoHash;

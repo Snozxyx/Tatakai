@@ -47,13 +47,36 @@ function unwrapMediaList(payloads: Array<TatakaiMedia | MediaEnvelope>): Tatakai
 
 const CONTENT_BASE = '/api/v3/content';
 
+/**
+ * Origin to resolve `CONTENT_BASE` against. On the web the page is served from
+ * the same origin as the API's reverse proxy, so `window.location.origin`
+ * (https://…) is correct and keeps requests same-origin. In the packaged desktop
+ * app the renderer loads from `file://`, where a relative `/api/v3/content/…`
+ * path would resolve to `file:///api/v3/content/…` and fail — so fall back to an
+ * explicit absolute backend origin (same one playback already uses).
+ */
+function resolveApiOrigin(): string {
+  if (typeof window !== 'undefined' && /^https?:$/i.test(window.location.protocol)) {
+    return window.location.origin;
+  }
+  const explicit = String(import.meta.env.VITE_BACKEND_ORIGIN || '').trim();
+  if (explicit && /^https?:\/\//i.test(explicit)) return explicit.replace(/\/+$/, '');
+  const apiUrl = String(import.meta.env.VITE_TATAKAI_API_URL || '').trim();
+  try {
+    if (apiUrl) return new URL(apiUrl).origin;
+  } catch {
+    /* fall through */
+  }
+  return 'https://api.tatakai.me';
+}
+
 // ─── HTTP client ─────────────────────────────────────────────────────────────
 
 export async function apiGet<T>(
   path: string,
   params?: Record<string, string | number | boolean | undefined>,
 ): Promise<T> {
-  const url = new URL(CONTENT_BASE + path, window.location.origin);
+  const url = new URL(CONTENT_BASE + path, resolveApiOrigin());
 
   if (params) {
     for (const [k, v] of Object.entries(params)) {
@@ -244,6 +267,29 @@ class ContentGraph {
   async search(filters: SearchFilters): Promise<ContentSearchResult> {
     const cacheKey = `search:${JSON.stringify(filters)}`;
     return this.cached(cacheKey, TTL.HOT, async () => {
+      const hasSimpleSearchInput = Boolean(filters.query?.trim() || filters.tags?.length);
+      const isSimpleTextSearch = hasSimpleSearchInput &&
+        !filters.genres?.length &&
+        !filters.format?.length &&
+        !filters.status?.length &&
+        !filters.studio?.length &&
+        !filters.season?.length &&
+        !filters.source?.length &&
+        !filters.year &&
+        !filters.rating &&
+        !filters.episodes &&
+        !filters.sortBy;
+
+      if (isSimpleTextSearch) {
+        return apiGet<ContentSearchResult>('/search/suggestions', {
+          q: filters.query,
+          type: 'anime',
+          tags: filters.tags?.join(','),
+          page: filters.page ?? 1,
+          perPage: filters.perPage ?? 20,
+        });
+      }
+
       const params: Record<string, string | number | boolean | undefined> = {
         q:        filters.query,
         page:     filters.page ?? 1,
@@ -251,6 +297,7 @@ class ContentGraph {
         isAdult:  filters.isAdult,
         sort:     filters.sortBy,
         genres:   filters.genres?.join(','),
+        tags:     filters.tags?.join(','),
         format:   filters.format?.join(','),
         status:   filters.status?.join(','),
         source:   filters.source?.join(','),
@@ -275,9 +322,20 @@ class ContentGraph {
     const rawId = String(id ?? '').trim();
     if (!rawId) throw new Error(`Invalid media ID: ${id}`);
 
+    // Diagnostics: trace exactly which branch/endpoint resolves (or fails) a
+    // given media id. Enable verbose logging by setting
+    // `localStorage.tatakaiMediaDebug = '1'` in the browser console; errors are
+    // always logged regardless.
+    const debugOn = (() => {
+      try { return localStorage.getItem('tatakaiMediaDebug') === '1'; } catch { return false; }
+    })();
+    const diag = (branch: string, extra?: Record<string, unknown>) => {
+      if (debugOn) console.debug('[getMedia]', { rawId, branch, ...extra });
+    };
+
     // 1. Check Memory Cache
     const memHit = queryCache.get<TatakaiMedia>(`media:resolve:${rawId}`);
-    if (memHit) return memHit;
+    if (memHit) { diag('mem-cache-hit'); return memHit; }
 
     // 2. Check Local DB (Dexie)
     try {
@@ -285,6 +343,7 @@ class ContentGraph {
       if (local?.raw) {
         const media = JSON.parse(local.raw) as TatakaiMedia;
         queryCache.set(`media:resolve:${rawId}`, media, TTL.WARM);
+        diag('dexie-hit');
         return media;
       }
     } catch (err) {
@@ -297,36 +356,70 @@ class ContentGraph {
       const numeric = Number(prefixed[2]);
       const provider = prefixed[1].toLowerCase();
       if (provider === 'mal') {
+        diag('prefixed-mal', { numeric });
         return this.cached(`media:mal:${numeric}`, TTL.COLD, () =>
-          apiGet<TatakaiMedia | MediaEnvelope>(`/mal/${numeric}`).then(unwrapMedia),
+          apiGet<TatakaiMedia | MediaEnvelope>(`/mal/${numeric}`).then(unwrapMedia)
+            .catch((e) => { console.warn('[getMedia] /mal failed', { numeric, error: (e as Error).message }); throw e; }),
         );
       }
+      diag('prefixed-anilist', { numeric });
       return this.cached(`media:anilist:${numeric}`, TTL.COLD, () =>
-        apiGet<TatakaiMedia | MediaEnvelope>(`/by-anilist/${numeric}`).then(unwrapMedia),
+        apiGet<TatakaiMedia | MediaEnvelope>(`/by-anilist/${numeric}`).then(unwrapMedia)
+          .catch((e) => { console.warn('[getMedia] /by-anilist failed', { numeric, error: (e as Error).message }); throw e; }),
       );
     }
 
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(rawId);
     if (isUuid) {
+      diag('uuid');
       return this.cached(`media:tatakai:${rawId}`, TTL.COLD, () =>
-        apiGet<TatakaiMedia | MediaEnvelope>(`/${rawId}`).then(unwrapMedia),
+        apiGet<TatakaiMedia | MediaEnvelope>(`/${rawId}`).then(unwrapMedia)
+          .catch((e) => { console.warn('[getMedia] /:uuid failed', { rawId, error: (e as Error).message }); throw e; }),
       );
     }
 
     const numericId = Number(rawId);
     if (Number.isFinite(numericId) && numericId > 0) {
+      diag('numeric', { numericId });
       return this.cached(`media:resolved:${numericId}`, TTL.COLD, async () => {
         try {
-          return await apiGet<TatakaiMedia | MediaEnvelope>(`/${numericId}`).then(unwrapMedia);
+          const m = await apiGet<TatakaiMedia | MediaEnvelope>(`/${numericId}`).then(unwrapMedia);
+          diag('numeric→/:id ok', { numericId });
+          return m;
         } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
           if (error instanceof Error && error.message.includes('TatakaiAPI 404')) {
-            return apiGet<TatakaiMedia | MediaEnvelope>(`/mal/${numericId}`).then(unwrapMedia);
+            console.warn('[getMedia] /:id 404 → trying /by-anilist', { numericId });
+            try {
+              const m = await apiGet<TatakaiMedia | MediaEnvelope>(`/by-anilist/${numericId}`).then(unwrapMedia);
+              diag('numeric→/by-anilist ok', { numericId });
+              return m;
+            } catch (anilistError) {
+              if (anilistError instanceof Error && anilistError.message.includes('TatakaiAPI 404')) {
+                console.warn('[getMedia] /by-anilist 404 → trying /mal', { numericId });
+                try {
+                  const m = await apiGet<TatakaiMedia | MediaEnvelope>(`/mal/${numericId}`).then(unwrapMedia);
+                  diag('numeric→/mal ok', { numericId });
+                  return m;
+                } catch (malError) {
+                  console.warn('[getMedia] all endpoints failed for numeric id', {
+                    numericId,
+                    error: malError instanceof Error ? malError.message : String(malError),
+                  });
+                  throw malError;
+                }
+              }
+              console.warn('[getMedia] /by-anilist failed (non-404)', { numericId, error: (anilistError as Error).message });
+              throw anilistError;
+            }
           }
+          console.warn('[getMedia] /:id failed (non-404)', { numericId, error: msg });
           throw error;
         }
       });
     }
 
+    console.warn('[getMedia] unresolvable id — no branch matched', { rawId });
     throw new Error(`Invalid media ID: ${id}`);
   }
 
@@ -362,7 +455,7 @@ class ContentGraph {
     episodes: Array<{ mal_id?: number; title?: string | null; filler?: boolean }>;
     hasNextPage: boolean;
   }> {
-    const url = new URL(`${CONTENT_BASE}/mal/${malId}/episodes`, window.location.origin);
+    const url = new URL(`${CONTENT_BASE}/mal/${malId}/episodes`, resolveApiOrigin());
     url.searchParams.set('page', String(page));
     const res = await fetch(url.toString(), {
       headers: { Accept: 'application/json' },
@@ -405,6 +498,25 @@ class ContentGraph {
     );
   }
 
+  // ── Live next-airing ──────────────────────────────────────────────────────
+
+  /**
+   * Live next-episode schedule for an anime, fetched from real AniList (never
+   * the mirror/DB). Returns null for finished/unknown titles or on error.
+   */
+  async getNextAiring(anilistId: number): Promise<{
+    status: string | null;
+    episodes: number | null;
+    nextAiringEpisode: { episode: number; airingAt: number; timeUntilAiring: number } | null;
+  } | null> {
+    if (!Number.isFinite(anilistId) || anilistId <= 0) return null;
+    try {
+      return await apiGet(`/by-anilist/${anilistId}/next-airing`);
+    } catch {
+      return null;
+    }
+  }
+
   // ── Cache management ──────────────────────────────────────────────────────
 
   invalidateAll() {
@@ -421,6 +533,26 @@ class ContentGraph {
 
   invalidateHome() {
     queryCache.delete('home:bundle');
+  }
+
+  /**
+   * Drop every cached copy of a single media item after it's been edited
+   * server-side (admin content editor), so the next getMedia() refetches the
+   * fresh row instead of serving the stale memory/Dexie copy. Coarse on the
+   * memory cache (clears all `media:` resolves) but this only runs on an admin
+   * save, which is rare.
+   */
+  async purgeMedia(id: string) {
+    queryCache.invalidatePrefix('media:');
+    try {
+      await db.cachedMedia.delete(id);
+      const numeric = Number(id);
+      if (Number.isFinite(numeric) && numeric > 0) {
+        await db.cachedMedia.where('anilistId').equals(numeric).delete();
+      }
+    } catch (err) {
+      console.warn('[ContentGraph] purgeMedia failed:', err);
+    }
   }
 }
 

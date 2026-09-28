@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -20,11 +20,14 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Loader2, AlertTriangle } from "lucide-react";
+import { TurnstileWidget, type TurnstileWidgetHandle } from "@/components/security/TurnstileWidget";
+import { isTurnstileEnabled, verifyTurnstileToken } from "@/lib/security/turnstile";
+import { ugcErrorMessage } from "@/lib/ugcErrors";
 
 interface ReportModalProps {
     isOpen: boolean;
     onClose: () => void;
-    targetType: 'comment' | 'anime' | 'server' | 'user';
+    targetType: 'comment' | 'anime' | 'server' | 'user' | 'post' | 'tierlist' | 'playlist';
     targetId: string;
     targetName?: string;
 }
@@ -34,6 +37,9 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName 
     const [reason, setReason] = useState("");
     const [details, setDetails] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+    const turnstileRef = useRef<TurnstileWidgetHandle>(null);
+    const turnstileEnabled = isTurnstileEnabled();
 
     const handleSubmit = async () => {
         if (!user) {
@@ -46,8 +52,23 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName 
             return;
         }
 
+        if (turnstileEnabled && !captchaToken) {
+            toast.error("Please complete the verification challenge");
+            return;
+        }
+
         setIsSubmitting(true);
         try {
+            if (turnstileEnabled) {
+                const ok = await verifyTurnstileToken(captchaToken);
+                if (!ok) {
+                    toast.error("Verification failed. Please try again.");
+                    turnstileRef.current?.reset();
+                    setCaptchaToken(null);
+                    return;
+                }
+            }
+
             const { error } = await supabase.from('reports').insert({
                 reporter_id: user.id,
                 target_type: targetType,
@@ -64,8 +85,12 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName 
             // Reset form
             setReason("");
             setDetails("");
+            turnstileRef.current?.reset();
+            setCaptchaToken(null);
         } catch (error: any) {
-            toast.error("Failed to submit report: " + error.message);
+            toast.error(ugcErrorMessage(error, "Failed to submit report: "));
+            turnstileRef.current?.reset();
+            setCaptchaToken(null);
         } finally {
             setIsSubmitting(false);
         }
@@ -74,7 +99,10 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName 
     const getReasons = () => {
         switch (targetType) {
             case 'comment':
-                return ["Spam", "Harassment", "Spoiler", "Hate Speech", "Other"];
+            case 'post':
+            case 'tierlist':
+            case 'playlist':
+                return ["Spam", "Harassment", "Spoiler", "Hate Speech", "NSFW", "Other"];
             case 'anime':
                 return ["Wrong Title/Info", "Broken Metadata", "Missing Episodes", "Copyright Issue", "Other"];
             case 'server':
@@ -123,6 +151,17 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName 
                             className="bg-white/5 border-white/10 min-h-[100px] resize-none"
                         />
                     </div>
+
+                    {turnstileEnabled && (
+                        <TurnstileWidget
+                            ref={turnstileRef}
+                            action="report"
+                            onToken={setCaptchaToken}
+                            onExpire={() => setCaptchaToken(null)}
+                            onError={() => setCaptchaToken(null)}
+                            className="flex justify-center"
+                        />
+                    )}
                 </div>
 
                 <DialogFooter className="gap-2 sm:gap-0">
@@ -132,7 +171,7 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName 
                     <Button
                         variant="destructive"
                         onClick={handleSubmit}
-                        disabled={isSubmitting || !user}
+                        disabled={isSubmitting || !user || (turnstileEnabled && !captchaToken)}
                         className="shadow-lg shadow-destructive/20"
                     >
                         {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}

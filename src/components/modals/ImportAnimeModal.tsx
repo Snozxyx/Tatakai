@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { Search, FileVideo, CheckCircle2, Loader2, ArrowLeft, SkipForward, Hash } from 'lucide-react';
 import { getProxiedImageUrl } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { ANILIST_GRAPHQL_ENDPOINT } from '@/lib/api/backendOrigin';
 
 // ── AniList Search ──────────────────────────────────────────────────────────
 
@@ -26,7 +27,7 @@ interface AniListMedia {
 async function searchAniList(query: string): Promise<AniListMedia[]> {
   if (!query.trim()) return [];
   try {
-    const res = await fetch('https://graphql.anilist.co', {
+    const res = await fetch(ANILIST_GRAPHQL_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

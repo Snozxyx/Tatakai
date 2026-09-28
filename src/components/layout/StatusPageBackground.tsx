@@ -2,11 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 
 const VIDEO_SOURCES = [
-  './videos/1.mp4',
-  './videos/2.webm',
-  './videos/3.mp4',
-  './videos/5.mp4',
-  './videos/6.mp4',
+  './assets/video/1.mp4',
+  './assets/video/2.webm',
+  './assets/video/3.mp4',
+  './assets/video/5.mp4',
+  './assets/video/6.mp4',
 ];
 
 interface StatusPageBackgroundProps {

@@ -3,6 +3,13 @@ import { PlaybackMode } from './player-core';
 import { playbackEventBus, PlayerEvents } from './PlaybackEventBus';
 import { buildProxyCandidateUrls, isLoopbackProxyUrl } from './stream-resolver';
 import { upsertLocalTorrentSessionHistory } from '@/lib/localStorage';
+import { setActivity, clearActivity } from '@/core/activity/activity-monitor';
+
+const fmtSpeed = (b?: number): string | null => {
+  if (!b || b <= 0) return null;
+  const mb = b / (1024 * 1024);
+  return mb >= 1 ? `${mb.toFixed(1)} MB/s` : `${Math.max(1, Math.round(b / 1024))} KB/s`;
+};
 
 export class TorrentAdapter extends AbstractSourceAdapter {
   readonly mode: PlaybackMode = 'torrent';
@@ -62,6 +69,12 @@ export class TorrentAdapter extends AbstractSourceAdapter {
 
       this.sessionId = session.sessionId;
 
+      setActivity('torrent', {
+        kind: 'torrenting',
+        label: session.name || session.fileName || 'Torrent stream',
+        detail: 'Connecting…',
+      });
+
       try {
         upsertLocalTorrentSessionHistory({
           sessionId: session.sessionId,
@@ -96,6 +109,16 @@ export class TorrentAdapter extends AbstractSourceAdapter {
       this.stopListener = (window as any).tatakaiRuntime.onTorrentProgress((stats: any) => {
         if (stats.sessionId === this.sessionId) {
           playbackEventBus.emit('torrent:progress', stats);
+          const dl = fmtSpeed(stats.downloadSpeed ?? stats.dlSpeedBps);
+          const peers = stats.numPeers ?? stats.peers;
+          const detail = [dl ? `↓ ${dl}` : null, typeof peers === 'number' && peers > 0 ? `${peers} peers` : null]
+            .filter(Boolean)
+            .join(' · ');
+          setActivity('torrent', {
+            kind: 'torrenting',
+            detail: detail || undefined,
+            progress: typeof stats.progress === 'number' ? Math.round(stats.progress * (stats.progress <= 1 ? 100 : 1)) : undefined,
+          });
         }
       });
 
@@ -117,6 +140,7 @@ export class TorrentAdapter extends AbstractSourceAdapter {
   }
 
   async unload(): Promise<void> {
+    clearActivity('torrent');
     if (this.sessionId) {
       await (window as any).tatakaiRuntime.stopTorrentSession(this.sessionId);
       this.sessionId = null;

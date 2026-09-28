@@ -1,9 +1,21 @@
-import { Play, BookOpen, Star, Film, ShieldAlert } from "lucide-react";
+/**
+ * The card behind the manga surfaces, search results and the anime page's
+ * related rails (docs/Plans.md §2 — "Cards (improve polish and consistency)").
+ *
+ * Navigation is a real anchor stretched over the poster rather than an `onClick`
+ * on the panel: the panel is a `div`, so the old version was unreachable by
+ * keyboard, announced as nothing to a screen reader, and could not be
+ * ctrl/middle-clicked into a new tab. The badges and the rating split are shared
+ * with `AnimeCardWithPreview` so the two agree.
+ */
+import { Play, BookOpen, Star, Film } from "lucide-react";
 
 import { GlassPanel } from "@/components/ui/GlassPanel";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { getProxiedImageUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { splitRating } from "@/lib/mediaRating";
+import { AdultBadge, MetaBadge, ScoreBadge } from "@/components/MediaCardBadges";
 
 export interface UnifiedMediaCardProps {
   item: {
@@ -15,6 +27,7 @@ export interface UnifiedMediaCardProps {
     rating?: string | number;
     episodes?: { sub?: number; dub?: number }; // For anime
     chapters?: number; // For manga
+    year?: number;
     mediaType: 'anime' | 'manga' | 'character';
     malId?: number;
     anilistId?: number;
@@ -22,17 +35,17 @@ export interface UnifiedMediaCardProps {
     isAdult?: boolean;
     blurAdult?: boolean;
   };
+  variant?: 'poster' | 'overlay';
   className?: string;
 }
 
-export function UnifiedMediaCard({ item, className = "" }: UnifiedMediaCardProps) {
-  const navigate = useNavigate();
-
+export function UnifiedMediaCard({ item, variant = 'overlay', className = "" }: UnifiedMediaCardProps) {
   const isAnime = item.mediaType === 'anime';
   const isManga = item.mediaType === 'manga';
   const isCharacter = item.mediaType === 'character';
   const isAdultItem = Boolean(item.isAdult);
   const shouldBlurAdult = Boolean(isAdultItem && item.blurAdult);
+  const { score, label } = splitRating(item.rating);
 
   const getMangaFormatLabel = () => {
     if (!isManga) return item.mediaType;
@@ -46,28 +59,22 @@ export function UnifiedMediaCard({ item, className = "" }: UnifiedMediaCardProps
 
   const mediaBadgeLabel = getMangaFormatLabel();
 
-  const handleClick = () => {
-    if (item.href) {
-      if (/^https?:\/\//i.test(item.href)) {
-        window.open(item.href, "_blank", "noopener,noreferrer");
-        return;
-      }
-
-      navigate(item.href);
-      return;
-    }
-
-    if (isAnime) {
-      navigate(`/anime/${encodeURIComponent(item.id)}`);
-    } else if (isManga) {
-      navigate(`/manga/${encodeURIComponent(item.id)}`);
-    } else if (isCharacter) {
+  /**
+   * An off-site `href` stays an external anchor; everything else routes. A card
+   * with no id at all gets no link rather than a dead one that navigates to the
+   * current page.
+   */
+  const isExternal = Boolean(item.href && /^https?:\/\//i.test(item.href));
+  const routeTo = (() => {
+    if (item.href) return item.href;
+    if (isAnime) return `/anime/${encodeURIComponent(item.id)}`;
+    if (isManga) return `/manga/${encodeURIComponent(item.id)}`;
+    if (isCharacter) {
       const characterRouteId = item.id || item.name;
-      if (characterRouteId) {
-        navigate(`/char/${encodeURIComponent(characterRouteId)}`);
-      }
+      return characterRouteId ? `/char/${encodeURIComponent(characterRouteId)}` : null;
     }
-  };
+    return null;
+  })();
 
   const getBadgeIcon = () => {
     if (isAnime) return <Film className="w-3 h-3" />;
@@ -81,34 +88,134 @@ export function UnifiedMediaCard({ item, className = "" }: UnifiedMediaCardProps
 
     return (
       <div className="flex flex-wrap items-center gap-2 mt-2">
-        {item.rating && (
-          <span className="flex items-center text-xs text-yellow-400 font-medium bg-yellow-400/10 px-1.5 py-0.5 rounded-md">
-            <Star className="w-3 h-3 mr-1 fill-current" />
-            {item.rating}
-          </span>
-        )}
+        {score && <ScoreBadge score={score} />}
+        {label && <MetaBadge>{label}</MetaBadge>}
 
-        {isAnime && item.episodes?.sub != null && (
-          <span className="text-xs text-muted-foreground bg-white/5 px-1.5 py-0.5 rounded-md">
+        {isAnime && !!item.episodes?.sub && (
+          <MetaBadge>
             {item.episodes.sub} sub {item.episodes.dub ? `• ${item.episodes.dub} dub` : ''}
-          </span>
+          </MetaBadge>
         )}
 
         {isManga && item.chapters != null && item.chapters > 0 && (
-          <span className="text-xs text-muted-foreground bg-white/5 px-1.5 py-0.5 rounded-md">
-            {item.chapters} ch
-          </span>
+          <MetaBadge>{item.chapters} ch</MetaBadge>
         )}
       </div>
     );
   };
 
+  if (variant === 'poster') {
+    return (
+      <div
+        className={cn(
+          'group relative flex flex-col transition-all duration-300',
+          routeTo && 'cursor-pointer',
+          className
+        )}
+      >
+        <div className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.04] transition-all duration-300 group-hover:border-white/20 group-hover:shadow-xl group-hover:shadow-black/60 group-hover:-translate-y-1">
+          <img
+            src={getProxiedImageUrl(item.poster || '')}
+            alt={item.name}
+            className={cn(
+              "w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105",
+              shouldBlurAdult && "blur-md scale-105"
+            )}
+            loading="lazy"
+            decoding="async"
+            onError={(event) => {
+              const image = event.currentTarget;
+              const directPoster = item.poster || '';
+              const stage = image.dataset.fallbackStage || 'proxy';
+
+              if (stage === 'proxy' && directPoster && image.currentSrc !== directPoster) {
+                image.dataset.fallbackStage = 'direct';
+                image.src = directPoster;
+                return;
+              }
+
+              if (stage !== 'placeholder') {
+                image.dataset.fallbackStage = 'placeholder';
+                image.src = '/placeholder.svg';
+              }
+            }}
+          />
+
+          {isAdultItem && <AdultBadge className="absolute top-2 right-2 z-20" />}
+
+          {shouldBlurAdult && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50">
+              <span className="rounded-full border border-destructive/40 bg-black/70 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.15em] text-destructive backdrop-blur-sm">
+                Sensitive
+              </span>
+            </div>
+          )}
+
+          {item.status && !isCharacter && !isAdultItem && (
+            <div className="absolute top-2 right-2 z-10">
+              <div className="px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                {item.status}
+              </div>
+            </div>
+          )}
+
+          {score && (
+            <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
+              <Star className="h-2.5 w-2.5 fill-amber text-amber" />
+              {score}
+            </div>
+          )}
+
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
+            <div className="w-11 h-11 rounded-full bg-primary/90 text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/30 backdrop-blur-sm transform scale-75 group-hover:scale-100 transition-transform duration-300 ease-out">
+              {isManga ? <BookOpen className="w-5 h-5 ml-0.5" /> : (isCharacter ? <Star className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />)}
+            </div>
+          </div>
+
+          {routeTo &&
+            (isExternal ? (
+              <a
+                href={routeTo}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={item.name}
+                className="absolute inset-0 z-30 focus-visible:outline-none"
+              />
+            ) : (
+              <Link
+                to={routeTo}
+                aria-label={item.name}
+                className="absolute inset-0 z-30 focus-visible:outline-none"
+              />
+            ))}
+        </div>
+
+        <div className="mt-2.5 px-0.5 space-y-0.5">
+          <h3 className="font-display font-bold text-sm leading-snug line-clamp-1 text-white/90 group-hover:text-white transition-colors">
+            {item.name}
+          </h3>
+          <p className="flex items-center gap-1.5 text-xs font-medium text-white/45">
+            <span className="capitalize">{mediaBadgeLabel}</span>
+            {item.year && <span>· {item.year}</span>}
+            {item.chapters && item.chapters > 0 && <span>· {item.chapters} ch</span>}
+            {isAnime && !!item.episodes?.sub && <span>· {item.episodes.sub} sub</span>}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <GlassPanel
-      className={`group relative overflow-hidden cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary/20 ${className}`}
-      onClick={handleClick}
+      className={cn(
+        'group relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary/20 focus-within:ring-2 focus-within:ring-ring',
+        routeTo && 'cursor-pointer',
+        className,
+      )}
     >
-      <div className="relative aspect-[3/4] overflow-hidden">
+      <div className="relative aspect-[2/3] overflow-hidden">
         <img
           src={getProxiedImageUrl(item.poster || '')}
           alt={item.name}
@@ -117,6 +224,7 @@ export function UnifiedMediaCard({ item, className = "" }: UnifiedMediaCardProps
             shouldBlurAdult && "blur-md scale-110"
           )}
           loading="lazy"
+          decoding="async"
           onError={(event) => {
             const image = event.currentTarget;
             const directPoster = item.poster || '';
@@ -135,19 +243,13 @@ export function UnifiedMediaCard({ item, className = "" }: UnifiedMediaCardProps
           }}
         />
 
-        {isAdultItem && (
-          <div className="absolute top-2 right-2 z-20 flex items-center gap-1 rounded-full border border-rose-500/50 bg-rose-600/90 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-lg shadow-rose-600/40 backdrop-blur-md animate-pulse">
-            <ShieldAlert className="w-3 h-3 text-rose-100" />
-            18+
-          </div>
-        )}
-
+        {isAdultItem && <AdultBadge className="absolute top-2 right-2 z-20" />}
 
         {shouldBlurAdult && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50">
-            <div className="rounded-full border border-rose-400/40 bg-black/70 px-3 py-1 text-[10px] font-black uppercase tracking-[0.15em] text-rose-200 backdrop-blur-sm">
+            <span className="rounded-full border border-destructive/40 bg-black/70 px-3 py-1 text-[10px] font-black uppercase tracking-[0.15em] text-destructive backdrop-blur-sm">
               Sensitive Preview
-            </div>
+            </span>
           </div>
         )}
 
@@ -185,6 +287,27 @@ export function UnifiedMediaCard({ item, className = "" }: UnifiedMediaCardProps
           </h3>
           {renderMetadata()}
         </div>
+
+        {/* The link overlays the whole card so the poster is one hit target.
+            It has to sit here rather than wrap the title: the title's own
+            container is absolutely positioned, so a stretched pseudo-element
+            inside it would only cover the bottom bar. */}
+        {routeTo &&
+          (isExternal ? (
+            <a
+              href={routeTo}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={item.name}
+              className="absolute inset-0 z-30 focus-visible:outline-none"
+            />
+          ) : (
+            <Link
+              to={routeTo}
+              aria-label={item.name}
+              className="absolute inset-0 z-30 focus-visible:outline-none"
+            />
+          ))}
       </div>
     </GlassPanel>
   );

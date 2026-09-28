@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button";
 import { ShieldAlert, Trash2, User } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 export function ModerationLogs() {
     const { data: logs, isLoading } = useAdminLogs(50, { action: 'automod_violation' });
     const deleteLogs = useDeleteAdminLogs();
+    const confirm = useConfirm();
 
     if (isLoading) {
         return <div className="space-y-4">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}</div>;
@@ -36,8 +38,8 @@ export function ModerationLogs() {
                     variant="outline"
                     size="sm"
                     className="text-xs"
-                    onClick={() => {
-                        if (confirm('Clear all visible logs?')) {
+                    onClick={async () => {
+                        if (await confirm({ title: 'Clear all visible logs?', destructive: true })) {
                             // In a real app we might pass IDs or a filter, existing hook supports filter
                             deleteLogs.mutate({ action: 'automod_violation' }, {
                                 onSuccess: () => toast.success('Logs cleared')

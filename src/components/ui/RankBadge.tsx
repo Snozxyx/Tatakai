@@ -1,27 +1,13 @@
-import { getRankTier, getRankImageUrl } from '@/lib/rankUtils';
+import { getRankTier, getRankImageUrl, getRankClassForRank } from '@/lib/rankUtils';
 import { cn } from '@/lib/utils';
 
 interface RankBadgeProps {
-  episodeCount: number;
+  /** Unified rank score (RP) — see computeRankScore in rankUtils. */
+  score: number;
   size?: 'xs' | 'sm' | 'md' | 'lg';
   showImage?: boolean;
   showName?: boolean;
   className?: string;
-}
-
-// Maps rank number → CSS animation class defined in index.css
-function getRankClass(rank: number): string {
-  if (rank === 1)  return 'rn-gray';
-  if (rank === 2)  return 'rn-gray2';
-  if (rank <= 4)   return 'rn-nature';
-  if (rank <= 6)   return 'rn-frost';
-  if (rank <= 8)   return 'rn-spectral';
-  if (rank <= 10)  return 'rn-electric';
-  if (rank === 11) return 'rn-demon';
-  if (rank <= 13)  return 'rn-sakura';
-  if (rank === 14) return 'rn-fire';
-  if (rank === 15) return 'rn-saiyan';
-  return 'rn-onepunch';
 }
 
 const SIZE_CONFIG = {
@@ -32,15 +18,15 @@ const SIZE_CONFIG = {
 };
 
 export function RankBadge({
-  episodeCount,
+  score,
   size = 'sm',
   showImage = true,
   showName = true,
   className,
 }: RankBadgeProps) {
-  const tier = getRankTier(episodeCount);
+  const tier = getRankTier(score);
   const { img, text, gap } = SIZE_CONFIG[size];
-  const rankClass = getRankClass(tier.rank);
+  const rankClass = getRankClassForRank(tier.rank);
 
   return (
     <span className={cn('inline-flex items-center', gap, className)}>

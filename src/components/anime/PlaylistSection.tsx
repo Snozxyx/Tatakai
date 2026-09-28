@@ -5,7 +5,6 @@ import { getProxiedImageUrl } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Music2, Plus, ChevronRight, Play, Lock, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
 
 // Mini playlist card with cover grid
 function PlaylistMiniCard({ playlist }: { playlist: Playlist }) {
@@ -14,9 +13,7 @@ function PlaylistMiniCard({ playlist }: { playlist: Playlist }) {
   const coverImages = items.slice(0, 4).map(item => item.anime_poster).filter(Boolean) as string[];
 
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
+    <div
       className="group cursor-pointer"
       onClick={() => navigate(`/playlist/${playlist.id}`)}
     >
@@ -70,7 +67,7 @@ function PlaylistMiniCard({ playlist }: { playlist: Playlist }) {
       <p className="text-xs text-muted-foreground">
         {playlist.items_count} {playlist.items_count === 1 ? 'item' : 'items'}
       </p>
-    </motion.div>
+    </div>
   );
 }
 
@@ -85,7 +82,7 @@ export function PlaylistSection() {
   // Don't show if loading
   if (isLoading) {
     return (
-      <section className="mt-16">
+      <section>
         <div className="flex items-center justify-between mb-6">
           <h2 className="font-display text-2xl font-semibold flex items-center gap-2">
             <Music2 className="w-6 h-6 text-primary" />
@@ -106,7 +103,7 @@ export function PlaylistSection() {
   }
 
   return (
-    <section className="mt-16">
+    <section>
       <div className="flex items-center justify-between mb-6">
         <h2 className="font-display text-2xl font-semibold flex items-center gap-2">
           <Music2 className="w-6 h-6 text-primary" />
@@ -124,9 +121,7 @@ export function PlaylistSection() {
       {playlists.length > 0 ? (
         <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
           {/* Create new playlist card */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
+          <div
             className="group cursor-pointer"
             onClick={() => navigate('/playlists')}
           >
@@ -138,7 +133,7 @@ export function PlaylistSection() {
                 Create New
               </span>
             </div>
-          </motion.div>
+          </div>
 
           {/* Existing playlists (show up to 5) */}
           {playlists.slice(0, 5).map((playlist) => (

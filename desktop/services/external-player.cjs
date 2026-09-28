@@ -3,15 +3,21 @@
 /**
  * external-player.cjs
  *
- * Detects and launches external media players (MPV, VLC, MPC-HC) on Windows.
- * Used by the desktop IPC layer to open torrent stream URLs in external players.
+ * Detects and launches external media players (MPV, VLC, IINA, MPC-HC/BE)
+ * across Windows, macOS, and Linux. Used by the desktop IPC layer to open
+ * torrent stream URLs in external players.
  */
 
 const { execFile, spawn } = require('child_process');
 const { promisify } = require('util');
 const execFileAsync = promisify(execFile);
 
+const IS_WIN = process.platform === 'win32';
+const IS_MAC = process.platform === 'darwin';
+
 // ── Known player definitions ──────────────────────────────────────────────────
+// Each player carries per-platform install-path lists; `execNames` is used for
+// the PATH fallback (`where` on Windows, `which` elsewhere).
 
 const PLAYERS = [
     {
@@ -30,7 +36,34 @@ const PLAYERS = [
             'C:\\Program Files (x86)\\mpv\\mpv.exe',
             process.env.APPDATA ? `${process.env.APPDATA}\\mpv\\mpv.exe` : null,
         ].filter(Boolean),
+        macPaths: [
+            '/opt/homebrew/bin/mpv',
+            '/usr/local/bin/mpv',
+            '/Applications/mpv.app/Contents/MacOS/mpv',
+        ],
+        linuxPaths: [
+            '/usr/bin/mpv',
+            '/usr/local/bin/mpv',
+            '/snap/bin/mpv',
+            '/var/lib/flatpak/exports/bin/io.mpv.Mpv',
+        ],
         execNames: ['mpv.exe', 'mpv'],
+    },
+    {
+        id: 'iina',
+        name: 'IINA',
+        description: 'Modern media player for macOS',
+        // IINA's CLI shim accepts mpv-style options behind an `--mpv-` prefix.
+        args: (url, opts) => [
+            url,
+            opts?.startTime ? `--mpv-start=${opts.startTime}` : null,
+            opts?.title ? `--mpv-title=${opts.title}` : null,
+        ].filter(Boolean),
+        macPaths: [
+            '/Applications/IINA.app/Contents/MacOS/iina-cli',
+            '/Applications/IINA.app/Contents/MacOS/IINA',
+        ],
+        execNames: ['iina-cli', 'iina'],
     },
     {
         id: 'vlc',
@@ -45,7 +78,15 @@ const PLAYERS = [
             'C:\\Program Files\\VideoLAN\\VLC\\vlc.exe',
             'C:\\Program Files (x86)\\VideoLAN\\VLC\\vlc.exe',
         ],
-        execNames: ['vlc.exe'],
+        macPaths: [
+            '/Applications/VLC.app/Contents/MacOS/VLC',
+        ],
+        linuxPaths: [
+            '/usr/bin/vlc',
+            '/snap/bin/vlc',
+            '/var/lib/flatpak/exports/bin/org.videolan.VLC',
+        ],
+        execNames: ['vlc.exe', 'vlc'],
     },
     {
         id: 'mpc-hc',
@@ -77,6 +118,27 @@ const PLAYERS = [
     },
 ];
 
+/**
+ * Returns the install-path candidates for a player on the current OS.
+ */
+function platformPaths(player) {
+    if (IS_WIN) return player.windowsPaths || [];
+    if (IS_MAC) return player.macPaths || [];
+    return player.linuxPaths || [];
+}
+
+/**
+ * All known install paths across every OS — used when reverse-matching a
+ * stored `executablePath` back to its player definition.
+ */
+function allKnownPaths(player) {
+    return [
+        ...(player.windowsPaths || []),
+        ...(player.macPaths || []),
+        ...(player.linuxPaths || []),
+    ];
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function fileExists(fs, filePath) {
@@ -89,12 +151,14 @@ async function fileExists(fs, filePath) {
 }
 
 /**
- * Try to find a player executable via PATH using `where` (Windows).
- * Returns null if not found.
+ * Try to find a player executable via PATH: `where` on Windows, `which`
+ * elsewhere. Returns null if not found.
  */
 async function findInPath(execName) {
+    // `where` (Windows) and `which` (macOS/Linux) both print the resolved path.
+    const finder = IS_WIN ? 'where' : 'which';
     try {
-        const { stdout } = await execFileAsync('where', [execName], { timeout: 3000 });
+        const { stdout } = await execFileAsync(finder, [execName], { timeout: 3000 });
         const first = stdout.trim().split('\n')[0]?.trim();
         return first || null;
     } catch {
@@ -116,8 +180,8 @@ async function detectExternalPlayers(fs) {
     for (const player of PLAYERS) {
         let execPath = null;
 
-        // Check known Windows install paths first
-        for (const p of (player.windowsPaths || [])) {
+        // Check known install paths for the current OS first
+        for (const p of platformPaths(player)) {
             if (await fileExists(fs, p)) { execPath = p; break; }
         }
 
@@ -154,9 +218,11 @@ async function detectExternalPlayers(fs) {
  * @returns {{ success: boolean, pid?: number, error?: string }}
  */
 function launchExternalPlayer(executablePath, streamUrl, options = {}, logger) {
-    // Find the player definition for correct arg building
+    // Find the player definition for correct arg building. Match against every
+    // OS's known paths (a stored pref may have been captured on any platform)
+    // plus the exec-name suffix from a PATH-resolved binary.
     const playerDef = PLAYERS.find((p) =>
-        p.windowsPaths?.includes(executablePath) ||
+        allKnownPaths(p).includes(executablePath) ||
         p.execNames?.some((n) => executablePath.endsWith(n))
     ) ?? PLAYERS[0]; // default to MPV-style if unknown
 

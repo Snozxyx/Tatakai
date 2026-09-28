@@ -47,8 +47,10 @@ DECLARE
     rand_suffix text;
 BEGIN
     -- Get base name from full_name or email
+    -- `0-9`, not `0-0`: as written the range covered the single character `0`, so
+    -- every digit except zero was stripped out of the derived username.
     IF NEW.raw_user_meta_data->>'full_name' IS NOT NULL THEN
-        base_username := lower(regexp_replace(NEW.raw_user_meta_data->>'full_name', '[^a-zA-Z0-0]', '', 'g'));
+        base_username := lower(regexp_replace(NEW.raw_user_meta_data->>'full_name', '[^a-zA-Z0-9]', '', 'g'));
     ELSE
         base_username := lower(split_part(NEW.email, '@', 1));
     END IF;
@@ -71,7 +73,9 @@ BEGIN
             final_username := base_username || extract(epoch from now())::text;
             EXIT;
         END IF;
-    END WHILE;
+    -- `END LOOP`, not `END WHILE`: plpgsql has no END WHILE, and CREATE FUNCTION
+    -- validates the body, so this file aborted where it stood.
+    END LOOP;
 
     INSERT INTO public.profiles (user_id, display_name, avatar_url, username)
     VALUES (

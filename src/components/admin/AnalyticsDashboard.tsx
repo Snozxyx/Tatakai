@@ -3,7 +3,8 @@ import { GlassPanel } from '@/components/ui/GlassPanel';
 import { motion } from 'framer-motion';
 import {
   TrendingUp, Users, Eye, Play, Clock, Globe, MapPin,
-  BarChart3, PieChart, Activity, ArrowUpRight
+  BarChart3, PieChart, Activity, ArrowUpRight,
+  Download, Star, GitFork, Github
 } from 'lucide-react';
 import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -12,6 +13,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+import { fetchAllReleases, fetchRepoStats, platformForAsset, formatCompact, GITHUB_REPO_URL } from '@/lib/github';
 
 export function AnalyticsDashboard() {
   const [timeRange, setTimeRange] = useState<'day' | 'week' | 'month'>('week');
@@ -339,8 +341,45 @@ export function AnalyticsDashboard() {
   });
 
 
-  const formatWatchTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
+  // GitHub releases & downloads (snozxyx/tatakai) — real download counts per release/platform
+  const { data: githubData } = useQuery({
+    queryKey: ['analytics_github_releases'],
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const [releases, repo] = await Promise.all([fetchAllReleases(), fetchRepoStats()]);
+      if (!releases || releases.length === 0) return null;
+
+      const perRelease = releases.map((r) => ({
+        version: r.tag_name.replace(/^v/i, ''),
+        downloads: r.assets.reduce((s, a) => s + (a.download_count || 0), 0),
+        date: (r.published_at || '').split('T')[0],
+      }));
+      const totalDownloads = perRelease.reduce((s, r) => s + r.downloads, 0);
+
+      const platform = new Map<string, number>();
+      releases.forEach((r) =>
+        r.assets.forEach((a) => {
+          const k = platformForAsset(a.name);
+          if (k) platform.set(k, (platform.get(k) || 0) + (a.download_count || 0));
+        })
+      );
+      const colors = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b'];
+      const perPlatform = Array.from(platform.entries())
+        .map(([name, value], i) => ({ name, value, color: colors[i % colors.length] }))
+        .sort((a, b) => b.value - a.value);
+
+      return {
+        totalDownloads,
+        stars: repo?.stargazers_count || 0,
+        forks: repo?.forks_count || 0,
+        latestVersion: perRelease[0]?.version || 'N/A',
+        perRelease: perRelease.slice(0, 10).reverse(),
+        perPlatform,
+      };
+    },
+  });
+
+  const formatWatchTime = (seconds: number) => {    const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     if (hours > 0) return `${hours}h ${minutes}m`;
     return `${minutes}m`;
@@ -712,6 +751,106 @@ export function AnalyticsDashboard() {
           </div>
         </GlassPanel>
       </div>
+
+      {/* GitHub Releases & Downloads */}
+      {githubData && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Github className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-semibold">GitHub Releases & Downloads</h2>
+            <a
+              href={GITHUB_REPO_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-muted-foreground hover:text-primary transition-colors ml-1"
+            >
+              snozxyx/tatakai ↗
+            </a>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { icon: Download, label: 'Total Downloads', value: formatCompact(githubData.totalDownloads), color: 'text-violet-400' },
+              { icon: Star, label: 'GitHub Stars', value: formatCompact(githubData.stars), color: 'text-amber-400' },
+              { icon: GitFork, label: 'Forks', value: formatCompact(githubData.forks), color: 'text-cyan-400' },
+              { icon: TrendingUp, label: 'Latest Version', value: `v${githubData.latestVersion}`, color: 'text-emerald-400' },
+            ].map((s) => (
+              <GlassPanel key={s.label} className="p-5">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-muted-foreground">{s.label}</span>
+                  <s.icon className={`w-4 h-4 ${s.color}`} />
+                </div>
+                <div className="text-2xl font-bold">{s.value}</div>
+              </GlassPanel>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <GlassPanel className="p-6">
+              <h3 className="font-medium mb-4 flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-primary" />
+                Downloads per Release
+              </h3>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={githubData.perRelease}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="version" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                    <Tooltip formatter={(v: number) => [v.toLocaleString(), 'Downloads']} />
+                    <Bar dataKey="downloads" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="Downloads" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </GlassPanel>
+
+            <GlassPanel className="p-6">
+              <h3 className="font-medium mb-4 flex items-center gap-2">
+                <PieChart className="w-4 h-4 text-primary" />
+                Downloads by Platform
+              </h3>
+              {githubData.perPlatform.length > 0 ? (
+                <div className="flex items-center gap-6">
+                  <div className="h-56 flex-1">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RePieChart>
+                        <Pie
+                          data={githubData.perPlatform}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={50}
+                          outerRadius={80}
+                          paddingAngle={2}
+                        >
+                          {githubData.perPlatform.map((p) => (
+                            <Cell key={p.name} fill={p.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(v: number) => [v.toLocaleString(), 'Downloads']} />
+                      </RePieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="space-y-2">
+                    {githubData.perPlatform.map((p) => (
+                      <div key={p.name} className="flex items-center gap-2 text-sm">
+                        <span className="w-3 h-3 rounded-sm" style={{ background: p.color }} />
+                        <span className="capitalize text-muted-foreground">{p.name}</span>
+                        <span className="font-semibold ml-auto">{formatCompact(p.value)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="h-56 flex items-center justify-center text-sm text-muted-foreground">
+                  No platform-tagged assets found
+                </div>
+              )}
+            </GlassPanel>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

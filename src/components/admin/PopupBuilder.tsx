@@ -17,6 +17,7 @@ import {
   Monitor, Smartphone, Edit2
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 const POPUP_TYPES = [
   { value: 'banner', label: 'Banner', description: 'Top of page notification bar' },
@@ -40,6 +41,7 @@ const FREQUENCIES = [
 ];
 
 export function PopupBuilder() {
+  const confirm = useConfirm();
   const [showForm, setShowForm] = useState(false);
   const [editingPopup, setEditingPopup] = useState<Popup | null>(null);
   const [newPageInput, setNewPageInput] = useState('');
@@ -160,7 +162,7 @@ export function PopupBuilder() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this popup?')) return;
+    if (!(await confirm({ title: 'Are you sure you want to delete this popup?', destructive: true }))) return;
 
     try {
       await deletePopup.mutateAsync(id);

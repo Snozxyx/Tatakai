@@ -12,21 +12,25 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
+import { resolveApiV3Base } from "@/lib/api/backendOrigin";
 import { Button } from "@/components/ui/button";
 import { useMangaDetail, useMangaChapters, useMangaBakaSeries, useMangaKitsuHierarchy } from "@/hooks/api/useMangaData";
+import { useAniListRecommendations } from "@/hooks/api/useAniListRecommendations";
+import { useMangaRecommendationEngine } from "@/hooks/api/useMangaRecommendationEngine";
 import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import { Skeleton } from "@/components/ui/skeleton-custom";
 import { UnifiedMediaCard, type UnifiedMediaCardProps } from "@/components/UnifiedMediaCard";
-import { EpisodeComments } from "@/components/video/EpisodeComments";
+import { Comments } from "@/components/comments/Comments";
 import { AddToPlaylistButton } from "@/components/playlist/AddToPlaylistButton";
 import { getProxiedImageUrl, fetchJikanCover } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { searchManga } from "@/core/content/manga-client";
 import { inferMangaAdultFlag } from "@/lib/contentSafety";
-import type { MangaSearchItem } from "@/types/manga";
+import { AdultWarningGate } from "@/components/content/AdultWarningGate";
+import type { MangaSearchItem, MangaChapterResponse, MangaChapterSource } from "@/types/manga";
 import {
   ArrowLeft,
   BookOpen,
@@ -34,7 +38,6 @@ import {
   Sparkles,
   Layers,
   Users,
-  AlertTriangle,
   BookmarkPlus,
   BookmarkCheck,
   Loader2,
@@ -47,8 +50,36 @@ import {
   ChevronRight,
   Puzzle,
   ChevronDown,
+  Tag,
+  Pencil,
+  Database,
+  CheckCircle2,
+  Download,
 } from "lucide-react";
 import type { MediaRelation } from "@/core/content/types";
+import { ContentEditSheet, type EditableColumns } from "@/components/admin/ContentEditSheet";
+import { MangaDownloadModal } from "@/components/manga/MangaDownloadModal";
+
+// Reliability order for the reader's cross-source fallback. Mirrors the
+// extension's MANGA_PROVIDERS priority: deterministic mappers (mangadex/comick)
+// and clean HTTP scrapers first, best-effort/CF-gated sources last. A chapter's
+// sources are sorted by this before being handed to the reader as `alternatives`
+// so a dead source falls through to the most trustworthy sibling.
+const MANGA_PROVIDER_RELIABILITY = [
+  "mangadex",
+  "mangapill",
+  "mangakatana",
+  "weebcentral",
+  "nelomanga",
+  "comick",
+  "atsu",
+  "webtoons",
+  "demonicscans",
+];
+function providerReliabilityRank(provider?: string | null): number {
+  const idx = MANGA_PROVIDER_RELIABILITY.indexOf(String(provider || "").toLowerCase());
+  return idx === -1 ? MANGA_PROVIDER_RELIABILITY.length : idx;
+}
 
 // --- Helper Component: Relation Tree ---
 function RelationTree({ relations }: { relations: MediaRelation[] }) {
@@ -92,6 +123,15 @@ import {
   useRemoveFromMangaReadlist,
   useUpsertMangaReadlist,
 } from "@/hooks/user/useMangaReadlist";
+import type { MangaReadlistStatus } from "@/hooks/user/useMangaReadlist";
+import { classifyReadingFormat } from "@/lib/rankUtils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   fetchExtensionMangaChapters,
   mergeChaptersWithExtensions,
@@ -146,29 +186,6 @@ const getChapterDisplayNumber = (chapter: any): number | null => {
   return null;
 };
 
-const queryAniListMetadata = async (id: number) => {
-  try {
-    const query = `
-      query ($id: Int) {
-        Media (id: $id, type: MANGA) {
-          bannerImage
-          chapters
-          volumes
-        }
-      }
-    `;
-    const res = await fetch("https://graphql.anilist.co", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query, variables: { id } })
-    });
-    const data = await res.json();
-    return data?.data?.Media;
-  } catch {
-    return null;
-  }
-};
-
 const toRecommendationCard = (item: MangaSearchItem): UnifiedMediaCardProps["item"] | null => {
   const title = item.canonicalTitle || item.title?.english || item.title?.romaji || item.title?.native;
   const id = item.anilistId || item.malId || item.id;
@@ -199,15 +216,73 @@ export default function MangaPage() {
   const { mangaId } = useParams<{ mangaId: string }>();
   const navigate = useNavigate();
   const isNative = useIsNativeApp();
-  const { user, profile } = useAuth();
+  const { user, profile, isAdmin } = useAuth();
   const { settings: contentSafetySettings, updateSettings: updateContentSafetySettings } = useContentSafetySettings();
   const [allowAdultForSession, setAllowAdultForSession] = useState(false);
   const [expandedChapterOrder, setExpandedChapterOrder] = useState<number | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [showMangaDownload, setShowMangaDownload] = useState(false);
 
   const { data: mangaData, isLoading: loadingInfo, error } = useMangaDetail(mangaId);
   const { data: chapterData, isLoading: loadingChapters } = useMangaChapters(mangaId);
   const { data: mangaBakaData } = useMangaBakaSeries(mangaData?.detail?.anilistId);
   const { data: kitsuHierarchy } = useMangaKitsuHierarchy(mangaData?.detail?.anilistId);
+  const { data: anilistMangaMeta } = useQuery({
+    queryKey: ['manga-anilist-tags', mangaData?.detail?.anilistId],
+    queryFn: async () => {
+      const id = mangaData?.detail?.anilistId;
+      if (!id) return null;
+      const response = await fetch(`${resolveApiV3Base()}/manga/by-anilist/${id}`);
+      if (!response.ok) return null;
+      const payload = await response.json();
+      return payload?.data ?? null;
+    },
+    enabled: Boolean(mangaData?.detail?.anilistId),
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const { data: directAniListMangaTags = [] } = useQuery({
+    queryKey: ['manga-tags-direct', mangaData?.detail?.anilistId],
+    // Tags come from the server-proxied `by-anilist` query (anilistMangaMeta),
+    // which is cached and CORS-safe. This direct AniList call was redundant with
+    // that channel and its 429s surfaced as "blocked by CORS" spam, so it now
+    // just mirrors the proxied tags instead of hitting graphql.anilist.co.
+    queryFn: async () => (anilistMangaMeta?.tags ?? []) as Array<{
+      id: number;
+      name: string;
+      category?: string;
+      rank?: number;
+      isMediaSpoiler?: boolean;
+      isGeneralSpoiler?: boolean;
+    }>,
+    enabled: Boolean(mangaData?.detail?.anilistId),
+    staleTime: 60 * 60 * 1000,
+  });
+
+  const combinedMangaTags = useMemo(() => {
+    // 1. Direct AniList tags or anilistMangaMeta tags
+    const aniList = directAniListMangaTags.length > 0 ? directAniListMangaTags : ((anilistMangaMeta?.tags || []) as any[]);
+    const validAniList = aniList
+      .filter((t: any) => !t.isMediaSpoiler && !t.isGeneralSpoiler)
+      .map((t: any) => ({
+        id: t.id || t.name,
+        name: t.name,
+        rank: t.rank,
+        weight: t.rank && t.rank >= 80 ? 'defining' : t.rank && t.rank >= 60 ? 'core' : 'normal',
+      }));
+
+    if (validAniList.length > 0) return validAniList;
+
+    // 2. MangaBaka tags fallback
+    return (mangaBakaData?.tags || [])
+      .filter((t: any) => !t.isSpoiler)
+      .map((t: any) => ({
+        id: t.id ?? t.name,
+        name: t.name,
+        rank: t.weight === 'defining' ? 90 : t.weight === 'core' ? 70 : undefined,
+        weight: t.weight,
+      }));
+  }, [directAniListMangaTags, anilistMangaMeta?.tags, mangaBakaData?.tags]);
 
   // Fetch extension manga chapters (Toko + other installed manga extensions) and merge
   // with API data before rendering. Requirements: 8.4, 8.5
@@ -219,11 +294,16 @@ export default function MangaPage() {
     if (!mangaData?.detail) return;
     const { anilistId, malId, canonicalTitle, title } = mangaData.detail;
     const titleStr = canonicalTitle || title?.english || title?.romaji || '';
-    fetchExtensionMangaChapters({
+    const reqParams = {
       anilistId: typeof anilistId === 'number' ? anilistId : undefined,
       malId: typeof malId === 'number' ? malId : undefined,
       title: titleStr || undefined,
-    }).then(setExtensionChapterPayload).catch(() => {/* silent */ });
+    };
+    fetchExtensionMangaChapters(reqParams)
+      .then((payload) => {
+        setExtensionChapterPayload(payload);
+      })
+      .catch(() => { /* extension chapters are best-effort */ });
   }, [mangaData?.detail]);
   const { data: readlistEntry } = useMangaReadlistItem(mangaId);
   const addToReadlist = useUpsertMangaReadlist();
@@ -239,7 +319,7 @@ export default function MangaPage() {
     queryKey: ["jikan-manga", malId],
     queryFn: async () => {
       if (!malId) return null;
-      const res = await fetch(`/api/v3/manga/mal/${malId}/full`);
+      const res = await fetch(`${resolveApiV3Base()}/manga/mal/${malId}/full`);
       if (!res.ok) return null;
       const json = await res.json();
       return json?.data ?? null;
@@ -253,20 +333,19 @@ export default function MangaPage() {
     setCoverImageSrc(getProxiedImageUrl(rawCoverImage));
   }, [rawCoverImage]);
 
+  // Banner + chapter/volume counts come from the server-proxied `by-anilist`
+  // query (anilistMangaMeta), not a direct graphql.anilist.co call — the direct
+  // call 429'd under load and surfaced as "blocked by CORS" in the console.
   useEffect(() => {
-    const anilistId = mangaData?.detail?.anilistId;
-    if (anilistId) {
-      queryAniListMetadata(anilistId).then(metadata => {
-        if (metadata) {
-          if (metadata.bannerImage) setBannerUrl(getProxiedImageUrl(metadata.bannerImage));
-          setAnilistMetadata({
-            chapters: metadata.chapters,
-            volumes: metadata.volumes,
-          });
-        }
-      });
+    if (!anilistMangaMeta) return;
+    if (anilistMangaMeta.bannerImage) {
+      setBannerUrl(getProxiedImageUrl(anilistMangaMeta.bannerImage));
     }
-  }, [mangaData?.detail?.anilistId]);
+    setAnilistMetadata({
+      chapters: anilistMangaMeta.chapters,
+      volumes: anilistMangaMeta.volumes,
+    });
+  }, [anilistMangaMeta]);
 
   const chapters = useMemo(() => {
     const base = chapterData?.mappedChapters ? chapterData.mappedChapters : [];
@@ -305,28 +384,35 @@ export default function MangaPage() {
     });
 
     if (!extensionChapterPayload?.chapters?.length) return enriched;
-    // Merge Toko/extension chapters into the enriched list (req 8.4, 8.5)
-    if (chapterData) {
-      const merged = mergeChaptersWithExtensions(chapterData, extensionChapterPayload);
-      const mergedBase = merged.mappedChapters ?? base;
-      // Re-apply Kitsu enrichment on the merged list
-      return mergedBase.map((ch) => {
-        const num = ch.chapterNumber;
-        if (num == null) return ch;
-        const kc = kitsuByNumber.get(num);
-        if (!kc) return ch;
-        return {
-          ...ch,
-          chapterTitle: ch.chapterTitle || kc.title || ch.chapterTitle,
-          _kitsuSynopsis: kc.synopsis,
-          _kitsuThumbnail: kc.thumbnail,
-          _kitsuPublished: kc.published,
-          _kitsuPageCount: kc.pageCount,
-        };
-      });
-    }
-    return enriched;
-  }, [chapterData, extensionChapterPayload, kitsuHierarchy]);
+    // Merge Toko/extension chapters into the enriched list (req 8.4, 8.5).
+    // The base API mapping is usually empty (mappings schema unreachable), so
+    // merge against a synthetic empty base when chapterData hasn't loaded —
+    // otherwise the extension's chapters would never surface.
+    const effectiveBase: MangaChapterResponse = chapterData ?? {
+      anilistId: mangaData?.detail?.anilistId ?? 0,
+      partial: false,
+      failedProviders: [],
+      chapters: [],
+      mappedChapters: [],
+    };
+    const merged = mergeChaptersWithExtensions(effectiveBase, extensionChapterPayload);
+    const mergedBase = merged.mappedChapters ?? base;
+    // Re-apply Kitsu enrichment on the merged list
+    return mergedBase.map((ch) => {
+      const num = ch.chapterNumber;
+      if (num == null) return ch;
+      const kc = kitsuByNumber.get(num);
+      if (!kc) return ch;
+      return {
+        ...ch,
+        chapterTitle: ch.chapterTitle || kc.title || ch.chapterTitle,
+        _kitsuSynopsis: kc.synopsis,
+        _kitsuThumbnail: kc.thumbnail,
+        _kitsuPublished: kc.published,
+        _kitsuPageCount: kc.pageCount,
+      };
+    });
+  }, [chapterData, extensionChapterPayload, kitsuHierarchy, mangaData?.detail?.anilistId]);
   const isChapterListLoading = loadingChapters && !chapterData;
   const [preferredProvider, setPreferredProvider] = useState<string>("auto");
   const [preferredLanguage, setPreferredLanguage] = useState<string>("auto");
@@ -536,8 +622,55 @@ export default function MangaPage() {
     return chapter.sources[0] || null;
   };
 
-  const getBestSourceKey = (chapter: (typeof sortedChapters)[number] | undefined) => {
-    return getBestSource(chapter)?.chapterKey || null;
+  // Build the reader URL from a source, threading everything the reader needs to
+  // reach the extension runtime (`provider`, `providerChapterId`) and to show a
+  // real chapter title instead of the raw `provider:key` string
+  // (`chapterNumber`/`chapterTitle`). Every navigation to the reader goes through
+  // here so no entry point silently drops the provider (which dead-ends at
+  // `getMangaReadByKey`'s provider guard).
+  const buildReaderQuery = (opts: {
+    chapterKey: string;
+    provider?: string | null;
+    providerChapterId?: string | null;
+    chapterNumber?: number | null;
+    chapterTitle?: string | null;
+    page?: number;
+  }) => {
+    const params = new URLSearchParams();
+    params.set("chapterKey", opts.chapterKey);
+    if (opts.provider) params.set("provider", opts.provider);
+    if (opts.providerChapterId) params.set("providerChapterId", opts.providerChapterId);
+    if (opts.chapterNumber != null && Number.isFinite(opts.chapterNumber))
+      params.set("chapterNumber", String(opts.chapterNumber));
+    if (opts.chapterTitle) params.set("chapterTitle", opts.chapterTitle);
+    params.set("page", String(Math.max(0, opts.page ?? 0)));
+    return params.toString();
+  };
+
+  // Reliability-sort a chapter's sources so the reader's cross-source fallback
+  // tries the most trustworthy sibling first when a source yields no pages.
+  const sortedSourcesFor = (chapter: { sources?: MangaChapterSource[] } | null | undefined) =>
+    [...(chapter?.sources || [])].sort(
+      (a, b) => providerReliabilityRank(a.provider) - providerReliabilityRank(b.provider),
+    );
+
+  // Navigate to the reader for a specific chapter+source, passing the chapter's
+  // reliability-sorted sources as router state (`alternatives`) for fallback.
+  const goToReader = (
+    chapter: { chapterNumber?: number | null; chapterTitle?: string | null; sources?: MangaChapterSource[] } | null | undefined,
+    source: MangaChapterSource | null | undefined,
+    page = 0,
+  ) => {
+    if (!mangaId || !source?.chapterKey) return;
+    const query = buildReaderQuery({
+      chapterKey: source.chapterKey,
+      provider: source.provider,
+      providerChapterId: source.providerChapterId,
+      chapterNumber: chapter?.chapterNumber ?? null,
+      chapterTitle: chapter?.chapterTitle ?? null,
+      page,
+    });
+    navigate(`/manga/read/${mangaId}?${query}`, { state: { sources: sortedSourcesFor(chapter) } });
   };
 
   const volumeSections = useMemo(() => {
@@ -618,10 +751,18 @@ export default function MangaPage() {
             (firstReadable?.chapter.chapterNumber != null ? `Chapter ${firstReadable.chapter.chapterNumber}` : ""),
           firstChapterKey: firstReadable?.source?.chapterKey || null,
           latestChapterKey: latestReadable?.source?.chapterKey || null,
+          // Full chapter+source objects so navigation can thread provider +
+          // number + title without re-deriving them from the key.
+          firstChapter: firstReadable?.chapter ?? null,
+          firstSource: firstReadable?.source ?? null,
+          latestChapter: latestReadable?.chapter ?? null,
+          latestSource: latestReadable?.source ?? null,
           readableChapters: readable.map((entry) => ({
             chapterKey: entry.source?.chapterKey || "",
             chapterNumber: entry.chapter.chapterNumber,
             chapterTitle: entry.chapter.chapterTitle,
+            chapter: entry.chapter,
+            source: entry.source,
           })),
         };
       });
@@ -692,6 +833,24 @@ export default function MangaPage() {
     info?.title?.romaji ||
     info?.title?.native ||
     "Unknown Title";
+
+  // Precise media format for the playlist item label (manga/manhwa/manhua/comic/novel).
+  const playlistMediaFormat = (() => {
+    const f = String(info?.format || "").toUpperCase();
+    const c = String(info?.origin || "").toUpperCase();
+    if (f === "NOVEL" || f === "LIGHT_NOVEL") return "novel";
+    if (f === "OEL") return "comic";
+    if (f === "MANHWA" || c === "KR") return "manhwa";
+    if (f === "MANHUA" || c === "CN" || c === "TW") return "manhua";
+    return "manga";
+  })();
+
+  // Narrowed to the 3-way MangaKind the downloader/Dynamic Island badge use
+  // (comic/novel collapse to 'manga' for the badge).
+  const mangaDownloadKind: "manga" | "manhwa" | "manhua" =
+    playlistMediaFormat === "manhwa" ? "manhwa"
+      : playlistMediaFormat === "manhua" ? "manhua"
+        : "manga";
 
   const recommendationTerms = useMemo(() => {
     if (!info) return [];
@@ -766,6 +925,70 @@ export default function MangaPage() {
     enabled: Boolean(info) && recommendationTerms.length > 0,
   });
 
+  // AniList's crowd-curated manga picks for this title (mirror-proxied, never direct).
+  const includeAdultRecs = !!contentSafetySettings?.showAdultEverywhere;
+  const { recommendations: anilistMangaRecs } = useAniListRecommendations(info?.anilistId, {
+    mediaType: "MANGA",
+    includeAdult: includeAdultRecs,
+    limit: 24,
+  });
+  // The app's own personalized manga engine (same source as the Recommendations page).
+  const { recommendations: mangaEngineRecs } = useMangaRecommendationEngine({ limit: 24 });
+
+  // Merge AniList (primary) + engine (personalized) + search (fallback), deduped
+  // and with the current title removed.
+  const mergedRecommendations = useMemo<UnifiedMediaCardProps["item"][]>(() => {
+    const seen = new Set<string>();
+    const out: UnifiedMediaCardProps["item"][] = [];
+    const curAniList = typeof info?.anilistId === "number" ? info.anilistId : null;
+    const curMal = typeof info?.malId === "number" ? info.malId : null;
+    const curRoute = String(mangaId || "");
+
+    const push = (card: UnifiedMediaCardProps["item"] | null | undefined) => {
+      if (!card) return;
+      if (card.isAdult && !includeAdultRecs) return;
+      if (curAniList != null && card.anilistId === curAniList) return;
+      if (curMal != null && card.malId === curMal) return;
+      if (String(card.id) === curRoute) return;
+      const key = String(card.anilistId ?? card.malId ?? card.id);
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push(card);
+    };
+
+    for (const r of anilistMangaRecs) {
+      push({
+        id: String(r.anilistId),
+        name: r.title,
+        poster: r.poster,
+        type: r.format ?? "manga",
+        rating: r.averageScore ? (r.averageScore / 10).toFixed(1) : undefined,
+        anilistId: r.anilistId,
+        malId: r.malId ?? undefined,
+        isAdult: r.isAdult,
+        mediaType: "manga",
+      });
+    }
+
+    for (const rec of mangaEngineRecs) {
+      const a = rec.anime;
+      push({
+        id: String(a.id),
+        name: a.title,
+        poster: a.poster ?? "",
+        type: a.format ?? "manga",
+        rating: a.averageScore ? (a.averageScore / 10).toFixed(1) : undefined,
+        anilistId: a.anilistId ?? undefined,
+        malId: a.malId ?? undefined,
+        mediaType: "manga",
+      });
+    }
+
+    for (const card of recommendationCards) push(card);
+
+    return out.slice(0, 16);
+  }, [anilistMangaRecs, mangaEngineRecs, recommendationCards, info?.anilistId, info?.malId, mangaId, includeAdultRecs]);
+
   if (loadingInfo) {
     return (
       <div className="min-h-screen bg-background text-foreground">
@@ -775,7 +998,7 @@ export default function MangaPage() {
           <div className="space-y-8">
             <Skeleton className="h-8 w-32" />
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <Skeleton className="aspect-[3/4] rounded-3xl" />
+              <Skeleton className="aspect-[2/3] rounded-3xl" />
               <div className="lg:col-span-2 space-y-4">
                 <Skeleton className="h-12 w-3/4" />
                 <Skeleton className="h-24 w-full" />
@@ -822,66 +1045,19 @@ export default function MangaPage() {
           "relative z-10 py-8 max-w-[980px] mx-auto pb-24",
           isNative ? "px-4" : "pl-6 md:pl-32 pr-6"
         )}>
-          <GlassPanel className="p-6 md:p-8 border border-amber-500/30">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-6 h-6 text-amber-500 mt-1" />
-              <div>
-                <h1 className="text-2xl md:text-3xl font-black">Sensitive Content Warning</h1>
-                <p className="mt-2 text-muted-foreground">
-                  This manga is marked as mature content. Continue only if you are comfortable viewing 18+ material.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-5 rounded-xl border border-white/10 bg-black/20 p-4">
-              <p className="text-sm text-muted-foreground">
-                Title: <span className="text-foreground font-semibold">{info.canonicalTitle || info.title?.english || info.title?.romaji || "Unknown"}</span>
-              </p>
-            </div>
-
-            <div className="mt-4 overflow-hidden rounded-xl border border-rose-500/30">
-              <div className="relative">
-                <img
-                  src="/manga18+.jpg"
-                  alt="18+ Content Banner"
-                  className="h-32 w-full object-cover md:h-40"
-                />
-                <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-black/70" />
-                <div className="absolute inset-0 flex items-end p-3">
-                  <p className="text-xs font-bold uppercase tracking-wider text-rose-100">
-                    Mature Content • 18+ Only
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 flex flex-wrap gap-3">
-              <button
-                onClick={() => navigate(-1)}
-                className="px-4 py-2 rounded-lg border border-white/15 bg-white/5 text-sm font-bold hover:bg-white/10 transition-colors"
-              >
-                Go Back
-              </button>
-              <button
-                onClick={() => setAllowAdultForSession(true)}
-                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-bold hover:brightness-110 transition-all"
-              >
-                Continue
-              </button>
-              <button
-                onClick={() => {
-                  updateContentSafetySettings({
-                    showAdultEverywhere: true,
-                    warnBeforeAdultOpen: false,
-                  });
-                  setAllowAdultForSession(true);
-                }}
-                className="px-4 py-2 rounded-lg border border-primary/30 bg-primary/15 text-primary text-sm font-bold hover:bg-primary/25 transition-colors"
-              >
-                Always Show Mature Media
-              </button>
-            </div>
-          </GlassPanel>
+          <AdultWarningGate
+            title={info.canonicalTitle || info.title?.english || info.title?.romaji || 'Unknown'}
+            mediaLabel="manga"
+            onBack={() => navigate(-1)}
+            onContinue={() => setAllowAdultForSession(true)}
+            onAlwaysShow={() => {
+              updateContentSafetySettings({
+                showAdultEverywhere: true,
+                warnBeforeAdultOpen: false,
+              });
+              setAllowAdultForSession(true);
+            }}
+          />
         </main>
 
         <MobileNav />
@@ -899,18 +1075,27 @@ export default function MangaPage() {
 
     if (hasSavedProgress && readlistEntry?.last_chapter_key) {
       const savedPage = Math.max(0, Number(readlistEntry.last_page_index || 0));
-      navigate(
-        `/manga/read/${mangaId}?chapterKey=${encodeURIComponent(readlistEntry.last_chapter_key)}&page=${savedPage}`,
-      );
+      const savedKey = String(readlistEntry.last_chapter_key);
+      // Find the chapter whose source matches the saved key so we can pass its
+      // reliability-sorted sources as fallback alternatives; fall back to the
+      // saved provider/number/title on the readlist row when it isn't listed.
+      const savedChapter = sortedChapters.find((c) => c.sources?.some((s) => s.chapterKey === savedKey));
+      const savedSource = savedChapter?.sources?.find((s) => s.chapterKey === savedKey);
+      const query = buildReaderQuery({
+        chapterKey: savedKey,
+        provider: savedSource?.provider || readlistEntry.last_provider,
+        providerChapterId: savedSource?.providerChapterId,
+        chapterNumber: savedChapter?.chapterNumber ?? readlistEntry.last_chapter_number ?? null,
+        chapterTitle: savedChapter?.chapterTitle ?? readlistEntry.last_chapter_title ?? null,
+        page: savedPage,
+      });
+      navigate(`/manga/read/${mangaId}?${query}`, { state: { sources: sortedSourcesFor(savedChapter) } });
       return;
     }
 
     if (visibleChapters.length > 0 || sortedChapters.length > 0) {
       const firstReadableChapter = visibleChapters[0] || sortedChapters[0];
-      const sourceKey = getBestSourceKey(firstReadableChapter);
-      if (sourceKey) {
-        navigate(`/manga/read/${mangaId}?chapterKey=${encodeURIComponent(sourceKey)}&page=0`);
-      }
+      goToReader(firstReadableChapter, getBestSource(firstReadableChapter), 0);
     }
   };
 
@@ -930,6 +1115,7 @@ export default function MangaPage() {
       mangaId,
       mangaTitle: displayTitle,
       mangaPoster: info.coverImage || null,
+      format: classifyReadingFormat({ format: info.format, countryOfOrigin: info.origin }),
       status: "plan_to_read",
       lastChapterKey: readlistEntry?.last_chapter_key || null,
       lastChapterNumber: readlistEntry?.last_chapter_number ?? null,
@@ -941,6 +1127,44 @@ export default function MangaPage() {
     });
   };
 
+  // Set an explicit readlist status (mirrors the anime WatchlistButton), keeping
+  // any existing reading progress intact.
+  const handleSetReadlistStatus = async (status: MangaReadlistStatus) => {
+    if (!mangaId) return;
+    if (!user) {
+      navigate("/auth");
+      return;
+    }
+    await addToReadlist.mutateAsync({
+      mangaId,
+      mangaTitle: displayTitle,
+      mangaPoster: info.coverImage || null,
+      format: classifyReadingFormat({ format: info.format, countryOfOrigin: info.origin }),
+      status,
+      lastChapterKey: readlistEntry?.last_chapter_key || null,
+      lastChapterNumber: readlistEntry?.last_chapter_number ?? null,
+      lastChapterTitle: readlistEntry?.last_chapter_title || null,
+      lastProvider: readlistEntry?.last_provider || null,
+      lastLanguage: readlistEntry?.last_language || null,
+      lastPageIndex: Number(readlistEntry?.last_page_index || 0),
+      totalPages: readlistEntry?.total_pages ?? null,
+    });
+  };
+
+  const handleRemoveReadlist = async () => {
+    if (mangaId) await removeFromReadlist.mutateAsync({ mangaId });
+  };
+
+  const READLIST_STATUS_OPTIONS: { value: MangaReadlistStatus; label: string }[] = [
+    { value: "plan_to_read", label: "Plan to Read" },
+    { value: "reading", label: "Reading" },
+    { value: "completed", label: "Completed" },
+    { value: "on_hold", label: "On Hold" },
+    { value: "dropped", label: "Dropped" },
+  ];
+  const currentReadlistStatus = readlistEntry?.status as MangaReadlistStatus | undefined;
+  const currentReadlistLabel = READLIST_STATUS_OPTIONS.find((o) => o.value === currentReadlistStatus)?.label;
+
   const displayRating =
     typeof info.score === "number" && Number.isFinite(info.score)
       ? (info.score / 10).toFixed(1)
@@ -949,10 +1173,10 @@ export default function MangaPage() {
   return (
     <>
       <Helmet>
-        <title>{displayTitle} - Read Manga | Tatakai</title>
-        <meta name="description" content={info.synopsis?.slice(0, 160) || `Read ${displayTitle} online for free.`} />
-        <meta property="og:title" content={`${displayTitle} - Read Manga | Tatakai`} />
-        <meta property="og:description" content={info.synopsis?.slice(0, 160) || `Read ${displayTitle} online for free.`} />
+        <title>{displayTitle} — Manga on Tatakai</title>
+        <meta name="description" content={info.synopsis?.slice(0, 160) || `Track ${displayTitle}, rate it, and add it to your lists on Tatakai.`} />
+        <meta property="og:title" content={`${displayTitle} — Manga on Tatakai`} />
+        <meta property="og:description" content={info.synopsis?.slice(0, 160) || `Track and discuss ${displayTitle} on Tatakai — the otaku community.`} />
         <meta property="og:image" content={info.coverImage || ""} />
         <meta property="og:type" content="book" />
         <meta name="twitter:card" content="summary_large_image" />
@@ -993,7 +1217,7 @@ export default function MangaPage() {
               <img
                 src={coverImageSrc}
                 alt={displayTitle}
-                className="w-full aspect-[3/4] object-cover"
+                className="w-full aspect-[2/3] object-cover"
                 onError={() => {
                   if (rawCoverImage && !coverFallbackTried && coverImageSrc !== rawCoverImage) {
                     setCoverFallbackTried(true);
@@ -1011,6 +1235,80 @@ export default function MangaPage() {
               <div>
                 <h1 className="font-display text-4xl md:text-5xl font-bold mb-4">{displayTitle}</h1>
 
+                {/* Provenance badge (all visitors) + admin edit button */}
+                <div className="flex flex-wrap items-center gap-2 mb-4">
+                  {info.inDb ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-medium">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      In Tatakai DB
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted text-muted-foreground text-xs font-medium">
+                      <Database className="w-3.5 h-3.5" />
+                      Not in DB yet
+                    </span>
+                  )}
+                  {isAdmin && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 gap-1.5 text-xs"
+                      onClick={() => setEditOpen(true)}
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      Edit content
+                    </Button>
+                  )}
+                </div>
+
+                {isAdmin && (
+                  <ContentEditSheet
+                    open={editOpen}
+                    onOpenChange={setEditOpen}
+                    mediaType="manga"
+                    title={displayTitle}
+                    id={
+                      (info.anilistId ? String(info.anilistId) : "") ||
+                      info.tatakaiId ||
+                      mangaId ||
+                      ""
+                    }
+                    initial={{
+                      title_romaji: info.title?.romaji ?? "",
+                      title_english: info.title?.english ?? "",
+                      title_native: info.title?.native ?? "",
+                      description: info.synopsis ?? "",
+                      cover_image_large: info.coverImage ?? "",
+                      cover_image_medium: info.coverImageMedium ?? "",
+                      banner_image: info.bannerImage ?? "",
+                      trailer_url: info.trailerUrl ?? "",
+                      format: info.format ?? "",
+                      status: info.status ?? "",
+                      country_of_origin: info.origin ?? "",
+                      rating: info.rating ?? "",
+                      chapters: info.totalChapters ?? "",
+                      volumes: info.totalVolumes ?? "",
+                      average_score: info.score ?? "",
+                      mean_score: info.meanScore ?? "",
+                      popularity: info.popularity ?? "",
+                      favourites: info.favourites ?? "",
+                      genres: (info.genres ?? []).join(", "),
+                    } satisfies Partial<EditableColumns>}
+                  />
+                )}
+
+                {isNative && info && (
+                  <MangaDownloadModal
+                    isOpen={showMangaDownload}
+                    onClose={() => setShowMangaDownload(false)}
+                    chapters={chapters}
+                    anilistId={Number(info.anilistId) || 0}
+                    title={displayTitle}
+                    posterUrl={coverImageSrc}
+                    kind={mangaDownloadKind}
+                  />
+                )}
+
                 <div className="flex flex-wrap gap-3 mb-6">
                   {displayRating && (
                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber/20 text-amber">
@@ -1018,12 +1316,10 @@ export default function MangaPage() {
                       <span className="font-bold">{displayRating}</span>
                     </div>
                   )}
-                  {info.mediaType && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted">
-                      <BookOpen className="w-4 h-4" />
-                      <span className="capitalize">{info.mediaType}</span>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted">
+                    <BookOpen className="w-4 h-4" />
+                    <span className="capitalize">{playlistMediaFormat}</span>
+                  </div>
                   {info.status && (
                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/20 text-primary">
                       <span className="font-semibold capitalize">
@@ -1063,18 +1359,44 @@ export default function MangaPage() {
                   </p>
                 )}
 
-                <div className="flex flex-wrap gap-2 mb-4">
+                <div className="flex flex-wrap gap-2 mb-3">
                   {info.genres?.map((genre) => (
                     <button
                       key={genre}
                       type="button"
-                      onClick={() => navigate(`/manga/genre/${encodeURIComponent(genre)}`)}
+                      onClick={() => navigate(`/search?genre=${encodeURIComponent(genre)}&type=manga`)}
                       className="px-3 py-1.5 rounded-lg bg-muted text-sm font-medium hover:bg-primary/20 hover:text-primary transition-colors"
                     >
                       {genre}
                     </button>
                   ))}
                 </div>
+
+                {/* Tags in Hero */}
+                {combinedMangaTags.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 mb-4">
+                    <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mr-1 flex items-center gap-1">
+                      <Tag className="w-3 h-3 text-primary" />
+                      Tags:
+                    </span>
+                    {combinedMangaTags.slice(0, 14).map((tag: any) => (
+                      <button
+                        key={`hero-tag-${tag.id || tag.name}`}
+                        type="button"
+                        onClick={() => navigate(`/search?mangaTag=${encodeURIComponent(tag.name)}&type=manga`)}
+                        className="px-2.5 py-0.5 rounded-full bg-white/5 hover:bg-primary/20 border border-white/10 hover:border-primary/40 text-xs text-muted-foreground hover:text-primary transition-all flex items-center gap-1 group"
+                        title={tag.rank ? `${tag.name} (${tag.rank}%) • Click to search` : `${tag.name} • Click to search`}
+                      >
+                        <span>{tag.name}</span>
+                        {typeof tag.rank === 'number' && (
+                          <span className="text-[10px] text-muted-foreground/60 group-hover:text-primary/70">
+                            {tag.rank}%
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
@@ -1091,22 +1413,70 @@ export default function MangaPage() {
                   animeName={displayTitle}
                   animePoster={info.coverImage || undefined}
                   mediaType="manga"
+                  mediaFormat={playlistMediaFormat}
                   className="h-auto border border-white/15 bg-white/5 text-foreground px-6 py-3.5 rounded-xl font-bold hover:bg-white/10 active:scale-95 transition-all"
                 />
-                <button
-                  onClick={handleToggleReadlist}
-                  disabled={addToReadlist.isPending || removeFromReadlist.isPending}
-                  className="flex items-center justify-center gap-2 border border-white/15 bg-white/5 text-foreground px-6 py-3.5 rounded-xl font-bold hover:bg-white/10 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isInReadlist ? <BookmarkCheck className="w-5 h-5 text-primary" /> : <BookmarkPlus className="w-5 h-5" />}
-                  {!user ? "Sign In for Readlist" : isInReadlist ? "In Readlist" : "Add to Readlist"}
-                </button>
+                {isNative && (
+                  <button
+                    onClick={() => setShowMangaDownload(true)}
+                    disabled={sortedChapters.length === 0}
+                    className="flex items-center justify-center gap-2 border border-white/15 bg-white/5 text-foreground px-6 py-3.5 rounded-xl font-bold hover:bg-white/10 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Download all chapters"
+                  >
+                    <Download className="w-5 h-5" />
+                    Download
+                  </button>
+                )}
+                {!user ? (
+                  <button
+                    onClick={() => navigate("/auth")}
+                    className="flex items-center justify-center gap-2 border border-white/15 bg-white/5 text-foreground px-6 py-3.5 rounded-xl font-bold hover:bg-white/10 active:scale-95 transition-all"
+                  >
+                    <BookmarkPlus className="w-5 h-5" />
+                    Sign In for Readlist
+                  </button>
+                ) : (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        disabled={addToReadlist.isPending || removeFromReadlist.isPending}
+                        className="flex items-center justify-center gap-2 border border-white/15 bg-white/5 text-foreground px-6 py-3.5 rounded-xl font-bold hover:bg-white/10 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {currentReadlistStatus ? <BookmarkCheck className="w-5 h-5 text-primary" /> : <BookmarkPlus className="w-5 h-5" />}
+                        {currentReadlistLabel ?? "Add to Readlist"}
+                        <ChevronDown className="w-4 h-4 opacity-60" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      {READLIST_STATUS_OPTIONS.map((option) => (
+                        <DropdownMenuItem
+                          key={option.value}
+                          onClick={() => handleSetReadlistStatus(option.value)}
+                          className={currentReadlistStatus === option.value ? "bg-primary/20" : ""}
+                        >
+                          {option.label}
+                        </DropdownMenuItem>
+                      ))}
+                      {currentReadlistStatus && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={handleRemoveReadlist}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            Remove from Readlist
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-8">
-            <div className="space-y-8">
+          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] gap-8">
+            <div className="space-y-8 min-w-0">
               {/* Overview */}
               {info.synopsis && (
                 <section>
@@ -1122,7 +1492,7 @@ export default function MangaPage() {
                 </section>
               )}
 
-                  {mangaBakaData && mangaBakaData.tags.filter((t) => !t.isSpoiler).length > 0 && (
+              {combinedMangaTags.length > 0 && (
                 <section>
                   <h3 className="font-display text-xl md:text-2xl font-bold mb-4 flex items-center gap-2">
                     <Palette className="w-5 h-5 text-primary" />
@@ -1130,26 +1500,26 @@ export default function MangaPage() {
                   </h3>
                   <GlassPanel className="p-5">
                     <div className="flex flex-wrap gap-1.5">
-                      {mangaBakaData.tags
-                        .filter((t) => !t.isSpoiler)
-                        .slice(0, 30)
-                        .map((tag) => (
-                          <button
-                            key={`tag-${tag.id ?? tag.name}`}
-                            type="button"
-                            onClick={() => navigate(`/search?type=manga&genre=${encodeURIComponent(tag.name)}`)}
-                            className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors hover:border-primary/40 hover:text-primary ${
-                              tag.weight === 'defining'
-                                ? 'bg-primary/10 border-primary/20 text-primary/80'
-                                : tag.weight === 'core'
-                                ? 'bg-white/5 border-white/10 text-foreground/70'
-                                : 'bg-white/[0.03] border-white/5 text-muted-foreground'
-                            }`}
-                            title={tag.path ?? undefined}
-                          >
-                            {tag.name}
-                          </button>
-                        ))}
+                      {combinedMangaTags.slice(0, 40).map((tag: any) => (
+                        <button
+                          key={`tag-${tag.id ?? tag.name}`}
+                          type="button"
+                          onClick={() => navigate(`/search?mangaTag=${encodeURIComponent(tag.name)}&type=manga`)}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors hover:border-primary/40 hover:text-primary flex items-center gap-1 ${
+                            tag.weight === 'defining'
+                              ? 'bg-primary/10 border-primary/20 text-primary/80'
+                              : tag.weight === 'core'
+                              ? 'bg-white/5 border-white/10 text-foreground/70'
+                              : 'bg-white/[0.03] border-white/5 text-muted-foreground'
+                          }`}
+                          title={tag.rank ? `${tag.name} (${tag.rank}%) • Click to search` : `${tag.name} • Click to search`}
+                        >
+                          <span>{tag.name}</span>
+                          {typeof tag.rank === 'number' && (
+                            <span className="text-[9px] opacity-60">{tag.rank}%</span>
+                          )}
+                        </button>
+                      ))}
                     </div>
                   </GlassPanel>
                 </section>
@@ -1187,7 +1557,7 @@ export default function MangaPage() {
                         <img
                           src={getProxiedImageUrl(char.image || char.poster || char.imageUrl || "") || "/placeholder.svg"}
                           alt={char.name}
-                          className="w-full aspect-[3/4] object-cover"
+                          className="w-full aspect-[2/3] object-cover"
                           loading="lazy"
                         />
                         <div className="p-2">
@@ -1211,6 +1581,17 @@ export default function MangaPage() {
                       Chapters
                     </h3>
                     <div className="flex items-center gap-2">
+                      {isNative && (
+                        <Button
+                          size="sm"
+                          onClick={() => setShowMangaDownload(true)}
+                          disabled={chapters.length === 0}
+                          className="h-8 gap-1.5 rounded-lg glow-primary text-xs font-bold"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          Download all
+                        </Button>
+                      )}
                       <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                         Sort by
                       </label>
@@ -1365,15 +1746,16 @@ export default function MangaPage() {
                         preferredProvider={preferredProvider}
                         effectivePreferredLanguage={effectivePreferredLanguage}
                         onNavigate={(provider, chapterKey) => {
-                          const encodedProvider = encodeURIComponent(provider);
                           const src = chapter.sources?.find(
                             (s) => s.provider === provider && s.chapterKey === chapterKey,
                           );
-                          const providerChapterId = encodeURIComponent(
-                            src?.providerChapterId || chapterKey,
-                          );
-                          navigate(
-                            `/manga/read/${mangaId}?chapterKey=${encodeURIComponent(chapterKey)}&provider=${encodedProvider}&providerChapterId=${providerChapterId}&page=0`,
+                          // goToReader threads provider + providerChapterId +
+                          // chapterNumber + chapterTitle and passes the chapter's
+                          // reliability-sorted sources as fallback alternatives.
+                          goToReader(
+                            chapter,
+                            src ?? { provider, chapterKey, providerChapterId: chapterKey, language: null, scanlator: null, releaseDate: null },
+                            0,
                           );
                         }}
                       />
@@ -1422,10 +1804,7 @@ export default function MangaPage() {
 
                         <div className="mt-3 flex flex-wrap gap-2">
                           <button
-                            onClick={() => {
-                              if (!mangaId || !volumeItem.firstChapterKey) return;
-                              navigate(`/manga/read/${mangaId}?chapterKey=${encodeURIComponent(volumeItem.firstChapterKey)}&page=0`);
-                            }}
+                            onClick={() => goToReader(volumeItem.firstChapter, volumeItem.firstSource, 0)}
                             disabled={!volumeItem.firstChapterKey}
                             className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                           >
@@ -1433,10 +1812,7 @@ export default function MangaPage() {
                           </button>
 
                           <button
-                            onClick={() => {
-                              if (!mangaId || !volumeItem.latestChapterKey) return;
-                              navigate(`/manga/read/${mangaId}?chapterKey=${encodeURIComponent(volumeItem.latestChapterKey)}&page=0`);
-                            }}
+                            onClick={() => goToReader(volumeItem.latestChapter, volumeItem.latestSource, 0)}
                             disabled={!volumeItem.latestChapterKey}
                             className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-bold hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                           >
@@ -1463,10 +1839,7 @@ export default function MangaPage() {
                             {volumeItem.readableChapters.slice(0, 6).map((chapterItem) => (
                               <button
                                 key={`volume-${volumeItem.volume}-chapter-${chapterItem.chapterKey}`}
-                                onClick={() => {
-                                  if (!mangaId || !chapterItem.chapterKey) return;
-                                  navigate(`/manga/read/${mangaId}?chapterKey=${encodeURIComponent(chapterItem.chapterKey)}&page=0`);
-                                }}
+                                onClick={() => goToReader(chapterItem.chapter, chapterItem.source, 0)}
                                 className="rounded-md border border-white/15 bg-white/5 px-2 py-1 text-[10px] font-bold uppercase tracking-wider hover:bg-white/10 transition-colors"
                               >
                                 {chapterItem.chapterNumber != null ? `Ch ${chapterItem.chapterNumber}` : "Open chapter"}
@@ -1491,15 +1864,15 @@ export default function MangaPage() {
                   Recommendations
                 </h3>
 
-                {loadingRecommendations ? (
+                {loadingRecommendations && mergedRecommendations.length === 0 ? (
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     {Array.from({ length: 8 }).map((_, index) => (
-                      <Skeleton key={`rec-skeleton-${index}`} className="aspect-[3/4] rounded-2xl" />
+                      <Skeleton key={`rec-skeleton-${index}`} className="aspect-[2/3] rounded-2xl" />
                     ))}
                   </div>
-                ) : recommendationCards.length > 0 ? (
+                ) : mergedRecommendations.length > 0 ? (
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {recommendationCards.map((card) => (
+                    {mergedRecommendations.map((card) => (
                       <div key={`manga-rec-${card.id}`} className="flex flex-col">
                         <UnifiedMediaCard item={card} className="flex-1" />
                       </div>
@@ -1515,9 +1888,10 @@ export default function MangaPage() {
               </section>
 
               <section>
-                <EpisodeComments
-                  animeId={`manga:${String(mangaId || info.anilistId || info.malId || "")}`}
-                  animeName={displayTitle}
+                <Comments
+                  entityType="manga"
+                  entityId={String(mangaId || info.anilistId || info.malId || "")}
+                  entityName={displayTitle}
                 />
               </section>
             </div>
@@ -1588,18 +1962,41 @@ export default function MangaPage() {
                   {info.genres && info.genres.length > 0 ? (
                     <div className="flex flex-wrap gap-1.5">
                       {info.genres.map((genre) => (
-                        <span
+                        <button
                           key={`meta-genre-${genre}`}
-                          className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-foreground"
+                          type="button"
+                          onClick={() => navigate(`/manga/genre/${encodeURIComponent(genre)}`)}
+                          className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-foreground transition-colors hover:border-primary/40 hover:text-primary"
                         >
                           {genre}
-                        </span>
+                        </button>
                       ))}
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">No genres available.</p>
                   )}
                 </div>
+
+                {Array.isArray(anilistMangaMeta?.tags) && anilistMangaMeta.tags.length > 0 && (
+                  <div className="mt-4">
+                    <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      AniList Tags
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {anilistMangaMeta.tags.filter((tag: any) => tag?.name).map((tag: any) => (
+                        <button
+                          key={tag.name}
+                          type="button"
+                          title={tag.isAdult ? "Adult AniList tag" : "Search this AniList tag"}
+                          onClick={() => navigate(`/search?mangaTag=${encodeURIComponent(tag.name)}&type=manga`)}
+                          className="rounded-md border border-primary/20 bg-primary/5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary/80 transition-colors hover:border-primary/40 hover:bg-primary/15"
+                        >
+                          #{tag.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* MangaBaka enrichment: cross-site ratings */}
                 {mangaBakaData && Object.keys(mangaBakaData.sources).length > 0 && (

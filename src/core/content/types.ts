@@ -185,6 +185,12 @@ export interface MediaRelation {
   coverImage?: string;
   format?: MediaFormat;
   status?: MediaStatus;
+  /** Air-start date from AniList — used to sort by release order */
+  startDate?: Partial<{ year: number; month: number; day: number }>;
+  /** Year the season aired — fallback sort key */
+  seasonYear?: number;
+  /** Episode count — shown as "N EPS" badge in the watch-order rail */
+  episodes?: number;
 }
 
 export interface NextAiringEpisode {
@@ -225,6 +231,7 @@ export interface MediaRanking {
 export interface SearchFilters {
   query?: string;
   genres?: string[];
+  tags?: string[];
   year?: { min?: number; max?: number };
   season?: MediaSeason[];
   format?: MediaFormat[];
@@ -276,6 +283,54 @@ export interface HomePageBundle {
   fetchedAt: number;
 }
 
+// ─── Manga hub bundles (single API call each) ─────────────────────────────────
+
+/**
+ * Everything above the fold on `/manga`, from `GET /api/v3/manga/home`.
+ *
+ * The manga twin of `HomePageBundle`. `adultLatest`/`adultPopular` only arrive
+ * when the caller opts in with `?adult=1`, so the default response stays cacheable
+ * for everyone.
+ */
+export interface MangaHomeBundle {
+  spotlight: TatakaiMedia[];
+  trending: TatakaiMedia[];
+  popular: TatakaiMedia[];
+  topRated: TatakaiMedia[];
+  newChapters: TatakaiMedia[];
+  manhwa: TatakaiMedia[];
+  manhua: TatakaiMedia[];
+  adultLatest: TatakaiMedia[];
+  adultPopular: TatakaiMedia[];
+  genres: string[];
+  fetchedAt: number;
+}
+
+/** One shelf of the manga hub's endless feed. */
+export interface MangaFeedSection {
+  /** Stable slug — safe as a React key and identical across refetches. */
+  id: string;
+  title: string;
+  /** Display subtitle, e.g. "cultivation". */
+  genre: string;
+  /** Layout hint; see `SectionLayout` in useInfiniteMangaSections. */
+  layout: string;
+  /** lucide icon *name* — the client owns the name → component lookup. */
+  icon: string;
+  items: TatakaiMedia[];
+}
+
+/**
+ * One scroll page of the endless feed, from `GET /api/v3/manga/sections?page=N`.
+ * Four shelves per page, assembled upstream in a single AniList request.
+ */
+export interface MangaSectionsPage {
+  page: number;
+  sections: MangaFeedSection[];
+  hasNextPage: boolean;
+  totalPages: number;
+  fetchedAt: number;
+}
 // ─── Adapter functions: TatakaiMedia → existing UI types ─────────────────────
 // These allow pages to use contentGraph without changing any component props.
 
@@ -300,6 +355,8 @@ export function toAnimeCard(m: TatakaiMedia): AnimeCard {
     },
     malId: m.malId,
     anilistId: m.anilistId,
+    isAdult: m.isAdult,
+    year: m.seasonYear ?? m.startDate?.year ?? undefined,
   };
 }
 
@@ -334,6 +391,7 @@ export function toSpotlightAnime(m: TatakaiMedia, rank: number): SpotlightAnime 
       sub: m.episodeSubCount ?? m.episodes ?? 0,
       dub: m.episodeDubCount ?? 0,
     },
+    isAdult: m.isAdult,
   };
 }
 
@@ -355,6 +413,7 @@ export function toTopAnime(m: TatakaiMedia, rank: number): TopAnime {
     },
     malId: m.malId,
     anilistId: m.anilistId,
+    isAdult: m.isAdult,
   };
 }
 
@@ -370,6 +429,7 @@ export function toTrendingAnime(m: TatakaiMedia, rank: number): TrendingAnime {
     name: m.titleEnglish ?? m.titleRomaji,
     poster: m.coverImageLarge ?? m.coverImageMedium ?? '',
     rank,
+    isAdult: m.isAdult,
   };
 }
 

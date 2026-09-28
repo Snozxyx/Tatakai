@@ -1,5 +1,7 @@
 // Auto-moderation utilities for content filtering
 
+import { isUrlAllowed } from '@/lib/urlHost';
+
 export interface ModerationResult {
   isAllowed: boolean;
   violations: ModerationViolation[];
@@ -13,12 +15,20 @@ export interface ModerationViolation {
   position: number;
 }
 
-// Simple pattern matching for moderation
+// Simple pattern matching for moderation.
+//
+// All word-list patterns use \b word boundaries and are matched against the
+// PLAIN-TEXT projection of the content (HTML stripped — see moderateContent),
+// so "hello"⊄"hell", "class"⊄"ass", "method"⊄"meth", and the tiptap-emitted
+// `class="text-primary font-semibold"` on mention/hashtag spans no longer
+// trips the filter. Strong profanity is sanitized (medium) rather than
+// hard-blocked so ordinary posts stop being rejected; only genuinely harmful
+// content (hard drugs, pirate sites) blocks.
 const PATTERNS = {
-  slurs: { pattern: /shit|damn|hell|ass|bitch|asshole|bastard|crap|fuck|motherfuck|piss|dick|cock|pussy|whore|slut/i, severity: 'critical' as const },
-  promotion: { pattern: /buy now|order now|click here|discount code/i, severity: 'medium' as const },
-  piracy: { pattern: /torrent|magnet:|gogoanime|9anime|kissanime|zoro\.to|animekisa/i, severity: 'high' as const },
-  illegal: { pattern: /drugs?|cocaine|heroin|methamphetamine|weed|cannabis|meth/i, severity: 'critical' as const },
+  slurs: { pattern: /\b(?:fuck\w*|motherfuck\w*|bitch|asshole|bastard|cunt|dick|cock|pussy|whore|slut)\b/i, severity: 'medium' as const },
+  promotion: { pattern: /\b(?:buy now|order now|click here|discount code)\b/i, severity: 'medium' as const },
+  piracy: { pattern: /\b(?:gogoanime|9anime|kissanime|animekisa)\b|magnet:\?|zoro\.to/i, severity: 'high' as const },
+  illegal: { pattern: /\b(?:cocaine|heroin|methamphetamine|fentanyl)\b/i, severity: 'critical' as const },
   spam: { pattern: /(.)\1{15,}/, severity: 'low' as const }, // 15+ repeated characters
   links: { pattern: /https?:\/\/[^\s]+/, severity: 'medium' as const }, // ALL links
 };
@@ -52,10 +62,21 @@ export function moderateContent(content: string, userId?: string, source?: strin
   const violations: ModerationViolation[] = [];
   let sanitizedContent = content;
 
+  // Match against the plain-text projection, not the raw HTML — tiptap emits
+  // `class="…"`, `data-*`, and tag names that would otherwise be scanned as
+  // prose (e.g. "class" contains "ass"). Strip tags and decode the few entities
+  // that could reconstitute a flagged word.
+  const scanText = content
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>');
+
   try {
     // Check if any whitelist phrases match
     const hasWhitelist = WHITELIST.some(phrase =>
-      content.toLowerCase().includes(phrase.toLowerCase())
+      scanText.toLowerCase().includes(phrase.toLowerCase())
     );
 
     // Check each pattern
@@ -65,21 +86,21 @@ export function moderateContent(content: string, userId?: string, source?: strin
 
         // Use global search
         const globalRegex = new RegExp(pattern.source, 'g' + (pattern.flags?.includes('i') ? 'i' : ''));
-        while ((match = globalRegex.exec(content)) !== null) {
+        while ((match = globalRegex.exec(scanText)) !== null) {
           const matchText = match[0];
 
-          // Special handling for links - check if domain is whitelisted
+          // Special handling for links — the host must be allowlisted. Compared as a
+          // parsed hostname, not a substring: `matchText.includes(domain)` used to let
+          // https://evil.com/?ref=giphy.com through. See `@/lib/urlHost`.
           if (type === 'links') {
-            const isWhitelistedDomain = WHITELIST_DOMAINS.some(domain =>
-              matchText.toLowerCase().includes(domain.toLowerCase())
-            );
-            if (isWhitelistedDomain) {
+            if (isUrlAllowed(matchText, WHITELIST_DOMAINS)) {
               continue; // Skip this link, it's allowed
             }
           }
 
-          // Skip if whitelisted phrase
-          if (hasWhitelist && WHITELIST.some(p => matchText.toLowerCase().includes(p.toLowerCase()))) {
+          // Skip if whitelisted phrase. Not applied to links: a URL can embed any
+          // phrase, so "https://evil.com/recommend" would otherwise pass.
+          if (type !== 'links' && hasWhitelist && WHITELIST.some(p => matchText.toLowerCase().includes(p.toLowerCase()))) {
             continue;
           }
 

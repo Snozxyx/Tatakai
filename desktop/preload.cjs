@@ -1,12 +1,15 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electron', {
+    // Synchronous platform flag (available in sandboxed preload) so the renderer
+    // can branch on macOS at first paint without awaiting an IPC round-trip —
+    // used by the title bar to yield to native traffic lights.
+    platform: process.platform,
     getPlatform: () => ipcRenderer.invoke('get-platform'),
     persistTheme: (payload) => ipcRenderer.invoke('theme:persist', payload),
     getSplashTheme: () => ipcRenderer.invoke('theme:get-splash'),
     updateRPC: (data) => ipcRenderer.send('update-rpc', data),
     clearRPC: () => ipcRenderer.send('clear-rpc'),
-    notify: (data) => ipcRenderer.send('notify', data),
     onNavigate: (callback) => {
         const handler = (_event, path) => callback(path);
         ipcRenderer.on('navigate', handler);
@@ -65,9 +68,47 @@ contextBridge.exposeInMainWorld('electron', {
         ipcRenderer.removeAllListeners('download-error');
     },
     onToggleLogViewer: (callback) => ipcRenderer.on('toggle-log-viewer', () => callback()),
+
+    // ── Manga chapter downloads + offline library ─────────────────────────────
+    // Dedicated event channels (manga-download-*) with PER-CHANNEL listener
+    // removal — never `removeAllListeners`, so the singleton monitor and any
+    // component listeners don't tear each other down.
+    manga: {
+        enqueueAll: (payload) => ipcRenderer.invoke('manga-download:enqueue-all', payload),
+        enqueueChapter: (payload) => ipcRenderer.invoke('manga-download:enqueue-chapter', payload),
+        cancel: (params) => ipcRenderer.invoke('manga-download:cancel', params),
+        list: () => ipcRenderer.invoke('manga-download:list'),
+        getOfflineLibrary: (customRoot) => ipcRenderer.invoke('manga:get-offline-library', customRoot),
+        getOfflinePages: (params) => ipcRenderer.invoke('manga:get-offline-pages', params),
+        deleteChapter: (params) => ipcRenderer.invoke('manga:delete-chapter', params),
+        deleteSeries: (params) => ipcRenderer.invoke('manga:delete-series', params),
+        openFolder: (params) => ipcRenderer.invoke('manga:open-folder', params),
+        onProgress: (callback) => {
+            const h = (_event, data) => callback(data);
+            ipcRenderer.on('manga-download-progress', h);
+            return () => ipcRenderer.removeListener('manga-download-progress', h);
+        },
+        onCompleted: (callback) => {
+            const h = (_event, data) => callback(data);
+            ipcRenderer.on('manga-download-completed', h);
+            return () => ipcRenderer.removeListener('manga-download-completed', h);
+        },
+        onError: (callback) => {
+            const h = (_event, data) => callback(data);
+            ipcRenderer.on('manga-download-error', h);
+            return () => ipcRenderer.removeListener('manga-download-error', h);
+        },
+    },
+
     minimize: () => ipcRenderer.send('window-minimize'),
     maximize: () => ipcRenderer.send('window-maximize'),
     close: () => ipcRenderer.send('window-close'),
+    isMaximized: () => ipcRenderer.invoke('window:is-maximized'),
+    onMaximizeChanged: (callback) => {
+        const handler = (_event, isMaximized) => callback(isMaximized);
+        ipcRenderer.on('window:maximize-changed', handler);
+        return () => ipcRenderer.removeListener('window:maximize-changed', handler);
+    },
     setFullscreen: (enabled) => ipcRenderer.invoke('window:set-fullscreen', enabled),
     isFullscreen: () => ipcRenderer.invoke('window:is-fullscreen'),
     onFullscreenChanged: (callback) => {
@@ -77,9 +118,9 @@ contextBridge.exposeInMainWorld('electron', {
     },
     log: (level, message, data) => ipcRenderer.send('log', { level, message, data }),
     exportLogs: () => ipcRenderer.invoke('export-logs'),
-    checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
-    downloadUpdate: () => ipcRenderer.invoke('download-update'),
-    quitAndInstall: () => ipcRenderer.invoke('quit-and-install'),
+    // Update actions live on the modern update:* channels below
+    // (updateCheck / updateDownload / updateInstall). `onUpdaterEvent` is the
+    // shared broadcast channel, owned by update-manager.cjs.
     onUpdaterEvent: (callback) => {
         const handler = (_event, data) => callback(data);
         ipcRenderer.on('updater-event', handler);
@@ -90,7 +131,12 @@ contextBridge.exposeInMainWorld('electron', {
     setAutoLaunch: (enabled) => ipcRenderer.invoke('set-auto-launch', enabled),
     getAutoLaunch: () => ipcRenderer.invoke('get-auto-launch'),
     getSystemInfo: () => ipcRenderer.invoke('get-system-info'),
-    getClientId: () => ipcRenderer.invoke('get-client-id'),
+    getStorageInfo: (downloadsPath, torrentCachePath) => ipcRenderer.invoke('system:get-storage-info', downloadsPath, torrentCachePath),
+    clearStorageCategory: (category, customPath) => ipcRenderer.invoke('system:clear-storage-category', category, customPath),
+    setMemoryProfile: (profile) => ipcRenderer.invoke('system:set-memory-profile', profile),
+    reclaimMemory: () => ipcRenderer.invoke('system:reclaim-memory'),
+    getExtensionApiPort: () => ipcRenderer.invoke('runtime:get-extension-api-port'),
+    setExtensionApiPort: (port) => ipcRenderer.invoke('runtime:set-extension-api-port', port),
     openDevTools: () => ipcRenderer.send('open-devtools'),
 
     // ── Production-readiness IPC bridge (Req 8.1, 8.2, 8.3, 8.4, 8.5) ─────────
@@ -170,6 +216,19 @@ contextBridge.exposeInMainWorld('tatakaiRuntime', {
     // Extension-API host base URL + mounted namespaces (generic SSE consumer).
     // Renderer resolves this once and builds `${baseUrl}/api/v3/<namespace>/...`.
     getExtensionApiBase: () => ipcRenderer.invoke('runtime:get-api-base'),
+    getExtensionApiPort: () => ipcRenderer.invoke('runtime:get-extension-api-port'),
+    setExtensionApiPort: (port) => ipcRenderer.invoke('runtime:set-extension-api-port', port),
+
+    // Watch-party host tunnel (host-hosted streaming over a Cloudflare quick
+    // tunnel). Desktop-host only; publishShareSource returns the public share
+    // URLs the renderer writes to the room row.
+    startShareTunnel: () => ipcRenderer.invoke('share:start-tunnel'),
+    stopShareTunnel: () => ipcRenderer.invoke('share:stop-tunnel'),
+    getShareStatus: () => ipcRenderer.invoke('share:get-status'),
+    publishShareSource: (options) => ipcRenderer.invoke('share:publish-source', options),
+    // Publish a local video file (device pick or offline-library episode) to the
+    // party — serves it off disk over the same tunnel and returns the public URL.
+    publishLocalFile: (options) => ipcRenderer.invoke('share:publish-local-file', options),
 
     // Source resolution (Phase 4 — local extension scraping)
     resolveEpisodeSources: (options) =>
@@ -207,6 +266,9 @@ contextBridge.exposeInMainWorld('tatakaiRuntime', {
         ipcRenderer.invoke('extension:review-status', { submissionId }),
     getExtensionSourceCode: (extensionId) =>
         ipcRenderer.invoke('extension:get-source-code', extensionId),
+    // Renderer contribution bundle (trust-gated in main; renderer loader imports it).
+    getRendererBundle: (extensionId) =>
+        ipcRenderer.invoke('runtime:get-renderer-bundle', extensionId),
 
     // Local cache (Phase 4)
     readLocalCache: (key) => ipcRenderer.invoke('cache:read', key),
@@ -216,10 +278,10 @@ contextBridge.exposeInMainWorld('tatakaiRuntime', {
     getWarpStatus: () => ipcRenderer.invoke('network:get-warp-status'),
     toggleWarp: (enabled) => ipcRenderer.invoke('network:toggle-warp', enabled),
     setWarpMode: (mode) => ipcRenderer.invoke('network:set-warp-mode', mode),
+    setWarpRouting: (flags) => ipcRenderer.invoke('network:set-warp-routing', flags),
     getWarpRoutingLog: () => ipcRenderer.invoke('network:get-warp-routing-log'),
 
     // Torrent (Phase 5 — desktop only)
-    searchTorrentCandidates: (options) => ipcRenderer.invoke('torrent:search', options),
     startTorrentSession: (infoHash, options) => ipcRenderer.invoke('torrent:start', infoHash, options),
     restoreTorrentSession: (snapshot) => ipcRenderer.invoke('torrent:restore-session', snapshot),
     stopTorrentSession: (sessionId, options) => ipcRenderer.invoke('torrent:stop', sessionId, options),

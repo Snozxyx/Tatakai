@@ -7,8 +7,8 @@ import { useIsMobile } from '@/hooks/ui/use-mobile';
 const PROMPT_KEY = 'tatakai_reduce_motion_prompt_seen';
 const REDUCE_MOTION_KEY = 'tatakai_reduce_motion';
 const REDUCE_MOTION_DELAY_UNTIL_KEY = 'tatakai_reduce_motion_prompt_delay_until';
-const V5_ANNOUNCEMENT_SEEN_KEY = 'tatakai_v5_announced';
-const V5_ANNOUNCEMENT_DELAY_MS = 60 * 1000;
+const ANNOUNCEMENT_SEEN_KEY = 'tatakai_v6_announced';
+const ANNOUNCEMENT_DELAY_MS = 60 * 1000;
 
 export function ReduceMotionPrompt() {
   const isMobile = useIsMobile();
@@ -20,10 +20,10 @@ export function ReduceMotionPrompt() {
     const hasSeen = localStorage.getItem(PROMPT_KEY);
     if (hasPreference !== null || hasSeen === 'true') return;
 
-    const hasSeenV5Announcement = localStorage.getItem(V5_ANNOUNCEMENT_SEEN_KEY) === 'true';
-    if (!hasSeenV5Announcement) {
+    const hasSeenAnnouncement = localStorage.getItem(ANNOUNCEMENT_SEEN_KEY) === 'true';
+    if (!hasSeenAnnouncement) {
       const currentDelayUntil = Number(localStorage.getItem(REDUCE_MOTION_DELAY_UNTIL_KEY) || '0');
-      const enforcedDelayUntil = Math.max(currentDelayUntil, Date.now() + V5_ANNOUNCEMENT_DELAY_MS);
+      const enforcedDelayUntil = Math.max(currentDelayUntil, Date.now() + ANNOUNCEMENT_DELAY_MS);
       localStorage.setItem(REDUCE_MOTION_DELAY_UNTIL_KEY, String(enforcedDelayUntil));
     }
 

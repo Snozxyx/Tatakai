@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { Sparkles, Loader2, Compass } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { useInfiniteHomeSections } from '@/hooks/api/useInfiniteHomeSections';
 import { useHomeData } from '@/hooks/api/useAnimeData';
 import { getHighQualityPoster } from '@/lib/api';
 import { buildPreferredAnimeRouteId } from '@/lib/animeIdMapping';
+import { HomeSectionHeading } from '@/components/home/HomeSectionHeading';
 
 function MobileCard({ anime }: { anime: any }) {
   const navigate = useNavigate();
@@ -35,7 +36,7 @@ function MobileCard({ anime }: { anime: any }) {
       className="w-full text-left"
     >
       <GlassPanel className="overflow-hidden border-white/10 bg-white/5">
-        <div className="relative aspect-[3/4]">
+        <div className="relative aspect-[2/3]">
           <img
             src={getHighQualityPoster(anime.poster || '', anime.anilistId)}
             alt={anime.name || 'Anime'}
@@ -132,7 +133,7 @@ export function MobileInfiniteHomeSections() {
       {isLoading && (
         <div className="grid grid-cols-2 gap-3 px-2">
           {Array.from({ length: 6 }).map((_, index) => (
-            <div key={index} className="aspect-[3/4] animate-pulse rounded-2xl border border-white/10 bg-white/5" />
+            <div key={index} className="aspect-[2/3] animate-pulse rounded-2xl border border-white/10 bg-white/5" />
           ))}
         </div>
       )}
@@ -157,9 +158,10 @@ export function MobileInfiniteHomeSections() {
 
       {visibleSections.map((section: any) => (
         <div key={section.id} className="mb-10">
-          <div className="mb-4 flex items-center justify-between px-2">
-            <h3 className="line-clamp-1 pr-2 text-xl font-black tracking-tight text-white">{section.title}</h3>
-          </div>
+          <HomeSectionHeading
+            icon={<Compass className="w-5 h-5 text-primary" />}
+            title={<span className="line-clamp-1 pr-2">{section.title}</span>}
+          />
           <div className="grid grid-cols-2 gap-3 px-2">
             {(section.animes || []).slice(0, 12).map((anime: any) => (
               <MobileCard key={anime.id || anime.name} anime={anime} />

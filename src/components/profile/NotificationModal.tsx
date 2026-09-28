@@ -7,6 +7,7 @@ import {
 import { useNotifications } from "@/hooks/community/useNotifications";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Bell, Check, Trash2, Loader2, CheckCircle2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,7 @@ interface NotificationModalProps {
 
 export function NotificationModal({ open, onOpenChange }: NotificationModalProps) {
     const { data: notifications = [], isLoading, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
+    const confirm = useConfirm();
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -114,8 +116,8 @@ export function NotificationModal({ open, onOpenChange }: NotificationModalProps
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            onClick={() => {
-                                                if (confirm('Delete notification?')) deleteNotification.mutate(notification.id);
+                                            onClick={async () => {
+                                                if (await confirm({ title: 'Delete notification?', destructive: true })) deleteNotification.mutate(notification.id);
                                             }}
                                             className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/20 bg-destructive/5 rounded-lg"
                                         >

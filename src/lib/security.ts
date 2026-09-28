@@ -26,6 +26,64 @@ export function sanitizeHTML(dirty: string): string {
 }
 
 /**
+ * Sanitize stored HTML at render time.
+ *
+ * Write-time sanitization only proves what *that* build's DOMPurify config allowed. Rows
+ * already in the database were sanitized by whatever config was in force when they were
+ * written, so anything rendered through `dangerouslySetInnerHTML` must be re-sanitized
+ * here, at display time, with the config that is current.
+ *
+ * Same tag allowlist as `sanitizeHTML`, plus anchor hardening: every link is forced to
+ * `target="_blank" rel="noopener noreferrer nofollow ugc"` so user content cannot reach
+ * the opening window or lend it ranking weight.
+ */
+export function sanitizeRichTextHTML(dirty: string): string {
+  if (!dirty) return '';
+
+  if (typeof window === 'undefined') {
+    // No DOM to purify against; fall back to escaping so nothing renders as markup.
+    return escapeHTML(dirty);
+  }
+
+  return DOMPurify.sanitize(dirty, {
+    ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p', 'br', 'ul', 'ol', 'li', 'code', 'pre', 'blockquote', 's', 'u'],
+    ALLOWED_ATTR: ['href', 'title', 'target', 'rel'],
+    ALLOWED_URI_REGEXP: /^(?:https?:|mailto:)/i,
+    ALLOW_DATA_ATTR: false,
+    ALLOW_ARIA_ATTR: false,
+    FORBID_TAGS: ['style', 'script', 'iframe', 'form', 'input', 'object', 'embed'],
+    FORBID_ATTR: ['style', 'srcset', 'formaction'],
+    RETURN_TRUSTED_TYPE: false,
+  });
+}
+
+/**
+ * Register the anchor-hardening hook once, on first use in a browser context.
+ *
+ * DOMPurify hooks are global to the instance, so this also hardens anchors produced by
+ * `sanitizeHTML` at write time. That is the intended direction — a stored link picking up
+ * `rel="noopener"` costs nothing — but it does mean output shape depends on whether this
+ * has run, so it is called at module scope by the render component rather than lazily.
+ */
+let anchorHookInstalled = false;
+export function installRichTextSanitizerHooks(): void {
+  if (anchorHookInstalled || typeof window === 'undefined') return;
+  anchorHookInstalled = true;
+
+  DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+    if (node.nodeName !== 'A') return;
+    const el = node as unknown as HTMLAnchorElement;
+    if (!el.getAttribute('href')) {
+      el.removeAttribute('target');
+      el.removeAttribute('rel');
+      return;
+    }
+    el.setAttribute('target', '_blank');
+    el.setAttribute('rel', 'noopener noreferrer nofollow ugc');
+  });
+}
+
+/**
  * Escape HTML entities
  */
 export function escapeHTML(text: string): string {

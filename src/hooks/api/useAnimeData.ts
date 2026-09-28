@@ -1,13 +1,17 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { contentGraph, toAnimeCard, toHomeData } from "@/core";
 import { trackEvent } from "@/core/analytics/AnalyticsService";
-import type { MediaFormat, MediaStatus, SearchFilters, TatakaiMedia } from "@/core";
+import type { MediaFormat, MediaSeason, MediaStatus, SearchFilters, TatakaiMedia } from "@/core";
 import { fetchEpisodeServers } from "@/lib/api";
 import { fetchAniZipMapping, type AniZipEpisode, type AniZipMapping } from "@/lib/mapping/anizip";
+import { resolveApiV3Base } from "@/lib/api/backendOrigin";
+import { useContentSafetySettings } from "@/hooks/user/useContentSafetySettings";
+import { filterAdultAnime } from "@/lib/contentSafety";
 import type {
   AnimeInfo,
   EpisodeData,
   EpisodeServer,
+  HomeData,
   NextEpisodeSchedule,
   SearchResult,
   StreamingData,
@@ -22,10 +26,15 @@ export type AnimeSearchFilters = {
   language?: string;
   sort?: string;
   genres?: string[];
+  tags?: string[];
   startDate?: string;
   endDate?: string;
   minRating?: number;
+  maxRating?: number;
   minReleaseYear?: number;
+  maxReleaseYear?: number;
+  minEpisodes?: number;
+  maxEpisodes?: number;
   isAdult?: boolean;
 };
 
@@ -71,8 +80,34 @@ function buildSearchFilters(query: string, page: number, filters: AnimeSearchFil
   const minRating = typeof filters.minRating === 'number' && filters.minRating > 0
     ? Math.round(filters.minRating * 10)
     : undefined;
+  const maxRating = typeof filters.maxRating === 'number' && filters.maxRating > 0
+    ? Math.round(filters.maxRating * 10)
+    : undefined;
   const minYear = typeof filters.minReleaseYear === 'number' && filters.minReleaseYear > 0
     ? Math.round(filters.minReleaseYear)
+    : undefined;
+  const maxYear = typeof filters.maxReleaseYear === 'number' && filters.maxReleaseYear > 0
+    ? Math.round(filters.maxReleaseYear)
+    : undefined;
+  const minEpisodes = typeof filters.minEpisodes === 'number' && filters.minEpisodes > 0
+    ? Math.round(filters.minEpisodes)
+    : undefined;
+  const maxEpisodes = typeof filters.maxEpisodes === 'number' && filters.maxEpisodes > 0
+    ? Math.round(filters.maxEpisodes)
+    : undefined;
+  const seasonKey = String(filters.season || '').trim().toUpperCase();
+  const season = (['WINTER', 'SPRING', 'SUMMER', 'FALL'] as const).includes(seasonKey as never)
+    ? (seasonKey as MediaSeason)
+    : undefined;
+
+  const rating = minRating != null || maxRating != null
+    ? { min: minRating, max: maxRating }
+    : undefined;
+  const year = minYear != null || maxYear != null
+    ? { min: minYear, max: maxYear }
+    : undefined;
+  const episodes = minEpisodes != null || maxEpisodes != null
+    ? { min: minEpisodes, max: maxEpisodes }
     : undefined;
 
   return {
@@ -80,12 +115,15 @@ function buildSearchFilters(query: string, page: number, filters: AnimeSearchFil
     page,
     perPage: 24,
     genres: normalizeGenres(filters.genres),
+    tags: normalizeGenres(filters.tags),
     format: format ? [format] : undefined,
     status: status ? [status] : undefined,
+    season: season ? [season] : undefined,
     sortBy,
     isAdult: filters.isAdult,
-    rating: minRating != null ? { min: minRating } : undefined,
-    year: minYear != null ? { min: minYear } : undefined,
+    rating,
+    year,
+    episodes,
   };
 }
 
@@ -216,6 +254,7 @@ function mediaToAnimeInfo(m: TatakaiMedia, mapping: AniZipMapping | null = null)
   ]);
 
   return {
+    isAdult: m.isAdult,
     info: {
       id: m.anilistId && m.anilistId > 0
         ? String(m.anilistId)
@@ -253,16 +292,54 @@ function mediaToAnimeInfo(m: TatakaiMedia, mapping: AniZipMapping | null = null)
     },
     moreInfo: {
       aired: m.startDate ? `${m.startDate.year}-${m.startDate.month}-${m.startDate.day}` : "Unknown",
-      genres: m.genres,
+      endDate: m.endDate?.year ? `${m.endDate.year}-${m.endDate.month ?? 1}-${m.endDate.day ?? 1}` : null,
+      genres: m.genres ?? [],
+      tags: m.tags ?? [],
       status: statusLabel,
-      studios: m.studios.map(s => s.name).join(", "),
+      studios: (m.studios ?? []).map(s => s.name).join(", "),
+      // Structured studios keep isMain/siteUrl so the page can badge the main
+      // studio and link out; the flat `studios` string above stays for callers
+      // that only render a label.
+      studioList: m.studios ?? [],
       duration: m.duration ? `${m.duration}m` : "Unknown",
       malId: m.malId || null,
       anilistId: m.anilistId,
+      // Previously-unsurfaced catalog fields (ask: light up the info page).
+      season: m.season ?? null,
+      seasonYear: m.seasonYear ?? null,
+      year: m.seasonYear ?? m.startDate?.year ?? null,
+      source: m.source ?? null,
+      countryOfOrigin: m.countryOfOrigin ?? null,
+      averageScore: m.averageScore ?? null,
+      meanScore: m.meanScore ?? null,
+      popularity: m.popularity ?? null,
+      favourites: m.favourites ?? null,
+      episodesTotal: m.episodes ?? null,
+      rankings: m.rankings ?? [],
+      streamingEpisodes: m.streamingEpisodes ?? [],
       relations: m.relations ?? [],
       staff: m.staff ?? [],
       externalLinks: m.externalLinks ?? [],
       nextAiringEpisode: m.nextAiringEpisode ?? null,
+      // Provenance: `tatakai` means this record is served from our own DB.
+      sourceApi: m.source_api ?? null,
+      inDb: m.source_api === "tatakai" || Boolean(m.tatakaiId),
+      tatakaiId: m.tatakaiId ?? null,
+      // Raw column values (unmapped) so the admin content editor can prefill the
+      // exact stored fields rather than display-formatted derivatives.
+      titleRomaji: m.titleRomaji ?? null,
+      titleEnglish: m.titleEnglish ?? null,
+      titleNative: m.titleNative ?? null,
+      coverImageLarge: m.coverImageLarge ?? null,
+      coverImageMedium: m.coverImageMedium ?? null,
+      bannerImage: m.bannerImage ?? null,
+      trailerUrl: m.trailerUrl ?? null,
+      formatRaw: m.format ?? null,
+      statusRaw: m.status ?? null,
+      rating: m.rating ?? null,
+      durationMin: m.duration ?? null,
+      episodeSubCount: m.episodeSubCount ?? null,
+      episodeDubCount: m.episodeDubCount ?? null,
       mapping: (m as { mapping?: unknown }).mapping ?? null,
       titleAliases,
       localizedTitles: mapping?.titles ?? {},
@@ -285,125 +362,6 @@ function dedupeStrings(values: Array<string | null | undefined>): string[] {
     out.push(text);
   }
   return out;
-}
-
-// ── AniList `streamingEpisodes` ───────────────────────────────────────────────
-//
-// This is the least trustworthy episode source in the stack and the reason
-// episode identity moved to ani.zip. Two independent problems, both visible on
-// AniList 151807 (Solo Leveling season 1, 12 episodes):
-//
-//   * the 13 rows it carries are season *two*'s Crunchyroll episodes, labelled
-//     with absolute numbers — "Episode 25 - On to the Next Target" … "Episode 13
-//     - You Aren't E-Rank, Are You?";
-//   * they are stored newest-first, so row 0 is episode 25.
-//
-// Reading `idx + 1` off that array gave episode 1 the title "Episode 25 - On to
-// the Next Target" and a 13-entry list for a 12-episode season. Neither the array
-// order nor the embedded number can be trusted, so these rows are now only ever
-// used to *attach a link* to an episode ani.zip already established, and as a
-// last-resort list when nothing else answered.
-
-/**
- * `"Episode 25 - On to the Next Target"` → `{ number: 25, title: "On to the Next Target" }`.
- *
- * The `Episode N` prefix is Crunchyroll boilerplate rather than part of the title,
- * so it is stripped either way. `number` is `null` when no label is present.
- */
-function parseStreamingEpisodeLabel(raw?: string | null): { number: number | null; title: string | null } {
-  const text = String(raw || '').trim();
-  if (!text) return { number: null, title: null };
-
-  const match = /^(?:episode|ep\.?|e)\s*(\d{1,4})\s*(?:[-–—:.]\s*(.*))?$/i.exec(text);
-  if (!match) return { number: null, title: text };
-
-  const number = Number(match[1]);
-  const title = String(match[2] ?? '').trim();
-  return {
-    number: Number.isFinite(number) && number > 0 ? number : null,
-    title: title || null,
-  };
-}
-
-/**
- * Fallback episode list built from `streamingEpisodes`, used only when ani.zip,
- * the DB and Jikan all came up empty.
- *
- * Rows are ordered by their own label rather than by array position, and a
- * contiguous run of absolute numbers (13–25) is rebased onto 1–13 so the internal
- * `?ep=<n>` ids stay season-relative. Unlabelled rows fall back to array order,
- * which is all there is to go on.
- */
-async function buildEpisodeList(media: TatakaiMedia, baseId: string): Promise<EpisodeData[]> {
-  const rows = media.streamingEpisodes ?? [];
-  if (rows.length === 0) return [];
-
-  const parsed = rows.map((ep) => ({ row: ep, ...parseStreamingEpisodeLabel(ep.title) }));
-  const labels = parsed.map((entry) => entry.number).filter((n): n is number => n != null);
-  const allLabelled = labels.length === parsed.length && new Set(labels).size === labels.length;
-
-  if (allLabelled) {
-    parsed.sort((a, b) => (a.number ?? 0) - (b.number ?? 0));
-  }
-
-  // Rebase only a contiguous run — a gappy set means the labels describe something
-  // other than this season and renumbering them would be a guess.
-  const min = labels.length > 0 ? Math.min(...labels) : 1;
-  const max = labels.length > 0 ? Math.max(...labels) : 1;
-  const contiguous = allLabelled && max - min + 1 === labels.length;
-  const offset = contiguous ? min - 1 : 0;
-
-  return parsed.map((entry, idx) => {
-    const number = allLabelled && entry.number != null ? entry.number - offset : idx + 1;
-    return {
-      // Always the internal `<baseId>?ep=<n>` form. `row.url` is an off-site
-      // Crunchyroll/Netflix watch page — using it as the episodeId poisoned every
-      // downstream parser (dispatch 400, "Episode ?", the Supabase 406). It is
-      // kept as `externalUrl` instead.
-      episodeId: buildEpisodeId(baseId, number),
-      number,
-      title: normalizeEpisodeTitle(entry.title, number),
-      isFiller: false,
-      externalUrl: entry.row.url || undefined,
-    };
-  });
-}
-
-/**
- * Attach `streamingEpisodes` watch links to a list that already has its identity.
- *
- * A row is only accepted when its label lines up with an episode we already hold —
- * by season number first, then by ani.zip's absolute number, which is what catches
- * a season-two row labelled "Episode 25". Rows that match neither (season one's
- * entry carrying season two's links) are dropped rather than forced into a slot.
- */
-function mergeStreamingLinks(episodes: EpisodeData[], media: TatakaiMedia): EpisodeData[] {
-  const rows = media.streamingEpisodes ?? [];
-  if (rows.length === 0 || episodes.length === 0) return episodes;
-
-  const byNumber = new Map<number, EpisodeData>();
-  const byAbsolute = new Map<number, EpisodeData>();
-  for (const episode of episodes) {
-    byNumber.set(episode.number, episode);
-    if (episode.absoluteNumber != null) byAbsolute.set(episode.absoluteNumber, episode);
-  }
-
-  const urlByEpisodeId = new Map<string, string>();
-  for (const row of rows) {
-    if (!row?.url) continue;
-    const { number } = parseStreamingEpisodeLabel(row.title);
-    if (number == null) continue;
-    const target = byNumber.get(number) ?? byAbsolute.get(number);
-    if (!target || urlByEpisodeId.has(target.episodeId)) continue;
-    urlByEpisodeId.set(target.episodeId, row.url);
-  }
-
-  if (urlByEpisodeId.size === 0) return episodes;
-
-  return episodes.map((episode) => {
-    const url = urlByEpisodeId.get(episode.episodeId);
-    return url && !episode.externalUrl ? { ...episode, externalUrl: url } : episode;
-  });
 }
 
 async function fetchDbEpisodes(media: TatakaiMedia, baseId: string): Promise<EpisodeData[]> {
@@ -560,6 +518,8 @@ function computeNextAiringFromBroadcast(broadcast?: {
 }
 
 export function useHomeData() {
+  const { settings } = useContentSafetySettings();
+  const showAdult = settings.showAdultEverywhere;
   return useQuery({
     queryKey: ["home"],
     queryFn: async () => {
@@ -569,7 +529,31 @@ export function useHomeData() {
     retry: false,
     staleTime: STALE_TIME.home,
     gcTime: isMobileNative ? 60 * 60 * 1000 : 30 * 60 * 1000, // 1 hour cache on mobile
+    // `getHomePage` bundles every rail and can't filter server-side, so hide
+    // mature titles on read. Reactive to the toggle without refetching.
+    select: (home: HomeData) => filterHomeDataAdult(home, showAdult),
   });
+}
+
+/** Drop mature titles from every home rail unless the user opted to see them. */
+function filterHomeDataAdult(home: HomeData, showAdult: boolean): HomeData {
+  if (showAdult) return home;
+  return {
+    ...home,
+    latestEpisodeAnimes: filterAdultAnime(home.latestEpisodeAnimes, showAdult),
+    spotlightAnimes: filterAdultAnime(home.spotlightAnimes, showAdult),
+    topAiringAnimes: filterAdultAnime(home.topAiringAnimes, showAdult),
+    topUpcomingAnimes: filterAdultAnime(home.topUpcomingAnimes, showAdult),
+    trendingAnimes: filterAdultAnime(home.trendingAnimes, showAdult),
+    mostPopularAnimes: filterAdultAnime(home.mostPopularAnimes, showAdult),
+    mostFavoriteAnimes: filterAdultAnime(home.mostFavoriteAnimes, showAdult),
+    latestCompletedAnimes: filterAdultAnime(home.latestCompletedAnimes, showAdult),
+    top10Animes: {
+      today: filterAdultAnime(home.top10Animes.today, showAdult),
+      week: filterAdultAnime(home.top10Animes.week, showAdult),
+      month: filterAdultAnime(home.top10Animes.month, showAdult),
+    },
+  };
 }
 
 export function useAnimeInfo(animeId: string | undefined) {
@@ -612,11 +596,11 @@ export function useEpisodes(animeId: string | undefined) {
       let episodes: EpisodeData[] = [];
 
       // ani.zip decides episode identity, so it is awaited before the fallback
-      // chain rather than alongside it. It is the only source here that is keyed
-      // by *this* AniList entry's episode numbers — AniList's own
-      // `streamingEpisodes` regularly carries a neighbouring season's rows (see
-      // `buildEpisodeList`), and Jikan is keyed by MAL, which splits seasons
-      // differently again.
+      // chain rather than alongside it. It is the only source here keyed by *this*
+      // AniList entry's episode numbers. AniList's own `streamingEpisodes` is NOT
+      // used for episodes at all — it regularly carries a neighbouring season's
+      // Crunchyroll rows (wrong numbers, wrong order), so it was removed as a
+      // source entirely. DB and Jikan remain only as non-ani.zip safety fallbacks.
       const mapping = await fetchAniZipMapping(media.anilistId);
 
       // 1. ani.zip — numbers, titles, air dates, synopses and screencaps.
@@ -638,12 +622,7 @@ export function useEpisodes(animeId: string | undefined) {
         }
       }
 
-      // 4. AniList `streamingEpisodes`, re-derived from their own labels.
-      if (episodes.length === 0) {
-        episodes = await buildEpisodeList(media, baseId);
-      }
-
-      // 5. Count-based placeholders from AniList episode total
+      // 4. Count-based placeholders from AniList episode total
       if (episodes.length === 0) {
         const count = Math.min(media.episodes ?? 0, 2000);
         episodes = Array.from({ length: count }, (_, i) => ({
@@ -654,10 +633,8 @@ export function useEpisodes(animeId: string | undefined) {
         }));
       }
 
-      // Whichever tier produced the list, ani.zip fills in what it lacks, and
-      // AniList contributes only off-site watch links — never numbers or order.
+      // Whichever tier produced the list, ani.zip fills in what it lacks.
       episodes = mergeAniZipEpisodes(episodes, mapping);
-      episodes = mergeStreamingLinks(episodes, media);
 
       if (import.meta.env.DEV) {
         console.debug("[useEpisodes] Episodes loaded", {
@@ -765,13 +742,16 @@ export function useInfiniteSearch(
 }
 
 export function useGenreAnimes(genre: string | undefined, page: number = 1) {
+  const { settings } = useContentSafetySettings();
+  const showAdult = settings.showAdultEverywhere;
   return useQuery({
-    queryKey: ["genre", genre, page],
+    queryKey: ["genre", genre, page, showAdult],
     queryFn: async (): Promise<SearchResult> => {
       const result = await contentGraph.search({
         page,
         perPage: 24,
         genres: genre ? [genre.replace(/-/g, " ")] : undefined,
+        isAdult: showAdult ? undefined : false,
       });
       return {
         animes: result.media.map(toAnimeCard),
@@ -788,13 +768,16 @@ export function useGenreAnimes(genre: string | undefined, page: number = 1) {
 }
 
 export function useInfiniteGenreAnimes(genre: string | undefined) {
+  const { settings } = useContentSafetySettings();
+  const showAdult = settings.showAdultEverywhere;
   return useInfiniteQuery({
-    queryKey: ["genre-infinite", genre],
+    queryKey: ["genre-infinite", genre, showAdult],
     queryFn: ({ pageParam = 1 }) =>
       contentGraph.search({
         page: Number(pageParam),
         perPage: 24,
         genres: genre ? [genre.replace(/-/g, " ")] : undefined,
+        isAdult: showAdult ? undefined : false,
       }).then((result): SearchResult => ({
         animes: result.media.map(toAnimeCard),
         mostPopularAnimes: result.media.map(toAnimeCard),
@@ -820,17 +803,25 @@ export function useNextEpisodeSchedule(animeId: string | undefined) {
       if (!animeId) return null;
       const media = await contentGraph.getMedia(animeId);
 
-      // Only show next episode schedule for currently airing anime
-      if (media.status !== 'RELEASING') {
+      // Next-episode data is fetched LIVE from real AniList (never our
+      // mirror/DB) — the airing schedule drifts (delays, breaks, late slots)
+      // faster than the mirror is refreshed. `getMedia` above is used only to
+      // resolve identity (anilistId/malId) and for the ani.zip/Jikan fallbacks.
+      const live = media.anilistId ? await contentGraph.getNextAiring(media.anilistId) : null;
+
+      // Gate on the live status when we have it, else the stored one.
+      const status = live?.status ?? media.status;
+      if (status !== 'RELEASING') {
         return null;
       }
 
-      if (media.nextAiringEpisode?.airingAt && media.nextAiringEpisode?.episode) {
+      const liveNext = live?.nextAiringEpisode;
+      if (liveNext?.airingAt && liveNext?.episode) {
         return {
-          airingAt: media.nextAiringEpisode.airingAt,
-          timeUntilAiring: media.nextAiringEpisode.timeUntilAiring ?? 0,
-          episode: media.nextAiringEpisode.episode,
-          airingISOTimestamp: new Date(media.nextAiringEpisode.airingAt * 1000).toISOString(),
+          airingAt: liveNext.airingAt,
+          timeUntilAiring: liveNext.timeUntilAiring ?? 0,
+          episode: liveNext.episode,
+          airingISOTimestamp: new Date(liveNext.airingAt * 1000).toISOString(),
         };
       }
 
@@ -920,7 +911,7 @@ export function useEpisodeTitleSearch(query: string, enabled = true) {
     queryFn: async (): Promise<EpisodeSearchHit[]> => {
       if (!query || query.trim().length < 3) return [];
       const params = new URLSearchParams({ q: query.trim(), perPage: '10' });
-      const res = await fetch(`/api/v3/content/search/episodes?${params}`);
+      const res = await fetch(`${resolveApiV3Base()}/content/search/episodes?${params}`);
       if (!res.ok) return [];
       const json = await res.json();
       return Array.isArray(json?.data) ? json.data : [];

@@ -7,9 +7,9 @@ import { Link } from "react-router-dom";
 const footerLinks = {
   Browse: [
     { name: "Browse Catalog", href: "/browse" },
-    { name: "Collections", href: "/collections" },
+    { name: "Community", href: "/community" },
     { name: "Trending", href: "/trending" },
-    { name: "Suggestions", href: "/suggestions" },
+    { name: "Favorites", href: "/favorites" },
   ],
   Support: [
     { name: "Community", href: "/community" },
@@ -117,11 +117,11 @@ export function FooterSection() {
             <div className="col-span-2">
               <Link to="/" className="inline-flex items-center gap-2 mb-6">
                 <span className="text-2xl font-display text-white">TATAKAI</span>
-                <span className="text-xs text-white/40 font-mono">ANIME</span>
+                <span className="text-xs text-white/40 font-mono">OTAKU</span>
               </Link>
 
               <p className="text-white/50 leading-relaxed mb-8 max-w-xs text-sm">
-                Stream thousands of anime titles in stunning quality. Download the app or browse our full catalog online.
+                The extension-based otaku community. Track anime and manga, build tier lists and playlists, and connect with fellow fans.
               </p>
 
               {/* Social Links */}

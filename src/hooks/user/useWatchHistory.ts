@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { updateMalAnimeStatus } from '@/lib/mal';
 import { updateAniListAnimeStatus, mapTatakaiStatusToAniList } from '@/lib/externalIntegrations';
 import { db } from '@/core/db';
+import { getLocalContinueWatching } from '@/lib/localStorage';
 
 interface WatchHistoryItem {
   id: string;
@@ -52,62 +53,105 @@ export function useContinueWatching() {
   return useQuery({
     queryKey: ['continue_watching', user?.id],
     queryFn: async () => {
-      // 1. Try local DB first (Dexie)
+      // Merge the local (Dexie) rows written on this device with the account's
+      // Supabase rows, newest-wins per episode. This makes Continue Watching sync
+      // across devices instead of "whatever this device happens to have locally".
+      const byEpisode = new Map<string, WatchHistoryItem>();
+
+      // 1. Local DB (Dexie) — updated most frequently on this device.
       try {
         const local = await db.watchProgress
           .orderBy('updatedAt')
           .reverse()
-          .limit(10)
+          .limit(30)
           .toArray();
-        
-        if (local.length > 0) {
-          const hydrated = await Promise.all(local.map(async (item) => {
-            let cachedMedia: any = null;
-            try {
-              cachedMedia = await db.cachedMedia.get(item.mediaId);
-            } catch {
-              cachedMedia = null;
-            }
 
-            const animeName = item.animeName || cachedMedia?.title || 'Unknown';
-            const animePoster = item.animePoster || cachedMedia?.poster || null;
+        for (const item of local) {
+          if (item.completed) continue;
+          let cachedMedia: any = null;
+          try {
+            cachedMedia = await db.cachedMedia.get(item.mediaId);
+          } catch {
+            cachedMedia = null;
+          }
 
-            return {
-              id: item.id,
-              user_id: user?.id || 'guest',
-              anime_id: item.mediaId,
-              anime_name: animeName,
-              anime_poster: animePoster,
-              episode_id: item.episodeId,
-              episode_number: item.episodeNumber ?? 0,
-              progress_seconds: item.progress,
-              duration_seconds: item.duration,
-              completed: item.completed,
-              watched_at: item.updatedAt,
-            };
-          }));
-
-          return hydrated as WatchHistoryItem[];
+          byEpisode.set(item.episodeId, {
+            id: item.id,
+            user_id: user?.id || 'guest',
+            anime_id: item.mediaId,
+            anime_name: item.animeName || cachedMedia?.title || 'Unknown',
+            anime_poster: item.animePoster || cachedMedia?.poster || null,
+            episode_id: item.episodeId,
+            episode_number: item.episodeNumber ?? 0,
+            progress_seconds: item.progress,
+            duration_seconds: item.duration,
+            completed: item.completed,
+            watched_at: item.updatedAt,
+          });
         }
       } catch (err) {
         console.warn('[useContinueWatching] Local DB error:', err);
       }
 
-      // 2. Fallback to Supabase
-      if (user) {
-        const { data, error } = await supabase
-          .from('watch_history')
-          .select('*')
-          .eq('user_id', user!.id)
-          .eq('completed', false)
-          .order('watched_at', { ascending: false })
-          .limit(10);
-
-        if (error) throw error;
-        return data as WatchHistoryItem[];
+      // 1b. localStorage mirror — written synchronously on every progress tick, so
+      // it survives an abrupt tab/window close that drops in-flight Dexie/Supabase
+      // writes. Newest-wins against the Dexie row so the exact stop position sticks.
+      try {
+        for (const it of getLocalContinueWatching()) {
+          const existing = byEpisode.get(it.episodeId);
+          if (existing && new Date(it.watchedAt).getTime() <= new Date(existing.watched_at).getTime()) {
+            continue;
+          }
+          byEpisode.set(it.episodeId, {
+            id: `${it.animeId}:${it.episodeId}`,
+            user_id: user?.id || 'guest',
+            anime_id: it.animeId,
+            anime_name: it.animeName || 'Unknown',
+            anime_poster: it.animePoster || null,
+            episode_id: it.episodeId,
+            episode_number: it.episodeNumber ?? 0,
+            progress_seconds: it.progressSeconds,
+            duration_seconds: it.durationSeconds,
+            completed: false,
+            watched_at: it.watchedAt,
+          });
+        }
+      } catch (err) {
+        console.warn('[useContinueWatching] localStorage mirror error:', err);
       }
-      
-      return [];
+
+      // 2. Supabase — merge in cross-device progress; keep whichever is newer.
+      if (user) {
+        try {
+          const { data, error } = await supabase
+            .from('watch_history')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('watched_at', { ascending: false })
+            .limit(30);
+
+          if (error) throw error;
+
+          for (const row of ((data as WatchHistoryItem[]) || [])) {
+            const existing = byEpisode.get(row.episode_id);
+            if (
+              !existing ||
+              new Date(row.watched_at).getTime() > new Date(existing.watched_at).getTime()
+            ) {
+              byEpisode.set(row.episode_id, row);
+            }
+          }
+        } catch (err) {
+          console.warn('[useContinueWatching] Supabase error:', err);
+        }
+      }
+
+      return Array.from(byEpisode.values())
+        .filter((it) => !it.completed)
+        .sort(
+          (a, b) => new Date(b.watched_at).getTime() - new Date(a.watched_at).getTime(),
+        )
+        .slice(0, 10) as WatchHistoryItem[];
     },
   });
 }
@@ -141,6 +185,12 @@ export function useUpdateWatchHistory() {
       anilistId?: number | null;
       isLastEpisode?: boolean;
     }) => {
+      // Netflix-style completion: an episode watched to >=90% counts as finished, so
+      // it drops out of Continue Watching even if the user never hit the exact end.
+      const _dur = durationSeconds != null ? durationSeconds : 0;
+      const reachedEnd = _dur > 0 && progressSeconds / _dur >= 0.9;
+      const effectiveCompleted = completed || reachedEnd;
+
       // Build upsert object dynamically to only include mal_id/anilist_id if provided
       const upsertData: any = {
         user_id: user!.id,
@@ -151,7 +201,7 @@ export function useUpdateWatchHistory() {
         episode_number: episodeNumber,
         progress_seconds: Math.round(progressSeconds),
         duration_seconds: durationSeconds != null ? Math.round(durationSeconds) : durationSeconds,
-        completed,
+        completed: effectiveCompleted,
         watched_at: new Date().toISOString(),
       };
 
@@ -182,7 +232,7 @@ export function useUpdateWatchHistory() {
           progress: progressSeconds,
           duration: durationSeconds || 0,
           updatedAt: new Date().toISOString(),
-          completed,
+          completed: effectiveCompleted,
         });
       } catch (err) {
         console.warn('[useUpdateWatchHistory] Local DB save failed:', err);
@@ -312,4 +362,156 @@ export function useClearAllWatchHistory() {
       queryClient.invalidateQueries({ queryKey: ['continue_watching'] });
     },
   });
+}
+
+export interface SavedProgress {
+  progress: number;
+  duration: number;
+  completed: boolean;
+  updatedAt: string;
+}
+
+/**
+ * Newest-wins lookup of a single episode's saved position across every store this
+ * device can see: the local Dexie row, the localStorage mirror, and (when signed in)
+ * the Supabase row. Used to auto-resume on ANY entry point, not just `?t=` links.
+ */
+export async function getSavedProgress(
+  animeId: string,
+  episodeId: string,
+  userId?: string,
+): Promise<SavedProgress | null> {
+  const candidates: SavedProgress[] = [];
+
+  try {
+    const row = await db.watchProgress.get(`${animeId}:${episodeId}`);
+    if (row) {
+      candidates.push({
+        progress: row.progress || 0,
+        duration: row.duration || 0,
+        completed: !!row.completed,
+        updatedAt: row.updatedAt,
+      });
+    }
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    const local = getLocalContinueWatching().find((i) => i.episodeId === episodeId);
+    if (local) {
+      candidates.push({
+        progress: local.progressSeconds || 0,
+        duration: local.durationSeconds || 0,
+        completed: false,
+        updatedAt: local.watchedAt,
+      });
+    }
+  } catch {
+    /* ignore */
+  }
+
+  if (userId) {
+    try {
+      const { data } = await supabase
+        .from('watch_history')
+        .select('progress_seconds, duration_seconds, completed, watched_at')
+        .eq('user_id', userId)
+        .eq('episode_id', episodeId)
+        .maybeSingle();
+      if (data) {
+        candidates.push({
+          progress: data.progress_seconds || 0,
+          duration: data.duration_seconds || 0,
+          completed: !!data.completed,
+          updatedAt: data.watched_at,
+        });
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (candidates.length === 0) return null;
+  candidates.sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+  );
+  return candidates[0];
+}
+
+/**
+ * One-shot reconciliation when a guest signs in: push this device's local watch
+ * progress (Dexie) up to Supabase so their history follows the account. Newest-wins —
+ * a local row is only pushed when it is newer than what the server already has.
+ */
+export async function migrateGuestProgressToAccount(userId: string): Promise<void> {
+  const flagKey = `tatakai_progress_migrated_${userId}`;
+  try {
+    if (localStorage.getItem(flagKey)) return;
+  } catch {
+    /* ignore */
+  }
+
+  let localRows: any[] = [];
+  try {
+    localRows = await db.watchProgress.orderBy('updatedAt').reverse().limit(200).toArray();
+  } catch {
+    localRows = [];
+  }
+  if (localRows.length === 0) {
+    try {
+      localStorage.setItem(flagKey, '1');
+    } catch {
+      /* ignore */
+    }
+    return;
+  }
+
+  const episodeIds = localRows.map((r) => r.episodeId);
+  const existing = new Map<string, string>();
+  try {
+    const { data } = await supabase
+      .from('watch_history')
+      .select('episode_id, watched_at')
+      .eq('user_id', userId)
+      .in('episode_id', episodeIds);
+    (data || []).forEach((r: any) => existing.set(r.episode_id, r.watched_at));
+  } catch {
+    /* treat as none present */
+  }
+
+  const upserts = localRows
+    .filter((r) => {
+      const prev = existing.get(r.episodeId);
+      return !prev || new Date(r.updatedAt).getTime() > new Date(prev).getTime();
+    })
+    .map((r) => ({
+      user_id: userId,
+      anime_id: r.mediaId,
+      anime_name: r.animeName || 'Unknown',
+      anime_poster: r.animePoster || null,
+      episode_id: r.episodeId,
+      episode_number: r.episodeNumber ?? 0,
+      progress_seconds: Math.round(r.progress || 0),
+      duration_seconds: r.duration ? Math.round(r.duration) : null,
+      completed: !!r.completed,
+      watched_at: r.updatedAt,
+    }));
+
+  if (upserts.length > 0) {
+    try {
+      await supabase
+        .from('watch_history')
+        .upsert(upserts, { onConflict: 'user_id,episode_id' });
+    } catch (e) {
+      console.warn('[migrateGuestProgress] upsert failed:', e);
+      return; // don't set the flag — retry on next sign-in
+    }
+  }
+
+  try {
+    localStorage.setItem(flagKey, '1');
+  } catch {
+    /* ignore */
+  }
 }

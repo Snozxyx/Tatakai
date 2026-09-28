@@ -1,6 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { isEnabled, FeatureFlag } from '@/core/feature-flags/feature-flags';
 import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
+import {
+  useDownloadStates as useMonitorStates,
+  markQueued,
+  markFailedStart,
+  markCancelled,
+} from '@/core/download/download-monitor';
 
 export type DownloadJobStatus = 'queued' | 'downloading' | 'completed' | 'failed' | 'cancelled';
 
@@ -23,120 +29,23 @@ export type StartDownloadPayload = {
   posterUrl?: string;
   subtitles?: Array<{ url: string; lang?: string; label?: string; language?: string }>;
   animeId?: number;
+  /** Torrent file index within a multi-file torrent (optional). */
+  fileIndex?: number;
+  /** Real audio language (e.g. 'ja', 'en'). Omit when the caller can't tell — history stores 'unknown' rather than guessing. */
+  resolvedLanguage?: string;
 };
 
+/**
+ * Thin binding over the app-lifetime `download-monitor` singleton. The monitor
+ * owns the (single) IPC subscription and history recording; this hook only
+ * exposes the live state map and the start/cancel actions. See
+ * `src/core/download/download-monitor.ts` for why the subscription can't live
+ * here (preload's `removeDownloadListeners` is global/destructive).
+ */
 export function useDownload() {
   const isDesktop = useIsDesktopApp();
   const managerEnabled = isEnabled(FeatureFlag.DOWNLOAD_MANAGER);
-  const [downloadStates, setDownloadStates] = useState<Record<string, DownloadJobEntry>>({});
-
-  useEffect(() => {
-    if (!isDesktop || typeof window === 'undefined') return;
-    const bridge = window.electron;
-    if (!bridge?.onDownloadProgress || !bridge.onDownloadCompleted || !bridge.onDownloadError) return;
-
-    const onProg = (data: Record<string, unknown>) => {
-      const id = String(data.episodeId || '');
-      if (!id) return;
-      const pct = typeof data.percent === 'number' ? data.percent : Number(data.percent) || 0;
-      setDownloadStates((prev) => ({
-        ...prev,
-        [id]: {
-          ...prev[id],
-          status: 'downloading',
-          progress: pct,
-          speed: typeof data.speed === 'string' ? data.speed : undefined,
-          eta: typeof data.eta === 'string' ? data.eta : undefined,
-        },
-      }));
-    };
-    const onDone = (data: Record<string, unknown>) => {
-      const id = String(data.episodeId || '');
-      if (!id) return;
-      setDownloadStates((prev) => ({
-        ...prev,
-        [id]: {
-          ...prev[id],
-          status: 'completed',
-          progress: 100,
-          localUri: typeof data.path === 'string' ? data.path : undefined,
-        },
-      }));
-
-      // Record in download history
-      const metaRaw = localStorage.getItem(`tatakai:dl:meta:${id}`);
-      if (metaRaw) {
-        try {
-          const meta = JSON.parse(metaRaw);
-          import('@/core/download/download-history-service').then(({ recordDownload }) => {
-            recordDownload({
-              animeId: meta.animeId || 0,
-              animeTitle: meta.animeTitle,
-              episodeNumber: meta.episodeNumber,
-              status: 'completed',
-              sourceType: meta.sourceType,
-              resolvedLanguage: meta.resolvedLanguage || 'ja',
-              fileSizeBytes: typeof data.size === 'number' ? data.size : undefined,
-              localPath: typeof data.path === 'string' ? data.path : undefined,
-              startedAt: meta.startedAt,
-              completedAt: new Date().toISOString(),
-              retryCount: 0,
-            });
-          });
-          localStorage.removeItem(`tatakai:dl:meta:${id}`);
-        } catch (e) {
-          console.error('[useDownload] Failed to parse/record download completed history:', e);
-        }
-      }
-    };
-    const onErr = (data: Record<string, unknown>) => {
-      const id = String(data.episodeId || '');
-      if (!id) return;
-      const errMsg = typeof data.error === 'string' ? data.error : 'Download failed';
-      setDownloadStates((prev) => ({
-        ...prev,
-        [id]: {
-          ...prev[id],
-          status: 'failed',
-          progress: prev[id]?.progress ?? 0,
-          error: errMsg,
-        },
-      }));
-
-      // Record in download history
-      const metaRaw = localStorage.getItem(`tatakai:dl:meta:${id}`);
-      if (metaRaw) {
-        try {
-          const meta = JSON.parse(metaRaw);
-          import('@/core/download/download-history-service').then(({ recordDownload }) => {
-            recordDownload({
-              animeId: meta.animeId || 0,
-              animeTitle: meta.animeTitle,
-              episodeNumber: meta.episodeNumber,
-              status: 'failed',
-              sourceType: meta.sourceType,
-              resolvedLanguage: meta.resolvedLanguage || 'ja',
-              errorMessage: errMsg,
-              startedAt: meta.startedAt,
-              completedAt: new Date().toISOString(),
-              retryCount: 0,
-            });
-          });
-          localStorage.removeItem(`tatakai:dl:meta:${id}`);
-        } catch (e) {
-          console.error('[useDownload] Failed to parse/record download failed history:', e);
-        }
-      }
-    };
-
-    bridge.onDownloadProgress(onProg);
-    bridge.onDownloadCompleted(onDone);
-    bridge.onDownloadError(onErr);
-
-    return () => {
-      bridge.removeDownloadListeners?.();
-    };
-  }, [isDesktop]);
+  const downloadStates = useMonitorStates();
 
   const startDownload = useCallback(
     async (
@@ -161,27 +70,41 @@ export function useDownload() {
         return { ok: false as const, reason: 'missing_download_path' as const };
       }
 
-      setDownloadStates((prev) => ({
-        ...prev,
-        [payload.episodeId]: { status: 'queued', progress: 0 },
-      }));
+      const sourceType: 'hls' | 'torrent' =
+        url.startsWith('magnet:') || url.includes('.torrent') ? 'torrent' : 'hls';
 
-      // Store download metadata in localStorage to preserve across page reloads/states
+      // Persist metadata BEFORE the optimistic markQueued so the monitor can
+      // enrich the entry (name/poster/torrent-badge) on first sight.
       const meta = {
         animeId: payload.animeId || 0,
         animeTitle: payload.animeName,
         episodeNumber: payload.episodeNumber,
-        sourceType: url.startsWith('magnet:') || url.includes('.torrent') ? 'torrent' : 'hls',
-        resolvedLanguage: 'ja',
-        startedAt: new Date().toISOString()
+        posterUrl: payload.posterUrl,
+        sourceType,
+        resolvedLanguage: payload.resolvedLanguage || 'unknown',
+        startedAt: new Date().toISOString(),
       };
       localStorage.setItem(`tatakai:dl:meta:${payload.episodeId}`, JSON.stringify(meta));
+
+      markQueued(payload.episodeId, {
+        animeName: payload.animeName,
+        episodeNumber: payload.episodeNumber,
+        posterUrl: payload.posterUrl,
+        sourceType,
+      });
 
       const res = await window.electron.startDownload({
         episodeId: payload.episodeId,
         animeName: payload.animeName,
         episodeNumber: payload.episodeNumber,
+        // The main process branches on `sourceType`, and the torrent branch
+        // reads `magnet` (NOT `url`). Passing only `url` for a magnet routed
+        // torrents into the ffmpeg/HLS branch → "ffmpeg exit code 1". Send both
+        // so torrent downloads take the torrent session path from any caller.
+        sourceType,
         url,
+        magnet: sourceType === 'torrent' ? url : undefined,
+        fileIndex: payload.fileIndex,
         headers: payload.headers || {},
         downloadPath,
         posterUrl: payload.posterUrl,
@@ -189,15 +112,10 @@ export function useDownload() {
       });
 
       if (!res?.success) {
-        setDownloadStates((prev) => ({
-          ...prev,
-          [payload.episodeId]: {
-            status: 'failed',
-            progress: 0,
-            error: typeof res?.error === 'string' ? res.error : 'start_failed',
-          },
-        }));
-        localStorage.removeItem(`tatakai:dl:meta:${payload.episodeId}`);
+        markFailedStart(
+          payload.episodeId,
+          typeof res?.error === 'string' ? res.error : 'start_failed',
+        );
         return { ok: false as const, reason: 'ipc_error' as const, error: res?.error };
       }
       return { ok: true as const };
@@ -208,38 +126,7 @@ export function useDownload() {
   const cancelDownload = useCallback(async (episodeId: string, animePath?: string) => {
     if (!window.electron?.cancelDownload) return;
     await window.electron.cancelDownload({ episodeId, animePath });
-    setDownloadStates((prev) => ({
-      ...prev,
-      [episodeId]: {
-        ...prev[episodeId],
-        status: 'cancelled',
-        progress: prev[episodeId]?.progress ?? 0,
-      },
-    }));
-
-    // Record in history
-    const metaRaw = localStorage.getItem(`tatakai:dl:meta:${episodeId}`);
-    if (metaRaw) {
-      try {
-        const meta = JSON.parse(metaRaw);
-        import('@/core/download/download-history-service').then(({ recordDownload }) => {
-          recordDownload({
-            animeId: meta.animeId || 0,
-            animeTitle: meta.animeTitle,
-            episodeNumber: meta.episodeNumber,
-            status: 'cancelled',
-            sourceType: meta.sourceType,
-            resolvedLanguage: meta.resolvedLanguage || 'ja',
-            startedAt: meta.startedAt,
-            completedAt: new Date().toISOString(),
-            retryCount: 0,
-          });
-        });
-        localStorage.removeItem(`tatakai:dl:meta:${episodeId}`);
-      } catch (e) {
-        console.error('[useDownload] Failed to parse/record download cancelled history:', e);
-      }
-    }
+    markCancelled(episodeId);
   }, []);
 
   const bridgeReady = typeof window !== 'undefined' && !!window.electron?.startDownload;

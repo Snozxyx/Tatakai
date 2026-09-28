@@ -2,15 +2,16 @@ import { useSearchParams, useNavigate, useParams } from "react-router-dom";
 import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
-import { Header } from "@/components/layout/Header";
+// import { Header } from "@/components/layout/Header";
 import { useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
 import { cn } from "@/lib/utils";
 import { CardSkeleton } from "@/components/ui/skeleton-custom";
 import { Input } from "@/components/ui/input";
-import { Search, X, Loader2, Film, User, ExternalLink, Users, BookOpen,Camera, Puzzle, ArrowRight, SlidersHorizontal, ChevronRight, Sparkles, Play } from "lucide-react";
+import { Search, X, Loader2, Film, User, ExternalLink, Users, BookOpen, Camera, Puzzle, ArrowRight, SlidersHorizontal, ChevronRight, Sparkles, Play, Tags } from "lucide-react";
 import { useAniListCharacterSearch } from '@/hooks/user/useProfileFeatures';
+import { ANILIST_GRAPHQL_ENDPOINT, resolveApiV3Base } from '@/lib/api/backendOrigin';
 import { GlassPanel } from "@/components/ui/GlassPanel";
-import { ALL_GENRES } from "@/lib/externalIntegrations";
+import { useAniListGenres } from "@/hooks/api/useAniListGenres";
 import { useInfiniteSearch as useInfSearch, type AnimeSearchFilters, useEpisodeTitleSearch } from "@/hooks/api/useAnimeData";
 import { useInfiniteMangaSearch } from "@/hooks/api/useMangaData";
 import { useRef, useCallback, useState, useEffect, useMemo } from "react";
@@ -21,10 +22,21 @@ import { type MangaSearchOptions } from "@/core/content/manga-client";
 import { getProxiedImageUrl } from "@/lib/api";
 import { UnifiedMediaCard } from "@/components/UnifiedMediaCard";
 import { useContentSafetySettings } from "@/hooks/user/useContentSafetySettings";
-import { inferMangaAdultFlag, isExplicitMangaSearchQuery } from "@/lib/contentSafety";
-import { VirtualAnimeGrid } from "@/components/virtualized/VirtualAnimeGrid";
-import { FeatureFlag, useFeatureFlag } from "@/core/feature-flags";
+import { isExplicitMangaSearchQuery, inferMangaAdultFlag, inferAnimeAdultFlag } from "@/lib/contentSafety";
 import { extensionRegistry } from "@/core/extensions/ExtensionRegistry";
+import { DiscoverHero } from '@/components/anime/discover/DiscoverHero';
+import { PillGroup } from '@/components/anime/discover/PillGroup';
+import { POSTER_GRID_CLASS, PosterGridSkeleton, DiscoverPosterGrid } from '@/components/anime/discover/DiscoverPosterGrid';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Check, ChevronDown, Tag } from 'lucide-react';
+import { discoverYears, DISCOVER_SORTS, type DiscoverSort, useDiscoverMedia } from '@/hooks/api/useDiscover';
+import { controlItemClass, controlMenuClass, controlTriggerClass } from '@/components/anime/discover/types';
+import { celebrate, type CelebrateVariant } from '@/components/effects/Celebrate';
 
 function useExtensionSearch(query: string, enabled: boolean) {
   return useQuery({
@@ -83,6 +95,28 @@ export default function SearchPage() {
   const queryParam = searchParams.get("q") || decodedProducerName || "";
   const [query, setQuery] = useState(queryParam);
   const [searchInput, setSearchInput] = useState(queryParam);
+
+  // Secret search phrases: typing one exactly fires a celebration flourish and
+  // nothing else — results are untouched. Guarded so it fires once per phrase,
+  // not on every keystroke. celebrate() is a no-op under reduced motion.
+  const firedPhraseRef = useRef<string>('');
+  useEffect(() => {
+    const SECRET: Record<string, CelebrateVariant> = {
+      tatakai: 'petal',
+      'over 9000': 'spark',
+      konami: 'confetti',
+      'plus ultra': 'spark',
+    };
+    const normalized = searchInput.trim().toLowerCase().replace(/\s+/g, ' ');
+    if (normalized in SECRET) {
+      if (firedPhraseRef.current !== normalized) {
+        firedPhraseRef.current = normalized;
+        celebrate({ variant: SECRET[normalized], count: 22 });
+      }
+    } else {
+      firedPhraseRef.current = '';
+    }
+  }, [searchInput]);
   const [page, setPage] = useState(1);
   const [resultType, setResultType] = useState<'all' | 'anime' | 'manga' | 'character'>(() => {
     const t = searchParams.get("type");
@@ -98,6 +132,7 @@ export default function SearchPage() {
   const [animeSortFilter, setAnimeSortFilter] = useState<string>('default');
   const [mangaTypeFilter, setMangaTypeFilter] = useState<string>('all');
   const [mangaStatusFilter, setMangaStatusFilter] = useState<string>('all');
+  const [mangaOrigin, setMangaOrigin] = useState<string>('all');
   const [mangaGenreFilter, setMangaGenreFilter] = useState<string>(() => {
     const g = searchParams.get("genre");
     return g ? g.trim() : 'all';
@@ -105,9 +140,69 @@ export default function SearchPage() {
   const [mangaAdultFilter, setMangaAdultFilter] = useState(false);
   const [minRating, setMinRating] = useState<number>(0);
   const [minReleaseYear, setMinReleaseYear] = useState<number>(0);
+  const [maxRating, setMaxRating] = useState<number>(0);
+  const [maxReleaseYear, setMaxReleaseYear] = useState<number>(0);
+  const [seasonFilter, setSeasonFilter] = useState<string>('all');
+  const [minEpisodes, setMinEpisodes] = useState<number>(0);
+  const [maxEpisodes, setMaxEpisodes] = useState<number>(0);
   const [sortMode, setSortMode] = useState<'relevance' | 'rating' | 'title' | 'popularity'>('relevance');
+  const [discoverSort, setDiscoverSort] = useState<DiscoverSort>('for-you');
+
+  const handleDiscoverSortChange = (newSort: DiscoverSort) => {
+    setDiscoverSort(newSort);
+    if (newSort === 'for-you') {
+      setSortMode('relevance');
+      setAnimeSortFilter('default');
+    } else if (newSort === 'top-rated') {
+      setSortMode('rating');
+      setAnimeSortFilter('score_desc');
+    } else if (newSort === 'newest') {
+      setSortMode('relevance');
+      setAnimeSortFilter('start_date_desc');
+    } else if (newSort === 'a-z') {
+      setSortMode('title');
+      setAnimeSortFilter('title_asc');
+    }
+  };
+
   const [imageConfidenceThreshold, setImageConfidenceThreshold] = useState<number>(0.85);
   const [showAdvancedAssist, setShowAdvancedAssist] = useState(false);
+  const [selectedAnimeTags, setSelectedAnimeTags] = useState<string[]>(() => {
+    const values = searchParams.getAll('animeTag');
+    const packed = searchParams.get('animeTags');
+    const typeParam = searchParams.get('type');
+    const generic = typeParam !== 'manga' ? searchParams.getAll('tag').concat(searchParams.get('tags')?.split(',') ?? []) : [];
+    return Array.from(new Set([...values, ...(packed ? packed.split(',') : []), ...generic].filter(Boolean)));
+  });
+  const [selectedMangaTags, setSelectedMangaTags] = useState<string[]>(() => {
+    const values = searchParams.getAll('mangaTag').concat(searchParams.getAll('manwhaTag'));
+    const packed = searchParams.get('mangaTags') || searchParams.get('manwhaTags');
+    const typeParam = searchParams.get('type');
+    const generic = typeParam === 'manga' ? searchParams.getAll('tag').concat(searchParams.get('tags')?.split(',') ?? []) : [];
+    return Array.from(new Set([...values, ...(packed ? packed.split(',') : []), ...generic].filter(Boolean)));
+  });
+  const [tagSearch, setTagSearch] = useState('');
+  const [mangaTagSearch, setMangaTagSearch] = useState('');
+  const [showSpoilerTags, setShowSpoilerTags] = useState(false);
+
+  const { data: anilistTags = [] } = useQuery({
+    queryKey: ['anilist-media-tags'],
+    queryFn: async () => {
+      const response = await fetch(`${resolveApiV3Base()}/content/tags`);
+      if (!response.ok) return [];
+      const payload = await response.json();
+      return Array.isArray(payload?.data) ? payload.data as Array<{
+        id: number;
+        name: string;
+        description?: string | null;
+        category?: string | null;
+        isGeneralSpoiler?: boolean;
+        isAdult?: boolean;
+      }> : [];
+    },
+    staleTime: 24 * 60 * 60 * 1000,
+    enabled: showAdvancedAssist,
+  });
 
   // Local state for filters to avoid triggering searches on every change
   const [localAnimeType, setLocalAnimeType] = useState(animeTypeFilter);
@@ -116,8 +211,15 @@ export default function SearchPage() {
   const [localAnimeSort, setLocalAnimeSort] = useState(animeSortFilter);
   const [localMangaType, setLocalMangaType] = useState(mangaTypeFilter);
   const [localMangaStatus, setLocalMangaStatus] = useState(mangaStatusFilter);
-  const [localMangaGenre, setLocalMangaGenre] = useState(mangaGenreFilter);  const [localMinRating, setLocalMinRating] = useState(minRating);
+  const [localMangaOrigin, setLocalMangaOrigin] = useState(mangaOrigin);
+  const [localMangaGenre, setLocalMangaGenre] = useState(mangaGenreFilter);
+  const [localMinRating, setLocalMinRating] = useState(minRating);
   const [localMinReleaseYear, setLocalMinReleaseYear] = useState(minReleaseYear);
+  const [localMaxRating, setLocalMaxRating] = useState(maxRating);
+  const [localMaxReleaseYear, setLocalMaxReleaseYear] = useState(maxReleaseYear);
+  const [localSeason, setLocalSeason] = useState(seasonFilter);
+  const [localMinEpisodes, setLocalMinEpisodes] = useState(minEpisodes);
+  const [localMaxEpisodes, setLocalMaxEpisodes] = useState(maxEpisodes);
   const [localSortMode, setLocalSortMode] = useState(sortMode);
   const [localMangaAdult, setLocalMangaAdult] = useState(mangaAdultFilter);
 
@@ -133,8 +235,14 @@ export default function SearchPage() {
     setAnimeSortFilter(localAnimeSort);
     setMangaTypeFilter(localMangaType);
     setMangaStatusFilter(localMangaStatus);
+    setMangaOrigin(localMangaOrigin);
     setMinRating(localMinRating);
     setMinReleaseYear(localMinReleaseYear);
+    setMaxRating(localMaxRating);
+    setMaxReleaseYear(localMaxReleaseYear);
+    setSeasonFilter(localSeason);
+    setMinEpisodes(localMinEpisodes);
+    setMaxEpisodes(localMaxEpisodes);
     setSortMode(localSortMode);
     setMangaAdultFilter(localMangaAdult);
     setPage(1);
@@ -147,9 +255,15 @@ export default function SearchPage() {
     setLocalAnimeSort(animeSortFilter);
     setLocalMangaType(mangaTypeFilter);
     setLocalMangaStatus(mangaStatusFilter);
+    setLocalMangaOrigin(mangaOrigin);
     setLocalMangaGenre(mangaGenreFilter);
     setLocalMinRating(minRating);
     setLocalMinReleaseYear(minReleaseYear);
+    setLocalMaxRating(maxRating);
+    setLocalMaxReleaseYear(maxReleaseYear);
+    setLocalSeason(seasonFilter);
+    setLocalMinEpisodes(minEpisodes);
+    setLocalMaxEpisodes(maxEpisodes);
     setLocalSortMode(sortMode);
     setLocalMangaAdult(mangaAdultFilter);
   }, [
@@ -159,9 +273,15 @@ export default function SearchPage() {
     animeSortFilter,
     mangaTypeFilter,
     mangaStatusFilter,
+    mangaOrigin,
     mangaGenreFilter,
     minRating,
     minReleaseYear,
+    maxRating,
+    maxReleaseYear,
+    seasonFilter,
+    minEpisodes,
+    maxEpisodes,
     sortMode,
     mangaAdultFilter,
   ]);
@@ -173,7 +293,33 @@ export default function SearchPage() {
   const shouldEnableCharacterSearch =
     shouldSearchCharacters && (!shouldDelaySecondaryStreams || enableSecondaryResultStreams);
   const { settings: contentSafetySettings } = useContentSafetySettings();
-  const useVirtualGrid = useFeatureFlag(FeatureFlag.VIRTUAL_GRID);
+  const { genres: anilistGenres } = useAniListGenres();
+  // Group tag options by AniList category, hiding general-spoiler tags unless
+  // the viewer opts in. Returns [{ category, tags }] sorted by category name.
+  const groupTagOptions = useCallback((term: string) => {
+    const needle = term.trim().toLowerCase();
+    const rows = anilistTags
+      .filter((tag) => !tag.isAdult || contentSafetySettings.showAdultEverywhere)
+      .filter((tag) => showSpoilerTags || !tag.isGeneralSpoiler)
+      .filter((tag) => !needle || tag.name.toLowerCase().includes(needle) || tag.category?.toLowerCase().includes(needle));
+
+    const buckets = new Map<string, typeof rows>();
+    for (const tag of rows) {
+      const category = (tag.category || 'Other').trim() || 'Other';
+      const bucket = buckets.get(category);
+      if (bucket) bucket.push(tag);
+      else buckets.set(category, [tag]);
+    }
+    return Array.from(buckets.entries())
+      .map(([category, tags]) => ({
+        category,
+        tags: tags.slice().sort((a, b) => a.name.localeCompare(b.name)),
+      }))
+      .sort((a, b) => a.category.localeCompare(b.category));
+  }, [anilistTags, contentSafetySettings.showAdultEverywhere, showSpoilerTags]);
+
+  const filteredTagOptions = useMemo(() => groupTagOptions(tagSearch), [groupTagOptions, tagSearch]);
+  const filteredMangaTagOptions = useMemo(() => groupTagOptions(mangaTagSearch), [groupTagOptions, mangaTagSearch]);
   const explicitMangaQuery = useMemo(() => isExplicitMangaSearchQuery(query), [query]);
   const allowAdultAnime = useMemo(
     () => contentSafetySettings.showAdultEverywhere || explicitMangaQuery,
@@ -186,7 +332,13 @@ export default function SearchPage() {
       animeGenreFilter !== 'all' ||
       animeSortFilter !== 'default' ||
       minRating > 0 ||
-      minReleaseYear > 0
+      minReleaseYear > 0 ||
+      maxRating > 0 ||
+      maxReleaseYear > 0 ||
+      seasonFilter !== 'all' ||
+      minEpisodes > 0 ||
+      maxEpisodes > 0 ||
+      selectedAnimeTags.length > 0
     );
   }, [
     animeTypeFilter,
@@ -195,6 +347,12 @@ export default function SearchPage() {
     animeSortFilter,
     minRating,
     minReleaseYear,
+    maxRating,
+    maxReleaseYear,
+    seasonFilter,
+    minEpisodes,
+    maxEpisodes,
+    selectedAnimeTags,
   ]);
 
   const animeGenreOptions = useMemo(() => {
@@ -210,14 +368,14 @@ export default function SearchPage() {
         .replace(/-+/g, '-');
     };
 
-    return ALL_GENRES.map((genre) => ({
+    return anilistGenres.map((genre) => ({
       label: genre,
       value: normalizeGenreValue(genre),
     })).filter((option, index, rows) => {
       if (!option.value) return false;
       return rows.findIndex((row) => row.value === option.value) === index;
     });
-  }, []);
+  }, [anilistGenres]);
 
   const normalizeAnimeStatus = useCallback((value: string | undefined) => {
     const normalized = String(value || '').toLowerCase().replace(/[_\s]+/g, '-');
@@ -261,19 +419,21 @@ export default function SearchPage() {
   }, [mangaGenreFilter, animeGenreOptions]);
 
   const genreFilterActive = animeGenreFilter !== 'all' || mangaGenreFilter !== 'all';
+  const tagFilterActive = selectedAnimeTags.length > 0 || selectedMangaTags.length > 0;
   const mangaFilterActive = useMemo(() => {
     return (
       mangaGenreFilter !== 'all' ||
       mangaTypeFilter !== 'all' ||
       mangaStatusFilter !== 'all' ||
+      mangaOrigin !== 'all' ||
       mangaAdultFilter
     );
   }, [mangaGenreFilter, mangaTypeFilter, mangaStatusFilter, mangaAdultFilter]);
 
   const shouldEnableMangaSearch =
     shouldSearchManga &&
-    (query.length > 0 || mangaFilterActive || genreFilterActive) &&
-    (!shouldDelaySecondaryStreams || enableSecondaryResultStreams || genreFilterActive || mangaFilterActive);
+    (query.length > 0 || mangaFilterActive || genreFilterActive || tagFilterActive) &&
+    (!shouldDelaySecondaryStreams || enableSecondaryResultStreams || genreFilterActive || mangaFilterActive || tagFilterActive);
 
   const normalizedMangaTypeFilter = useMemo(() => {
     const normalized = String(mangaTypeFilter || '').toLowerCase();
@@ -304,6 +464,12 @@ export default function SearchPage() {
     if (animeSortFilter !== 'default') filters.sort = animeSortFilter;
     if (minRating > 0) filters.minRating = minRating;
     if (minReleaseYear > 0) filters.minReleaseYear = minReleaseYear;
+    if (maxRating > 0) filters.maxRating = maxRating;
+    if (maxReleaseYear > 0) filters.maxReleaseYear = maxReleaseYear;
+    if (seasonFilter !== 'all') filters.season = seasonFilter;
+    if (minEpisodes > 0) filters.minEpisodes = minEpisodes;
+    if (maxEpisodes > 0) filters.maxEpisodes = maxEpisodes;
+    if (selectedAnimeTags.length > 0) filters.tags = selectedAnimeTags;
     filters.isAdult = allowAdultAnime ? true : false;
     return filters;
   }, [
@@ -313,7 +479,13 @@ export default function SearchPage() {
     animeSortFilter,
     minRating,
     minReleaseYear,
+    maxRating,
+    maxReleaseYear,
+    seasonFilter,
+    minEpisodes,
+    maxEpisodes,
     allowAdultAnime,
+    selectedAnimeTags,
   ]);
 
   const mangaSearchOptions = useMemo<MangaSearchOptions>(() => {
@@ -331,12 +503,14 @@ export default function SearchPage() {
       mode: hasGenre ? 'genre' : mangaSearchMode,
       provider: 'all',
       genre: resolvedMangaGenre,
+      tags: selectedMangaTags,
+      origin: mangaOrigin === 'all' ? undefined : mangaOrigin,
       sort: hasGenre ? 'POPULARITY_DESC' : undefined,
       adult: mangaAdultFilter || explicitMangaQuery || contentSafetySettings.showAdultEverywhere,
       types: types.length > 0 ? Array.from(new Set(types)) : undefined,
       mangaType: normalizedMangaTypeFilter !== 'all' ? (normalizedMangaTypeFilter as any) : undefined,
       // Allow genre-only AniList browse (no text query required)
-      requiresQuery: !(hasGenre || mangaSearchMode === 'genre' || mangaSearchMode === 'explore' || mangaSearchMode === 'latest' || mangaSearchMode === 'category'),
+      requiresQuery: !(hasGenre || selectedMangaTags.length > 0 || mangaOrigin !== 'all' || mangaSearchMode === 'genre' || mangaSearchMode === 'explore' || mangaSearchMode === 'latest' || mangaSearchMode === 'category'),
     };
   }, [
     mangaSearchMode,
@@ -345,6 +519,8 @@ export default function SearchPage() {
     explicitMangaQuery,
     contentSafetySettings.showAdultEverywhere,
     normalizedMangaTypeFilter,
+    selectedMangaTags,
+    mangaOrigin,
   ]);
 
   const atsuGenreOptions = useMemo(() => {
@@ -370,7 +546,7 @@ export default function SearchPage() {
   }, []);
 
   const shouldEnableAnimeSearch =
-    shouldSearchAnime && !isProducerRoute && (query.length > 0 || animeFilterActive || genreFilterActive);
+    shouldSearchAnime && !isProducerRoute && (query.length > 0 || animeFilterActive || genreFilterActive || tagFilterActive);
 
   const { 
     data: infiniteData, 
@@ -378,7 +554,7 @@ export default function SearchPage() {
     hasNextPage: hasNextSearchPage,
     isFetchingNextPage: isFetchingNextSearchPage,
     isLoading: isLoadingSearch,
-  } = useInfSearch(query, animeBackendFilters, shouldEnableAnimeSearch, animeFilterActive);
+  } = useInfSearch(query, animeBackendFilters, shouldEnableAnimeSearch, animeFilterActive || selectedAnimeTags.length > 0);
 
   const {
     data: producerInfiniteData,
@@ -516,7 +692,7 @@ export default function SearchPage() {
             id: String(normalizedId),
             name: fallbackTitle,
             poster: manga?.poster || "",
-            type: manga?.mediaType || manga?.type || "manga",
+            type: manga?.type || manga?.mediaType || "manga",
             status: manga?.status || undefined,
             year:
               typeof manga?.year === "number" ? manga.year : undefined,
@@ -634,7 +810,23 @@ export default function SearchPage() {
   const unifiedResults = useMemo(() => {
     const arr: any[] = [];
     if (resultType === 'all' || resultType === 'anime') {
-      arr.push(...filteredAnimeResults.map(a => ({ ...a, mediaType: 'anime' as const })));
+      arr.push(
+        ...filteredAnimeResults.map((a) => {
+          const isAdult = inferAnimeAdultFlag(a);
+          return {
+            ...a,
+            mediaType: 'anime' as const,
+            isAdult,
+            // Mirror the manga blur: mature anime only reach here on an explicit
+            // query (safe mode hides them server-side), so blur those covers.
+            blurAdult:
+              isAdult &&
+              !contentSafetySettings.showAdultEverywhere &&
+              explicitMangaQuery &&
+              contentSafetySettings.blurAdultInSearch,
+          };
+        })
+      );
     }
     if (resultType === 'all' || resultType === 'manga') {
       arr.push(
@@ -688,9 +880,11 @@ export default function SearchPage() {
       mangaTypeFilter !== 'all',
       mangaStatusFilter !== 'all',
       mangaGenreFilter !== 'all',
+      mangaOrigin !== 'all',
       mangaAdultFilter,
       minRating > 0,
       minReleaseYear > 0,
+      selectedAnimeTags.length > 0 || selectedMangaTags.length > 0,
       sortMode !== 'relevance',
     ].filter(Boolean).length;
   }, [
@@ -701,9 +895,12 @@ export default function SearchPage() {
     mangaTypeFilter,
     mangaStatusFilter,
     mangaGenreFilter,
+    mangaOrigin,
     mangaAdultFilter,
     minRating,
     minReleaseYear,
+    selectedAnimeTags,
+    selectedMangaTags,
     sortMode,
   ]);
 
@@ -757,7 +954,7 @@ export default function SearchPage() {
               }
             }
           `;
-          const res = await fetch('https://graphql.anilist.co', {
+          const res = await fetch(ANILIST_GRAPHQL_ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ query: gql, variables: { ids: anilistIds } }),
@@ -797,7 +994,16 @@ export default function SearchPage() {
   useEffect(() => {
     setQuery(queryParam);
     setSearchInput(queryParam);
-  }, [queryParam]);
+    const typeParam = searchParams.get('type');
+    if (typeParam === 'anime' || typeParam === 'manga' || typeParam === 'character' || typeParam === 'all') {
+      setResultType(typeParam as any);
+    }
+    const genericTags = searchParams.getAll('tag').concat(searchParams.get('tags')?.split(',') ?? []);
+    const animeTags = searchParams.getAll('animeTag').concat(typeParam !== 'manga' ? genericTags : []);
+    const mangaTags = searchParams.getAll('mangaTag').concat(searchParams.getAll('manwhaTag')).concat(typeParam === 'manga' ? genericTags : []);
+    setSelectedAnimeTags(Array.from(new Set(animeTags.concat(searchParams.get('animeTags')?.split(',') ?? []).filter(Boolean))));
+    setSelectedMangaTags(Array.from(new Set(mangaTags.concat((searchParams.get('mangaTags') || searchParams.get('manwhaTags'))?.split(',') ?? []).filter(Boolean))));
+  }, [queryParam, searchParams]);
 
   useEffect(() => {
     if (!shouldDelaySecondaryStreams) {
@@ -825,8 +1031,8 @@ export default function SearchPage() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchInput.trim()) {
-      const term = searchInput.trim();
+    const term = searchInput.trim();
+    if (term) {
       try {
         const history = localStorage.getItem('tatakai_search_history');
         let searches: string[] = history ? JSON.parse(history) : [];
@@ -834,6 +1040,15 @@ export default function SearchPage() {
         localStorage.setItem('tatakai_search_history', JSON.stringify(searches));
       } catch { }
       navigate(`/search?q=${encodeURIComponent(term)}`);
+    } else {
+      navigate('/search');
+    }
+  };
+
+  const handleClearSearch = () => {
+    setSearchInput('');
+    if (query) {
+      navigate('/search');
     }
   };
 
@@ -864,11 +1079,11 @@ export default function SearchPage() {
     } catch { }
   };
 
-  const showAnimeResults = (resultType === 'all' || resultType === 'anime') && (query.length > 0 || animeFilterActive || genreFilterActive);
-  const showMangaResults = shouldSearchManga && (query.length > 0 || mangaFilterActive || genreFilterActive);
+  const showAnimeResults = (resultType === 'all' || resultType === 'anime') && (query.length > 0 || animeFilterActive || genreFilterActive || tagFilterActive);
+  const showMangaResults = shouldSearchManga && (query.length > 0 || mangaFilterActive || genreFilterActive || tagFilterActive);
   const showCharacterResults = shouldEnableCharacterSearch && query.length > 1;
   const isQuerylessMangaMode = showMangaResults && mangaSearchMode !== 'search';
-  const hasSearchContext = query.length > 0 || isQuerylessMangaMode || animeFilterActive || genreFilterActive;
+  const hasSearchContext = query.length > 0 || isQuerylessMangaMode || animeFilterActive || genreFilterActive || tagFilterActive;
   const hasMoreResults =
     (showAnimeResults && !!hasNextAnimePage) ||
     (showMangaResults && !!hasNextMangaPage);
@@ -885,6 +1100,12 @@ export default function SearchPage() {
   const isCharacterInitialLoading = showCharacterResults && loadingCharacters && characterResults.length === 0;
   const hybridLoading = isAnimeInitialLoading || isMangaInitialLoading || isCharacterInitialLoading;
 
+  const { data: discoverData, isLoading: isLoadingDiscover } = useDiscoverMedia({
+    sort: discoverSort,
+    year: minReleaseYear > 0 ? minReleaseYear : null,
+    genre: animeGenreFilter !== 'all' ? animeGenreFilter : undefined,
+  });
+
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       {!isNative && <Background />}
@@ -894,59 +1115,58 @@ export default function SearchPage() {
         "relative z-10 pr-6 py-6 max-w-[1800px] mx-auto pb-24 md:pb-6",
         isNative ? "p-6" : "pl-6 md:pl-32"
       )}>
-        <Header />
-
-        {/* Mobile Search Bar */}
-        <form onSubmit={handleSearch} className="mb-6 md:hidden">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-            <Input
-              id="tatakai-global-search"
-              type="text"
-              placeholder="Search anime or manga..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="pl-10 pr-20 h-12 bg-muted/50 border-border/50 rounded-xl text-base"
-            />
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-              {searchInput && (
-                <button
-                  type="button"
-                  onClick={() => setSearchInput('')}
-                  className="p-1 rounded-full hover:bg-muted"
-                >
-                  <X className="w-4 h-4 text-muted-foreground" />
-                </button>
-              )}
-              <label className="p-1 rounded-full hover:bg-muted cursor-pointer text-muted-foreground hover:text-primary transition-colors">
-                <Camera className="w-5 h-5" />
-                <input
-                  type="file"
-                  className="hidden"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      setSelectedFile(file);
-                      // Optional: auto-scroll to image search section or trigger search
-                    }
-                  }}
-                />
-              </label>
-            </div>
+        {/* Discover Hero when browsing */}
+        {!hasSearchContext && !isProducerRoute && (
+          <div className="mb-8 mt-2">
+            <DiscoverHero />
           </div>
-        </form>
+        )}
 
-        <div className="mb-8 md:mb-12">
-          <h1 className="font-display text-2xl md:text-4xl font-bold mb-4 md:mb-6 flex items-center gap-3">
-            <Search className="w-6 h-6 md:w-8 md:h-8 text-primary" />
-            {hasSearchContext ? 'Search Results' : 'Search'}
-          </h1>
+        {/* Centered Search Bar in Middle of Page after Hero */}
+        <div className="flex justify-center mb-8">
+          <form onSubmit={handleSearch} className="w-full max-w-2xl">
+            <div className="relative flex items-center shadow-2xl rounded-full">
+              <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-primary pointer-events-none" />
+              <Input
+                id="tatakai-search-page-input"
+                type="text"
+                placeholder="Search anime, manga, characters..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="pl-14 pr-32 h-14 bg-card/85 hover:bg-card focus:bg-card border border-white/15 hover:border-primary/40 focus:border-primary rounded-full text-base shadow-lg shadow-black/20 backdrop-blur-md transition-all"
+              />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                {searchInput && (
+                  <button
+                    type="button"
+                    onClick={handleClearSearch}
+                    className="p-1.5 rounded-full hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+                    title="Clear"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  className="px-5 h-9 rounded-full bg-primary text-primary-foreground font-semibold text-sm hover:brightness-110 active:scale-95 transition-all shadow-md"
+                >
+                  Search
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
 
-          <div className="flex flex-col md:flex-row gap-6 items-start md:items-center mb-6">
-            <div className="flex-1">
+        <div className="mb-8 md:mb-10">
+          
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5 mb-6">
+            <div>
+              <h1 className="font-display text-2xl md:text-3xl font-bold flex items-center gap-3">
+                <Search className="w-6 h-6 md:w-7 md:h-7 text-primary" />
+                {hasSearchContext ? 'Search Results' : 'Discover'}
+              </h1>
               {(query || isQuerylessMangaMode) && (
-                <p className="text-muted-foreground text-sm md:text-base mb-2">
+                <p className="text-muted-foreground text-xs md:text-sm mt-1">
                   {query ? (
                     <>
                       Showing results for "<span className="text-foreground font-medium">{query}</span>"
@@ -964,22 +1184,35 @@ export default function SearchPage() {
               )}
             </div>
 
-            {/* Type Filters */}
-            <div className="flex bg-muted/50 p-1 rounded-xl w-full md:w-auto overflow-x-auto hide-scrollbar">
+          </div>
+          
+
+          {/* Sleek Discover Filter Bar (docs/image-8.png / GenrePage style) */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            
+            <PillGroup
+              options={DISCOVER_SORTS}
+              value={discoverSort}
+              onChange={handleDiscoverSortChange}
+              label="Sort"
+            />
+
+            {/* Type Switcher Pills */}
+            <div className="flex bg-muted/40 p-1 rounded-full border border-white/5">
               {[
-                { id: 'all', label: 'All Results' },
-                { id: 'anime', label: 'Anime', icon: <Film className="w-4 h-4" /> },
-                { id: 'manga', label: 'Manga', icon: <BookOpen className="w-4 h-4" /> },
+                { id: 'all', label: 'All' },
+                { id: 'anime', label: 'Anime', icon: <Film className="w-3 h-3" /> },
+                { id: 'manga', label: 'Manga', icon: <BookOpen className="w-3 h-3" /> },
                 { id: 'character', label: 'Characters' }
               ].map(type => (
                 <button
                   key={type.id}
                   onClick={() => setResultType(type.id as any)}
                   className={cn(
-                    "px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all whitespace-nowrap",
+                    "px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all whitespace-nowrap",
                     resultType === type.id
                       ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                      : "text-muted-foreground hover:text-foreground"
                   )}
                 >
                   {type.icon}
@@ -988,107 +1221,190 @@ export default function SearchPage() {
               ))}
             </div>
 
-            {/* Image Search Integration */}
-            <div className="w-full md:w-auto p-4 rounded-2xl bg-muted/30 border border-white/5 backdrop-blur-sm">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 px-1">Search by Image (trace.moe)</p>
-              <div className="flex gap-2">
-                <label className="flex-1 cursor-pointer group">
-                  <div className="flex items-center gap-2 px-4 h-10 rounded-xl bg-white/5 border border-white/10 group-hover:border-primary/50 transition-colors">
-                    <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors overflow-hidden truncate">
-                      {selectedFile ? selectedFile.name : 'Choose frame...'}
-                    </span>
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept="image/*"
-                      onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                    />
-                  </div>
-                </label>
+            {/* Year Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger className={controlTriggerClass}>
+                {minReleaseYear > 0 ? minReleaseYear : 'Any year'}
+                <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className={controlMenuClass}>
+                <DropdownMenuItem
+                  className={controlItemClass}
+                  onSelect={() => {
+                    setMinReleaseYear(0);
+                    setLocalMinReleaseYear(0);
+                  }}
+                >
+                  Any year
+                  {minReleaseYear === 0 && <Check className="h-3.5 w-3.5 text-primary" />}
+                </DropdownMenuItem>
+                {discoverYears().map((value) => (
+                  <DropdownMenuItem
+                    key={value}
+                    className={controlItemClass}
+                    onSelect={() => {
+                      setMinReleaseYear(value);
+                      setLocalMinReleaseYear(value);
+                    }}
+                  >
+                    {value}
+                    {minReleaseYear === value && <Check className="h-3.5 w-3.5 text-primary" />}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
+            {/* Trace.moe image search */}
+            <div className="flex items-center gap-2">
+              <label className={controlTriggerClass}>
+                <span className="max-w-[120px] truncate">{selectedFile ? selectedFile.name : 'Image search'}</span>
+                <input
+                  type="file"
+                  className="hidden"
+                  accept="image/*"
+                  onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                />
+              </label>
+              {selectedFile && (
                 <button
                   onClick={handleImageSearch}
-                  disabled={!selectedFile || isSearchingImage}
-                  className="px-4 h-10 rounded-xl bg-primary text-primary-foreground font-medium hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-w-[100px]"
+                  disabled={isSearchingImage}
+                  className="px-3.5 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-bold hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5"
                 >
-                  {isSearchingImage ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    'Identify'
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <GlassPanel className="mt-5 p-4 md:p-6 space-y-6 border border-white/10 shadow-xl overflow-hidden relative">
-            <div className="flex flex-wrap items-center justify-between gap-4 relative z-10">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowAdvancedAssist((value) => !value)}
-                  className={cn(
-                    "h-10 px-4 rounded-xl text-sm font-bold bg-background/70 border transition-all flex items-center gap-2",
-                    showAdvancedAssist 
-                      ? "border-primary text-primary shadow-lg shadow-primary/10" 
-                      : "border-white/10 text-muted-foreground hover:text-foreground hover:border-white/20"
-                  )}
-                >
-                  <SlidersHorizontal className="w-4 h-4" />
-                  {showAdvancedAssist ? 'Hide Power Filters' : 'Show Power Filters'}
-                  {activeFilterCount > 0 && (
-                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] ml-1">
-                      {activeFilterCount}
-                    </span>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLocalAnimeType('all');
-                    setLocalAnimeStatus('all');
-                    setLocalAnimeGenre('all');
-                    setLocalAnimeSort('default');
-                    setLocalMangaType('all');
-                    setLocalMangaStatus('all');
-                    setLocalMangaGenre('all');
-                    setLocalMangaAdult(false);
-                    setLocalMinRating(0);
-                    setLocalMinReleaseYear(0);
-                    setLocalSortMode('relevance');
-                    
-                    // Immediately apply reset
-                    setAnimeTypeFilter('all');
-                    setAnimeStatusFilter('all');
-                    setAnimeGenreFilter('all');
-                    setAnimeSortFilter('default');
-                    setMangaTypeFilter('all');
-                    setMangaStatusFilter('all');
-                    setMangaGenreFilter('all');
-                    setMangaAdultFilter(false);
-                    setMinRating(0);
-                    setMinReleaseYear(0);
-                    setSortMode('relevance');
-                  }}
-                  className="h-10 px-4 rounded-xl text-xs font-bold uppercase tracking-wide bg-background/70 border border-white/10 text-muted-foreground hover:text-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-all"
-                >
-                  Reset all
-                </button>
-              </div>
-
-              {showAdvancedAssist && (
-                <button
-                  onClick={applyFilters}
-                  className="h-10 px-8 rounded-xl bg-primary text-primary-foreground font-bold hover:scale-105 active:scale-95 transition-all shadow-lg shadow-primary/20 flex items-center gap-2"
-                >
-                  <Search className="w-4 h-4" />
-                  Apply Filters
+                  {isSearchingImage ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Identify'}
                 </button>
               )}
             </div>
 
-            {showAdvancedAssist && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pt-4 animate-in fade-in slide-in-from-top-2 duration-300">
+            {/* Genre Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger className={controlTriggerClass}>
+                <Tag className="h-3.5 w-3.5 opacity-60" />
+                {resolvedAnimeGenre || (animeGenreFilter !== 'all' ? animeGenreFilter : 'Genre')}
+                <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className={controlMenuClass}>
+                <DropdownMenuItem
+                  className={controlItemClass}
+                  onSelect={() => {
+                    setAnimeGenreFilter('all');
+                    setLocalAnimeGenre('all');
+                    setMangaGenreFilter('all');
+                    setLocalMangaGenre('all');
+                  }}
+                >
+                  All genres
+                  {animeGenreFilter === 'all' && <Check className="h-3.5 w-3.5 text-primary" />}
+                </DropdownMenuItem>
+                {animeGenreOptions.map((option) => (
+                  <DropdownMenuItem
+                    key={option.value}
+                    className={controlItemClass}
+                    onSelect={() => {
+                      setAnimeGenreFilter(option.value);
+                      setLocalAnimeGenre(option.label);
+                      setMangaGenreFilter(option.value);
+                      setLocalMangaGenre(option.label);
+                    }}
+                  >
+                    {option.label}
+                    {animeGenreFilter === option.value && <Check className="h-3.5 w-3.5 text-primary" />}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
+
+            {/* Power Filters Button */}
+            <button
+              type="button"
+              onClick={() => setShowAdvancedAssist((val) => !val)}
+              className={cn(
+                "h-8 px-3 rounded-full text-xs font-semibold border transition-all flex items-center gap-1.5",
+                showAdvancedAssist
+                  ? "border-primary text-primary bg-primary/10 shadow-sm"
+                  : "border-white/10 text-muted-foreground hover:text-foreground hover:border-white/20 bg-muted/20"
+              )}
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span>Filters</span>
+              {activeFilterCount > 0 && (
+                <span className="flex items-center justify-center w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] font-bold">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {showAdvancedAssist && (
+            <GlassPanel className="mt-4 p-4 md:p-6 space-y-6 border border-white/10 shadow-xl overflow-hidden relative animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex flex-wrap items-center justify-between gap-4 relative z-10 pb-3 border-b border-white/5">
+                <div className="flex items-center gap-2">
+                  <SlidersHorizontal className="w-4 h-4 text-primary" />
+                  <span className="text-xs font-bold uppercase tracking-wider">Power Filters</span>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLocalAnimeType('all');
+                      setLocalAnimeStatus('all');
+                      setLocalAnimeGenre('all');
+                      setLocalAnimeSort('default');
+                      setLocalMangaType('all');
+                      setLocalMangaStatus('all');
+                      setLocalMangaOrigin('all');
+                      setLocalMangaGenre('all');
+                      setLocalMangaAdult(false);
+                      setLocalMinRating(0);
+                      setLocalMinReleaseYear(0);
+                      setLocalMaxRating(0);
+                      setLocalMaxReleaseYear(0);
+                      setLocalSeason('all');
+                      setLocalMinEpisodes(0);
+                      setLocalMaxEpisodes(0);
+                      setLocalSortMode('relevance');
+
+                      // Immediately apply reset
+                      setAnimeTypeFilter('all');
+                      setAnimeStatusFilter('all');
+                      setAnimeGenreFilter('all');
+                      setAnimeSortFilter('default');
+                      setMangaTypeFilter('all');
+                      setMangaStatusFilter('all');
+                      setMangaOrigin('all');
+                      setMangaGenreFilter('all');
+                      setMangaAdultFilter(false);
+                      setMinRating(0);
+                      setMinReleaseYear(0);
+                      setMaxRating(0);
+                      setMaxReleaseYear(0);
+                      setSeasonFilter('all');
+                      setMinEpisodes(0);
+                      setMaxEpisodes(0);
+                      setSortMode('relevance');
+                      setSelectedAnimeTags([]);
+                      setSelectedMangaTags([]);
+                      setTagSearch('');
+                      setMangaTagSearch('');
+                    }}
+                    className="h-9 px-3.5 rounded-xl text-xs font-bold uppercase tracking-wide bg-background/70 border border-white/10 text-muted-foreground hover:text-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-all"
+                  >
+                    Reset all
+                  </button>
+
+                  <button
+                    onClick={applyFilters}
+                    className="h-9 px-6 rounded-xl bg-primary text-primary-foreground font-bold hover:scale-105 active:scale-95 transition-all shadow-lg shadow-primary/20 flex items-center gap-2 text-xs"
+                  >
+                    <Search className="w-3.5 h-3.5" />
+                    Apply Filters
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pt-2">
                 {/* Anime Section */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 pb-2 border-b border-white/5">
@@ -1144,6 +1460,72 @@ export default function SearchPage() {
                     </select>
                   </div>
 
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Tags className="w-3.5 h-3.5 text-primary" />
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">AniList Tags</p>
+                    </div>
+                    <Input
+                      value={tagSearch}
+                      onChange={(event) => setTagSearch(event.target.value)}
+                      placeholder="Search tags..."
+                      className="h-9 rounded-xl bg-background/80 border-white/10 text-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSpoilerTags((v) => !v)}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors",
+                        showSpoilerTags
+                          ? "border-amber-400/50 bg-amber-400/15 text-amber-300"
+                          : "border-white/10 bg-background/60 text-muted-foreground hover:border-amber-400/30 hover:text-amber-300"
+                      )}
+                    >
+                      {showSpoilerTags ? 'Hiding nothing — spoiler tags shown' : 'Show spoiler tags'}
+                    </button>
+                    {selectedAnimeTags.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedAnimeTags.map((tag) => (
+                          <button
+                            key={tag}
+                            type="button"
+                            title="Remove tag"
+                            onClick={() => setSelectedAnimeTags((current) => current.filter((value) => value !== tag))}
+                            className="rounded-md bg-primary/15 px-2 py-1 text-[10px] font-bold text-primary hover:bg-primary/25"
+                          >
+                            {tag} x
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex max-h-40 flex-col gap-2 overflow-y-auto pr-1">
+                      {filteredTagOptions.map(({ category, tags }) => (
+                        <div key={category} className="space-y-1">
+                          <p className="text-[9px] uppercase tracking-[0.15em] text-muted-foreground/70 font-bold sticky top-0 bg-background/95 py-0.5">{category}</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {tags.map((tag) => (
+                              <button
+                                key={tag.id}
+                                type="button"
+                                title={tag.description || tag.category || tag.name}
+                                onClick={() => setSelectedAnimeTags((current) => current.includes(tag.name) ? current.filter((value) => value !== tag.name) : [...current, tag.name])}
+                                className={cn(
+                                  "rounded-md border px-2 py-1 text-[10px] transition-colors",
+                                  selectedAnimeTags.includes(tag.name)
+                                    ? "border-primary/50 bg-primary/15 text-primary"
+                                    : "border-white/10 bg-background/60 text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                                )}
+                              >
+                                {tag.name}
+                                {tag.isGeneralSpoiler && <span className="ml-1 text-amber-400" title="General spoiler">!</span>}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="space-y-1.5">
                     <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Sort Method</p>
                     <select
@@ -1166,6 +1548,55 @@ export default function SearchPage() {
                   <div className="flex items-center gap-2 pb-2 border-b border-white/5">
                     <BookOpen className="w-4 h-4 text-primary" />
                     <h3 className="text-xs font-black uppercase tracking-[0.2em] text-foreground">Manga Filters</h3>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Origin</p>
+                    <select
+                      value={localMangaOrigin}
+                      onChange={(e) => setLocalMangaOrigin(e.target.value)}
+                      className="w-full h-10 rounded-xl bg-background/80 border border-white/10 px-3 text-sm focus:border-primary/50 outline-none transition-colors"
+                    >
+                      <option value="all">All origins</option>
+                      <option value="JP">Japan (Manga)</option>
+                      <option value="KR">South Korea (Manhwa/Webtoon)</option>
+                      <option value="CN">China (Manhua)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2 rounded-xl border border-white/10 bg-background/50 p-3">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Popular Manhwa / Webtoon Tags</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {['Cultivation', 'Dungeon', 'Necromancy', 'Age Regression', 'Video Games', 'Revenge', 'Survival', 'Martial Arts', 'Post-Apocalyptic'].map((tag) => (
+                        <button
+                          key={`popular-manhwa-${tag}`}
+                          type="button"
+                          onClick={() => setSelectedMangaTags((current) => current.includes(tag) ? current.filter((value) => value !== tag) : [...current, tag])}
+                          className={cn(
+                            "rounded-md border px-2 py-1 text-[10px] transition-colors",
+                            selectedMangaTags.includes(tag) ? "border-primary/50 bg-primary/15 text-primary" : "border-white/10 text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                          )}
+                        >
+                          {tag}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Popular Manga Tags</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {['School', 'Shounen', 'Seinen', 'Shoujo', 'Josei', 'Isekai', 'Cyberpunk', 'Samurai', 'Ninja', 'Family Life'].map((tag) => (
+                        <button
+                          key={`popular-manga-${tag}`}
+                          type="button"
+                          onClick={() => setSelectedMangaTags((current) => current.includes(tag) ? current.filter((value) => value !== tag) : [...current, tag])}
+                          className={cn(
+                            "rounded-md border px-2 py-1 text-[10px] transition-colors",
+                            selectedMangaTags.includes(tag) ? "border-primary/50 bg-primary/15 text-primary" : "border-white/10 text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                          )}
+                        >
+                          {tag}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1221,6 +1652,71 @@ export default function SearchPage() {
                         </option>
                       ))}
                     </select>
+                  </div>
+
+                  <div className="space-y-2 rounded-xl border border-primary/10 bg-primary/5 p-3">
+                    <div className="flex items-center gap-2">
+                      <Tags className="w-3.5 h-3.5 text-primary" />
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">AniList Tags</p>
+                    </div>
+                    <Input
+                      value={mangaTagSearch}
+                      onChange={(event) => setMangaTagSearch(event.target.value)}
+                      placeholder="Search manga tags..."
+                      className="h-9 rounded-xl bg-background/80 border-white/10 text-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSpoilerTags((v) => !v)}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors",
+                        showSpoilerTags
+                          ? "border-amber-400/50 bg-amber-400/15 text-amber-300"
+                          : "border-white/10 bg-background/60 text-muted-foreground hover:border-amber-400/30 hover:text-amber-300"
+                      )}
+                    >
+                      {showSpoilerTags ? 'Spoiler tags shown' : 'Show spoiler tags'}
+                    </button>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedMangaTags.length > 0 ? selectedMangaTags.map((tag) => (
+                        <button
+                          key={`manga-${tag}`}
+                          type="button"
+                          onClick={() => setSelectedMangaTags((current) => current.filter((value) => value !== tag))}
+                          className="rounded-md bg-primary/15 px-2 py-1 text-[10px] font-bold text-primary hover:bg-primary/25"
+                        >
+                          {tag} x
+                        </button>
+                      )) : (
+                        <span className="text-[10px] text-muted-foreground">No manga tags selected</span>
+                      )}
+                    </div>
+                    <div className="flex max-h-40 flex-col gap-2 overflow-y-auto pr-1">
+                      {filteredMangaTagOptions.map(({ category, tags }) => (
+                        <div key={`manga-cat-${category}`} className="space-y-1">
+                          <p className="text-[9px] uppercase tracking-[0.15em] text-muted-foreground/70 font-bold sticky top-0 bg-background/95 py-0.5">{category}</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {tags.map((tag) => (
+                              <button
+                                key={`manga-tag-${tag.id}`}
+                                type="button"
+                                title={tag.description || tag.category || tag.name}
+                                onClick={() => setSelectedMangaTags((current) => current.includes(tag.name) ? current.filter((value) => value !== tag.name) : [...current, tag.name])}
+                                className={cn(
+                                  "rounded-md border px-2 py-1 text-[10px] transition-colors",
+                                  selectedMangaTags.includes(tag.name)
+                                    ? "border-primary/50 bg-primary/15 text-primary"
+                                    : "border-white/10 bg-background/60 text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                                )}
+                              >
+                                {tag.name}
+                                {tag.isGeneralSpoiler && <span className="ml-1 text-amber-400" title="General spoiler">!</span>}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-2 p-3 rounded-xl bg-background/70 border border-white/10 hover:border-primary/30 transition-all cursor-pointer group" onClick={() => setLocalMangaAdult(!localMangaAdult)}>
@@ -1288,13 +1784,89 @@ export default function SearchPage() {
                         placeholder="Any year..."
                       />
                       {localMinReleaseYear > 0 && (
-                        <button 
+                        <button
                           onClick={() => setLocalMinReleaseYear(0)}
                           className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
                         >
                           <X className="w-3 h-3" />
                         </button>
                       )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Max Rating</p>
+                      <span className="text-xs font-bold text-primary">{localMaxRating > 0 ? localMaxRating.toFixed(1) : 'Any'}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={10}
+                      step={0.5}
+                      value={localMaxRating}
+                      onChange={(e) => setLocalMaxRating(Number(e.target.value))}
+                      className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Max Release Year</p>
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        min={1900}
+                        max={new Date().getFullYear() + 1}
+                        value={localMaxReleaseYear || ''}
+                        onChange={(e) => setLocalMaxReleaseYear(Math.max(0, Number(e.target.value) || 0))}
+                        className="h-10 rounded-xl bg-background/80 border-white/10 focus:border-primary/50"
+                        placeholder="Any year..."
+                      />
+                      {localMaxReleaseYear > 0 && (
+                        <button
+                          onClick={() => setLocalMaxReleaseYear(0)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Season <span className="text-muted-foreground/60 normal-case">(anime)</span></p>
+                    <select
+                      value={localSeason}
+                      onChange={(e) => setLocalSeason(e.target.value)}
+                      className="w-full h-10 rounded-xl bg-background/80 border border-white/10 px-3 text-sm focus:border-primary/50 outline-none transition-colors"
+                    >
+                      <option value="all">Any season</option>
+                      <option value="WINTER">Winter</option>
+                      <option value="SPRING">Spring</option>
+                      <option value="SUMMER">Summer</option>
+                      <option value="FALL">Fall</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Episodes <span className="text-muted-foreground/60 normal-case">(anime)</span></p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        type="number"
+                        min={0}
+                        value={localMinEpisodes || ''}
+                        onChange={(e) => setLocalMinEpisodes(Math.max(0, Number(e.target.value) || 0))}
+                        className="h-10 rounded-xl bg-background/80 border-white/10 focus:border-primary/50"
+                        placeholder="Min"
+                      />
+                      <Input
+                        type="number"
+                        min={0}
+                        value={localMaxEpisodes || ''}
+                        onChange={(e) => setLocalMaxEpisodes(Math.max(0, Number(e.target.value) || 0))}
+                        className="h-10 rounded-xl bg-background/80 border-white/10 focus:border-primary/50"
+                        placeholder="Max"
+                      />
                     </div>
                   </div>
 
@@ -1313,10 +1885,16 @@ export default function SearchPage() {
                       className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
                     />
                   </div>
+                  
                 </div>
+                
               </div>
-            )}
-          </GlassPanel>
+              
+            </GlassPanel>
+            
+          )}
+          
+
 
         {/* Image Search Results Overlay/Section */}
         </div>
@@ -1483,11 +2061,7 @@ export default function SearchPage() {
 
         {hasSearchContext ? (
           hybridLoading ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {Array.from({ length: 12 }).map((_, i) => (
-              <CardSkeleton key={i} />
-            ))}
-          </div>
+            <PosterGridSkeleton count={14} className="mt-6" />
           ) : (
           <>
             {showCharacterResults && characterResults.length > 0 && (
@@ -1498,30 +2072,18 @@ export default function SearchPage() {
                   </div>
                   <h2 className="text-2xl font-black tracking-tight">Character <span className="text-primary italic">Matches</span></h2>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {characterResults.map((character: any) => (
-                    <GlassPanel 
-                      key={character.id} 
-                      className="p-3 flex items-center gap-4 hover:bg-white/10 transition-all cursor-pointer group border-white/5 hover:border-primary/30"
-                      onClick={() => navigate(`/character/${character.id}?name=${encodeURIComponent(character.name?.full || character.name || '')}`)}
-                    >
-                      <div className="relative w-16 h-16 flex-shrink-0 overflow-hidden rounded-2xl border border-white/10">
-                        <img
-                          src={character.image?.large || character.image?.medium || character.poster || '/placeholder.svg'}
-                          alt={character.name?.full || character.name || 'Character'}
-                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                          loading="lazy"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-bold text-sm truncate group-hover:text-primary transition-colors">{character.name?.full || character.name}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Registry: AniList</span>
-                          <ChevronRight className="w-3 h-3 text-muted-foreground/40 group-hover:translate-x-1 transition-transform" />
-                        </div>
-                      </div>
-                    </GlassPanel>
+                <div className={POSTER_GRID_CLASS}>
+                  {characterResults.map((character: any) => (
+                    <UnifiedMediaCard
+                      key={character.id}
+                      variant="poster"
+                      item={{
+                        id: String(character.id),
+                        name: character.name?.full || character.name || 'Character',
+                        mediaType: 'character',
+                        poster: character.image?.large || character.image?.medium || character.poster || '/placeholder.svg',
+                      }}
+                    />
                   ))}
                 </div>
               </div>
@@ -1574,15 +2136,11 @@ export default function SearchPage() {
 
             {(showAnimeResults || showMangaResults) && hasMixedResults && (
               <>
-                {resultType === 'anime' && useVirtualGrid ? (
-                  <VirtualAnimeGrid animes={filteredAnimeResults} compact />
-                ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                    {unifiedResults.map((item) => (
-                      <UnifiedMediaCard key={item.id} item={item} />
-                    ))}
-                  </div>
-                )}
+                <div className={POSTER_GRID_CLASS}>
+                  {unifiedResults.map((item) => (
+                    <UnifiedMediaCard key={item.id} item={item} variant="poster" />
+                  ))}
+                </div>
 
                 {/* Infinite Scroll Trigger */}
                 <div ref={scrollRef} className="h-20 mt-8 flex flex-col items-center justify-center gap-3">
@@ -1613,26 +2171,22 @@ export default function SearchPage() {
           </>
           )
         ) : (
-          <div className="text-center py-20">
-            <Search className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Search anime, manga, and characters</h2>
-            <p className="text-muted-foreground">Use the search bar above or switch Manga Feed filters for queryless discovery.</p>
-
+          <div className="mt-8 flex w-full flex-col items-center text-center">
             {recentSearches.length > 0 && (
-              <div className="mt-6">
-                <p className="text-sm text-muted-foreground mb-3">Recent searches</p>
-                <div className="flex flex-wrap gap-2 justify-center">
+              <div className="mb-8 w-full max-w-3xl">
+                <p className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Recent searches</p>
+                <div className="flex flex-wrap justify-center gap-2.5">
                   {recentSearches.map((term, idx) => (
-                    <div key={idx} className="group inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-muted hover:bg-muted/80 text-sm">
+                    <div key={idx} className="group inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-xs transition-all">
                       <button
                         onClick={() => runRecentSearch(term)}
-                        className="font-medium"
+                        className="font-medium text-foreground"
                       >
                         {term}
                       </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); deleteSearchItem(term); }}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity ml-1 text-destructive hover:text-destructive/80"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity ml-1 text-muted-foreground hover:text-destructive"
                         title="Remove"
                       >
                         <X className="w-3 h-3" />
@@ -1642,6 +2196,8 @@ export default function SearchPage() {
                 </div>
               </div>
             )}
+
+            
           </div>
         )}
       </main>

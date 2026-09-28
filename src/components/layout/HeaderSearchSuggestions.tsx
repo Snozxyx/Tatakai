@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Search, Film, BookOpen, Loader2, Clock, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { resolveApiV3Base } from "@/lib/api/backendOrigin";
 
 interface Suggestion {
   id: string | number;
@@ -11,64 +12,30 @@ interface Suggestion {
   type: "anime" | "manga" | "history";
   year?: number | null;
   format?: string | null;
+  countryOfOrigin?: string | null;
 }
 
 async function fetchSuggestions(q: string): Promise<Suggestion[]> {
   if (!q || q.trim().length < 2) return [];
-  const params = new URLSearchParams({ q: q.trim(), perPage: "6" });
-  const [animeRes, mangaRes] = await Promise.allSettled([
-    fetch(`/api/v3/content/search?${params}`).then((r) => r.json()),
-    fetch(`/api/v3/manga/search?${params}&mode=search`).then((r) => r.json()),
-  ]);
+  const params = new URLSearchParams({ q: q.trim() });
+  const raw = await fetch(`${resolveApiV3Base()}/content/search/suggestions?${params}`, {
+    signal: AbortSignal.timeout(4000),
+  }).then((response) => response.json());
 
   const results: Suggestion[] = [];
-
-  if (animeRes.status === "fulfilled") {
-    // API returns { success, data: [...] }
-    const raw = animeRes.value;
-    const mediaArr = Array.isArray(raw?.data)
-      ? raw.data
-      : Array.isArray(raw)
-      ? raw
-      : [];
-    for (const m of mediaArr.slice(0, 4)) {
-      const name = m.titleEnglish || m.titleRomaji || m.titleNative ||
-        m.title?.english || m.title?.romaji || m.title?.native;
-      if (!name || name === "Unknown") continue;
-      results.push({
-        id: m.anilistId ?? m.tatakaiId ?? m.malId ?? m.id,
-        name,
-        poster: m.coverImageLarge || m.coverImageMedium || m.coverImage?.large || null,
-        type: "anime",
-        year: m.startDate?.year ?? m.seasonYear ?? null,
-        format: m.format ?? null,
-      });
-    }
-  }
-
-  if (mangaRes.status === "fulfilled") {
-    const raw = mangaRes.value;
-    const mediaArr = Array.isArray(raw?.data)
-      ? raw.data
-      : Array.isArray(raw)
-      ? raw
-      : [];
-    for (const m of mediaArr.slice(0, 3)) {
-      const name = m.canonicalTitle || m.titleEnglish || m.titleRomaji || m.titleNative ||
-        m.title?.english || m.title?.romaji || m.title?.native;
-      if (!name || name === "Unknown") continue;
-      const id = m.anilistId ?? m.malId ?? m.id;
-      if (!results.some((r) => r.name.toLowerCase() === name.toLowerCase())) {
-        results.push({
-          id,
-          name,
-          poster: m.poster || m.coverImageLarge || m.coverImage?.large || null,
-          type: "manga",
-          year: null,
-          format: m.mediaType ?? m.format ?? "MANGA",
-        });
-      }
-    }
+  const mediaArr = Array.isArray(raw?.data?.media) ? raw.data.media : [];
+  for (const m of mediaArr) {
+    const name = m.titleEnglish || m.titleRomaji || m.titleNative;
+    if (!name || name === "Unknown") continue;
+    results.push({
+      id: m.anilistId ?? m.tatakaiId ?? m.malId,
+      name,
+      poster: m.coverImageLarge || m.coverImageMedium || null,
+      type: m.mediaType === "manga" ? "manga" : "anime",
+      year: m.startDate?.year ?? m.seasonYear ?? null,
+      format: m.format ?? null,
+      countryOfOrigin: m.countryOfOrigin ?? null,
+    });
   }
 
   return results;
@@ -81,9 +48,27 @@ interface Props {
   onClose: () => void;
 }
 
+function formatSuggestionType(item: Suggestion): string {
+  if (item.type !== "manga") return item.format || "Anime";
+  const format = String(item.format || "MANGA").toUpperCase();
+  if (item.countryOfOrigin === "KR") return "Manhwa";
+  if (item.countryOfOrigin === "CN") return "Manhua";
+  if (format === "MANHWA") return "Manhwa";
+  if (format === "MANHUA") return "Manhua";
+  if (format === "OEL") return "Comics";
+  if (format === "ONE_SHOT") return "One-shot";
+  return "Manga";
+}
+
 export function HeaderSearchSuggestions({ query, visible, onSelect, onClose }: Props) {
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
+  const [debouncedQuery, setDebouncedQuery] = useState(query);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query), 350);
+    return () => window.clearTimeout(timer);
+  }, [query]);
 
   const [history, setHistory] = useState<string[]>(() => {
     try {
@@ -95,9 +80,9 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose }: P
   });
 
   const { data: suggestions = [], isFetching } = useQuery({
-    queryKey: ["header-suggestions", query],
-    queryFn: () => fetchSuggestions(query),
-    enabled: visible && query.trim().length >= 2,
+    queryKey: ["header-suggestions", debouncedQuery],
+    queryFn: () => fetchSuggestions(debouncedQuery),
+    enabled: visible && debouncedQuery.trim().length >= 2,
     staleTime: 30_000,
     retry: false,
   });
@@ -117,7 +102,8 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose }: P
 
   const showHistory = query.trim().length < 2 && history.length > 0;
   const showSuggestions = query.trim().length >= 2;
-  const hasContent = showHistory || (showSuggestions && (isFetching || suggestions.length > 0));
+  const isWaitingForQuery = query !== debouncedQuery;
+  const hasContent = showHistory || (showSuggestions && (isWaitingForQuery || isFetching || suggestions.length > 0));
   if (!hasContent) return null;
 
   const handleSelect = (item: Suggestion) => {
@@ -228,7 +214,7 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose }: P
                             : "bg-primary/15 text-primary/80"
                         )}
                       >
-                        {item.type === "manga" ? item.format || "Manga" : item.format || "Anime"}
+                        {formatSuggestionType(item)}
                       </span>
                       {item.year && (
                         <span className="text-[10px] text-muted-foreground">{item.year}</span>

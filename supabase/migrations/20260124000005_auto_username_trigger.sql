@@ -28,10 +28,12 @@ BEGIN
         final_username := base_username;
 
         -- Check for uniqueness and add random suffix if needed
+        -- `END LOOP`, not `END WHILE`: plpgsql has no END WHILE, and CREATE
+        -- FUNCTION validates the body, so this file aborted where it stood.
         WHILE EXISTS (SELECT 1 FROM public.profiles WHERE username = final_username) LOOP
             rand_suffix := floor(random() * 9000 + 1000)::text;
             final_username := base_username || rand_suffix;
-        END WHILE;
+        END LOOP;
 
         NEW.username := final_username;
     END IF;

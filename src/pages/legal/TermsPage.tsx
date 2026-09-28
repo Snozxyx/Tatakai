@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
@@ -30,7 +30,7 @@ export default function TermsPage() {
             Terms and Conditions
           </h1>
           <p className="text-muted-foreground">
-            Last updated: January 11, 2026
+            Last updated: September 28, 2026
           </p>
         </div>
 
@@ -42,6 +42,10 @@ export default function TermsPage() {
             <CardContent className="space-y-4">
               <p>
                 By accessing and using Tatakai, you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service.
+              </p>
+              <p>
+                Any content you post, comment, rate, or otherwise contribute is additionally governed by our{" "}
+                <Link to="/community-guidelines" className="text-primary hover:underline">Community Guidelines</Link>, which form part of these Terms.
               </p>
             </CardContent>
           </Card>
@@ -115,6 +119,12 @@ export default function TermsPage() {
                 <li>Attempt to gain unauthorized access to any portion of the service</li>
                 <li>Interfere with or disrupt the service or servers</li>
               </ul>
+              <p>
+                All posts, comments, and other community contributions must also follow our{" "}
+                <Link to="/community-guidelines" className="text-primary hover:underline">Community Guidelines</Link>.
+                Before your first post or comment you will be asked to confirm that you have read and agree to
+                them. Violations may result in content removal, warnings, suspension, or a permanent ban.
+              </p>
             </CardContent>
           </Card>
 

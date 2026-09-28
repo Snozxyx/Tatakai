@@ -7,12 +7,14 @@ import { Badge } from '@/components/ui/badge';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Loader2, CheckCircle, XCircle, Trash2, Image as ImageIcon } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 export function PendingSuggestions() {
   const { isAdmin } = useAuth();
   const { data: suggestions, isLoading } = useAllSuggestions();
   const reviewSuggestion = useReviewSuggestion();
   const deleteSuggestion = useDeleteSuggestion();
+  const confirm = useConfirm();
   const [adminNotes, setAdminNotes] = useState<Record<string, string>>({});
   const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(null);
 
@@ -29,7 +31,7 @@ export function PendingSuggestions() {
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this suggestion?')) {
+    if (await confirm({ title: 'Are you sure you want to delete this suggestion?', destructive: true })) {
       await deleteSuggestion.mutateAsync(id);
     }
   };

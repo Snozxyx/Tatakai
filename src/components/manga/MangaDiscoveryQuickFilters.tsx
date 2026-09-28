@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Layers, BookOpen, Flame, Clock3, Sparkles, ArrowRight } from "lucide-react";
+import { HomeSectionHeading } from "@/components/home/HomeSectionHeading";
 
 interface FilterConfig {
   key: string;
@@ -49,7 +50,7 @@ const ALL_CARDS: FilterConfig[] = [
     description: "Western comic flow",
     to: "/manga/discover?type=comics",
     icon: BookOpen,
-    poster: "https://cdn.atsu.moe/static/posters/PpYZrYu1LUs0GVYT.jpg",
+    poster: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx100805-3DCHMdZ5blWl.jpg",
     accent: "from-amber-500/60 via-orange-800/30 to-black/85",
     glowColor: "shadow-amber-500/25",
     textColor: "text-amber-300",
@@ -73,7 +74,7 @@ const ALL_CARDS: FilterConfig[] = [
     description: "Recently read this month",
     to: "/manga/discover?feed=recent&window=month",
     icon: Clock3,
-    poster: "https://cdn.atsu.moe/static/posters/smyw3jl9NabpSky6.jpg",
+    poster: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx144946-cscic3n2SwdY.jpg",
     accent: "from-emerald-600/60 via-teal-800/30 to-black/85",
     glowColor: "shadow-emerald-500/25",
     textColor: "text-emerald-300",
@@ -206,20 +207,20 @@ export function MangaDiscoveryQuickFilters() {
   return (
     <section className="relative mb-12">
       {/* Section header */}
-      <div className="flex items-center gap-3 mb-8">
-        <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center border border-primary/30">
-          <Flame className="w-5 h-5 text-primary" />
-        </div>
-        <h2 className="text-2xl lg:text-3xl font-bold font-display tracking-tight">Discovery</h2>
-        <button
-          type="button"
-          onClick={() => navigate("/manga/discover")}
-          className="self-start sm:self-auto inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold text-white/80 hover:text-white hover:bg-white/10 transition-all duration-200 backdrop-blur-sm"
-        >
-          Full Explorer
-          <ArrowRight className="w-3.5 h-3.5" />
-        </button>
-      </div>
+      <HomeSectionHeading
+        icon={<Flame className="w-5 h-5 text-primary" />}
+        title="Discovery"
+        action={
+          <button
+            type="button"
+            onClick={() => navigate("/manga/discover")}
+            className="self-start sm:self-auto inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold text-white/80 hover:text-white hover:bg-white/10 transition-all duration-200 backdrop-blur-sm shrink-0"
+          >
+            Full Explorer
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        }
+      />
 
       {/* Bento Grid */}
       <div

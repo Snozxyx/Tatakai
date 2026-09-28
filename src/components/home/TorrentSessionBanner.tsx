@@ -1,81 +1,104 @@
-import React, { useState, useEffect } from 'react';
+/**
+ * The desktop-only "active torrent sessions" row on the home page.
+ *
+ * The card is `ResumeCard`, shared with the manga continue-reading row: same
+ * poster size, paddings, progress bar and remove affordance. Only the wiring is
+ * local — the 10 s stats poll against `tatakaiRuntime.getTorrentStats`, the
+ * per-session stop, and the clear-all confirmation.
+ */
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, X, Zap, Clock, ExternalLink, Trash2, Loader2 } from 'lucide-react';
-import { GlassPanel } from '@/components/ui/GlassPanel';
+import { 
+  Clock, 
+  Trash2, 
+  Zap, 
+  Activity, 
+  PauseCircle, 
+  ArrowRight,
+  HardDriveDownload
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+import { SectionHeading } from '@/components/anime/discover/SectionHeading';
+import { RESUME_GRID_CLASS, ResumeCard } from '@/components/shared/ResumeCard';
 import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
-import { getLocalTorrentSessionHistory, removeLocalTorrentSessionHistory, clearLocalTorrentSessionHistory, LocalTorrentSessionItem } from '@/lib/localStorage';
+import {
+  getLocalTorrentSessionHistory,
+  removeLocalTorrentSessionHistory,
+  clearLocalTorrentSessionHistory,
+  type LocalTorrentSessionItem,
+} from '@/lib/localStorage';
+
+/** `0 KB/s` while a session is spinning up, MB/s once it is actually moving. */
+function formatSpeed(bytesPerSecond?: number): string {
+  const value = Number(bytesPerSecond || 0);
+  if (!Number.isFinite(value) || value <= 0) return '0 KB/s';
+  if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB/s`;
+  return `${(value / 1024 / 1024).toFixed(1)} MB/s`;
+}
 
 export function TorrentSessionBanner() {
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const isDesktop = useIsDesktopApp();
   const [sessions, setSessions] = useState<LocalTorrentSessionItem[]>([]);
   const [activeSessions, setActiveSessions] = useState<Record<string, any>>({});
-  const [loading, setLoading] = useState(true);
 
-  const loadSessions = async () => {
-    if (!isDesktop) {
-      setLoading(false);
-      return;
-    }
+  const loadSessions = useCallback(async () => {
+    if (!isDesktop) return;
 
     try {
-      // Load history from existing system
       const history = getLocalTorrentSessionHistory();
       setSessions(history);
 
-      // Check for active sessions in the desktop runtime
       if ((window as any).tatakaiRuntime?.getTorrentStats) {
-          const statsMap: Record<string, any> = {};
-          for (const s of history) {
-            try {
-                const stats = await (window as any).tatakaiRuntime.getTorrentStats(s.sessionId);
-                if (stats && stats.success !== false) {
-                    statsMap[s.sessionId] = stats;
-                }
-            } catch (e) {
-                // Ignore errors
+        const statsMap: Record<string, any> = {};
+        for (const item of history) {
+          try {
+            const stats = await (window as any).tatakaiRuntime.getTorrentStats(item.sessionId);
+            if (stats && stats.success !== false) {
+              statsMap[item.sessionId] = stats;
             }
+          } catch {
+            // A session the runtime has already dropped simply stays inactive.
           }
-          setActiveSessions(statsMap);
+        }
+        setActiveSessions(statsMap);
       }
-    } catch (e) {
-      console.error('Failed to load torrent sessions:', e);
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      console.error('Failed to load torrent sessions:', error);
     }
-  };
+  }, [isDesktop]);
 
   useEffect(() => {
     loadSessions();
     const interval = setInterval(loadSessions, 10000);
     return () => clearInterval(interval);
-  }, [isDesktop]);
+  }, [loadSessions]);
 
-  const removeSession = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
+  const removeSession = (id: string) => {
     removeLocalTorrentSessionHistory(id);
-    setSessions(prev => prev.filter(s => s.sessionId !== id));
-    
+    setSessions((prev) => prev.filter((item) => item.sessionId !== id));
+
     if (activeSessions[id]) {
-        (window as any).tatakaiRuntime?.stopTorrentSession?.(id);
-        const newActive = { ...activeSessions };
-        delete newActive[id];
-        setActiveSessions(newActive);
+      (window as any).tatakaiRuntime?.stopTorrentSession?.(id);
+      setActiveSessions((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
     }
   };
 
   const clearAll = async () => {
-    if (window.confirm('Are you sure you want to stop all active torrents and clear history?')) {
-        clearLocalTorrentSessionHistory();
-        setSessions([]);
-        setActiveSessions({});
-        if ((window as any).tatakaiRuntime?.clearAllTorrentData) {
-            await (window as any).tatakaiRuntime.clearAllTorrentData();
-            toast.success('All torrent data cleared');
-        }
+    if (!(await confirm({ title: 'Stop all active torrents and clear the session history?', destructive: true }))) return;
+    clearLocalTorrentSessionHistory();
+    setSessions([]);
+    setActiveSessions({});
+    if ((window as any).tatakaiRuntime?.clearAllTorrentData) {
+      await (window as any).tatakaiRuntime.clearAllTorrentData();
+      toast.success('All torrent data cleared');
     }
   };
 
@@ -83,97 +106,92 @@ export function TorrentSessionBanner() {
     return null;
   }
 
-  return (
-    <div className="mb-12">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-black flex items-center gap-3 tracking-tight">
-          <div className="p-2 rounded-xl bg-primary/10 border border-primary/20">
-            <Zap className="w-5 h-5 text-primary" />
-          </div>
-          Active Torrent Sessions
-        </h2>
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={clearAll}
-          className="text-muted-foreground hover:text-destructive font-bold flex items-center gap-2"
-        >
-          <Trash2 className="w-4 h-4" />
-          Clear All
-        </Button>
-      </div>
+  const activeCount = Object.keys(activeSessions).length;
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+  return (
+    <section className="mb-12 space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <SectionHeading
+        eyebrow="Downloads"
+        title="Torrent Sessions"
+        action={
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearAll}
+            className="group gap-2 rounded-full text-xs font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+          >
+            <Trash2 className="h-3.5 w-3.5 transition-transform group-hover:scale-110" />
+            Clear all
+            {activeCount > 0 && (
+              <span className="ml-1 inline-flex items-center rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-bold text-destructive">
+                {activeCount} live
+              </span>
+            )}
+          </Button>
+        }
+      />
+
+      <div className={RESUME_GRID_CLASS}>
         {sessions.map((session) => {
           const stats = activeSessions[session.sessionId];
-          const isActive = !!stats;
+          const isActive = Boolean(stats);
+          const title = session.animeName || session.torrentName || 'Unknown torrent';
+          const href = `/watch/${
+            session.animeId || `torrent-${session.sessionId}`
+          }?sessionId=${session.sessionId}&torrent=true`;
 
           return (
-            <GlassPanel
+            <ResumeCard
               key={session.sessionId}
-              onClick={() => navigate(`/watch/${session.animeId || 'torrent-' + session.sessionId}?sessionId=${session.sessionId}&torrent=true`)}
-              className={cn(
-                "group relative overflow-hidden border-white/5 hover:border-primary/40 cursor-pointer transition-all duration-300 p-4",
-                isActive ? "bg-primary/5" : "opacity-60 grayscale hover:grayscale-0"
-              )}
-            >
-              <div className="flex gap-4">
-                <div className="relative w-16 h-24 rounded-lg overflow-hidden flex-shrink-0 bg-muted">
-                  {session.animePoster ? (
-                    <img src={session.animePoster} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Zap className="w-6 h-6 text-muted-foreground/20" />
-                    </div>
-                  )}
-                  {isActive && (
-                    <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                      <Loader2 className="w-6 h-6 text-white animate-spin" />
-                    </div>
-                  )}
+              onClick={() => navigate(href)}
+              poster={session.animePoster || undefined}
+              title={title}
+              primaryMeta={
+                isActive ? (
+                  <span className="flex items-center gap-1.5 font-medium text-emerald-400">
+                    <Activity className="h-3 w-3 animate-pulse" />
+                    Downloading
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-white/50">
+                    <PauseCircle className="h-3 w-3" />
+                    Session paused
+                  </span>
+                )
+              }
+              secondaryMeta={
+                <span className="inline-flex items-center gap-1.5 text-white/40">
+                  <Clock className="h-3 w-3" />
+                  {new Date(session.startedAt).toLocaleDateString(undefined, {
+                    month: 'short',
+                    day: 'numeric'
+                  })}
+                </span>
+              }
+              progress={isActive ? Number(stats.progress) : undefined}
+              progressNote={
+                isActive ? (
+                  <span className="flex items-center gap-1 text-[11px] tabular-nums font-medium text-white/70">
+                    <HardDriveDownload className="h-3 w-3" />
+                    {formatSpeed(stats.downloadSpeed)}
+                  </span>
+                ) : undefined
+              }
+              footer={
+                <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-white/40 transition-colors group-hover:text-white/70">
+                  {isActive ? 'Open Player' : 'Resume Session'}
+                  <ArrowRight className="h-3 w-3" />
                 </div>
-
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-bold text-sm truncate group-hover:text-primary transition-colors">
-                    {session.animeName || session.torrentName || 'Unknown Torrent'}
-                  </h3>
-                  <div className="mt-2 space-y-1">
-                    {isActive ? (
-                      <>
-                        <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-primary">
-                          <span>Progress {stats.progress}%</span>
-                          <span>{stats.downloadSpeed ? (stats.downloadSpeed / 1024 / 1024).toFixed(1) + ' MB/s' : '0 KB/s'}</span>
-                        </div>
-                        <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden mt-1">
-                          <div 
-                            className="h-full bg-primary transition-all duration-500" 
-                            style={{ width: `${stats.progress}%` }}
-                          />
-                        </div>
-                        <div className="flex items-center gap-2 mt-1 text-[9px] text-muted-foreground font-medium">
-                          <Clock className="w-3 h-3" />
-                          <span>Started {new Date(session.startedAt).toLocaleDateString()}</span>
-                        </div>
-                      </>
-                    ) : (
-                      <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-widest">
-                        Session Inactive • Click to Resume
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <button
-                  onClick={(e) => removeSession(e, session.sessionId)}
-                  className="absolute top-2 right-2 p-1.5 rounded-full bg-black/40 text-white/40 hover:text-destructive hover:bg-destructive/10 transition-all opacity-0 group-hover:opacity-100"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </GlassPanel>
+              }
+              busy={isActive}
+              dimmed={!isActive}
+              fallbackIcon={Zap}
+              onRemove={() => removeSession(session.sessionId)}
+              removeLabel={`Remove ${title}`}
+            />
           );
         })}
       </div>
-    </div>
+    </section>
   );
 }

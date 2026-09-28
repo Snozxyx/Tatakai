@@ -5,12 +5,14 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { TierListEditor } from '@/components/tierlist/TierListEditor';
 import { TierListGrid } from '@/components/tierlist/TierListCard';
-import { TierListCommentsSection } from '@/components/tierlist/TierListCommentsSection';
+import { Comments } from '@/components/comments/Comments';
+import { Seo } from '@/components/seo/Seo';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserTierLists, usePublicTierLists, useTierListByShareCode, useDeleteTierList, DEFAULT_TIERS } from '@/hooks/user/useTierLists';
 import {
@@ -23,11 +25,49 @@ import {
 } from '@/hooks/user/useTierListCollaboration';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Plus, User, Trash2, Edit, Share2, Heart, Eye, Globe, Lock, MessageSquare, Users, UserPlus } from 'lucide-react';
+import { ArrowLeft, Plus, User, Trash2, Edit, Share2, Heart, Eye, Globe, Lock, Users, UserPlus, Layers, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
+
+// Helper function to resolve item type & link target reliably
+function getItemDetails(item: any) {
+  const rawId = String(item.anime_id || item.id || '');
+  const itemType = String(item.type || item.item_type || item.media_type || '').toLowerCase();
+  const image = String(item.anime_image || item.image || item.poster || '');
+
+  // Legacy items were saved as a bare numeric id with no type marker, so a
+  // character is indistinguishable from an anime by id alone. AniList serves
+  // character art from /anilistcdn/character/... and anime/manga covers from
+  // /anilistcdn/media/... — use that to classify older rows.
+  const imageLooksLikeCharacter = /\/character\//i.test(image);
+
+  const isCharacter =
+    itemType === 'character' ||
+    itemType === 'char' ||
+    /^(char[-_:/]|character[-_:/])/i.test(rawId) ||
+    imageLooksLikeCharacter;
+
+  const isManga =
+    !isCharacter && (
+      itemType === 'manga' ||
+      /^(manga[-_:/])/i.test(rawId)
+    );
+
+  const cleanCharId = rawId.replace(/^(char[-_:/]|character[-_:/])/i, '');
+  const cleanMangaId = rawId.replace(/^manga[-_:/]/i, '');
+  const title = item.anime_title || item.title || item.name || '';
+
+  let linkTo = `/anime/${rawId}`;
+  if (isCharacter) {
+    linkTo = `/char/${encodeURIComponent(cleanCharId)}?name=${encodeURIComponent(title)}`;
+  } else if (isManga) {
+    linkTo = `/manga/${encodeURIComponent(cleanMangaId)}`;
+  }
+
+  return { isCharacter, isManga, linkTo, title };
+}
 
 // Main Tier Lists page - list all public tier lists + user's own
 export default function TierListPage() {
@@ -45,11 +85,6 @@ export default function TierListPage() {
     setShowEditor(true);
   };
 
-  const handleEdit = (tierList: any) => {
-    setEditingTierList(tierList);
-    setShowEditor(true);
-  };
-
   const handleCloseEditor = () => {
     setShowEditor(false);
     setEditingTierList(null);
@@ -62,21 +97,23 @@ export default function TierListPage() {
         <Sidebar />
 
         <main className={`relative z-10 ${isDesktopApp ? 'pl-6' : 'pl-6 md:pl-32'} pr-6 py-6 max-w-[1400px] mx-auto pb-24 md:pb-6`}>
-          <div className="flex items-center gap-4 mb-8">
-            <button
+          <div className="flex items-center gap-4 mb-6">
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={handleCloseEditor}
-              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+              className="rounded-full gap-2 text-muted-foreground hover:text-foreground hover:bg-card/40"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-4 h-4" />
               <span>Back</span>
-            </button>
+            </Button>
           </div>
 
           <div className="mb-8">
-            <h1 className="font-display text-3xl md:text-4xl font-bold mb-2">
+            <h1 className="font-display text-3xl md:text-5xl font-extrabold tracking-tight mb-2 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
               {editingTierList ? 'Edit Tier List' : 'Create Tier List'}
             </h1>
-            <p className="text-muted-foreground">Rank your favorite anime</p>
+            <p className="text-muted-foreground text-base">Rank, reorganize, and refine your anime tier lists.</p>
           </div>
 
           <TierListEditor
@@ -96,24 +133,32 @@ export default function TierListPage() {
       <Sidebar />
 
       <main className={`relative z-10 ${isDesktopApp ? 'pl-6' : 'pl-6 md:pl-32'} pr-6 py-6 max-w-[1400px] mx-auto pb-24 md:pb-6`}>
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <button
+        {/* Navigation Bar */}
+        <div className="flex items-center gap-4 mb-6">
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+            className="rounded-full gap-2 text-muted-foreground hover:text-foreground hover:bg-card/40"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-4 h-4" />
             <span>Back</span>
-          </button>
+          </Button>
         </div>
 
-        <div className="flex items-center justify-between mb-8">
+        {/* Page Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
-            <h1 className="font-display text-3xl md:text-4xl font-bold mb-2">Tier Lists</h1>
-            <p className="text-muted-foreground">Rank and share your anime preferences</p>
+            <h1 className="font-display text-3xl md:text-5xl font-extrabold tracking-tight mb-2 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+              Tier Lists
+            </h1>
+            <p className="text-muted-foreground text-base">Explore community rankings or publish your own custom tiers.</p>
           </div>
           {user && (
-            <Button onClick={handleCreate} className="gap-2">
+            <Button 
+              onClick={handleCreate} 
+              className="rounded-full gap-2 px-6 h-11 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all active:scale-95"
+            >
               <Plus className="w-4 h-4" />
               Create Tier List
             </Button>
@@ -121,14 +166,20 @@ export default function TierListPage() {
         </div>
 
         <Tabs defaultValue={user ? "my-lists" : "community"} className="space-y-6">
-          <TabsList className="bg-muted/50 p-1">
+          <TabsList className="bg-card/30 backdrop-blur-xl border border-border/40 p-1.5 rounded-full inline-flex">
             {user && (
-              <TabsTrigger value="my-lists" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger 
+                value="my-lists" 
+                className="rounded-full px-5 py-2 text-sm gap-2 transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"
+              >
                 <User className="w-4 h-4" />
                 My Lists
               </TabsTrigger>
             )}
-            <TabsTrigger value="community" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger 
+              value="community" 
+              className="rounded-full px-5 py-2 text-sm gap-2 transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"
+            >
               <Globe className="w-4 h-4" />
               Community
             </TabsTrigger>
@@ -137,11 +188,20 @@ export default function TierListPage() {
           {user && (
             <TabsContent value="my-lists">
               {loadingUser ? (
-                <div className="text-center py-12 text-muted-foreground">Loading...</div>
+                <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
+                  <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                  <span className="text-sm font-medium">Fetching your tier lists...</span>
+                </div>
               ) : userTierLists.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground mb-4">You haven't created any tier lists yet</p>
-                  <Button onClick={handleCreate} className="gap-2">
+                <div className="w-full flex flex-col items-center justify-center py-24 px-4 text-center bg-card/10 backdrop-blur-sm border border-dashed border-border/50 rounded-[2rem]">
+                  <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4 text-primary">
+                    <Layers className="w-8 h-8" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-2">No Tier Lists Yet</h3>
+                  <p className="text-muted-foreground max-w-sm mb-6 text-sm">
+                    Create custom rankings for your favorite anime, characters, or manga series.
+                  </p>
+                  <Button onClick={handleCreate} className="rounded-full gap-2 px-6 h-11">
                     <Plus className="w-4 h-4" />
                     Create Your First Tier List
                   </Button>
@@ -157,11 +217,14 @@ export default function TierListPage() {
 
           <TabsContent value="community">
             {loadingPublic ? (
-              <div className="text-center py-12 text-muted-foreground">Loading...</div>
+              <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
+                <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                <span className="text-sm font-medium">Loading community tier lists...</span>
+              </div>
             ) : (
               <TierListGrid
                 tierLists={publicTierLists}
-                emptyMessage="No public tier lists yet. Be the first to create one!"
+                emptyMessage="No community tier lists found."
               />
             )}
           </TabsContent>
@@ -186,9 +249,11 @@ export function TierListViewPage() {
   const addCollaborator = useAddTierListCollaborator();
   const updateCollaboratorRole = useUpdateTierListCollaboratorRole();
   const removeCollaborator = useRemoveTierListCollaborator();
+  const confirm = useConfirm();
 
   const [collaboratorSearch, setCollaboratorSearch] = useState('');
   const [newCollaboratorRole, setNewCollaboratorRole] = useState<TierCollaboratorRole>('editor');
+  const [showCollaboratorsModal, setShowCollaboratorsModal] = useState(false);
 
   const canEdit = user?.id === tierList?.user_id || !!tierListAccess?.canEdit;
   const canManageCollaborators = user?.id === tierList?.user_id || !!tierListAccess?.canManage;
@@ -227,7 +292,7 @@ export function TierListViewPage() {
   };
 
   const handleDelete = async () => {
-    if (!tierList || !confirm('Are you sure you want to delete this tier list?')) return;
+    if (!tierList || !(await confirm({ title: 'Are you sure you want to delete this tier list?', destructive: true }))) return;
 
     try {
       await deleteMutation.mutateAsync(tierList.id);
@@ -269,19 +334,21 @@ export function TierListViewPage() {
     });
   };
 
-  const handleWatchWithFriends = (animeId: string, animeTitle: string, animeImage: string) => {
-    if (animeId.startsWith('char-')) {
+  const handleWatchWithFriends = (item: any) => {
+    const { isCharacter, isManga, title } = getItemDetails(item);
+    
+    if (isCharacter || isManga) {
       toast.info('Watch rooms can only be launched for anime entries');
       return;
     }
 
     const params = new URLSearchParams({
-      anime: animeId,
-      title: animeTitle,
+      anime: String(item.anime_id),
+      title: title,
     });
 
-    if (animeImage) {
-      params.set('poster', animeImage);
+    if (item.anime_image) {
+      params.set('poster', item.anime_image);
     }
 
     navigate(`/isshoni?${params.toString()}`);
@@ -292,17 +359,28 @@ export function TierListViewPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-muted-foreground">Loading...</div>
+        <div className="flex flex-col items-center gap-3 text-muted-foreground">
+          <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+          <span className="text-sm font-medium">Loading tier list...</span>
+        </div>
       </div>
     );
   }
 
   if (error || !tierList) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-muted-foreground mb-4">Tier list not found or is private</p>
-          <Button onClick={() => navigate('/tierlists')}>Browse Tier Lists</Button>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="bg-card/20 backdrop-blur-xl border border-border/40 p-8 rounded-[2rem] text-center max-w-md w-full shadow-2xl">
+          <div className="w-12 h-12 bg-muted/50 rounded-full flex items-center justify-center mx-auto mb-4 text-muted-foreground">
+            <Lock className="w-6 h-6" />
+          </div>
+          <h2 className="text-xl font-bold mb-2">Tier List Unavailable</h2>
+          <p className="text-muted-foreground text-sm mb-6">
+            This tier list might be private or may have been deleted.
+          </p>
+          <Button onClick={() => navigate('/tierlists')} className="rounded-full px-6 w-full">
+            Browse Tier Lists
+          </Button>
         </div>
       </div>
     );
@@ -314,256 +392,347 @@ export function TierListViewPage() {
       <Sidebar />
 
       <main className={`relative z-10 ${isDesktopApp ? 'pl-6' : 'pl-6 md:pl-32'} pr-6 py-6 max-w-[1400px] mx-auto pb-24 md:pb-6`}>
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <button
+        {/* Navigation Bar */}
+        <div className="flex items-center gap-4 mb-6">
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+            className="rounded-full gap-2 text-muted-foreground hover:text-foreground hover:bg-card/40"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-4 h-4" />
             <span>Back</span>
-          </button>
+          </Button>
         </div>
 
-        <GlassPanel className="p-6 mb-6">
-          <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
+        {/* Tier List Card Header */}
+        {tierList && (
+          <Seo
+            title={tierList.name || (tierList as any).title || 'Tier List'}
+            description={tierList.description || `A tier list by ${tierList.profiles?.display_name || tierList.profiles?.username || 'a Tatakai member'}.`}
+            canonicalPath={`/tierlist/${shareCode}`}
+            kind="website"
+            suffix=" — Tatakai Tier List"
+          />
+        )}
+        <div className="bg-card/20 backdrop-blur-xl border border-border/40 p-6 md:p-8 rounded-[2rem] mb-6 shadow-xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 blur-[100px] rounded-full pointer-events-none" />
+          
+          <div className="relative z-10 flex flex-col md:flex-row md:items-start justify-between gap-6">
+            <div className="space-y-3 max-w-2xl">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-muted/40 border border-white/5 text-xs font-semibold text-muted-foreground">
                 {tierList.is_public ? (
-                  <Globe className="w-4 h-4 text-green-500" />
+                  <>
+                    <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Public Tier List</span>
+                  </>
                 ) : (
-                  <Lock className="w-4 h-4 text-muted-foreground" />
+                  <>
+                    <Lock className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Private Tier List</span>
+                  </>
                 )}
-                <span className="text-sm text-muted-foreground">
-                  {tierList.is_public ? 'Public' : 'Private'}
-                </span>
               </div>
-              <h1 className="font-display text-3xl md:text-4xl font-bold mb-2">{tierList.name}</h1>
+
+              <h1 className="font-display text-3xl md:text-5xl font-extrabold tracking-tight">
+                {tierList.name}
+              </h1>
+
               {tierList.description && (
-                <p className="text-muted-foreground">{tierList.description}</p>
+                <p className="text-muted-foreground text-base leading-relaxed">
+                  {tierList.description}
+                </p>
               )}
             </div>
 
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={handleShare} className="gap-2">
-                <Share2 className="w-4 h-4" />
-                Share
-              </Button>
-              {canEdit && (
-                <>
-                  <Button variant="outline" size="sm" onClick={() => navigate(`/tierlists/edit/${tierList.id}`)} className="gap-2">
-                    <Edit className="w-4 h-4" />
-                    Edit
-                  </Button>
-                </>
+            <div className="flex items-center gap-2.5 flex-wrap">
+              {/* Collaborators Modal Icon Trigger */}
+              {(canManageCollaborators || collaborators.length > 0) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowCollaboratorsModal(true)}
+                  className="rounded-full gap-2 bg-card/30 border-border/50 hover:bg-card/60 backdrop-blur-md relative"
+                  title="Manage Collaborators"
+                >
+                  <Users className="w-4 h-4 text-primary" />
+                  <span>Collaborators</span>
+                  {collaborators.length > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 rounded-full bg-primary/20 text-primary text-xs font-bold">
+                      {collaborators.length}
+                    </span>
+                  )}
+                </Button>
               )}
+
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleShare} 
+                className="rounded-full gap-2 bg-card/30 border-border/50 hover:bg-card/60 backdrop-blur-md"
+              >
+                <Share2 className="w-4 h-4" />
+                <span>Share</span>
+              </Button>
+
+              {canEdit && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => navigate(`/tierlists/edit/${tierList.id}`)} 
+                  className="rounded-full gap-2 bg-card/30 border-border/50 hover:bg-card/60 backdrop-blur-md"
+                >
+                  <Edit className="w-4 h-4" />
+                  <span>Edit</span>
+                </Button>
+              )}
+
               {isOwner && (
-                <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleDelete}
-                    disabled={deleteMutation.isPending}
-                    className="gap-2 text-red-500 hover:text-red-600"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Delete
-                  </Button>
-                </>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDelete}
+                  disabled={deleteMutation.isPending}
+                  className="rounded-full gap-2 bg-rose-500/10 border-rose-500/20 text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 backdrop-blur-md"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Delete</span>
+                </Button>
               )}
             </div>
           </div>
 
-          {/* Author info */}
+          {/* Author Meta */}
           {tierList.profiles && (
-            <div className="flex items-center justify-between mt-6 pt-6 border-t border-muted">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-8 pt-6 border-t border-border/30">
               <Link
                 to={`/user/${tierList.profiles.username}`}
-                className="flex items-center gap-3 hover:text-primary transition-colors"
+                className="flex items-center gap-3 group"
               >
-                <Avatar>
+                <Avatar className="w-10 h-10 ring-2 ring-primary/20">
                   <AvatarImage src={tierList.profiles.avatar_url || undefined} />
-                  <AvatarFallback>
-                    <User className="w-4 h-4" />
+                  <AvatarFallback className="bg-muted">
+                    <User className="w-5 h-5 text-muted-foreground" />
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="font-medium">{tierList.profiles.username || tierList.profiles.display_name || 'Anonymous'}</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="font-semibold text-sm group-hover:text-primary transition-colors">
+                    {tierList.profiles.username || tierList.profiles.display_name || 'Anonymous'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
                     Created {formatDistanceToNow(new Date(tierList.created_at), { addSuffix: true })}
                   </p>
                 </div>
               </Link>
 
-              <div className="flex items-center gap-6 text-muted-foreground">
-                <span className="flex items-center gap-2">
+              <div className="flex items-center gap-5 text-xs font-medium text-muted-foreground bg-muted/20 px-4 py-2 rounded-full border border-white/5 self-start sm:self-auto">
+                <span className="flex items-center gap-1.5">
                   <Eye className="w-4 h-4" />
                   {tierList.views_count || 0} views
                 </span>
-                <span className="flex items-center gap-2">
-                  <Heart className={cn("w-4 h-4", tierList.user_liked && "text-red-500 fill-current")} />
+                <span className="w-1 h-1 rounded-full bg-border" />
+                <span className="flex items-center gap-1.5">
+                  <Heart className={cn("w-4 h-4", tierList.user_liked && "text-rose-500 fill-current")} />
                   {tierList.likes_count || 0} likes
                 </span>
               </div>
             </div>
           )}
-        </GlassPanel>
+        </div>
 
-        {(canManageCollaborators || collaborators.length > 0) && (
-          <GlassPanel className="p-6 mb-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Users className="w-5 h-5 text-primary" />
-              <h2 className="font-semibold text-lg">Collaborators</h2>
-            </div>
+        {/* Collaborators Pop-up Modal */}
+        {showCollaboratorsModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
+            <div 
+              className="fixed inset-0" 
+              onClick={() => setShowCollaboratorsModal(false)} 
+            />
+            
+            <GlassPanel className="relative z-10 w-full max-w-lg p-6 rounded-[2rem] border-border/40 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200 max-h-[85vh] overflow-y-auto">
+              <div className="flex items-center justify-between pb-3 border-b border-border/30">
+                <div className="flex items-center gap-2">
+                  <Users className="w-5 h-5 text-primary" />
+                  <h2 className="font-bold text-lg">Manage Collaborators</h2>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-full h-8 w-8 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowCollaboratorsModal(false)}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
 
-            <div className="space-y-3">
-              {collaborators.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No collaborators yet.</p>
-              ) : (
-                collaborators.map((collaborator) => {
-                  const displayName = collaborator.profile?.display_name || collaborator.profile?.username || collaborator.user_id;
+              {/* Existing Collaborators */}
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Current Collaborators
+                </p>
 
-                  return (
-                    <div key={collaborator.id} className="p-3 rounded-lg bg-muted/30 border border-border/50 flex items-center gap-3">
-                      <Avatar className="w-8 h-8">
-                        <AvatarImage src={collaborator.profile?.avatar_url || undefined} />
-                        <AvatarFallback>{(displayName?.[0] || 'U').toUpperCase()}</AvatarFallback>
-                      </Avatar>
+                {collaborators.length === 0 ? (
+                  <p className="text-sm text-muted-foreground italic py-2">No collaborators added yet.</p>
+                ) : (
+                  collaborators.map((collaborator) => {
+                    const displayName = collaborator.profile?.display_name || collaborator.profile?.username || collaborator.user_id;
 
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{displayName}</p>
-                        <p className="text-xs text-muted-foreground truncate">@{collaborator.profile?.username || 'unknown'}</p>
-                      </div>
+                    return (
+                      <div key={collaborator.id} className="p-3.5 rounded-2xl bg-card/40 border border-border/40 flex items-center gap-3">
+                        <Avatar className="w-9 h-9">
+                          <AvatarImage src={collaborator.profile?.avatar_url || undefined} />
+                          <AvatarFallback>{(displayName?.[0] || 'U').toUpperCase()}</AvatarFallback>
+                        </Avatar>
 
-                      {canManageCollaborators ? (
-                        <div className="flex items-center gap-2">
-                          <select
-                            value={collaborator.role}
-                            onChange={(event) => handleUpdateCollaboratorRole(collaborator.id, event.target.value as TierCollaboratorRole)}
-                            className="h-8 rounded-md border border-border bg-background px-2 text-xs"
-                          >
-                            <option value="viewer">viewer</option>
-                            <option value="editor">editor</option>
-                            <option value="owner">owner</option>
-                          </select>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                            onClick={() => handleRemoveCollaborator(collaborator.id)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold truncate">{displayName}</p>
+                          <p className="text-xs text-muted-foreground truncate">@{collaborator.profile?.username || 'unknown'}</p>
                         </div>
-                      ) : (
-                        <span className="px-2 py-1 rounded-full bg-muted text-muted-foreground text-xs uppercase">{collaborator.role}</span>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
 
-            {canManageCollaborators && (
-              <div className="mt-5 pt-5 border-t border-border space-y-3">
-                <div className="flex items-center gap-2 text-sm font-semibold">
-                  <UserPlus className="w-4 h-4 text-primary" />
-                  Add collaborator
-                </div>
-
-                <div className="flex gap-2">
-                  <Input
-                    value={collaboratorSearch}
-                    onChange={(event) => setCollaboratorSearch(event.target.value)}
-                    placeholder="Search username or display name"
-                  />
-                  <select
-                    value={newCollaboratorRole}
-                    onChange={(event) => setNewCollaboratorRole(event.target.value as TierCollaboratorRole)}
-                    className="h-10 rounded-md border border-border bg-background px-2 text-sm"
-                  >
-                    <option value="viewer">viewer</option>
-                    <option value="editor">editor</option>
-                    <option value="owner">owner</option>
-                  </select>
-                </div>
-
-                {collaboratorSearch.trim().length >= 2 && (
-                  <div className="max-h-44 overflow-y-auto rounded-lg border border-border/60 bg-muted/30 divide-y divide-border/50">
-                    {collaboratorSearchResults.length === 0 ? (
-                      <p className="text-sm text-muted-foreground p-3">No matching users found.</p>
-                    ) : (
-                      collaboratorSearchResults.map((profile) => {
-                        const displayName = profile.display_name || profile.username || profile.user_id;
-
-                        return (
-                          <div key={profile.user_id} className="p-3 flex items-center gap-3">
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src={profile.avatar_url || undefined} />
-                              <AvatarFallback>{(displayName?.[0] || 'U').toUpperCase()}</AvatarFallback>
-                            </Avatar>
-
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{displayName}</p>
-                              <p className="text-xs text-muted-foreground truncate">@{profile.username || 'unknown'}</p>
-                            </div>
-
-                            <Button size="sm" onClick={() => handleAddCollaborator(profile.user_id)}>
-                              Add
+                        {canManageCollaborators ? (
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={collaborator.role}
+                              onChange={(event) => handleUpdateCollaboratorRole(collaborator.id, event.target.value as TierCollaboratorRole)}
+                              className="h-8 rounded-full border border-border/60 bg-background/80 px-3 text-xs font-medium focus:ring-1 focus:ring-primary"
+                            >
+                              <option value="viewer">viewer</option>
+                              <option value="editor">editor</option>
+                              <option value="owner">owner</option>
+                            </select>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-full text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10"
+                              onClick={() => handleRemoveCollaborator(collaborator.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
-                        );
-                      })
-                    )}
-                  </div>
+                        ) : (
+                          <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase tracking-wider">
+                            {collaborator.role}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })
                 )}
               </div>
-            )}
-          </GlassPanel>
+
+              {/* Add New Collaborators */}
+              {canManageCollaborators && (
+                <div className="pt-4 border-t border-border/30 space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold">
+                    <UserPlus className="w-4 h-4 text-primary" />
+                    Add New Collaborator
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Input
+                      value={collaboratorSearch}
+                      onChange={(event) => setCollaboratorSearch(event.target.value)}
+                      placeholder="Search username or display name..."
+                      className="rounded-full bg-background/50 border-border/50"
+                    />
+                    <select
+                      value={newCollaboratorRole}
+                      onChange={(event) => setNewCollaboratorRole(event.target.value as TierCollaboratorRole)}
+                      className="h-10 rounded-full border border-border/50 bg-background/50 px-3 text-sm font-medium focus:ring-1 focus:ring-primary"
+                    >
+                      <option value="viewer">viewer</option>
+                      <option value="editor">editor</option>
+                      <option value="owner">owner</option>
+                    </select>
+                  </div>
+
+                  {collaboratorSearch.trim().length >= 2 && (
+                    <div className="max-h-44 overflow-y-auto rounded-2xl border border-border/50 bg-card/60 backdrop-blur-md divide-y divide-border/30">
+                      {collaboratorSearchResults.length === 0 ? (
+                        <p className="text-sm text-muted-foreground p-3.5 text-center">No matching users found.</p>
+                      ) : (
+                        collaboratorSearchResults.map((profile) => {
+                          const displayName = profile.display_name || profile.username || profile.user_id;
+
+                          return (
+                            <div key={profile.user_id} className="p-3 flex items-center gap-3 hover:bg-card/80 transition-colors">
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage src={profile.avatar_url || undefined} />
+                                <AvatarFallback>{(displayName?.[0] || 'U').toUpperCase()}</AvatarFallback>
+                              </Avatar>
+
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{displayName}</p>
+                                <p className="text-xs text-muted-foreground truncate">@{profile.username || 'unknown'}</p>
+                              </div>
+
+                              <Button size="sm" onClick={() => handleAddCollaborator(profile.user_id)} className="rounded-full px-4 h-8 text-xs">
+                                Add
+                              </Button>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </GlassPanel>
+          </div>
         )}
 
-        {/* Tier Rows */}
-        <div className="space-y-2">
+        {/* Tier List Grid Display */}
+        <div className="space-y-3">
           {DEFAULT_TIERS.map(tier => {
             const tierItems = tierList.items.filter(i => i.tier === tier.name);
             return (
-              <div key={tier.name} className="flex border border-muted rounded-lg overflow-hidden bg-muted/10">
+              <div 
+                key={tier.name} 
+                className="flex border border-border/40 rounded-2xl overflow-hidden bg-card/20 backdrop-blur-xl shadow-lg min-h-[96px]"
+              >
+                {/* Tier Color Label */}
                 <div
-                  className="w-16 md:w-20 flex-shrink-0 flex items-center justify-center font-bold text-2xl md:text-3xl text-white"
-                  style={{ backgroundColor: tier.color }}
+                  className="w-20 md:w-28 flex-shrink-0 flex items-center justify-center font-black text-2xl md:text-4xl shadow-inner relative"
+                  style={{ 
+                    backgroundColor: tier.color, 
+                    color: 'rgba(255,255,255,0.95)',
+                    textShadow: '0 2px 6px rgba(0,0,0,0.35)'
+                  }}
                 >
                   {tier.name}
                 </div>
-                <div className="flex-1 min-h-[80px] md:min-h-[100px] p-2 flex flex-wrap gap-2">
+
+                {/* Tier Content Grid */}
+                <div className="flex-1 p-3 flex flex-wrap items-center gap-2.5">
                   {tierItems.map(item => {
-                    const isCharacter = item.anime_id.startsWith('char-');
-                    const charId = item.anime_id.replace('char-', '');
-                    const linkTo = isCharacter
-                      ? `/char/${encodeURIComponent(charId)}?name=${encodeURIComponent(item.anime_title)}`
-                      : `/anime/${item.anime_id}`;
+                    const { isCharacter, isManga, linkTo, title } = getItemDetails(item);
 
                     return (
-                      <div key={item.anime_id} className="group relative w-14 h-20 md:w-16 md:h-24 rounded-lg overflow-hidden">
+                      <div 
+                        key={item.anime_id} 
+                        className="group relative w-16 h-24 md:w-20 md:h-28 rounded-xl overflow-hidden bg-background/50 shadow-md border border-white/10 hover:border-primary/50 transition-all duration-300"
+                      >
                         <Link to={linkTo} className="block w-full h-full">
                           <img
                             src={item.anime_image}
-                            alt={item.anime_title}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                            alt={title}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                           />
-                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-1">
-                            <p className="text-[10px] text-white text-center line-clamp-3">{item.anime_title}</p>
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-1.5">
+                            <p className="text-[10px] leading-tight font-medium text-white text-center w-full line-clamp-3">
+                              {title}
+                            </p>
                           </div>
                         </Link>
 
-                        {!isCharacter && (
+                        {!isCharacter && !isManga && (
                           <button
                             type="button"
                             onClick={(event) => {
                               event.preventDefault();
                               event.stopPropagation();
-                              handleWatchWithFriends(item.anime_id, item.anime_title, item.anime_image);
+                              handleWatchWithFriends(item);
                             }}
-                            className="absolute top-1 left-1 h-6 w-6 rounded-full bg-black/70 border border-white/20 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute top-1.5 right-1.5 h-7 w-7 rounded-full bg-black/70 backdrop-blur-md border border-white/20 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-primary hover:border-primary shadow-lg"
                             title="Watch with friends"
                           >
                             <Users className="w-3.5 h-3.5" />
@@ -572,9 +741,10 @@ export function TierListViewPage() {
                       </div>
                     );
                   })}
+
                   {tierItems.length === 0 && (
-                    <div className="flex items-center justify-center w-full text-muted-foreground text-sm">
-                      No anime in this tier
+                    <div className="flex items-center justify-center w-full h-full text-muted-foreground/40 text-xs font-medium italic">
+                      No items in this tier
                     </div>
                   )}
                 </div>
@@ -584,8 +754,8 @@ export function TierListViewPage() {
         </div>
 
         {/* Comments Section */}
-        <GlassPanel className="p-6 mt-8">
-          <TierListCommentsSection tierListId={tierList.id} />
+        <GlassPanel className="p-6 md:p-8 mt-8 rounded-[2rem] border-border/40">
+          <Comments entityType="tier_list" entityId={tierList.id} entityName={tierList.name} />
         </GlassPanel>
       </main>
 
@@ -593,4 +763,3 @@ export function TierListViewPage() {
     </div>
   );
 }
-

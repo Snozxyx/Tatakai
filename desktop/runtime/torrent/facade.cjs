@@ -1,49 +1,21 @@
 'use strict';
 
-const { searchTorrentCandidates } = require('./core/candidate-discovery.cjs');
 const { TorrentSessionManager } = require('./session/session-manager.cjs');
 const { createPlaybackManifest } = require('./streaming/stream-bridge.cjs');
-const { buildDisplayTitleFromRelease, buildQualityBadge } = require('./naming/display-title-builder.cjs');
 const { detectBatchTorrentLayout } = require('./naming/batch-detector.cjs');
 
 /**
  * TorrentFacade — public API for the TatakaiTorrentCore system.
  *
  * Consumed by ipc-torrent.cjs IPC handlers.
- * Methods map directly to IPC channels: torrent:search, torrent:start, etc.
+ * Methods map directly to IPC channels: torrent:start, torrent:stream, etc.
+ * The torrent engine is a content-neutral transport: it downloads from a
+ * user-supplied magnet/torrent. It does not index or search for content.
  */
 class TorrentFacade {
     constructor({ app, fs, path, logger, getMainWindow }) {
         this._logger = logger;
         this._sessions = new TorrentSessionManager({ app, fs, path, logger, getMainWindow });
-    }
-
-    // ── torrent:search ────────────────────────────────────────────────────────
-
-    async search(options) {
-        try {
-            if (process.env.TATAKAI_DISABLE_TORRENT === '1') {
-                return { success: true, candidates: [], disabled: true };
-            }
-
-            const result = await searchTorrentCandidates(options || {});
-
-            // Enrich each candidate with display metadata
-            const enriched = (result.candidates || []).map((c) => ({
-                ...c,
-                displayTitle: buildDisplayTitleFromRelease(c.parsed),
-                qualityBadge: buildQualityBadge(c.parsed),
-            }));
-
-            return {
-                success: result.success,
-                candidates: enriched,
-                source: result.source,
-            };
-        } catch (err) {
-            this._logger.error('[Torrent] search failed:', err.message);
-            return { success: false, error: err.message, candidates: [] };
-        }
     }
 
     // ── torrent:start ─────────────────────────────────────────────────────────

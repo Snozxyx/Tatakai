@@ -1,5 +1,5 @@
 import { ArrowLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Background } from '@/components/layout/Background';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
@@ -30,7 +30,7 @@ export default function PrivacyPage() {
             <h1 className="text-4xl md:text-5xl font-display font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
               Privacy Policy
             </h1>
-            <p className="text-muted-foreground">Last updated: January 11, 2026</p>
+            <p className="text-muted-foreground">Last updated: September 28, 2026</p>
           </div>
 
           {/* Content */}
@@ -87,7 +87,7 @@ export default function PrivacyPage() {
               </p>
               <ul className="list-disc list-inside space-y-2 text-muted-foreground ml-4">
                 <li>Encrypted data transmission (HTTPS/TLS)</li>
-                <li>Secure authentication via Supabase</li>
+                <li>Secure authentication </li>
                 <li>Regular security audits and updates</li>
                 <li>Access controls and monitoring</li>
               </ul>
@@ -129,9 +129,8 @@ export default function PrivacyPage() {
                 Our service integrates with third-party providers:
               </p>
               <ul className="list-disc list-inside space-y-2 text-muted-foreground ml-4">
-                <li><strong>Supabase:</strong> Authentication and database hosting</li>
-                <li><strong>Vercel:</strong> Website hosting and deployment</li>
                 <li><strong>External APIs:</strong> Anime data and images</li>
+                <li><strong>External Services:</strong> Video streaming and playback</li>
               </ul>
               <p className="text-muted-foreground leading-relaxed mt-3">
                 These services have their own privacy policies. We recommend reviewing them.
@@ -176,7 +175,9 @@ export default function PrivacyPage() {
 
             <div className="border-t border-border pt-6 mt-8">
               <p className="text-sm text-muted-foreground text-center">
-                By using Tatakai, you agree to this Privacy Policy and our Terms of Service.
+                By using Tatakai, you agree to this Privacy Policy, our{' '}
+                <Link to="/terms" className="text-primary hover:underline">Terms of Service</Link>, and{' '}
+                <Link to="/community-guidelines" className="text-primary hover:underline">Community Guidelines</Link>.
               </p>
             </div>
           </GlassPanel>

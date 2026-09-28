@@ -13,6 +13,28 @@
 
 const BASE_URL = `${import.meta.env.VITE_BACKEND_ORIGIN}/api/v3`;
 
+/**
+ * Absolute origin of the Tatakai backend (no `/api/v3` suffix). Prefers
+ * `VITE_BACKEND_ORIGIN`, then the origin of `VITE_TATAKAI_API_URL`, then the
+ * current page origin (web dev, where Vite proxies `/api/*`). Never returns a
+ * bare relative path so `app://tatakai.me` on desktop can't intercept it.
+ */
+function resolveBackendOrigin(): string {
+  const explicit = String(import.meta.env.VITE_BACKEND_ORIGIN || "").trim();
+  if (/^https?:\/\//i.test(explicit)) return explicit.replace(/\/+$/, "");
+
+  const apiUrl = String(import.meta.env.VITE_TATAKAI_API_URL || "").trim();
+  try {
+    if (apiUrl) return new URL(apiUrl).origin;
+  } catch {
+    /* fall through */
+  }
+  if (typeof window !== "undefined" && window.location.protocol.startsWith("http")) {
+    return window.location.origin;
+  }
+  return "";
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -167,23 +189,31 @@ export async function fetchMarketplaceExtensions(
  * Downloads a `.kai` extension bundle from the given URL and returns it as
  * an `ArrayBuffer` ready to be passed to `extension:load-kai`.
  *
- * Routes through the existing `/api/proxy/raw` backend endpoint to avoid
- * browser CORS restrictions on external CDNs (e.g. raw.githubusercontent.com).
+ * Routes through a dedicated `/api/proxy/extension` endpoint to avoid
+ * browser CORS restrictions on GitHub release assets (which block cross-origin redirects).
  *
- * Requirements: 16.3
+ * The proxy path is resolved against the absolute backend origin, never left
+ * relative. On desktop the renderer runs from `app://tatakai.me`, where a
+ * relative `/api/proxy/extension` is intercepted by the app:// file handler and
+ * SPA-falls-back to `index.html` — the downloader then fed that HTML to JSZip
+ * ("Can't find end of central directory"). Hitting the real backend (which
+ * already answers every other renderer API call cross-origin) returns the
+ * actual `.kai` bytes.
  */
 export async function downloadExtensionKai(mainUrl: string): Promise<ArrayBuffer> {
   const isHttpUrl = /^https?:\/\//i.test(mainUrl);
 
   if (isHttpUrl) {
     try {
-      const proxyUrl = `/api/proxy/raw?url=${encodeURIComponent(mainUrl)}`;
+      const proxyUrl = `${resolveBackendOrigin()}/api/proxy/extension?url=${encodeURIComponent(mainUrl)}`;
       const proxyResponse = await fetch(proxyUrl);
       if (proxyResponse.ok) {
         return await proxyResponse.arrayBuffer();
       }
-    } catch {
-      // Proxy request failed or unavailable, fallback to direct fetch below
+      // Log proxy error for debugging, but continue to fallback
+      console.debug(`Extension proxy returned ${proxyResponse.status}, attempting direct fetch`);
+    } catch (e) {
+      console.debug("Extension proxy unreachable:", e);
     }
   }
 

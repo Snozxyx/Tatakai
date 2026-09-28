@@ -115,11 +115,29 @@ function createPerfMonitor({ logger = null, getMainWindow = null, maxEntries = D
     try {
       const win = getMainWindow ? getMainWindow() : null
       if (win && !win.isDestroyed()) {
-        const info = await withTimeout(win.webContents.getProcessMemoryInfo(), RENDERER_INFO_TIMEOUT_MS)
-        if (info !== null) {
-          rendererHeapMB = info.privateBytes / 1024 / 1024
-          // workingSetSize is available on all platforms; use it as the renderer RSS proxy
-          rendererRssMB = info.workingSetSize / 1024 / 1024
+        const wc = win.webContents
+        if (typeof wc.getProcessMemoryInfo === 'function') {
+          // Older Electron: async per-webContents memory info.
+          const info = await withTimeout(wc.getProcessMemoryInfo(), RENDERER_INFO_TIMEOUT_MS)
+          if (info !== null) {
+            rendererHeapMB = info.privateBytes / 1024 / 1024
+            // workingSetSize is available on all platforms; use it as the renderer RSS proxy
+            rendererRssMB = info.workingSetSize / 1024 / 1024
+          }
+        } else {
+          // Newer Electron removed webContents.getProcessMemoryInfo — read the
+          // renderer's working set from app.getAppMetrics() (sizes are in KB),
+          // matched to this window's OS process id.
+          const { app } = require('electron')
+          let osPid = null
+          try { osPid = typeof wc.getOSProcessId === 'function' ? wc.getOSProcessId() : null } catch (_) { osPid = null }
+          const metrics = typeof app.getAppMetrics === 'function' ? app.getAppMetrics() : []
+          const entry = osPid != null
+            ? metrics.find((m) => m.pid === osPid)
+            : metrics.find((m) => m.type === 'Tab' || m.type === 'renderer')
+          if (entry && entry.memory && typeof entry.memory.workingSetSize === 'number') {
+            rendererRssMB = entry.memory.workingSetSize / 1024
+          }
         }
       }
     } catch (err) {

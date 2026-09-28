@@ -3,11 +3,13 @@ import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Clock, Calendar, Bell, BellOff, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
+import { useTrackedShows, useToggleTrackedShow } from '@/hooks/user/useTrackedShows';
 
 interface NextEpisodeScheduleProps {
   animeId: string;
   animeName: string;
+  animePoster?: string;
+  anilistId?: number | null;
   airingTime?: string; // ISO string or Unix timestamp
   nextEpisodeNumber?: number;
   dayOfWeek?: string;
@@ -83,6 +85,8 @@ function CountdownTimer({ targetDate }: { targetDate: Date }) {
 export function NextEpisodeSchedule({
   animeId,
   animeName,
+  animePoster,
+  anilistId,
   airingTime,
   nextEpisodeNumber,
   dayOfWeek,
@@ -90,8 +94,11 @@ export function NextEpisodeSchedule({
   overview,
   thumbnail,
 }: NextEpisodeScheduleProps) {
-  const [notifyEnabled, setNotifyEnabled] = useState(false);
   const [userTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const { data: trackedShows } = useTrackedShows();
+  const toggleTracked = useToggleTrackedShow();
+
+  const isTracked = !!trackedShows?.some((row) => row.anime_id === animeId);
 
   // If no airing time provided, don't render anything
   if (!airingTime) {
@@ -119,37 +126,17 @@ export function NextEpisodeSchedule({
     timeZoneName: 'short',
   });
 
-  const handleNotifyToggle = async () => {
-    if (!notifyEnabled) {
-      // Web notification fallback
-      if (!('Notification' in window)) {
-        toast.error('Notifications not supported in this browser');
-        return;
-      }
-      
-      const permission = await Notification.requestPermission();
-      if (permission === 'granted') {
-        setNotifyEnabled(true);
-        toast.success('Notifications enabled');
-      } else {
-        toast.error('Notification permission denied');
-      }
-    } else {
-      setNotifyEnabled(false);
-      toast.info('Notifications disabled');
-    }
+  const handleNotifyToggle = () => {
+    // The hook treats `tracked` as the *current* state and flips it, and shows
+    // its own success/error toast — so we just pass what we know and let it run.
+    toggleTracked.mutate({
+      animeId,
+      anilistId: anilistId ?? null,
+      title: animeName,
+      imageUrl: animePoster,
+      tracked: isTracked,
+    });
   };
-
-  // Check if notification was previously enabled
-  useEffect(() => {
-    const stored = localStorage.getItem(`notify_${animeId}`);
-    if (stored === 'true') {
-      setNotifyEnabled(true);
-
-      // Re-verify permission/schedule if native? 
-      // Too expensive to check schedule existence every mount, trust local storage.
-    }
-  }, [animeId]);
 
   return (
     <GlassPanel className="p-6 mb-8">
@@ -162,15 +149,16 @@ export function NextEpisodeSchedule({
           variant="ghost"
           size="sm"
           onClick={handleNotifyToggle}
+          disabled={toggleTracked.isPending}
           className={cn(
             "gap-2",
-            notifyEnabled && "text-primary"
+            isTracked && "text-primary"
           )}
         >
-          {notifyEnabled ? (
+          {isTracked ? (
             <>
               <Bell className="w-4 h-4 fill-current" />
-              Notifying
+              Tracking
             </>
           ) : (
             <>

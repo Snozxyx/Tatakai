@@ -31,7 +31,8 @@ import { Capacitor } from '@capacitor/core';
 import { KeepAwake } from '@capacitor-community/keep-awake';
 import { cn } from "@/lib/utils";
 import { formatTime } from "@/core/player/time-utils";
-import { buildSubtitleFetchCandidates, getSubtitleSelectionKey, normalizeSubtitleToVtt } from "@/core/player/subtitle-utils";
+import { buildSubtitleFetchCandidates, getSubtitleSelectionKey, isBrowserReadyVttUrl, normalizeSubtitleToVtt } from "@/core/player/subtitle-utils";
+import { UpNextOverlay } from "./overlays/UpNextOverlay";
 
 interface MobileVideoPlayerProps {
   sources: Array<{ url: string; isM3U8: boolean; quality?: string }>;
@@ -50,7 +51,7 @@ interface MobileVideoPlayerProps {
   outroWindow?: { start: number; end: number } | null;
   initialSeekSeconds?: number;
   hideTimelineUi?: boolean;
-  onProgressUpdate?: (progressSeconds: number, durationSeconds?: number, completed?: boolean) => void;
+  onProgressUpdate?: (progressSeconds: number, durationSeconds?: number, completed?: boolean, flush?: boolean) => void;
   animeId?: string;
   animeName?: string;
   animePoster?: string;
@@ -217,6 +218,20 @@ export function MobileVideoPlayer({
   const [activeSkip, setActiveSkip] = useState<SkipSegment | null>(null);
   const [playbackRate, setPlaybackRate] = useState(settings.playbackSpeed);
   const [subtitleBlobs, setSubtitleBlobs] = useState<Record<string, string>>({});
+  // Auto-next Up-Next countdown (null = hidden).
+  const [upNextCountdown, setUpNextCountdown] = useState<number | null>(null);
+
+  const visibleSubtitles = useMemo(
+    () =>
+      subtitles.filter((sub) => {
+        const url = String(sub.url || '').trim();
+        if (!url) return false;
+        if (isBrowserReadyVttUrl(url)) return true;
+        if (subtitleBlobs[url]) return true;
+        return false;
+      }),
+    [subtitles, subtitleBlobs],
+  );
   
   // Double-tap seek
   const [doubleTapSide, setDoubleTapSide] = useState<'left' | 'right' | null>(null);
@@ -585,7 +600,12 @@ export function MobileVideoPlayer({
 
     const handleDurationChange = () => setDuration(video.duration);
     const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
+    const handlePause = () => {
+      setIsPlaying(false);
+      // Save the exact position on stop so reopening resumes from here.
+      const t = Math.floor(video.currentTime || 0);
+      if (t > 0) onProgressUpdate?.(t, Math.floor(video.duration || 0) || 0, false, true);
+    };
     const handleWaiting = () => setIsBuffering(true);
     const handlePlaying = () => setIsBuffering(false);
     const handleProgress = () => {
@@ -595,7 +615,10 @@ export function MobileVideoPlayer({
     };
     const handleEnded = () => {
       onProgressUpdate?.(video.duration, video.duration, true);
-      onEpisodeEnd?.();
+      if (settings.sleepTimer === "end-of-episode") return;
+      if (settings.autoNextEpisode) {
+        setUpNextCountdown(Math.max(1, Math.round(settings.autoNextCountdownSeconds || 10)));
+      }
     };
     const handleError = () => {
       setVideoError("Error loading video");
@@ -623,7 +646,48 @@ export function MobileVideoPlayer({
       video.removeEventListener('ended', handleEnded);
       video.removeEventListener('error', handleError);
     };
-  }, [onEpisodeEnd, onProgressUpdate, onError]);
+  }, [onEpisodeEnd, onProgressUpdate, onError, settings.autoNextEpisode, settings.autoNextCountdownSeconds, settings.sleepTimer]);
+
+  // Up-Next countdown driver.
+  useEffect(() => {
+    if (upNextCountdown === null) return;
+    if (upNextCountdown <= 0) {
+      setUpNextCountdown(null);
+      onEpisodeEnd?.();
+      return;
+    }
+    const id = window.setTimeout(() => {
+      setUpNextCountdown((prev) => (prev === null ? null : prev - 1));
+    }, 1000);
+    return () => window.clearTimeout(id);
+  }, [upNextCountdown, onEpisodeEnd]);
+
+  // Persist exact position on tab-hide / app background / unmount so reopening resumes here.
+  const progressCbRef = useRef<typeof onProgressUpdate>(onProgressUpdate);
+  useEffect(() => {
+    progressCbRef.current = onProgressUpdate;
+  }, [onProgressUpdate]);
+  useEffect(() => {
+    const saveNow = () => {
+      const video = videoRef.current;
+      if (!video) return;
+      const t = Math.floor(video.currentTime || 0);
+      const dur = Math.floor(video.duration || 0) || undefined;
+      if (t > 0) progressCbRef.current?.(t, dur, false, true);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") saveNow();
+    };
+    window.addEventListener("beforeunload", saveNow);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("beforeunload", saveNow);
+      document.removeEventListener("visibilitychange", onVisibility);
+      saveNow();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   // Fullscreen toggle
   const lockLandscapeOrientation = useCallback(async () => {
@@ -948,16 +1012,19 @@ export function MobileVideoPlayer({
           const subtitleKey = getSubtitleSelectionKey(sub, idx);
           const subtitleSourceUrl = String(sub.url || '').trim();
           if (!subtitleSourceUrl) return null;
+          const blobUrl = subtitleBlobs[subtitleSourceUrl];
           const proxiedSubtitleUrl = !isOffline
             ? getProxiedSubtitleUrl(subtitleSourceUrl, playbackReferer)
             : subtitleSourceUrl;
+          const src = blobUrl || (isBrowserReadyVttUrl(proxiedSubtitleUrl || '') ? proxiedSubtitleUrl : undefined);
+          if (!src) return null;
           return (
           <track
             key={subtitleKey}
             kind="subtitles"
             label={sub.label || sub.lang}
             srcLang={sub.lang}
-            src={subtitleBlobs[subtitleKey] || proxiedSubtitleUrl || subtitleSourceUrl}
+            src={src}
             default={subtitleKey === currentSubtitle}
           />
         )})}
@@ -968,6 +1035,20 @@ export function MobileVideoPlayer({
         <div className="absolute inset-0 flex items-center justify-center bg-black/30">
           <Loader2 className="w-16 h-16 text-primary animate-spin" />
         </div>
+      )}
+
+      {/* Auto-next Up-Next countdown */}
+      {upNextCountdown !== null && (
+        <UpNextOverlay
+          secondsLeft={upNextCountdown}
+          total={Math.max(1, Math.round(settings.autoNextCountdownSeconds || 10))}
+          episodeNumber={typeof episodeNumber === "number" ? episodeNumber + 1 : undefined}
+          onPlayNow={() => {
+            setUpNextCountdown(null);
+            onEpisodeEnd?.();
+          }}
+          onCancel={() => setUpNextCountdown(null)}
+        />
       )}
 
       {/* Double-tap Seek Indicator */}
@@ -1150,7 +1231,7 @@ export function MobileVideoPlayer({
                       >
                         Off
                       </button>
-                      {subtitles.map((sub, idx) => {
+                      {visibleSubtitles.map((sub, idx) => {
                         const subtitleKey = getSubtitleSelectionKey(sub, idx);
                         return (
                         <button

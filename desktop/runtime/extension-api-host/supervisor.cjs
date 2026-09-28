@@ -37,12 +37,18 @@ function createExtensionApiHost() {
     let stopping = false;
     let restartAttempts = 0;
 
+    let configuredPort = DEFAULT_PORT;
+
     function getBaseUrl() {
         return port ? `http://${HOST}:${port}` : null;
     }
 
     function getPort() {
         return port;
+    }
+
+    function getConfiguredPort() {
+        return configuredPort;
     }
 
     function listNamespaces() {
@@ -106,18 +112,22 @@ function createExtensionApiHost() {
 
     /**
      * @param {object} args
-     * @param {object} args.registry     ExtensionRegistry singleton
-     * @param {object} args.localProxy   LocalProxyServer singleton
-     * @param {object} [args.logger]     LogService
+     * @param {object} args.registry        ExtensionRegistry singleton
+     * @param {object} args.localProxy      LocalProxyServer singleton
+     * @param {object} [args.logger]        LogService
      * @param {Function} [args.ensureProxy] async () => proxyBaseUrl (started first)
+     * @param {number} [args.preferredPort] Custom port to bind on
      * @returns {Promise<string|null>} the host base URL
      */
-    async function start({ registry, localProxy, logger, ensureProxy } = {}) {
+    async function start({ registry, localProxy, logger, ensureProxy, preferredPort } = {}) {
         if (started) return getBaseUrl();
         if (!registry || !localProxy) {
             throw new Error('[ExtHost] start requires { registry, localProxy }');
         }
         deps = { registry, localProxy, logger, ensureProxy };
+        if (preferredPort && Number(preferredPort) > 0) {
+            configuredPort = Number(preferredPort);
+        }
 
         // Ensure the in-app proxy is running FIRST so registerSource() mints
         // valid tokenized URLs (baseUrl() would otherwise be :null).
@@ -133,9 +143,9 @@ function createExtensionApiHost() {
 
         let srv = null;
         try {
-            srv = await tryListen(DEFAULT_PORT);
+            srv = await tryListen(configuredPort);
         } catch (err) {
-            logger?.warn?.(`[ExtHost] listen on ${DEFAULT_PORT} failed (${err.message}); trying ephemeral port`);
+            logger?.warn?.(`[ExtHost] listen on ${configuredPort} failed (${err.message}); trying ephemeral port`);
             srv = null;
         }
         if (!srv) {
@@ -152,6 +162,54 @@ function createExtensionApiHost() {
         logger?.info?.(`[ExtHost] listening on ${getBaseUrl()}`);
         logger?.info?.(`[ExtHost] mounted namespaces: ${namespaces.map((n) => n.namespace).join(', ') || '(none installed)'}`);
         return getBaseUrl();
+    }
+
+    async function setPort(newPort) {
+        const target = Number(newPort);
+        if (!target || target < 1024 || target > 65535) {
+            throw new Error(`Invalid port: ${newPort}. Must be between 1024 and 65535.`);
+        }
+        configuredPort = target;
+
+        if (!started || !app) {
+            return { success: true, port: configuredPort, baseUrl: `http://${HOST}:${configuredPort}` };
+        }
+
+        stopping = true;
+        if (server) {
+            const srv = server;
+            server = null;
+            await new Promise((resolve) => {
+                try {
+                    srv.close(() => resolve());
+                } catch (_) {
+                    resolve();
+                }
+            });
+        }
+        port = null;
+        stopping = false;
+
+        let srv = null;
+        try {
+            srv = await tryListen(configuredPort);
+        } catch (err) {
+            deps?.logger?.warn?.(`[ExtHost] listen on requested port ${configuredPort} failed (${err.message})`);
+            srv = null;
+        }
+
+        if (!srv) {
+            srv = await tryListen(0);
+        }
+
+        server = srv;
+        port = server.address().port;
+        started = true;
+        restartAttempts = 0;
+        attachGuard();
+
+        deps?.logger?.info?.(`[ExtHost] port updated, listening on ${getBaseUrl()}`);
+        return { success: true, port, baseUrl: getBaseUrl() };
     }
 
     async function stop() {
@@ -172,7 +230,7 @@ function createExtensionApiHost() {
         stopping = false;
     }
 
-    return { start, stop, getBaseUrl, getPort, listNamespaces, refresh };
+    return { start, stop, getBaseUrl, getPort, getConfiguredPort, setPort, listNamespaces, refresh, DEFAULT_PORT };
 }
 
 module.exports = { createExtensionApiHost };

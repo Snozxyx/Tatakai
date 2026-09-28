@@ -1,11 +1,20 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { ANILIST_GRAPHQL_ENDPOINT } from '@/lib/api/backendOrigin';
+import type { ProfileAppSettings } from '@/lib/profileSettings';
 
 // ── API Providers (all verified working) ────────────────────────────────────
 const WAIFU_IM_API  = 'https://api.waifu.im/search';
 const NEKOSIA_API   = 'https://api.nekosia.cat/api/v1';
 const NEKOSAPI_API  = 'https://api.nekosapi.com/v3';
+const NEKOS_BEST_API = 'https://nekos.best/api/v2';
+
+// nekos.best animated (GIF) categories — anime reaction clips usable as avatars.
+const NEKOS_BEST_GIF_CATEGORIES = [
+  'hug', 'pat', 'wave', 'wink', 'happy', 'dance',
+  'smile', 'blush', 'poke', 'cry', 'bored', 'nod',
+];
 
 export interface NekosImage {
   id: string;
@@ -15,6 +24,10 @@ export interface NekosImage {
   rating: string;
   gender?: 'male' | 'female' | 'any';
   provider?: string;
+  isGif?: boolean;            // nekos.best animated categories
+  animeName?: string;         // nekos.best anime_name / AniList media title
+  artistName?: string;        // nekos.best artist_name (attribution)
+  mediaId?: number;           // AniList media id (banner search)
 }
 
 export interface AniListCharacter {
@@ -91,7 +104,7 @@ export async function searchAniListCharacters(query: string, page = 1): Promise<
       }
     }
   `;
-  const res = await fetch('https://graphql.anilist.co', {
+  const res = await fetch(ANILIST_GRAPHQL_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ query: gql, variables: { query, page } }),
@@ -185,6 +198,123 @@ export async function fetchRandomAnimeImage(options?: {
   return images.sort(() => Math.random() - 0.5).slice(0, limit);
 }
 
+// ── nekos.best animated GIF avatars ──────────────────────────────────────────
+export async function fetchNekosBestGifs(category?: string, amount = 12): Promise<NekosImage[]> {
+  // When no category is given, spread the request across a few random categories
+  // so the gallery is varied rather than 12 of the same reaction.
+  const categories = category
+    ? [category]
+    : [...NEKOS_BEST_GIF_CATEGORIES].sort(() => Math.random() - 0.5).slice(0, 4);
+
+  const perCategory = Math.max(1, Math.ceil(amount / categories.length));
+  const results = await Promise.allSettled(
+    categories.map(async (cat) => {
+      const res = await fetch(`${NEKOS_BEST_API}/${cat}?amount=${Math.min(perCategory, 20)}`);
+      if (!res.ok) return [] as NekosImage[];
+      const data = await res.json();
+      return (data?.results ?? []).map((r: any, i: number): NekosImage => ({
+        id: `nekos-best-${cat}-${Date.now()}-${i}`,
+        url: r.url,
+        rating: 'safe',
+        isGif: true,
+        animeName: typeof r.anime_name === 'string' ? r.anime_name : undefined,
+        artistName: typeof r.artist_name === 'string' ? r.artist_name : undefined,
+        provider: 'nekos.best',
+      }));
+    }),
+  );
+
+  const images = results
+    .filter((r): r is PromiseFulfilledResult<NekosImage[]> => r.status === 'fulfilled')
+    .flatMap((r) => r.value)
+    .filter((img) => !!img.url);
+
+  return images.sort(() => Math.random() - 0.5).slice(0, amount);
+}
+
+// ── AniList media banner search (title banners) ──────────────────────────────
+export async function searchAniListMedia(
+  query: string,
+  type: 'ANIME' | 'MANGA' = 'ANIME',
+): Promise<NekosImage[]> {
+  const gql = `
+    query ($query: String, $type: MediaType) {
+      Page(page: 1, perPage: 18) {
+        media(search: $query, type: $type, sort: SEARCH_MATCH) {
+          id
+          title { romaji english }
+          bannerImage
+          coverImage { large }
+        }
+      }
+    }
+  `;
+  const res = await fetch(ANILIST_GRAPHQL_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ query: gql, variables: { query, type } }),
+  });
+  if (!res.ok) throw new Error('AniList media search failed');
+  const json = await res.json();
+  const rows = Array.isArray(json?.data?.Page?.media) ? json.data.Page.media : [];
+  return rows
+    .filter((m: any) => typeof m?.bannerImage === 'string' && m.bannerImage)
+    .map((m: any): NekosImage => ({
+      id: `anilist-media-${m.id}`,
+      url: m.bannerImage,
+      rating: 'safe',
+      animeName: asSafeText(m?.title?.english || m?.title?.romaji, 'Unknown'),
+      mediaId: Number(m?.id) || undefined,
+      provider: 'anilist',
+    }));
+}
+
+// ── waifu.im landscape banners ───────────────────────────────────────────────
+export async function fetchWaifuLandscape(limit = 8): Promise<NekosImage[]> {
+  const url = `${WAIFU_IM_API}?orientation=LANDSCAPE&is_nsfw=false&many=true&limit=${Math.min(limit, 30)}`;
+  const res = await fetch(url);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data?.images ?? [])
+    .filter((img: any) => !!img?.url)
+    .map((img: any, i: number): NekosImage => ({
+      id: `waifu-landscape-${Date.now()}-${i}`,
+      url: img.url,
+      palette: img.dominant_color ? [img.dominant_color] : undefined,
+      source: img.source,
+      rating: img.is_nsfw ? 'nsfw' : 'safe',
+      provider: 'waifu.im',
+    }));
+}
+
+// Hook to fetch random animated GIF avatars
+export function useRandomAvatarGifs(limit = 12) {
+  return useQuery({
+    queryKey: ['anime_avatar_gifs', limit],
+    queryFn: () => fetchNekosBestGifs(undefined, limit),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+// Hook to search AniList media banners for the banner picker
+export function useAniListMediaSearch(query: string, type: 'ANIME' | 'MANGA' = 'ANIME', enabled = true) {
+  return useQuery({
+    queryKey: ['anilist_media_banner', type, query],
+    queryFn: () => searchAniListMedia(query, type),
+    enabled: enabled && query.trim().length > 1,
+    staleTime: 10 * 60 * 1000,
+  });
+}
+
+// Hook to fetch landscape waifu.im banners
+export function useWaifuLandscapeBanners(limit = 8) {
+  return useQuery({
+    queryKey: ['waifu_landscape', limit],
+    queryFn: () => fetchWaifuLandscape(limit),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 // Hook to fetch random profile images with gender filter
 export function useRandomProfileImages(limit = 6, gender: 'male' | 'female' | 'any' = 'any') {
   return useQuery({
@@ -260,6 +390,50 @@ export function useUpdateProfileBanner() {
   });
 }
 
+// Update profile customization (ambient color + background effect) stored in the
+// app_settings jsonb. Merges into the existing app_settings so unrelated keys are
+// preserved. Batch ambientColor + backgroundEffect into ONE call per save to avoid
+// a read-modify-write race.
+export function useUpdateProfileSettings() {
+  const queryClient = useQueryClient();
+  const { user, profile, refreshProfile } = useAuth();
+
+  return useMutation({
+    mutationFn: async (patch: NonNullable<ProfileAppSettings['profile']>) => {
+      if (!user) throw new Error('Not logged in');
+
+      const current = ((profile as any)?.app_settings ?? {}) as ProfileAppSettings;
+      const merged: ProfileAppSettings = {
+        ...current,
+        profile: { ...(current.profile ?? {}), ...patch },
+      };
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ app_settings: merged })
+        .eq('user_id', user.id);
+
+      if (error) {
+        // The profiles.app_settings column is not in the deployed schema yet
+        // (migration 20260902000003 written but not applied) — PostgREST reports
+        // PGRST204 / 42703. Surface an actionable message instead of the raw code.
+        const msg = `${error.message} ${(error as any).details ?? ''}`.toLowerCase();
+        if ((error as any).code === '42703' || (error as any).code === 'PGRST204' || msg.includes('app_settings')) {
+          throw new Error(
+            'Profile customization needs the profiles.app_settings column, which is missing from the database. Apply migration 20260902000003_profiles_column_level_update.sql (or add the column) and reload the schema cache.',
+          );
+        }
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      refreshProfile();
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries({ queryKey: ['public_profile'] });
+    },
+  });
+}
+
 // Fetch public profile by username
 export function usePublicProfile(username: string) {
   return useQuery({
@@ -312,7 +486,9 @@ export function usePublicWatchHistory(userId: string, isPublic: boolean, showHis
         .select('*')
         .eq('user_id', userId)
         .order('watched_at', { ascending: false })
-        .limit(50);
+        // Bounded but high enough that a viewed user's derived rank/episode count
+        // isn't capped (was 50, which undercounted ranks past the first 50 eps).
+        .limit(2000);
 
       if (error) throw error;
       return data;

@@ -1,23 +1,33 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Download, Play, Trash2, FolderOpen, Info, Search, RefreshCw,
   Plus, FolderSync, HardDrive, Wrench, Loader2, X, History,
-  AlertCircle, CheckCircle2, Ban, Bot, Magnet,
+  AlertCircle, CheckCircle2, Ban, Bot, Magnet, Languages, Server, BookOpen,
 } from 'lucide-react';
 import { ImportAnimeModal } from '@/components/modals/ImportAnimeModal';
 import { TorrentDownloadModal } from '@/components/modals/TorrentDownloadModal';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
-import { useIsNativeApp } from '@/hooks/ui/useIsNativeApp';
+import { useIsNativeApp, useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 import { Skeleton } from '@/components/ui/skeleton-custom';
 import { toast } from 'sonner';
 import { fetchCombinedSources } from '@/lib/api';
 import { useDownload } from '@/hooks/media/useDownload';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { getLanguageLabel } from '@/core/download/language-resolver';
+import { getKnownServerOptions } from '@/lib/serverNames';
 import type { DownloadHistoryEntry } from '@/core/db/tatakai-db';
+import type { OfflineMangaSeries } from '@/types/electron-bridge';
+
+const MANGA_KIND_BADGE: Record<string, { label: string; cls: string }> = {
+  manhwa: { label: 'Manhwa', cls: 'bg-fuchsia-500/20 text-fuchsia-300' },
+  manhua: { label: 'Manhua', cls: 'bg-amber-500/20 text-amber-300' },
+  manga: { label: 'Manga', cls: 'bg-sky-500/20 text-sky-300' },
+};
 
 interface OfflineAnime {
   name: string;
@@ -50,6 +60,79 @@ interface AutoDownloadSubscription {
   nextEpisode: number;
   addedAt: number;
   enqueuedEpisodes: number[];
+}
+
+// Canonical languages offered by the resolver, in preference-friendly order.
+const AUTO_DL_LANGUAGES = ['ja', 'en', 'hi', 'es', 'pt', 'fr', 'ko', 'zh', 'ar', 'de', 'it', 'th'];
+
+/**
+ * Global Auto-Download preferences: preferred audio language and default
+ * server. Persisted to localStorage keys the automation engine
+ * (`tatakai_default_language`) and the manual download modal
+ * (`tatakai_default_server`) both read.
+ */
+function AutoDownloadSettings() {
+  const [language, setLanguage] = useState<string>(
+    () => localStorage.getItem('tatakai_default_language') || 'ja',
+  );
+  const [server, setServer] = useState<string>(
+    () => localStorage.getItem('tatakai_default_server') || '',
+  );
+  const serverOptions = useMemo(() => getKnownServerOptions(), []);
+
+  const onLanguage = (v: string) => {
+    setLanguage(v);
+    localStorage.setItem('tatakai_default_language', v);
+    toast.success(`Preferred audio language set to ${getLanguageLabel(v)}`);
+  };
+  const onServer = (v: string) => {
+    setServer(v);
+    if (v) localStorage.setItem('tatakai_default_server', v);
+    else localStorage.removeItem('tatakai_default_server');
+    toast.success(v ? 'Default server updated' : 'Default server set to Auto');
+  };
+
+  const selectClass =
+    'w-full h-10 rounded-lg bg-white/5 border border-white/10 px-3 text-sm ' +
+    'focus:outline-none focus:border-primary/50 transition-colors appearance-none cursor-pointer';
+
+  return (
+    <GlassPanel className="p-4 space-y-4">
+      <div className="flex items-center gap-2">
+        <Wrench className="w-4 h-4 text-primary" />
+        <h3 className="font-semibold text-sm">Download preferences</h3>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <Languages className="w-3.5 h-3.5" /> Preferred audio language
+          </label>
+          <select value={language} onChange={(e) => onLanguage(e.target.value)} className={selectClass}>
+            {AUTO_DL_LANGUAGES.map((code) => (
+              <option key={code} value={code} className="bg-neutral-900">
+                {getLanguageLabel(code)}
+              </option>
+            ))}
+          </select>
+          <p className="text-[11px] text-muted-foreground">Used for auto-downloads and as the default in the download picker.</p>
+        </div>
+        <div className="space-y-1.5">
+          <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <Server className="w-3.5 h-3.5" /> Default server
+          </label>
+          <select value={server} onChange={(e) => onServer(e.target.value)} className={selectClass}>
+            <option value="" className="bg-neutral-900">Auto (recommended)</option>
+            {serverOptions.map((s) => (
+              <option key={s.key} value={s.key} className="bg-neutral-900">
+                {s.name}
+              </option>
+            ))}
+          </select>
+          <p className="text-[11px] text-muted-foreground">Preferred first — the app falls back to others when unavailable.</p>
+        </div>
+      </div>
+    </GlassPanel>
+  );
 }
 
 function AutoDownloadRules({ isNative }: { isNative: boolean }) {
@@ -116,20 +199,25 @@ function AutoDownloadRules({ isNative }: { isNative: boolean }) {
 
   if (subscriptions.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center space-y-4">
-        <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-          <Bot className="w-8 h-8 text-primary/60" />
+      <div className="space-y-6">
+        <AutoDownloadSettings />
+        <div className="flex flex-col items-center justify-center py-16 text-center space-y-4">
+          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+            <Bot className="w-8 h-8 text-primary/60" />
+          </div>
+          <h3 className="text-xl font-bold">No shows queued for auto-download</h3>
+          <p className="text-muted-foreground text-sm max-w-sm">
+            Open any anime, tap <span className="text-foreground font-medium">Download → Auto-Download</span>, and new
+            episodes will download automatically as they air — using the preferences above.
+          </p>
         </div>
-        <h3 className="text-xl font-bold">No Auto-Download Rules</h3>
-        <p className="text-muted-foreground text-sm max-w-sm">
-          Go to an anime page and click "Auto-Download" to automatically get new episodes when they air.
-        </p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <AutoDownloadSettings />
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold flex items-center gap-2">
           <Bot className="w-5 h-5 text-primary" />
@@ -176,6 +264,7 @@ export default function OfflineLibraryPage() {
   const [syncing, setSyncing] = useState(false);
   const [search, setSearch] = useState('');
   const [downloadPath, setDownloadPath] = useState<string | null>(null);
+  const [mangaSeries, setMangaSeries] = useState<OfflineMangaSeries[]>([]);
 
   // ── History state ──────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState('library');
@@ -186,9 +275,11 @@ export default function OfflineLibraryPage() {
   });
 
   const isNative = useIsNativeApp();
+  const isDesktopApp = useIsDesktopApp();
   const navigate = useNavigate();
   const location = useLocation();
   const { downloadStates = {}, cancelDownload } = useDownload();
+  const confirm = useConfirm();
 
   // Read tab from URL on mount
   useEffect(() => {
@@ -241,6 +332,32 @@ export default function OfflineLibraryPage() {
     }
   };
 
+  // ── Manga library loader ─────────────────────────────────────────────────────
+  const loadMangaLibrary = async () => {
+    const electron = (window as any).electron;
+    if (!isNative || !electron?.manga?.getOfflineLibrary) return;
+    try {
+      const customPath = getDownloadPath();
+      const library: OfflineMangaSeries[] = (await electron.manga.getOfflineLibrary(customPath)) || [];
+      if (electron?.streamLocalFile) {
+        await Promise.all(library.map(async (s) => {
+          const raw = s.poster || s.posterUrl || null;
+          if (raw && raw.startsWith('tatakai-media://')) {
+            try {
+              const result = await electron.streamLocalFile(raw);
+              if (result?.success && result.url) s.poster = result.url;
+            } catch { /* keep original */ }
+          } else if (raw) {
+            s.poster = raw;
+          }
+        }));
+      }
+      setMangaSeries(library);
+    } catch (err) {
+      console.error('Failed to load offline manga library:', err);
+    }
+  };
+
   // ── History loaders ────────────────────────────────────────────────────────
   const loadHistoryData = async () => {
     setHistoryLoading(true);
@@ -257,7 +374,7 @@ export default function OfflineLibraryPage() {
   };
 
   // ── Effects ────────────────────────────────────────────────────────────────
-  useEffect(() => { loadOfflineLibrary(); }, [isNative]);
+  useEffect(() => { loadOfflineLibrary(); loadMangaLibrary(); }, [isNative]);
 
   useEffect(() => {
     if (activeTab === 'history') loadHistoryData();
@@ -272,6 +389,7 @@ export default function OfflineLibraryPage() {
       const result = await (window as any).electron.syncOfflineLibrary(customPath);
       toast.success(result.message);
       await loadOfflineLibrary();
+      await loadMangaLibrary();
     } catch (err) {
       console.error('Sync failed:', err);
       toast.error('Failed to sync library');
@@ -345,7 +463,7 @@ export default function OfflineLibraryPage() {
   const handleDeleteAnime = async (anime: OfflineAnime, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!isNative) return;
-    if (!window.confirm(`Delete "${anime.name}" and all its episodes?\n\nThis action cannot be undone.`)) return;
+    if (!(await confirm({ title: `Delete "${anime.name}" and all its episodes?`, description: 'This action cannot be undone.', destructive: true }))) return;
     try {
       toast.loading(`Deleting ${anime.name}...`);
       const result = await (window as any).electron.deleteAnime(anime.path);
@@ -355,6 +473,41 @@ export default function OfflineLibraryPage() {
       console.error('Delete failed:', err);
       toast.error('Failed to delete anime');
     }
+  };
+
+  // ── Manga handlers ─────────────────────────────────────────────────────────
+  const handleDeleteMangaSeries = async (series: OfflineMangaSeries, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isNative) return;
+    if (!(await confirm({ title: `Delete "${series.title}" and all downloaded chapters?`, description: 'This action cannot be undone.', destructive: true }))) return;
+    try {
+      toast.loading(`Deleting ${series.title}...`);
+      const result = await (window as any).electron.manga.deleteSeries({ anilistId: series.anilistId, customRoot: getDownloadPath() || undefined });
+      if (result?.success) { toast.success(`Deleted ${series.title}`); await loadMangaLibrary(); }
+      else toast.error(result?.error || 'Failed to delete series');
+    } catch (err) {
+      console.error('Delete manga failed:', err);
+      toast.error('Failed to delete manga series');
+    }
+  };
+
+  const handleOpenMangaFolder = async (series: OfflineMangaSeries, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isNative) return;
+    try { await (window as any).electron.manga.openFolder({ anilistId: series.anilistId, customRoot: getDownloadPath() || undefined }); }
+    catch (err) { console.error('Failed to open manga folder:', err); }
+  };
+
+  const handleReadManga = (series: OfflineMangaSeries) => {
+    const first = series.chapters?.[0];
+    if (!first) { toast.error('No chapters downloaded'); return; }
+    const params = new URLSearchParams({ chapterKey: first.chapterKey });
+    if (first.chapterNumber != null) params.set('chapterNumber', String(first.chapterNumber));
+    if (first.provider) params.set('provider', String(first.provider));
+    // offline=true marks this as a local-only read so ProtectedRoute keeps the
+    // reader reachable during maintenance / a ban / a server outage.
+    params.set('offline', 'true');
+    navigate(`/manga/read/${series.anilistId}?${params.toString()}`);
   };
 
   // ── Not-native gate ────────────────────────────────────────────────────────
@@ -380,12 +533,18 @@ export default function OfflineLibraryPage() {
   const [torrentModalOpen, setTorrentModalOpen] = useState(false);
 
   const filteredAnimes = animes.filter(a => a.name.toLowerCase().includes(search.toLowerCase()));
+  const filteredManga = mangaSeries.filter(m => (m.title || '').toLowerCase().includes(search.toLowerCase()));
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Sidebar />
 
-      <main className={isNative
+      {/* Desktop app renders the solid 80px fixed Sidebar, so clear it at every
+          width (pl-6 slid the heading under the rail). Mobile app hides the rail
+          (bottom MobileNav instead); web clears the floating pill via md:pl-32. */}
+      <main className={isDesktopApp
+        ? 'lg:pl-3 pl-6 pr-6 py-12 max-w-[1600px] mx-auto space-y-8'
+        : isNative
         ? 'pl-6 pr-6 py-12 max-w-[1600px] mx-auto space-y-8'
         : 'pl-6 md:pl-32 pr-6 py-12 max-w-[1600px] mx-auto space-y-8'
       }>
@@ -405,7 +564,7 @@ export default function OfflineLibraryPage() {
               <Plus className="w-4 h-4" />
               Import Videos
             </Button>
-            {isNative && (window as any).tatakaiRuntime?.searchTorrentCandidates && (
+            {isNative && (window as any).tatakaiRuntime?.startTorrentSession && (
               <Button variant="outline" size="sm" onClick={() => setTorrentModalOpen(true)} className="gap-2">
                 <Magnet className="w-4 h-4" />
                 Torrent Download
@@ -430,10 +589,20 @@ export default function OfflineLibraryPage() {
               className="w-full h-12 pl-12 pr-4 rounded-xl bg-white/5 border border-white/10 focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all outline-none text-sm"
             />
           </div>
-          {animes.length > 0 && (
+          {(animes.length > 0 || mangaSeries.length > 0) && (
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2"><HardDrive className="w-4 h-4" /><span>{animes.length} anime</span></div>
-              <div className="flex items-center gap-2"><Download className="w-4 h-4" /><span>{animes.reduce((a, b) => a + b.episodes.length, 0)} episodes</span></div>
+              {animes.length > 0 && (
+                <>
+                  <div className="flex items-center gap-2"><HardDrive className="w-4 h-4" /><span>{animes.length} anime</span></div>
+                  <div className="flex items-center gap-2"><Download className="w-4 h-4" /><span>{animes.reduce((a, b) => a + b.episodes.length, 0)} episodes</span></div>
+                </>
+              )}
+              {mangaSeries.length > 0 && (
+                <>
+                  <div className="flex items-center gap-2"><BookOpen className="w-4 h-4" /><span>{mangaSeries.length} series</span></div>
+                  <div className="flex items-center gap-2"><Download className="w-4 h-4" /><span>{mangaSeries.reduce((a, b) => a + (b.chapterCount ?? b.chapters?.length ?? 0), 0)} chapters</span></div>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -509,7 +678,7 @@ export default function OfflineLibraryPage() {
             {/* Anime Grid */}
             {loading ? (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-                {Array.from({ length: 12 }).map((_, i) => <Skeleton key={i} className="aspect-[3/4] rounded-2xl" />)}
+                {Array.from({ length: 12 }).map((_, i) => <Skeleton key={i} className="aspect-[2/3] rounded-2xl" />)}
               </div>
             ) : filteredAnimes.length > 0 ? (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-6">
@@ -523,7 +692,7 @@ export default function OfflineLibraryPage() {
                       }
                     }}
                   >
-                    <div className="aspect-[3/4] relative overflow-hidden bg-gradient-to-br from-purple-500/20 to-blue-500/20">
+                    <div className="aspect-[2/3] relative overflow-hidden bg-gradient-to-br from-primary/20 to-secondary/20">
                       {anime.poster ? (
                         <img
                           src={anime.poster}
@@ -573,7 +742,7 @@ export default function OfflineLibraryPage() {
                   </GlassPanel>
                 ))}
               </div>
-            ) : (
+            ) : filteredManga.length > 0 ? null : (
               <div className="flex flex-col items-center justify-center py-32 text-center space-y-6">
                 <div className="w-24 h-24 rounded-3xl bg-muted flex items-center justify-center text-muted-foreground/30">
                   <Download className="w-12 h-12" />
@@ -581,8 +750,8 @@ export default function OfflineLibraryPage() {
                 <div className="space-y-2">
                   <h2 className="text-2xl font-bold">Library is empty</h2>
                   <p className="text-muted-foreground max-w-sm">
-                    You haven't downloaded any anime yet. Start by downloading your favourite episodes,
-                    or sync your folder if you already have videos.
+                    You haven't downloaded any anime or manga yet. Start by downloading your favourite episodes
+                    or chapters, or sync your folder if you already have videos.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-3 justify-center">
@@ -609,6 +778,77 @@ export default function OfflineLibraryPage() {
                   <Button variant="link" size="sm" onClick={handleOpenFolder} className="mt-2 p-0 h-auto text-xs">
                     Open Downloads Folder →
                   </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Manga / Manhwa / Manhua Grid */}
+            {filteredManga.length > 0 && (
+              <div className="space-y-4">
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  <BookOpen className="w-5 h-5 text-primary" />
+                  Manga & Comics ({filteredManga.length})
+                </h2>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+                  {filteredManga.map((series) => {
+                    const badge = MANGA_KIND_BADGE[series.kind || 'manga'] || MANGA_KIND_BADGE.manga;
+                    const chapterCount = series.chapterCount ?? series.chapters?.length ?? 0;
+                    return (
+                      <GlassPanel
+                        key={series.anilistId}
+                        className="group relative overflow-hidden h-fit cursor-pointer border-transparent hover:border-primary/50 transition-all duration-300"
+                        onClick={() => handleReadManga(series)}
+                      >
+                        <div className="aspect-[2/3] relative overflow-hidden bg-gradient-to-br from-primary/20 to-secondary/20">
+                          {series.poster ? (
+                            <img
+                              src={series.poster}
+                              alt={series.title}
+                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <BookOpen className="w-12 h-12 text-white/20" />
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-60 group-hover:opacity-100 transition-opacity" />
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center shadow-xl shadow-primary/40 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                              <BookOpen className="w-6 h-6 text-white" />
+                            </div>
+                          </div>
+                          <div className={`absolute top-3 left-3 px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider ${badge.cls}`}>
+                            {badge.label}
+                          </div>
+                          <div className="absolute top-3 right-3 px-2 py-1 rounded-md bg-black/60 backdrop-blur-md text-[10px] font-bold text-white border border-white/10 uppercase tracking-wider">
+                            {chapterCount} CH
+                          </div>
+                          <button
+                            onClick={(e) => handleOpenMangaFolder(series, e)}
+                            className="absolute bottom-3 right-3 p-2 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-primary/20 hover:border-primary/50"
+                            title="Open folder"
+                          >
+                            <FolderOpen className="w-3.5 h-3.5 text-white" />
+                          </button>
+                          <button
+                            onClick={(e) => handleDeleteMangaSeries(series, e)}
+                            className="absolute bottom-3 left-3 p-2 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/20 hover:border-destructive/50"
+                            title="Delete series and all chapters"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                          </button>
+                        </div>
+                        <div className="p-4 space-y-1">
+                          <h3 className="font-bold text-sm line-clamp-1 group-hover:text-primary transition-colors">{series.title}</h3>
+                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">
+                            <BookOpen className="w-3 h-3" />
+                            Offline Ready
+                          </div>
+                        </div>
+                      </GlassPanel>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -642,7 +882,7 @@ export default function OfflineLibraryPage() {
                   size="sm"
                   disabled={history.length === 0}
                   onClick={async () => {
-                    if (!window.confirm('Clear the entire download history? This cannot be undone.')) return;
+                    if (!(await confirm({ title: 'Clear the entire download history? This cannot be undone.', destructive: true }))) return;
                     const { clearHistory } = await import('@/core/download/download-history-service');
                     await clearHistory();
                     toast.success('Download history cleared');

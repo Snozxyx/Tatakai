@@ -37,6 +37,24 @@ const VALID_TYPES = ['torrent', 'onlinestream', 'custom'];
 const MAX_BUNDLE_BYTES = 10 * 1024 * 1024;  // 10 MB
 const MAX_ICON_BYTES = 512 * 1024;          // 512 KB
 
+// An extension id is used verbatim as a directory name under
+// <userData>/extensions/<id>/. If it were allowed to contain path separators or
+// `..`, a malicious .kai (or a hand-crafted sideload-manifest call) could make
+// installKaiExtension write manifest.json / bundle.js *outside* the extensions
+// directory — anywhere the app process can write. Constrain the id to a safe,
+// url/path-friendly charset with no separators and no traversal.
+const EXTENSION_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+
+function isValidExtensionId(id) {
+    return (
+        typeof id === 'string' &&
+        EXTENSION_ID_RE.test(id) &&
+        !id.includes('..') &&
+        id !== '.' &&
+        id !== '..'
+    );
+}
+
 const TATAKAI_PUBLIC_KEY_PEM =
     process.env.TATAKAI_EXT_PUBLIC_KEY ||
     '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\n-----END PUBLIC KEY-----';
@@ -86,11 +104,59 @@ async function parseKaiFile(kaiBuffer, options = {}) {
     if (missing.length > 0) {
         throw new Error(`Invalid .kai manifest — missing fields: ${missing.join(', ')}`);
     }
+    if (!isValidExtensionId(manifest.id)) {
+        throw new Error(
+            'Invalid .kai manifest — id must be a safe identifier ' +
+            '(letters, digits, dot, dash, underscore; no path separators or "..")'
+        );
+    }
     if (!VALID_TYPES.includes(manifest.type)) {
         throw new Error(`Invalid .kai manifest — type must be one of: ${VALID_TYPES.join(' | ')}`);
     }
     if (!Array.isArray(manifest.permissions)) {
         throw new Error('Invalid .kai manifest — permissions must be an array');
+    }
+
+    // ── Optional structured fields (validated only if present) ────────────────
+    if (manifest.apiServer != null) {
+        const s = manifest.apiServer;
+        if (typeof s !== 'object' || Array.isArray(s)) {
+            throw new Error('Invalid .kai manifest — apiServer must be an object');
+        }
+        if (typeof s.namespace !== 'string' || s.namespace === '') {
+            throw new Error('Invalid .kai manifest — apiServer.namespace must be a non-empty string');
+        }
+        if (!/^[a-z0-9][a-z0-9-]*$/.test(s.namespace)) {
+            throw new Error('Invalid .kai manifest — apiServer.namespace must be url-safe (lowercase, digits, hyphen)');
+        }
+        if (typeof s.contract !== 'string' || s.contract === '') {
+            throw new Error('Invalid .kai manifest — apiServer.contract must be a non-empty string');
+        }
+        if (!Array.isArray(s.routes)) {
+            throw new Error('Invalid .kai manifest — apiServer.routes must be an array');
+        }
+    }
+
+    const caps = Array.isArray(manifest.capabilities) ? manifest.capabilities : [];
+    if (caps.includes('custom-source')) {
+        const cs = manifest.customSources;
+        if (!Array.isArray(cs) || cs.length === 0) {
+            throw new Error(
+                "Invalid .kai manifest — capabilities includes 'custom-source' " +
+                'but customSources[] is empty'
+            );
+        }
+        for (const src of cs) {
+            if (!src || typeof src.id !== 'string' || src.id === '') {
+                throw new Error('Invalid .kai manifest — each customSources[] entry needs a non-empty id');
+            }
+            if (src.kind !== 'read' && src.kind !== 'watch') {
+                throw new Error(`Invalid .kai manifest — customSources["${src.id}"].kind must be 'read' or 'watch'`);
+            }
+            if (typeof src.name !== 'string' || src.name === '') {
+                throw new Error(`Invalid .kai manifest — customSources["${src.id}"].name must be a non-empty string`);
+            }
+        }
     }
 
     // ── bundle.js ───────────────────────────────────────────────────────────
@@ -166,7 +232,17 @@ async function readKaiFile(filePath, fs, options = {}) {
  */
 function installKaiExtension(parsed, extensionsDir, fs, path) {
     const extId = parsed.manifest.id;
+    if (!isValidExtensionId(extId)) {
+        throw new Error(`Refusing to install extension with unsafe id: ${extId}`);
+    }
     const extDir = path.join(extensionsDir, extId);
+    // Defence in depth: even if the id somehow slipped past validation, ensure
+    // the resolved target stays inside the extensions directory.
+    const resolvedDir = path.resolve(extDir);
+    const resolvedBase = path.resolve(extensionsDir);
+    if (resolvedDir !== resolvedBase && !resolvedDir.startsWith(resolvedBase + path.sep)) {
+        throw new Error('Refusing to install extension outside the extensions directory');
+    }
     if (!fs.existsSync(extDir)) fs.mkdirSync(extDir, { recursive: true });
 
     fs.writeFileSync(
@@ -197,6 +273,7 @@ module.exports = {
     parseKaiFile,
     readKaiFile,
     installKaiExtension,
+    isValidExtensionId,
     KAI_MAGIC,
     VALID_TYPES,
 };

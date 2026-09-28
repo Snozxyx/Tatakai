@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
@@ -7,28 +7,15 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { getRankImageUrl, getRankNameStyle } from '@/lib/rankUtils';
+import { getRankImageUrl, getRankNameStyleForRank } from '@/lib/rankUtils';
 import { cn } from '@/lib/utils';
 import { Search, Trophy, CheckCircle, Lock, UserCircle, Loader2, X } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-
-// ── Achievement definitions ──────────────────────────────────────────────
-const ACHIEVEMENTS = [
-  { id: 'filler-watcher', title: 'Filler Watcher',  description: 'Watch your very first episode',            rank: 1  },
-  { id: 'genin',          title: 'Genin',            description: 'Watch 5 episodes — the journey begins',    rank: 2  },
-  { id: 'chunin',         title: 'Chunin',           description: 'Reach 10 episodes watched',               rank: 3  },
-  { id: 'week-warrior',   title: 'Jonin',            description: 'Maintain a 7-day watch streak',            rank: 4  },
-  { id: 'plus-ultra',     title: 'Plus Ultra',       description: 'Watch 35 episodes — go beyond!',           rank: 5  },
-  { id: 'pro-hero',       title: 'Pro Hero',         description: "Watch 50 episodes — you're a hero",        rank: 6  },
-  { id: 'soul-reaper',    title: 'Soul Reaper',      description: 'Explore 25 different anime series',        rank: 7  },
-  { id: 'bankai',         title: 'Bankai',           description: 'Reach 100 total episodes watched',         rank: 8  },
-  { id: 'survey-corps',   title: 'Survey Corps',     description: 'Explore 50 different anime series',        rank: 9  },
-  { id: 'month-legend',   title: 'Titan Shifter',    description: 'Maintain a 30-day watch streak',           rank: 10 },
-  { id: 'demon-slayer',   title: 'Demon Slayer',     description: 'Accumulate 5000+ watch minutes',           rank: 11 },
-  { id: 'hashira',        title: 'Hashira',          description: 'Watch 600 total episodes — a true Pillar', rank: 12 },
-];
-
-const RANK_EPISODES = [0, 0, 5, 10, 20, 35, 50, 75, 100, 150, 250, 400, 600];
+import {
+  ACHIEVEMENTS,
+  useUserAchievements,
+  useGrantAchievement,
+  useRevokeAchievement,
+} from '@/hooks/admin/useAchievements';
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 function computeAutoUnlocked(
@@ -55,12 +42,9 @@ function computeAutoUnlocked(
 
 // ── Component ─────────────────────────────────────────────────────────────
 export function AchievementManager() {
-  const { profile: adminProfile } = useAuth();
-  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [selectedUser, setSelectedUser] = useState<{ user_id: string; display_name: string; username: string; avatar_url: string | null } | null>(null);
   const [note, setNote] = useState('');
-  const [revokeNote, setRevokeNote] = useState('');
 
   // ── User search ──────────────────────────────────────────────────────
   const { data: users = [], isFetching: searchFetching } = useQuery({
@@ -112,18 +96,7 @@ export function AchievementManager() {
   });
 
   // ── Manual grants for the user ────────────────────────────────────────
-  const { data: grants = [] } = useQuery({
-    queryKey: ['admin_user_achievements', selectedUser?.user_id],
-    enabled: !!selectedUser,
-    queryFn: async () => {
-      const { data, error } = await (supabase
-        .from('user_achievements' as any)
-        .select('achievement_id, granted_at, note')
-        .eq('user_id', selectedUser!.user_id)) as any;
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
+  const { data: grants = [] } = useUserAchievements(selectedUser?.user_id);
 
   const grantedSet = new Set(grants.map((g) => g.achievement_id));
 
@@ -136,43 +109,9 @@ export function AchievementManager() {
       )
     : new Set<string>();
 
-  // ── Grant mutation ────────────────────────────────────────────────────
-  const grantMutation = useMutation({
-    mutationFn: async ({ achievementId }: { achievementId: string }) => {
-      const { error } = await supabase.from('user_achievements' as any).upsert({
-        user_id: selectedUser!.user_id,
-        achievement_id: achievementId,
-        granted_by: adminProfile?.user_id,
-        note: note.trim() || null,
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin_user_achievements', selectedUser?.user_id] });
-      queryClient.invalidateQueries({ queryKey: ['user_achievements', selectedUser?.user_id] });
-      toast.success('Achievement granted');
-      setNote('');
-    },
-    onError: (e: any) => toast.error('Grant failed: ' + e.message),
-  });
-
-  // ── Revoke mutation ───────────────────────────────────────────────────
-  const revokeMutation = useMutation({
-    mutationFn: async ({ achievementId }: { achievementId: string }) => {
-      const { error } = await (supabase
-        .from('user_achievements' as any)
-        .delete()
-        .eq('user_id', selectedUser!.user_id)
-        .eq('achievement_id', achievementId)) as any;
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin_user_achievements', selectedUser?.user_id] });
-      queryClient.invalidateQueries({ queryKey: ['user_achievements', selectedUser?.user_id] });
-      toast.success('Achievement revoked');
-    },
-    onError: (e: any) => toast.error('Revoke failed: ' + e.message),
-  });
+  // ── Grant / revoke (shared hooks) ─────────────────────────────────────
+  const grantMutation = useGrantAchievement();
+  const revokeMutation = useRevokeAchievement();
 
   const isPending = grantMutation.isPending || revokeMutation.isPending;
 
@@ -264,7 +203,7 @@ export function AchievementManager() {
               const isAuto = autoSet.has(a.id);
               const isManual = grantedSet.has(a.id);
               const unlocked = isAuto || isManual;
-              const ns = getRankNameStyle(RANK_EPISODES[a.rank] ?? 0);
+              const ns = getRankNameStyleForRank(a.rank);
 
               return (
                 <GlassPanel
@@ -310,7 +249,15 @@ export function AchievementManager() {
                         variant="outline"
                         className="flex-1 h-6 text-[10px]"
                         disabled={isPending}
-                        onClick={() => grantMutation.mutate({ achievementId: a.id })}
+                        onClick={() =>
+                          grantMutation.mutate(
+                            { userId: selectedUser.user_id, achievementId: a.id, note },
+                            {
+                              onSuccess: () => { toast.success('Achievement granted'); setNote(''); },
+                              onError: (e: any) => toast.error('Grant failed: ' + e.message),
+                            },
+                          )
+                        }
                       >
                         <CheckCircle className="w-3 h-3 mr-1" />
                         Grant
@@ -322,7 +269,15 @@ export function AchievementManager() {
                         variant="destructive"
                         className="flex-1 h-6 text-[10px]"
                         disabled={isPending}
-                        onClick={() => revokeMutation.mutate({ achievementId: a.id })}
+                        onClick={() =>
+                          revokeMutation.mutate(
+                            { userId: selectedUser.user_id, achievementId: a.id },
+                            {
+                              onSuccess: () => toast.success('Achievement revoked'),
+                              onError: (e: any) => toast.error('Revoke failed: ' + e.message),
+                            },
+                          )
+                        }
                       >
                         <Lock className="w-3 h-3 mr-1" />
                         Revoke

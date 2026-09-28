@@ -150,3 +150,18 @@ export function buildUniqueSimpleNameMap(
 
   return output;
 }
+
+/**
+ * The distinct, user-pickable server/provider options, keyed by the provider
+ * base segment (e.g. `animepahe`). Deduped by friendly alias so the same alias
+ * (e.g. two "Hinata" providers) appears once. Sorted by display name. Used to
+ * seed the global "Default server" preference in Auto-Download settings.
+ */
+export function getKnownServerOptions(): Array<{ key: string; name: string }> {
+  const byName = new Map<string, { key: string; name: string }>();
+  for (const key of Object.keys(PROVIDER_ALIASES)) {
+    const name = PROVIDER_ALIASES[key];
+    if (!byName.has(name)) byName.set(name, { key, name });
+  }
+  return Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name));
+}

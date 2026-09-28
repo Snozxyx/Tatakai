@@ -38,7 +38,7 @@ const MemoizedAnimeCard = memo(({ anime, isUltraLite, blurhashEnabled, measureRe
       className="group cursor-pointer overflow-hidden h-full"
       onClick={() => onClick(anime)}
     >
-      <div ref={measureRef} className="relative aspect-[3/4]">
+      <div ref={measureRef} className="relative aspect-[2/3]">
         {blurhashEnabled ? (
           <BlurhashImage
             src={posterSrc}

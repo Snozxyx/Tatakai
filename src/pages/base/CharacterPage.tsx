@@ -18,11 +18,13 @@ import {
     JikanCharacterFullResponse,
     getProxiedImageUrl
 } from '@/lib/api';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { cn } from '@/lib/utils';
+import { useIsCharacterFavorited, useToggleCharacterFavorite } from '@/hooks/user/useCharacterFavorites';
+import { ANILIST_GRAPHQL_ENDPOINT } from '@/lib/api/backendOrigin';
 
 // AniList Character GraphQL
 const ANILIST_CHAR_QUERY = `
@@ -52,7 +54,6 @@ export default function CharacterPage() {
     const navigate = useNavigate();
     const isDesktopApp = useIsDesktopApp();
     const location = useLocation();
-    const [isLiked, setIsLiked] = useState(false);
 
     const { fallbackName } = useMemo(() => {
         const searchParams = new URLSearchParams(location.search);
@@ -69,7 +70,7 @@ export default function CharacterPage() {
             
             // 1. Try by ID if numeric
             if (isNumericId) {
-                const res = await fetch('https://graphql.anilist.co', {
+                const res = await fetch(ANILIST_GRAPHQL_ENDPOINT, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ query: ANILIST_CHAR_QUERY, variables: { id: parseInt(charname) } })
@@ -101,7 +102,7 @@ export default function CharacterPage() {
                     }
                 }
             `;
-            const searchRes = await fetch('https://graphql.anilist.co', {
+            const searchRes = await fetch(ANILIST_GRAPHQL_ENDPOINT, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ query: searchGql, variables: { search: searchQuery } })
@@ -113,6 +114,11 @@ export default function CharacterPage() {
     });
 
     const isLoading = aniLoading;
+
+    // Favorite state is keyed on the AniList character id (stored as text).
+    const favoriteCharacterId = aniListChar?.id != null ? String(aniListChar.id) : undefined;
+    const { data: isFavorited = false } = useIsCharacterFavorited(favoriteCharacterId);
+    const toggleFavorite = useToggleCharacterFavorite();
 
     if (isLoading) {
         return (
@@ -170,14 +176,25 @@ export default function CharacterPage() {
                             />
                             <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-60" />
                             
-                            <button 
-                                onClick={() => setIsLiked(!isLiked)}
+                            <button
+                                onClick={() => {
+                                    if (!favoriteCharacterId || toggleFavorite.isPending) return;
+                                    toggleFavorite.mutate({
+                                        characterId: favoriteCharacterId,
+                                        characterName: char.name?.full || char.name?.native || 'Unknown Character',
+                                        characterImage: char.image?.large || null,
+                                        nativeName: char.name?.native || null,
+                                    });
+                                }}
+                                disabled={toggleFavorite.isPending}
+                                aria-pressed={isFavorited}
+                                aria-label={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
                                 className={cn(
-                                    "absolute top-6 right-6 w-14 h-14 rounded-2xl flex items-center justify-center backdrop-blur-2xl border border-white/20 transition-all active:scale-90 shadow-xl",
-                                    isLiked ? "bg-red-500 text-white border-red-400" : "bg-black/40 text-white/60 hover:text-white"
+                                    "absolute top-6 right-6 w-14 h-14 rounded-2xl flex items-center justify-center backdrop-blur-2xl border border-white/20 transition-all active:scale-90 shadow-xl disabled:opacity-60",
+                                    isFavorited ? "bg-red-500 text-white border-red-400" : "bg-black/40 text-white/60 hover:text-white"
                                 )}
                             >
-                                <Heart className={cn("w-6 h-6", isLiked && "fill-current")} />
+                                <Heart className={cn("w-6 h-6", isFavorited && "fill-current")} />
                             </button>
                         </motion.div>
 
@@ -277,7 +294,7 @@ export default function CharacterPage() {
                                 whileInView={{ opacity: 1, y: 0 }}
                                 transition={{ delay: idx * 0.05 }}
                                 className="group cursor-pointer"
-                                onClick={() => navigate(`/${rel.node.type === 'ANIME' ? 'watch' : 'manga'}/${rel.node.id}`)}
+                                onClick={() => navigate(`/${rel.node.type === 'ANIME' ? 'anime' : 'manga'}/${rel.node.id}`)}
                             >
                                 <div className="relative aspect-[3/4.5] rounded-2xl overflow-hidden border border-white/5 mb-3">
                                     <img 

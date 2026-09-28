@@ -5,6 +5,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MessageSquare, Layout, Star, List, Clock, ExternalLink } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Link } from 'react-router-dom';
+import { CommentContent } from '@/components/comments/CommentContent';
+import { CommentAttachments } from '@/components/comments/CommentAttachments';
+import { CommentEmbeds } from '@/components/comments/CommentEmbeds';
 
 interface UserActivityLogsProps {
     userId: string;
@@ -109,13 +112,15 @@ export function UserActivityLogs({ userId }: UserActivityLogsProps) {
                     ) : (
                         comments?.map((comment: any) => (
                             <GlassPanel key={comment.id} className="p-3 bg-muted/20 border-white/5">
-                                <p className="text-sm line-clamp-2 mb-2">{comment.content}</p>
-                                <div className="flex items-center justify-between text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
+                                <CommentContent content={comment.content} clamp className="text-sm mb-2" />
+                                <CommentAttachments attachments={comment.attachments} className="mb-2" />
+                                <CommentEmbeds embeds={comment.embeds} poll={comment.poll} />
+                                <div className="flex items-center justify-between text-[10px] text-muted-foreground uppercase tracking-widest font-bold mt-2">
                                     <span className="flex items-center gap-1">
                                         <Clock className="w-3 h-3" />
                                         {formatDate(comment.created_at)}
                                     </span>
-                                    <span>{comment.anime_id}</span>
+                                    <span>{comment.entity_type}</span>
                                 </div>
                             </GlassPanel>
                         ))

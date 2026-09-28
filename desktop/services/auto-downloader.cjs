@@ -316,7 +316,7 @@ class AutoDownloader {
      */
     // eslint-disable-next-line no-unused-vars
     async _findTorrentSource(_animeId, title, episode) {
-        // Real implementation: search Nyaa RSS for a matching torrent candidate.
+        // Resolve via an installed extension / user-supplied (BYO) magnet source.
         // Return null when no suitable candidate is found.
         return null;
     }

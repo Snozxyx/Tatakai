@@ -1,10 +1,17 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useAnimeRatingStats, useUserRating, useRateAnime, useDeleteRating } from '@/hooks/user/useRatings';
+import { useCommunityRulesGate } from '@/components/community/CommunityRulesGate';
+import {
+  useAnimeRatings,
+  useAnimeRatingStats,
+  useUserRating,
+  useRateAnime,
+  useDeleteRating,
+} from '@/hooks/user/useRatings';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Star, Loader2, Trash2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Star, Loader2, Trash2, MessageSquareQuote } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 
 interface RatingsSectionProps {
   animeId: string;
@@ -52,14 +59,22 @@ function StarRating({ rating, onRate, interactive = false, size = 'md' }: {
 export function RatingsSection({ animeId }: RatingsSectionProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const ensureAgreed = useCommunityRulesGate();
   const [selectedRating, setSelectedRating] = useState(0);
   const [review, setReview] = useState('');
   const [showReviewInput, setShowReviewInput] = useState(false);
   
   const { data: stats, isLoading: loadingStats } = useAnimeRatingStats(animeId);
   const { data: userRating, isLoading: loadingUserRating } = useUserRating(animeId);
+  const { data: allRatings = [] } = useAnimeRatings(animeId);
   const rateAnime = useRateAnime();
   const deleteRating = useDeleteRating();
+
+  // Community reviews = ratings that carry free-text, newest first (the hook
+  // already returns them ordered by created_at desc with the author profile).
+  const reviews = allRatings.filter(
+    (r) => typeof r.review === 'string' && r.review.trim().length > 0,
+  );
 
   const handleRate = async (rating: number) => {
     setSelectedRating(rating);
@@ -67,6 +82,7 @@ export function RatingsSection({ animeId }: RatingsSectionProps) {
   };
 
   const handleSubmitRating = async () => {
+    if (!(await ensureAgreed())) return;
     await rateAnime.mutateAsync({
       animeId,
       rating: selectedRating,
@@ -175,7 +191,88 @@ export function RatingsSection({ animeId }: RatingsSectionProps) {
           <Button onClick={() => navigate('/auth')}>Sign In</Button>
         </div>
       )}
-      
+
+      {/* Community Reviews */}
+      <div className="space-y-4 pt-2">
+        <div className="flex items-center gap-2">
+          <MessageSquareQuote className="w-5 h-5 text-primary" />
+          <h4 className="font-display text-lg font-semibold">Reviews</h4>
+          {reviews.length > 0 && (
+            <span className="text-sm text-muted-foreground">({reviews.length})</span>
+          )}
+        </div>
+
+        {reviews.length > 0 ? (
+          <div className="space-y-3">
+            {reviews.map((r) => {
+              const displayRating = r.rating > 5 ? Math.round(r.rating / 2) : r.rating;
+              const name = r.profile?.display_name || r.profile?.username || 'Anonymous';
+              const initial = name.charAt(0).toUpperCase();
+              const date = new Date(r.created_at).toLocaleDateString(undefined, {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+              });
+              const avatar = (
+                <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 border border-border/40 bg-primary/15 flex items-center justify-center">
+                  {r.profile?.avatar_url ? (
+                    <img
+                      src={r.profile.avatar_url}
+                      alt={name}
+                      loading="lazy"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-sm font-bold text-primary">{initial}</span>
+                  )}
+                </div>
+              );
+
+              return (
+                <div
+                  key={r.id}
+                  className="p-4 rounded-xl bg-card/50 border border-border/30 space-y-2"
+                >
+                  <div className="flex items-center gap-3">
+                    {r.profile?.username ? (
+                      <Link to={`/user/${r.profile.username}`} className="shrink-0">
+                        {avatar}
+                      </Link>
+                    ) : (
+                      avatar
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-foreground/90 truncate">
+                          {r.profile?.username ? (
+                            <Link
+                              to={`/user/${r.profile.username}`}
+                              className="hover:text-primary transition-colors"
+                            >
+                              {name}
+                            </Link>
+                          ) : (
+                            name
+                          )}
+                        </span>
+                        <span className="text-xs text-muted-foreground">{date}</span>
+                      </div>
+                      <StarRating rating={displayRating} size="sm" />
+                    </div>
+                  </div>
+                  <p className="text-sm text-foreground/85 leading-relaxed whitespace-pre-line">
+                    {r.review}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="p-6 rounded-xl bg-card/50 border border-border/30 text-center text-sm text-muted-foreground">
+            No reviews yet. Rate this anime and share your thoughts.
+          </div>
+        )}
+      </div>
     </div>
   );
 }

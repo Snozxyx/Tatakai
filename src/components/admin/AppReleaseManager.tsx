@@ -11,6 +11,7 @@ import {
     Download, Plus, Trash2, Edit2, CheckCircle,
     XCircle, Monitor, Apple, Terminal, Save, X
 } from 'lucide-react';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 interface AppRelease {
     id: string;
@@ -25,6 +26,7 @@ interface AppRelease {
 
 export function AppReleaseManager() {
     const queryClient = useQueryClient();
+    const confirm = useConfirm();
     const [isAdding, setIsAdding] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -287,8 +289,8 @@ export function AppReleaseManager() {
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => {
-                                        if (confirm('Delete this release?')) deleteMutation.mutate(release.id);
+                                    onClick={async () => {
+                                        if (await confirm({ title: 'Delete this release?', destructive: true })) deleteMutation.mutate(release.id);
                                     }}
                                     className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                                 >

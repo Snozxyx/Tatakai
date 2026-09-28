@@ -2,8 +2,8 @@ import { Search, User, LogOut, Shield, Download, Camera, Loader2, X, Film, Play,
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useIsNativeApp, useIsDesktopApp } from "@/hooks/ui/useIsNativeApp";
-import { DownloadIndicator } from "@/components/layout/DownloadIndicator";
+import { useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
+
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { NotificationBell } from "@/components/ui/NotificationBell";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,6 +23,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { ANILIST_GRAPHQL_ENDPOINT } from "@/lib/api/backendOrigin";
 
 // ── Image search helpers ──────────────────────────────────────────────────────
 
@@ -48,7 +49,7 @@ async function runImageSearch(file: File): Promise<any[]> {
   if (ids.length > 0) {
     try {
       const gql = `query ($ids:[Int]){Page(perPage:50){media(id_in:$ids,type:ANIME){id title{english romaji}coverImage{medium}}}}`;
-      const r = await fetch("https://graphql.anilist.co", {
+      const r = await fetch(ANILIST_GRAPHQL_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: gql, variables: { ids } }),
@@ -90,7 +91,6 @@ export function Header() {
   const navigate = useNavigate();
   const { user, profile, isAdmin, isModerator, isBanned, signOut, isLoading } = useAuth();
   const isNative = useIsNativeApp();
-  const isDesktopApp = useIsDesktopApp();
 
   // Image search state
   const [showImageSearch, setShowImageSearch] = useState(false);
@@ -267,8 +267,6 @@ export function Header() {
           <div className="hidden sm:block">
             <NotificationBell />
           </div>
-
-          {isDesktopApp && <DownloadIndicator />}
 
           {isLoading ? (
             <div className="w-10 h-10 rounded-full bg-muted animate-pulse" />

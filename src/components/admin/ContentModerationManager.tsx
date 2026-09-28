@@ -14,10 +14,13 @@ import {
 import { Link } from 'react-router-dom';
 import { usePinForumPost } from '@/hooks/community/useForum';
 import { cn } from '@/lib/utils';
+import { useConfirm } from '@/components/ui/confirm-dialog';
+import { RichContent } from '@/components/community/feed/richText';
 
 export function ContentModerationManager() {
   const queryClient = useQueryClient();
   const pinPost = usePinForumPost();
+  const confirm = useConfirm();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('forum');
 
@@ -240,9 +243,9 @@ export function ContentModerationManager() {
                         )}
                       </div>
                       <h4 className="font-medium truncate">{post.title}</h4>
-                      <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{post.content}</p>
+                      <RichContent html={post.content} className="text-sm text-muted-foreground line-clamp-2 mt-1" />
                       <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                        <span>By @{post.profile?.username || 'unknown'}</span>
+                        <Link to={`/admin/user/${post.user_id}`} className="hover:text-primary transition-colors">By @{post.profile?.username || 'unknown'}</Link>
                         <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
                         <span className="flex items-center gap-1">
                           <Eye className="w-3 h-3" />
@@ -274,8 +277,8 @@ export function ContentModerationManager() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => {
-                          if (confirm('Delete this forum post?')) {
+                        onClick={async () => {
+                          if (await confirm({ title: 'Delete this forum post?', destructive: true })) {
                             deleteForumPost.mutate(post.id);
                           }
                         }}
@@ -324,7 +327,7 @@ export function ContentModerationManager() {
                         {playlist.description || 'No description'}
                       </p>
                       <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                        <span>By @{playlist.profile?.username || 'unknown'}</span>
+                        <Link to={`/admin/user/${playlist.user_id}`} className="hover:text-primary transition-colors">By @{playlist.profile?.username || 'unknown'}</Link>
                         <span>{playlist.items_count || 0} items</span>
                         <span>{formatDistanceToNow(new Date(playlist.created_at), { addSuffix: true })}</span>
                       </div>
@@ -338,8 +341,8 @@ export function ContentModerationManager() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => {
-                          if (confirm('Delete this playlist?')) {
+                        onClick={async () => {
+                          if (await confirm({ title: 'Delete this playlist?', destructive: true })) {
                             deletePlaylist.mutate(playlist.id);
                           }
                         }}
@@ -388,7 +391,7 @@ export function ContentModerationManager() {
                         {tierList.description || 'No description'}
                       </p>
                       <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                        <span>By @{tierList.profile?.username || 'unknown'}</span>
+                        <Link to={`/admin/user/${tierList.user_id}`} className="hover:text-primary transition-colors">By @{tierList.profile?.username || 'unknown'}</Link>
                         <span>{formatDistanceToNow(new Date(tierList.created_at), { addSuffix: true })}</span>
                         {tierList.views_count > 0 && (
                           <span className="flex items-center gap-1">
@@ -409,8 +412,8 @@ export function ContentModerationManager() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => {
-                          if (confirm('Delete this tier list?')) {
+                        onClick={async () => {
+                          if (await confirm({ title: 'Delete this tier list?', destructive: true })) {
                             deleteTierList.mutate(tierList.id);
                           }
                         }}

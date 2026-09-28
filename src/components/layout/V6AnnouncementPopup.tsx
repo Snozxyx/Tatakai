@@ -3,28 +3,31 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/compone
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useIsMobile } from '@/hooks/ui/use-mobile';
+import { useSettingsModal } from '@/contexts/SettingsModalContext';
 import {
     Sparkles,
     BookOpen,
     Settings,
     Users,
-    ShieldCheck,
-    Target,
-    Search
+    Blocks,
+    PlayCircle,
+    MessageSquare,
+    Award
 } from 'lucide-react';
 
 const REDUCE_MOTION_PROMPT_DELAY_UNTIL_KEY = 'tatakai_reduce_motion_prompt_delay_until';
-const POPUP_VISIBILITY_EVENT = 'tatakai-v5-popup-visibility';
-const POPUP_ACTIVE_CLASS = 'v5-popup-active';
+const POPUP_VISIBILITY_EVENT = 'tatakai-v6-popup-visibility';
+const POPUP_ACTIVE_CLASS = 'v6-popup-active';
 const REDUCE_MOTION_DELAY_MS = 60 * 1000;
 
-export function V5AnnouncementPopup() {
+export function V6AnnouncementPopup() {
     const [isOpen, setIsOpen] = useState(false);
     const isMobile = useIsMobile();
+    const { openSettings } = useSettingsModal();
 
     useEffect(() => {
-        const hasSeenV5 = localStorage.getItem('tatakai_v5_announced') === 'true';
-        if (!hasSeenV5) {
+        const hasSeenV6 = localStorage.getItem('tatakai_v6_announced') === 'true';
+        if (!hasSeenV6) {
             const timer = setTimeout(() => setIsOpen(true), 2000);
             return () => clearTimeout(timer);
         }
@@ -64,39 +67,44 @@ export function V5AnnouncementPopup() {
 
     const handleClose = () => {
         setIsOpen(false);
-        localStorage.setItem('tatakai_v5_announced', 'true');
+        localStorage.setItem('tatakai_v6_announced', 'true');
     };
 
     const handleGoToSettings = () => {
         handleClose();
-        window.location.href = '/settings?tab=changelog';
+        openSettings('changelog');
     };
 
     const features = [
         {
-            icon: <ShieldCheck className="w-5 h-5 text-emerald-400" />,
-            title: "Playback Reliability",
-            description: "Smarter failover and source quality memory reduce dead streams and repeated retries."
-        },
-        {
-            icon: <Users className="w-5 h-5 text-cyan-400" />,
-            title: "Watch2Together Upgrades",
-            description: "Host transfer, reconnect recovery, and cleaner room sync for smoother group sessions."
-        },
-        // {
-        //     icon: <Target className="w-5 h-5 text-amber-400" />,
-        //     title: "Explainable Recommendations",
-        //     description: "See recommendation reasons, factor breakdowns, and give direct feedback controls."
-        // },
-        {
-            icon: <Search className="w-5 h-5 text-violet-400" />,
-            title: "Hybrid Search",
-            description: "Anime + character results, advanced filters, and image-search confidence controls."
+            icon: <Blocks className="w-5 h-5 text-violet-400" />,
+            title: "Extension Ecosystem",
+            description: "Add sources, themes, custom read/watch verticals, and full UI — as modular extensions that run side by side."
         },
         {
             icon: <BookOpen className="w-5 h-5 text-rose-400" />,
-            title: "Manga V5 Expansion",
-            description: "New manga hub sections, better chapter filtering, and smoother reader navigation upgrades."
+            title: "Manga, Rebuilt",
+            description: "A comick-style reader with per-device settings, saved progress, and download-whole-series offline reading."
+        },
+        {
+            icon: <PlayCircle className="w-5 h-5 text-emerald-400" />,
+            title: "Continue Watching",
+            description: "Netflix-style cross-device resume, auto-downloads, richer anime info, and a release calendar."
+        },
+        {
+            icon: <Users className="w-5 h-5 text-cyan-400" />,
+            title: "Watch2Together",
+            description: "Host-streamed rooms with password protection and a redesigned ambient theater."
+        },
+        {
+            icon: <MessageSquare className="w-5 h-5 text-sky-400" />,
+            title: "Community Feed",
+            description: "A feed-first community with posts, polls, and rich embeds."
+        },
+        {
+            icon: <Award className="w-5 h-5 text-amber-400" />,
+            title: "Ranks & Badges",
+            description: "Unified Mitsu ranks with animated name effects, plus collectible Chikra badges with rarity tiers."
         }
     ];
 
@@ -106,20 +114,12 @@ export function V5AnnouncementPopup() {
                 className="w-[95vw] max-w-[660px] p-0 overflow-hidden bg-background/70 border-white/10 shadow-2xl rounded-3xl animate-in fade-in zoom-in duration-500"
                 style={{ backdropFilter: 'blur(30px)' }}
             >
-                <DialogTitle className="sr-only">Tatakai V5 Update</DialogTitle>
-                <DialogDescription className="sr-only">Reliability + Discovery Upgrade Announcement</DialogDescription>
-                
+
                 <div className="relative h-44 w-full overflow-hidden sm:h-52">
-                    <img src="/tatakaibanner.png" alt="Tatakai V5" className="absolute inset-0 w-full h-full object-cover" />
+                    <img src={`${import.meta.env.BASE_URL}assets/logo/tatakaibanner.png`} alt="Tatakai V6" className="absolute inset-0 w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/40 to-transparent" />
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-4 sm:p-6">
-                        <Badge variant="outline" className="mb-3 border-primary/50 text-primary bg-primary/10 px-3 py-1 font-black uppercase tracking-[0.2em] text-[10px]">
-                            Major Update
-                        </Badge>
-                        <h1 className="text-3xl sm:text-5xl font-black tracking-tighter text-foreground drop-shadow-2xl">
-                            TATAKAI <span className="text-primary">V5</span>
-                        </h1>
-                        <p className="text-muted-foreground text-xs mt-2 font-medium tracking-widest uppercase">Reliability + Discovery Upgrade</p>
+                        
                     </div>
                 </div>
 
@@ -165,5 +165,6 @@ export function V5AnnouncementPopup() {
     );
 }
 
-export const V4AnnouncementPopup = V5AnnouncementPopup;
+export const V5AnnouncementPopup = V6AnnouncementPopup;
+export const V4AnnouncementPopup = V6AnnouncementPopup;
 

@@ -8,6 +8,7 @@ import { usePageTracking } from "@/hooks/api/useAnalytics";
 import { useActiveSession } from "@/hooks/auth/useActiveSession";
 import { useClientId, setCachedClientId } from "@/hooks/ui/useClientId";
 import { useIsNativeApp, useIsDesktopApp } from "@/hooks/ui/useIsNativeApp";
+import { useTitlebarHidden } from "@/hooks/ui/useTitlebarHidden";
 import { useIsMobile } from "@/hooks/ui/use-mobile";
 import { useSmartTV } from "@/hooks/ui/useSmartTV";
 import { useOnline } from "@/hooks/ui/useOnline";
@@ -21,13 +22,19 @@ import { TitleBar } from "@/components/layout/TitleBar";
 import { MobileNav } from '@/components/layout/MobileNav';
 import { OfflineBanner } from '@/components/layout/OfflineBanner';
 import { OfflineGate } from '@/components/layout/OfflineGate';
-import { V5AnnouncementPopup } from '@/components/layout/V6AnnouncementPopup';
+import { V6AnnouncementPopup } from '@/components/layout/V6AnnouncementPopup';
 import { PopupDisplay } from "@/components/layout/PopupDisplay";
 import { ReduceMotionPrompt } from '@/components/layout/ReduceMotionPrompt';
 import { LogViewer } from "@/components/debug/LogViewer";
 import { DevConsole } from "@/components/debug/DevConsole";
 import { GlobalListeners, DeepLinkHandler, AntiDevToolsGuard } from "@/routes/AppRoutes";
+import { EasterEggs } from "@/components/layout/EasterEggs";
+import { CelebrationHost } from "@/components/effects/Celebrate";
 import { MagnetAlignmentModal } from "@/components/modals/MagnetAlignmentModal";
+import { SettingsModal } from "@/components/settings/SettingsModal";
+import { ConfirmProvider } from "@/components/ui/confirm-dialog";
+import { CommunityRulesGateProvider } from "@/components/community/CommunityRulesGate";
+import { IdleReclaimProvider } from "@/contexts/IdleReclaimProvider";
 import { toast } from 'sonner';
 import { getLocalTorrentSessionHistory, getLocalTorrentSessionHistoryEnabled } from '@/lib/localStorage';
 
@@ -60,6 +67,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const isNative = useIsNativeApp();
   const isDesktopApp = useIsDesktopApp();
+  const [titlebarHidden] = useTitlebarHidden();
   const isMobile = useIsMobile();
   const isMobileApp = Capacitor.isNativePlatform();
   const isDevtoolsBlockedPage = location.pathname.startsWith('/devtools-blocked');
@@ -130,18 +138,39 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
   const online = useOnline();
   const hideSidebarPages = ['/', '/welcome', '/download', '/downloads', '/auth', '/onboarding', '/setup', '/maintenance', '/banned', '/error', '/devtools-blocked', '/smarttv', '/manga/read'];
   const isHiddenPage = hideSidebarPages.some(page => page === '/' ? location.pathname === '/' : location.pathname.startsWith(page));
+  // The community feed ships its own X-style CommunitySidebar, so suppress the
+  // global Sidebar there. The single-post /community/forum/:id view and the
+  // space page /community/c/:slug now share that layout too, so they render
+  // their own CommunitySidebar and must not double up with the global nav.
+  const isCommunityFeed = location.pathname === '/community'
+    || location.pathname.startsWith('/community/forum/')
+    || /^\/community\/c\/[^/]+/.test(location.pathname);
   // Also hide sidebar when offline (OfflineGate shows full-screen offline page)
-  const showSidebar = !isMobile && !isMobileApp && !isHiddenPage && online;
+  const showSidebar = !isMobile && !isMobileApp && !isHiddenPage && !isCommunityFeed && online;
 
   useEffect(() => {
     if (isNative) document.body.classList.add('native-app');
     else document.body.classList.remove('native-app');
+    // desktop-app is Electron/Tauri only (native-app also covers mobile). Sheet
+    // and overlay offsets that must clear the 32px titlebar key off this class.
+    if (isDesktopApp) document.body.classList.add('desktop-app');
+    else document.body.classList.remove('desktop-app');
     if (isMobileApp) document.documentElement.classList.add('capacitor-native');
     return () => {
       document.body.classList.remove('native-app');
+      document.body.classList.remove('desktop-app');
       document.documentElement.classList.remove('capacitor-native');
     };
-  }, [isNative, isMobileApp]);
+  }, [isNative, isMobileApp, isDesktopApp]);
+
+  // "Hide title bar" preference → toggle the class the CSS keys off. Desktop
+  // only; the class removal on cleanup keeps web/mobile untouched.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (isDesktopApp && titlebarHidden) root.classList.add('titlebar-hidden');
+    else root.classList.remove('titlebar-hidden');
+    return () => root.classList.remove('titlebar-hidden');
+  }, [isDesktopApp, titlebarHidden]);
 
   const [magnetModalOpen, setMagnetModalOpen] = useState(false);
   const [initialMagnet, setInitialMagnet] = useState<string | undefined>();
@@ -181,16 +210,23 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
   }, [isDesktopApp]);
 
   return (
+    <ConfirmProvider>
+    <CommunityRulesGateProvider>
+    <IdleReclaimProvider />
     <div
       className={cn(
         "min-h-screen relative flex flex-col transition-all duration-300",
         isDesktopApp && showSidebar && online && "lg:pl-[var(--sidebar-width)]",
-        isDesktopApp && "pt-8"
+        isDesktopApp && !titlebarHidden && "pt-8"
       )}
     >
       <Toaster />
       <Sonner />
       <OfflineBanner />
+      {/* Rendered OUTSIDE OfflineGate: the titlebar (drag region + window
+          controls) must stay visible even when NoInternetPage takes over the
+          viewport, otherwise the desktop window can't be moved or closed. */}
+      {isDesktopApp && <TitleBar />}
       <OfflineGate>
         {isDevtoolsBlockedPage ? (
           <main className="flex-1 w-full relative z-[1000]">
@@ -200,10 +236,11 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
           <>
             {getDevModeEnabled() && <DevConsole />}
             {showSidebar && <Background />}
-            {isDesktopApp && <TitleBar />}
             {showSidebar && <Sidebar />}
-            <V5AnnouncementPopup />
+            <V6AnnouncementPopup />
             <GlobalListeners />
+            <EasterEggs />
+            <CelebrationHost />
             {deferredStartupReady && <PopupDisplay />}
             <ReduceMotionPrompt />
             <LogViewer />
@@ -221,6 +258,8 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
               initialTorrentBuffer={initialTorrentBuffer}
             />
 
+            <SettingsModal />
+
             <main className="flex-1 w-full relative z-10">
               {children}
             </main>
@@ -230,6 +269,8 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
         )}
       </OfflineGate>
     </div>
+    </CommunityRulesGateProvider>
+    </ConfirmProvider>
   );
 };
 
@@ -237,7 +278,7 @@ function ConditionalFooter() {
   const location = useLocation();
   const isNative = useIsNativeApp();
   if (isNative) return null;
-  const hideFooter = ['/welcome', '/download', '/watch/', '/novel/comingsoon', '/dmca', '/suggestions','/privacy', '/terms', '/char/', '/genre/', '/manga/', '/manga', '/isshoni/', '/search', '/image-search', '/status', '/banned', '/maintenance', '/service-unavailable', '/503', '/error', '/devtools-blocked', '/auth', '/reset-password', '/update-password', '/onboarding', '/setup', '/mal-redirect', '/anilist-redirect', '/favorites', '/', '/trending', '/settings' , '/recommendations' , '/admin', '/mobile-app'].some(path => location.pathname === '/' ? path === '/' : location.pathname.startsWith(path));
+  const hideFooter = ['/welcome', '/download', '/watch/', '/novel/comingsoon', '/dmca', '/suggestions','/privacy', '/terms', '/community-guidelines', '/community-rules', '/char/', '/genre/', '/manga/', '/manga', '/isshoni/', '/search', '/image-search', '/status', '/banned', '/maintenance', '/service-unavailable', '/503', '/error', '/devtools-blocked', '/auth', '/reset-password', '/update-password', '/onboarding', '/setup', '/mal-redirect', '/anilist-redirect', '/favorites', '/', '/trending', '/settings' , '/recommendations' , '/admin', '/mobile-app'].some(path => location.pathname === '/' ? path === '/' : location.pathname.startsWith(path));
   if (hideFooter) return null;
   return <Footer />;
 }

@@ -1,3 +1,6 @@
+import { getActiveStreamingProxySnapshot } from '@/hooks/user/useProxySettings';
+import { resolveBackendOrigin } from '@/lib/api/backendOrigin';
+
 const STREAM_PROXY_PASSWORD = String(
   import.meta.env.VITE_STREAM_PROXY_PASSWORD || import.meta.env.VITE_PROXY_PASSWORD || ''
 ).trim();
@@ -10,14 +13,18 @@ const STREAM_PROXY_BASE = String(
   import.meta.env.VITE_STREAM_PROXY_URL ||
     import.meta.env.VITE_PROXY_NODE_URL ||
     import.meta.env.VITE_PROXY_CF_URL ||
-    'http://localhost:3000/api/v1/streamingProxy'
+    'https://hoko.tatakai.me/api/v1/streamingProxy'
 ).trim();
 
-// Local API base for subtitle proxying — avoids CORS issues with the external streaming proxy.
-// The local API sets Access-Control-Allow-Origin: * so subtitle <track> elements always load.
-const LOCAL_API_BASE = String(
-  import.meta.env.VITE_TATAKAI_API_URL || 'http://localhost:8090/api/v3'
-).trim().replace(/\/api\/v3\/?$/, '');
+// Backend origin for subtitle proxying — avoids CORS issues with the external
+// streaming proxy (the local API sets Access-Control-Allow-Origin: * so subtitle
+// <track> elements always load). Resolved via the shared helper (VITE_BACKEND_ORIGIN
+// → origin of VITE_TATAKAI_API_URL → page origin) so the desktop app:// build hits
+// api.tatakai.me instead of a dead localhost fallback.
+const LOCAL_API_BASE = (
+  resolveBackendOrigin() ||
+  String(import.meta.env.VITE_TATAKAI_API_URL || '').trim().replace(/\/api\/v3\/?$/, '')
+);
 
 function isLocalLike(url: string): boolean {
   return (
@@ -87,11 +94,14 @@ function buildProxyUrl(rawUrl: string, referer?: string, userAgent?: string, typ
   const url = unwrapProxyUrl(rawUrl);
   if (!url || isLocalLike(url) || !/^https?:/i.test(url)) return url;
 
-  const base = STREAM_PROXY_BASE;
+  const snapshot = getActiveStreamingProxySnapshot();
+  const base = snapshot.url || STREAM_PROXY_BASE;
+  const password = snapshot.password !== undefined ? snapshot.password : STREAM_PROXY_PASSWORD;
+
   const params = new URLSearchParams({ url, type });
   if (referer) params.set('referer', referer);
   if (userAgent) params.set('userAgent', userAgent);
-  if (STREAM_PROXY_PASSWORD) params.set('password', STREAM_PROXY_PASSWORD);
+  if (password) params.set('password', password);
   return `${base}?${params.toString()}`;
 }
 
@@ -110,6 +120,18 @@ export function getProxiedSubtitleUrl(rawUrl: string, referer?: string, userAgen
   if (referer) params.set('referer', referer);
   if (userAgent) params.set('userAgent', userAgent);
   return `${LOCAL_API_BASE}/api/proxy/subtitle?${params.toString()}`;
+}
+
+/**
+ * Route a small public JSON API (waifu.im / nekosia.cat) through the local API's
+ * /api/proxy/json passthrough. Direct cross-origin fetches to these hosts get
+ * blocked (403/CORS) from the desktop renderer and spam the console; the proxy
+ * makes the request server-side and returns the JSON with Access-Control-Allow-Origin: *.
+ */
+export function getProxiedJsonUrl(rawUrl: string): string {
+  const url = String(rawUrl || '').trim();
+  if (!url || !/^https?:/i.test(url)) return url;
+  return `${LOCAL_API_BASE}/api/proxy/json?url=${encodeURIComponent(url)}`;
 }
 
 export function readProxyQuerySnapshot(rawUrl: string): {

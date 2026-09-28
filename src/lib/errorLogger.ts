@@ -34,7 +34,7 @@ export async function logClientError(err: unknown, context: Record<string, any> 
 
     // Frontend errors are intentionally NOT persisted to admin_logs/staff logs by default.
     // Keep an explicit opt-in switch for exceptional debugging sessions.
-    const shouldPersistToAdminLogs = import.meta.env.VITE_LOG_FRONTEND_ERRORS_TO_DB === 'true';
+    const shouldPersistToAdminLogs = import.meta.env.VITE_LOG_FRONTEND_ERRORS_TO_DB === 'false';
     if (shouldPersistToAdminLogs) {
       await supabase.from('admin_logs').insert({
         user_id: userId,

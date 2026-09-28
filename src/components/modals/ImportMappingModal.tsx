@@ -48,6 +48,8 @@ interface MappingItem extends ParsedImportGroup {
   seasonNumber: number;
   releaseGroup: string;
   primaryEpisode: number;
+  posterUrl: string;
+  anilistId: number | null;
 }
 
 export function ImportMappingModal({
@@ -95,6 +97,8 @@ export function ImportMappingModal({
             primaryEpisode: firstEpisode,
             seasonNumber: firstFile?.parsedSeason !== null && firstFile?.parsedSeason !== undefined ? firstFile.parsedSeason : 1,
             releaseGroup: firstFile?.parsedGroup || '',
+            posterUrl: '',
+            anilistId: null,
           };
         });
         setItems(mapped);
@@ -142,11 +146,14 @@ export function ImportMappingModal({
   const applyBulkAnime = (anime: any) => {
     setSelectedBulkAnime(anime);
     const officialTitle = anime.titleEnglish || anime.titleRomaji || anime.titleNative;
-    
+    const poster = anime.coverImageLarge || anime.coverImageMedium || '';
+
     setItems(prev => prev.map(item => ({
       ...item,
       targetAnimeName: officialTitle,
-      seasonNumber: bulkSeason
+      seasonNumber: bulkSeason,
+      posterUrl: poster,
+      anilistId: anime.anilistId ?? null,
     })));
     toast.success(`Applied "${officialTitle}" to all files!`);
     setBulkSearchResults([]);
@@ -199,12 +206,55 @@ export function ImportMappingModal({
 
   const selectIndividualAnime = (index: number, anime: any) => {
     const title = anime.titleEnglish || anime.titleRomaji || anime.titleNative;
-    updateItemField(index, 'targetAnimeName', title);
+    const poster = anime.coverImageLarge || anime.coverImageMedium || '';
+    setItems(prev => {
+      const next = [...prev];
+      next[index] = {
+        ...next[index],
+        targetAnimeName: title,
+        posterUrl: poster,
+        anilistId: anime.anilistId ?? null,
+      };
+      return next;
+    });
     setActiveSearchIndex(null);
     setIndivSearchResults([]);
   };
 
+  // Detect files that would resolve to the same anime/season/episode slot and
+  // therefore overwrite each other on disk. Returns a human-readable list of
+  // colliding slots (empty = safe to import).
+  const findCollisions = (): string[] => {
+    const slots = new Map<string, number>();
+    for (const item of items) {
+      const name = (item.targetAnimeName || item.displayTitle || '').trim().toLowerCase();
+      item.files.forEach((file, index) => {
+        const season = file.parsedSeason ?? item.seasonNumber;
+        const episode = file.parsedEpisode ?? item.primaryEpisode + index;
+        const key = `${name}|S${season}|E${episode}`;
+        slots.set(key, (slots.get(key) || 0) + 1);
+      });
+    }
+    return Array.from(slots.entries())
+      .filter(([, count]) => count > 1)
+      .map(([key]) => {
+        const [name, s, e] = key.split('|');
+        return `${name || 'untitled'} ${s}${e}`;
+      });
+  };
+
   const handleImport = async () => {
+    // Guard against two files mapping to the same anime/season/episode, which
+    // would silently overwrite one another during finalize-import.
+    const collisions = findCollisions();
+    if (collisions.length > 0) {
+      toast.error('Duplicate episode slots detected', {
+        description: `${collisions.slice(0, 3).join(', ')}${collisions.length > 3 ? ` +${collisions.length - 3} more` : ''}. Adjust the season/episode numbers so each file is unique.`,
+        duration: 8000,
+      });
+      return;
+    }
+
     setImporting(true);
     try {
       const customPath = localStorage.getItem('tatakai_download_path') || undefined;
@@ -215,6 +265,8 @@ export function ImportMappingModal({
           episodeNumber: item.primaryEpisode,
           seasonNumber: item.seasonNumber,
           releaseGroup: item.releaseGroup || undefined,
+          posterUrl: item.posterUrl || undefined,
+          anilistId: item.anilistId ?? undefined,
           files: item.files.map((file, index) => ({
             originalPath: file.originalPath,
             episodeNumber: file.parsedEpisode ?? item.primaryEpisode + index,
@@ -320,6 +372,17 @@ export function ImportMappingModal({
                 <div className="p-4 space-y-3">
                   {items.map((item, idx) => (
                     <div key={idx} className="relative p-3 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 transition-colors flex flex-col md:flex-row gap-4 items-start md:items-center">
+                      {item.posterUrl ? (
+                        <img
+                          src={item.posterUrl}
+                          alt=""
+                          className="w-10 h-14 rounded object-cover flex-shrink-0 border border-white/10"
+                        />
+                      ) : (
+                        <div className="w-10 h-14 rounded flex-shrink-0 border border-dashed border-white/15 flex items-center justify-center">
+                          <FolderOpen className="w-4 h-4 text-muted-foreground/40" />
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0 space-y-1">
                         <span className="text-[10px] text-muted-foreground font-mono block truncate" title={item.displayTitle}>
                           {item.displayTitle}

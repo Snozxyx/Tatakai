@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { extensionRegistry, type RegisteredTheme } from '@/core/extensions/ExtensionRegistry';
 import {
   readGuestSettingsFromCookie,
   readProfileAppSettings,
@@ -797,6 +798,61 @@ export const THEME_INFO: Record<Theme, { name: string; gradient: string; descrip
   },
 };
 const THEME_KEY = 'anime-theme';
+
+/**
+ * A theme id may be a built-in `Theme` OR an extension-contributed theme's
+ * namespaced id (e.g. `aurora:midnight-aurora`). Persisted values and state
+ * both use this widened type so custom themes survive reloads.
+ */
+export type ThemeId = Theme | string;
+
+type ThemeInfoEntry = { name: string; gradient: string; description: string; icon: string; category: 'dark' | 'light' };
+
+/** Strip a leading `--` and drop non-string values from an extension color map. */
+function normalizeRegisteredColors(colors: Record<string, string>): ThemeColors {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(colors)) {
+    if (typeof v !== 'string') continue;
+    out[k.startsWith('--') ? k.slice(2) : k] = v;
+  }
+  return out as unknown as ThemeColors;
+}
+
+/** True if `id` names a built-in theme or a currently-registered extension theme. */
+function isKnownTheme(id: string | null | undefined): boolean {
+  if (!id) return false;
+  if ((THEME_COLORS as Record<string, ThemeColors>)[id]) return true;
+  return extensionRegistry.getThemes().some((t) => t.id === id);
+}
+
+/**
+ * Resolve any theme id to a color palette. Built-ins win; then a registered
+ * extension theme; else fall back to the default so `applyTheme` never no-ops
+ * on an id whose extension has not registered yet.
+ */
+export function resolveColors(id: ThemeId): ThemeColors {
+  const builtin = (THEME_COLORS as Record<string, ThemeColors>)[id as string];
+  if (builtin) return builtin;
+  const reg = extensionRegistry.getThemes().find((t) => t.id === id);
+  if (reg) {
+    const norm = normalizeRegisteredColors(reg.colors);
+    if (reg.info?.category === 'light') (norm as ThemeColors).isLight = true;
+    return norm;
+  }
+  return THEME_COLORS['cherry-blossom'];
+}
+
+/** Map a registered theme's metadata into the built-in `THEME_INFO` shape. */
+function registeredInfoEntry(t: RegisteredTheme): ThemeInfoEntry {
+  return {
+    name: t.name || t.info?.label || t.id,
+    gradient: t.info?.gradient || 'from-slate-500 via-slate-600 to-slate-700',
+    description: t.info?.description || 'Extension theme',
+    icon: t.info?.icon || '🧩',
+    category: t.info?.category || 'dark',
+  };
+}
+
 export function useTheme() {
   const { user, profile } = useAuth();
   const seededAccountRef = useRef<string | null>(null);
@@ -813,18 +869,22 @@ export function useTheme() {
     );
   }, []);
 
-  const [theme, setThemeState] = useState<Theme>(() => {
+  const [theme, setThemeState] = useState<ThemeId>(() => {
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(THEME_KEY) as Theme | null;
-      if (stored && THEME_COLORS[stored]) return stored;
+      const stored = localStorage.getItem(THEME_KEY);
+      // Keep any persisted id (built-in or extension): resolveColors falls back
+      // safely until a still-loading extension theme registers.
+      if (stored) return stored as ThemeId;
 
       const cookieTheme = readGuestSettingsFromCookie().theme?.theme;
-      if (cookieTheme && THEME_COLORS[cookieTheme as Theme]) {
-        return cookieTheme as Theme;
-      }
+      if (cookieTheme) return cookieTheme as ThemeId;
     }
     return 'cherry-blossom';
   });
+
+  // Re-render when extension themes (un)register, so the switcher stays live.
+  const [themesVersion, setThemesVersion] = useState(0);
+  useEffect(() => extensionRegistry.subscribe(() => setThemesVersion((v) => v + 1)), []);
 
   const [reduceMotion, setReduceMotionState] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -861,8 +921,8 @@ export function useTheme() {
     if (!accountThemeSettings || typeof accountThemeSettings !== 'object') return;
 
     const nextTheme = String(accountThemeSettings.theme || '').trim();
-    if (nextTheme && THEME_COLORS[nextTheme as Theme] && nextTheme !== theme) {
-      setThemeState(nextTheme as Theme);
+    if (nextTheme && isKnownTheme(nextTheme) && nextTheme !== theme) {
+      setThemeState(nextTheme as ThemeId);
       localStorage.setItem(THEME_KEY, nextTheme);
     }
 
@@ -884,7 +944,7 @@ export function useTheme() {
 
     writeGuestSettingsCookie({
       theme: {
-        theme: nextTheme && THEME_COLORS[nextTheme as Theme] ? nextTheme : theme,
+        theme: nextTheme && isKnownTheme(nextTheme) ? nextTheme : theme,
         reduceMotion:
           typeof accountThemeSettings.reduceMotion === 'boolean'
             ? accountThemeSettings.reduceMotion
@@ -923,8 +983,8 @@ export function useTheme() {
   }, [user?.id, accountThemeSettings, theme, reduceMotion, highContrast]);
 
   const applyTheme = useCallback(
-    (themeName: Theme) => {
-      const colors = THEME_COLORS[themeName];
+    (themeName: ThemeId) => {
+      const colors = resolveColors(themeName);
       if (!colors) return;
 
       const root = document.documentElement;
@@ -934,6 +994,7 @@ export function useTheme() {
           root.style.setProperty(`--${key}`, value);
         }
       });
+      root.style.setProperty('--ring', colors.primary);
 
       document.body.classList.toggle('light-theme', colors.isLight);
       document.body.classList.toggle('dark-theme', !colors.isLight);
@@ -951,10 +1012,16 @@ export function useTheme() {
     applyTheme(theme);
   }, [theme, applyTheme]);
 
+  // Re-apply once a late-registering extension theme becomes available.
+  useEffect(() => {
+    applyTheme(theme);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [themesVersion]);
+
   /** Sync active palette to Electron `userData/theme.json` for the native splash + OS surfaces. */
   useEffect(() => {
     if (typeof window === 'undefined' || !window.electron?.persistTheme) return;
-    const colors = THEME_COLORS[theme];
+    const colors = resolveColors(theme);
     if (!colors) return;
     void window.electron.persistTheme({
       theme,
@@ -967,9 +1034,9 @@ export function useTheme() {
       border: colors.border,
       card: colors.card,
     });
-  }, [theme]);
+  }, [theme, themesVersion]);
 
-  const setTheme = useCallback((newTheme: Theme) => {
+  const setTheme = useCallback((newTheme: ThemeId) => {
     setThemeState(newTheme);
     localStorage.setItem(THEME_KEY, newTheme);
     writeGuestSettingsCookie({
@@ -1035,7 +1102,20 @@ export function useTheme() {
     }
   }, [user?.id, theme, reduceMotion]);
 
-  const isLightTheme = THEME_COLORS[theme]?.isLight ?? false;
+  const isLightTheme = resolveColors(theme)?.isLight ?? false;
+
+  // Built-in ids first, then registered extension theme ids (recomputed on change).
+  const themes = useMemo<ThemeId[]>(() => {
+    const builtins = Object.keys(THEME_COLORS) as ThemeId[];
+    const registered = extensionRegistry.getThemes().map((t) => t.id);
+    return [...builtins, ...registered];
+  }, [themesVersion]);
+
+  const themeInfo = useMemo<Record<string, ThemeInfoEntry>>(() => {
+    const merged: Record<string, ThemeInfoEntry> = { ...THEME_INFO };
+    for (const t of extensionRegistry.getThemes()) merged[t.id] = registeredInfoEntry(t);
+    return merged;
+  }, [themesVersion]);
 
   return {
     theme,
@@ -1044,9 +1124,9 @@ export function useTheme() {
     setReduceMotion,
     highContrast,
     setHighContrast,
-    themes: Object.keys(THEME_COLORS) as Theme[],
-    themeInfo: THEME_INFO,
+    themes,
+    themeInfo,
     isLightTheme,
-    isUltraLite: THEME_COLORS[theme]?.isUltraLite ?? false,
+    isUltraLite: resolveColors(theme)?.isUltraLite ?? false,
   };
 }

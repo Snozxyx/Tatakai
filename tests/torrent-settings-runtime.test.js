@@ -77,6 +77,7 @@ describe('TorrentSessionManager settings', () => {
                 cleanupMaxCacheGb: 50,
                 cleanupMaxAgeHours: 72,
                 cleanupOnPlaybackEnd: true,
+                customTrackers: [],
             });
         }).not.toThrow();
 
@@ -92,6 +93,7 @@ describe('TorrentSessionManager settings', () => {
             cleanupMaxCacheGb: 50,
             cleanupMaxAgeHours: 72,
             cleanupOnPlaybackEnd: true,
+            customTrackers: [],
         });
 
         expect(() => manager._applyBandwidthSchedule()).not.toThrow();
@@ -133,6 +135,7 @@ describe('TorrentSessionManager settings', () => {
             cleanupMaxCacheGb: 50,
             cleanupMaxAgeHours: 72,
             cleanupOnPlaybackEnd: true,
+            customTrackers: [],
         });
     });
 
@@ -156,5 +159,29 @@ describe('TorrentSessionManager settings', () => {
             cleanupMaxAgeHours: 12,
             cleanupOnPlaybackEnd: false,
         });
+    });
+
+    it('sanitizes custom trackers and applies them to the announce list', () => {
+        const { manager } = makeManager();
+
+        const settings = manager.updateTorrentSettings({
+            customTrackers: [
+                'udp://tracker.example.com:1337/announce',
+                '  wss://tracker.example.org  ',
+                'udp://tracker.example.com:1337/announce', // duplicate
+                'ftp://not-a-tracker.example',              // rejected scheme
+                '',                                          // empty
+            ],
+        });
+
+        expect(settings.customTrackers).toEqual([
+            'udp://tracker.example.com:1337/announce',
+            'wss://tracker.example.org',
+        ]);
+
+        const trackers = manager._computeTrackers();
+        expect(trackers).toContain('udp://tracker.example.com:1337/announce');
+        expect(trackers).toContain('wss://tracker.example.org');
+        expect(trackers).not.toContain('ftp://not-a-tracker.example');
     });
 });

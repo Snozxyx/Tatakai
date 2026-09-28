@@ -31,6 +31,8 @@ export interface SyncProposalItem {
   localProgress?: number | null;
   remoteStatus?: string | null;
   remoteProgress?: number | null;
+  localVolumes?: number | null;
+  remoteVolumes?: number | null;
   actionText: string;
 }
 
@@ -86,6 +88,37 @@ export function useIntegrationSync() {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ integration, mediaType }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: 'Preview failed' }));
+        throw new Error(err.message || err.error || 'Preview failed');
+      }
+
+      const json = await res.json();
+      const items: SyncProposalItem[] = json.data ?? [];
+      setState(s => ({ ...s, isLoadingPreview: false, previewItems: items }));
+      return items;
+    } catch (err: any) {
+      setState(s => ({ ...s, isLoadingPreview: false, error: err.message }));
+      return [];
+    }
+  }, []);
+
+  /**
+   * Unified preview: both anime AND manga for one integration in a single modal.
+   * Backs the single "Sync" button.
+   */
+  const loadUnifiedPreview = useCallback(async (
+    integration: Integration,
+  ): Promise<SyncProposalItem[]> => {
+    setState(s => ({ ...s, isLoadingPreview: true, error: null, previewItems: [] }));
+    try {
+      const headers = await getBearerHeader();
+      const res = await fetch(`${TATAKAI_API_URL}/sync/preview`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ integration, mediaType: 'all' }),
       });
 
       if (!res.ok) {
@@ -176,6 +209,7 @@ export function useIntegrationSync() {
     ...state,
     getLastSyncedAt,
     loadPreview,
+    loadUnifiedPreview,
     applySync,
     singleItemSync,
   };

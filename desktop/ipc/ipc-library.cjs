@@ -571,13 +571,17 @@ module.exports = function registerLibraryHandlers(ipcMain, app, dialog, shell, f
                 if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
 
                 const manifestPath = path.join(destDir, 'manifest.json');
-                let manifest = { animeName: cleanTitle, posterUrl: item.posterUrl || posterUrl || null, episodes: [] };
+                let manifest = { animeName: cleanTitle, posterUrl: item.posterUrl || posterUrl || null, anilistId: item.anilistId ?? null, episodes: [] };
                 if (fs.existsSync(manifestPath)) {
                     try {
                         manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
                         // Update posterUrl if provided and not already set
                         if ((item.posterUrl || posterUrl) && !manifest.posterUrl) {
                             manifest.posterUrl = item.posterUrl || posterUrl;
+                        }
+                        // Backfill anilistId if the mapping now supplies one
+                        if (item.anilistId != null && manifest.anilistId == null) {
+                            manifest.anilistId = item.anilistId;
                         }
                     } catch (_) {}
                 }

@@ -28,17 +28,20 @@ interface AddToPlaylistButtonProps {
   animeName: string;
   animePoster?: string;
   mediaType?: 'anime' | 'manga';
+  /** Precise media type stored on the item (e.g. manhwa/manhua/novel). Falls back to mediaType. */
+  mediaFormat?: string;
   variant?: 'default' | 'icon' | 'mini';
   className?: string;
 }
 
-export function AddToPlaylistButton({ 
-  animeId, 
-  animeName, 
+export function AddToPlaylistButton({
+  animeId,
+  animeName,
   animePoster,
   mediaType = 'anime',
+  mediaFormat,
   variant = 'default',
-  className 
+  className
 }: AddToPlaylistButtonProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -92,6 +95,7 @@ export function AddToPlaylistButton({
         animeId,
         animeName,
         animePoster,
+        mediaFormat: mediaFormat || mediaType,
       });
 
       setNewPlaylistName('');
@@ -112,6 +116,7 @@ export function AddToPlaylistButton({
       animeId,
       animeName,
       animePoster,
+      mediaFormat: mediaFormat || mediaType,
     });
   };
 

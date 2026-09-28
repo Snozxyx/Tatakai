@@ -7,6 +7,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Navigation } from "@/components/ui/navbar";
 import { FooterSection } from "@/components/ui/footer";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  useGitHubRepo,
+  useAllReleases,
+  platformForAsset,
+  platformKeyForName,
+  formatCompact,
+  formatBytes,
+  firstLine,
+  GITHUB_RELEASES_URL,
+} from "@/lib/github";
 
 interface DownloadItem {
   id?: string;
@@ -17,7 +27,9 @@ interface DownloadItem {
   requirements: string;
   link: string;
   comingSoon?: boolean;
-  versions: { version: string; date: string; size: string; notes?: string }[];
+  /** Phone/mobile build that is still under active development — shown as "In Progress", not downloadable. */
+  inProgress?: boolean;
+  versions: { version: string; date: string; size: string; notes?: string; downloadUrl?: string }[];
 }
 
 const DEFAULT_DOWNLOADS: DownloadItem[] = [
@@ -59,21 +71,20 @@ const DEFAULT_DOWNLOADS: DownloadItem[] = [
     name: "Android",
     category: "Mobile App",
     icon: Smartphone,
-    description: "APK / Google Play Store",
+    description: "Native Android app — currently in development",
     requirements: "Android 8.0 or later",
-    link: "https://github.com/snozxyx/tatakai/releases",
-    versions: [
-      { version: "5.2.0", date: "2025-01-18", size: "45 MB", notes: "Native mobile UI with offline video downloads and PIP mode." },
-    ]
+    link: "#",
+    inProgress: true,
+    versions: []
   },
   {
     name: "iOS",
     category: "Mobile App",
     icon: Smartphone,
-    description: "TestFlight / App Store",
+    description: "iPhone & iPad app — currently in development",
     requirements: "iOS 14.0 or later",
     link: "#",
-    comingSoon: true,
+    inProgress: true,
     versions: []
   },
 ];
@@ -84,9 +95,11 @@ export function DownloadSection() {
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
   const [downloadsList, setDownloadsList] = useState<DownloadItem[]>(DEFAULT_DOWNLOADS);
   const [selectedDownload, setSelectedDownload] = useState<DownloadItem | null>(null);
-  const [stats, setStats] = useState({ downloads: "50M+", activeUsers: "120K+", rating: "4.9★", platforms: "5+" });
-  const [isLoadingSupabase, setIsLoadingSupabase] = useState(false);
+  const [stats, setStats] = useState({ platforms: "—", downloads: "—", stars: "—", version: "—" });
   const sectionRef = useRef<HTMLElement>(null);
+
+  const releases = useAllReleases();
+  const repo = useGitHubRepo();
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -100,59 +113,68 @@ export function DownloadSection() {
     return () => observer.disconnect();
   }, []);
 
-  // Fetch admin update policies from Supabase to keep download builds in sync with Supabase Admin Panel
+  // Populate real download links + version history from GitHub Releases (snozxyx/tatakai)
   useEffect(() => {
-    const fetchSupabaseUpdatePolicies = async () => {
-      setIsLoadingSupabase(true);
-      try {
-        const { data: policies, error } = await supabase
-          .from("update_policies")
-          .select("*")
-          .eq("active", true)
-          .order("published_at", { ascending: false });
+    if (!releases || releases.length === 0) return;
+    const latest = releases[0];
 
-        if (!error && policies && policies.length > 0) {
-          // Merge Supabase update policies with defaults
-          const stablePolicy = policies.find((p: any) => p.channel === "stable") || policies[0];
-          if (stablePolicy && stablePolicy.target_version) {
-            const formattedDate = new Date(stablePolicy.published_at || Date.now()).toISOString().split("T")[0];
-            setDownloadsList((prev) =>
-              prev.map((item) => {
-                if (!item.comingSoon) {
-                  return {
-                    ...item,
-                    versions: [
-                      {
-                        version: stablePolicy.target_version,
-                        date: formattedDate,
-                        size: item.name === "Android" ? "45 MB" : "85 MB",
-                        notes: stablePolicy.notes || `Admin update policy for ${stablePolicy.channel} channel`,
-                      },
-                      ...item.versions,
-                    ],
-                  };
-                }
-                return item;
-              })
-            );
-          }
-        }
-      } catch (err) {
-        console.warn("Could not load update policies from Supabase:", err);
-      } finally {
-        setIsLoadingSupabase(false);
-      }
-    };
+    setDownloadsList((prev) =>
+      prev.map((item) => {
+        const key = platformKeyForName(item.name);
+        if (!key || item.inProgress) return item; // iOS / in-progress mobile builds — no GitHub download
+        const versions = releases
+          .map((rel) => {
+            const asset = rel.assets.find((a) => platformForAsset(a.name) === key);
+            if (!asset) return null;
+            return {
+              version: rel.tag_name.replace(/^v/i, ""),
+              date: (rel.published_at || "").split("T")[0],
+              size: formatBytes(asset.size),
+              notes: firstLine(rel.body) || rel.name || undefined,
+              downloadUrl: asset.browser_download_url,
+            };
+          })
+          .filter(Boolean) as DownloadItem["versions"];
+        const latestAsset = latest.assets.find((a) => platformForAsset(a.name) === key);
+        return {
+          ...item,
+          link: latestAsset?.browser_download_url || item.link,
+          versions: versions.length ? versions : item.versions,
+        };
+      }),
+    );
+  }, [releases]);
 
-    fetchSupabaseUpdatePolicies();
-  }, []);
+  // Real aggregate stats from GitHub (downloads, platforms, stars, latest version)
+  useEffect(() => {
+    if (!releases && !repo) return;
+    const totalDownloads = (releases || []).reduce(
+      (sum, r) => sum + r.assets.reduce((s, a) => s + (a.download_count || 0), 0),
+      0,
+    );
+    const platformsWithBuild = new Set<string>();
+    (releases || []).forEach((r) =>
+      r.assets.forEach((a) => {
+        const k = platformForAsset(a.name);
+        if (k) platformsWithBuild.add(k);
+      }),
+    );
+    const latestVersion = releases && releases[0]?.tag_name ? releases[0].tag_name.replace(/^v/i, "") : null;
+    setStats({
+      platforms: platformsWithBuild.size ? `${platformsWithBuild.size}` : "—",
+      downloads: totalDownloads > 0 ? formatCompact(totalDownloads) : "—",
+      stars: repo ? formatCompact(repo.stargazers_count) : "—",
+      version: latestVersion ? `v${latestVersion}` : "—",
+    });
+  }, [releases, repo]);
 
   const handleDownloadClick = async (downloadItem: DownloadItem) => {
     // Record download event in Supabase if online
     try {
       await supabase.from("analytics_events").insert({
         event_type: "download_click",
-        event_data: {
+        page_path: typeof window !== "undefined" ? window.location.pathname : null,
+        metadata: {
           platform: downloadItem.name,
           category: downloadItem.category,
           timestamp: new Date().toISOString(),
@@ -165,7 +187,7 @@ export function DownloadSection() {
     if (downloadItem.link && downloadItem.link !== "#") {
       window.open(downloadItem.link, "_blank");
     } else {
-      window.open("https://github.com/snozxyx/tatakai/releases", "_blank");
+      window.open(GITHUB_RELEASES_URL, "_blank");
     }
   };
 
@@ -211,9 +233,7 @@ export function DownloadSection() {
               <span className="text-xs font-mono uppercase tracking-widest text-primary font-bold">Cross-Platform Sync</span>
               <h3 className="text-2xl font-bold text-white">Watch anywhere, resume anytime</h3>
             </div>
-            <span className="text-xs text-white/50 font-mono bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
-              Synced with Supabase Cloud
-            </span>
+           
           </div>
         </div>
       </div>
@@ -223,15 +243,16 @@ export function DownloadSection() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-20">
           {downloadsList.map((download, index) => {
             const Icon = download.icon;
+            const isLocked = download.comingSoon || download.inProgress;
             return (
               <button
                 key={download.name}
-                onClick={() => !download.comingSoon && setSelectedDownload(download)}
-                disabled={download.comingSoon}
+                onClick={() => !isLocked && setSelectedDownload(download)}
+                disabled={isLocked}
                 className={`group relative overflow-hidden p-8 border rounded-2xl transition-all duration-500 text-left ${
-                  download.comingSoon ? "opacity-50 cursor-not-allowed bg-white/[0.02]" : "bg-white/[0.03] hover:bg-white/[0.07]"
+                  isLocked ? "opacity-50 cursor-not-allowed bg-white/[0.02]" : "bg-white/[0.03] hover:bg-white/[0.07]"
                 } ${
-                  hoveredIndex === index && !download.comingSoon
+                  hoveredIndex === index && !isLocked
                     ? "border-white/40 shadow-xl scale-[1.02]"
                     : "border-white/10 hover:border-white/30"
                 } ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
@@ -239,14 +260,14 @@ export function DownloadSection() {
                   transitionDelay: `${index * 50 + 200}ms`,
                 }}
                 onMouseEnter={(e) => {
-                  if (!download.comingSoon) {
+                  if (!isLocked) {
                     setHoveredIndex(index);
                     const rect = e.currentTarget.getBoundingClientRect();
                     setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
                   }
                 }}
                 onMouseMove={(e) => {
-                  if (!download.comingSoon) {
+                  if (!isLocked) {
                     const rect = e.currentTarget.getBoundingClientRect();
                     setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
                   }
@@ -276,16 +297,20 @@ export function DownloadSection() {
                   {download.category}
                 </span>
 
-                {/* Coming Soon Badge */}
-                {download.comingSoon && (
-                  <span className="absolute top-4 left-4 text-xs font-mono px-2.5 py-0.5 bg-amber-500/20 text-amber-300 rounded border border-amber-500/30">
-                    SOON
+                {/* Status badge — in-progress mobile builds vs coming soon */}
+                {isLocked && (
+                  <span className={`absolute top-4 left-4 text-xs font-mono px-2.5 py-0.5 rounded border ${
+                    download.inProgress
+                      ? "bg-primary/20 text-primary border-primary/30"
+                      : "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                  }`}>
+                    {download.inProgress ? "IN PROGRESS" : "SOON"}
                   </span>
                 )}
 
                 {/* Icon */}
                 <div className={`mb-6 p-3 rounded-xl bg-white/5 border border-white/10 w-fit transition-transform ${
-                  hoveredIndex === index && !download.comingSoon ? "scale-110 bg-white/10 text-primary" : "text-white"
+                  hoveredIndex === index && !isLocked ? "scale-110 bg-white/10 text-primary" : "text-white"
                 }`}>
                   <Icon className="w-8 h-8" />
                 </div>
@@ -298,7 +323,7 @@ export function DownloadSection() {
                 </div>
 
                 {/* Latest version badge */}
-                {!download.comingSoon && download.versions.length > 0 && (
+                {!isLocked && download.versions.length > 0 && (
                   <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between text-xs text-white/50 font-mono">
                     <span>Latest: v{download.versions[0].version}</span>
                     <span className="text-primary font-semibold group-hover:underline flex items-center gap-1">
@@ -308,7 +333,7 @@ export function DownloadSection() {
                 )}
 
                 {/* Animated underline */}
-                {!download.comingSoon && (
+                {!isLocked && (
                   <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/10 overflow-hidden">
                     <div className={`h-full bg-white transition-all duration-500 ${
                       hoveredIndex === index ? "w-full" : "w-0"
@@ -328,7 +353,7 @@ export function DownloadSection() {
             <div>
               <h3 className="text-3xl font-display text-white mb-3">Ready to watch Tatakai?</h3>
               <p className="text-white/60 max-w-md text-base leading-relaxed">
-                Choose your platform above to download the native app or jump straight into web playback right in your browser.
+                Anime playback runs in the native app. Install it for your platform above to unlock the full player, offline downloads, and extension sources — or browse the catalog in your browser.
               </p>
             </div>
 
@@ -348,7 +373,7 @@ export function DownloadSection() {
                   variant="outline"
                   className="h-14 px-8 text-base rounded-full border-white/20 hover:bg-white/10 text-white font-medium"
                 >
-                  Open Web Player
+                  Browse Catalog
                 </Button>
               </a>
             </div>
@@ -363,8 +388,8 @@ export function DownloadSection() {
             {[
               { value: stats.platforms, label: "Supported Platforms" },
               { value: stats.downloads, label: "Total Downloads" },
-              { value: stats.rating, label: "Community Rating" },
-              { value: stats.activeUsers, label: "Monthly Active Streamers" },
+              { value: stats.stars, label: "GitHub Stars" },
+              { value: stats.version, label: "Latest Version" },
             ].map((stat) => (
               <div key={stat.label} className="flex flex-col">
                 <span className="text-3xl md:text-4xl font-display text-white mb-1">{stat.value}</span>
@@ -455,6 +480,16 @@ export function DownloadSection() {
                       <span>{version.date}</span>
                       {idx === 0 && <span className="px-1.5 py-0.5 bg-primary/20 text-primary border border-primary/30 rounded text-[9px] font-bold">Latest Build</span>}
                     </p>
+                    {version.downloadUrl && (
+                      <a
+                        href={version.downloadUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-flex items-center gap-1 text-[10px] font-mono text-primary hover:underline"
+                      >
+                        <Download className="w-3 h-3" /> Direct download
+                      </a>
+                    )}
                   </div>
                 ))}
               </div>

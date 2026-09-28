@@ -3,15 +3,21 @@ import { Download, Monitor, Zap, Shield, Globe, ArrowRight, Apple, Laptop } from
 import { Button } from '@/components/ui/button';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
+import { useLatestRelease, platformForAsset, GITHUB_RELEASES_URL, type PlatformKey } from '@/lib/github';
 
 const FEATURES = [
   { icon: Zap,     title: 'Offline Playback',   desc: 'Download episodes and watch without internet connection.' },
-  { icon: Shield,  title: 'Ad-Free Experience',  desc: 'No ads, no trackers. Pure anime streaming.' },
+  { icon: Shield,  title: 'Ad-Free Experience',  desc: 'No ads, no trackers. A clean, focused otaku experience.' },
   { icon: Globe,   title: 'Extension Support',   desc: 'Unlock community-built sources via the extension platform.' },
 ];
 
 export function DownloadSection() {
   const isDesktopApp = useIsDesktopApp();
+  const latest = useLatestRelease();
+  const linkFor = (key: PlatformKey) => {
+    const asset = latest?.assets.find((a) => platformForAsset(a.name) === key);
+    return asset?.browser_download_url || GITHUB_RELEASES_URL;
+  };
 
   // Don't show if already in the desktop app
   if (isDesktopApp) return null;
@@ -64,7 +70,7 @@ export function DownloadSection() {
         {/* Download buttons */}
         <div className="flex flex-col gap-4 min-w-[240px]">
           <Button
-            onClick={() => window.open('https://github.com/tatakai-app/releases/latest', '_blank')}
+            onClick={() => window.open(linkFor('windows'), '_blank')}
             className="h-16 px-8 rounded-2xl font-black text-lg bg-primary text-primary-foreground shadow-2xl shadow-primary/25 hover:scale-105 active:scale-95 transition-all w-full justify-start gap-4"
           >
             <Monitor className="w-6 h-6" />
@@ -77,10 +83,7 @@ export function DownloadSection() {
 
           <Button
             variant="outline"
-            onClick={() => window.open('https://github.com/tatakai-app/releases/latest', '_blank')}
-            className="h-16 px-8 rounded-2xl font-black text-lg border-white/10 bg-white/5 hover:bg-white/10 hover:border-primary/30 transition-all w-full justify-start gap-4 backdrop-blur-md"
-          >
-            <Apple className="w-6 h-6" />
+            onClick={() => window.open(linkFor('macos'), '_blank')}
             <div className="text-left">
               <div className="text-[10px] font-bold uppercase tracking-widest opacity-75">Download for</div>
               <div className="leading-tight">macOS</div>
@@ -90,7 +93,7 @@ export function DownloadSection() {
 
           <Button
             variant="outline"
-            onClick={() => window.open('https://github.com/tatakai-app/releases/latest', '_blank')}
+            onClick={() => window.open(linkFor('linux'), '_blank')}
             className="h-16 px-8 rounded-2xl font-black text-lg border-white/10 bg-white/5 hover:bg-white/10 hover:border-primary/30 transition-all w-full justify-start gap-4 backdrop-blur-md"
           >
             <Laptop className="w-6 h-6" />

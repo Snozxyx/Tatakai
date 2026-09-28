@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { GlassPanel } from '@/components/ui/GlassPanel';
+import { SettingsSection, SettingRow } from '@/components/settings/SettingsPrimitives';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
-import { Zap, Shield, Maximize, Trash2, RotateCcw } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function TorrentSettings() {
+    const confirm = useConfirm();
     const [maxConns, setMaxConns] = useState(() => Number(localStorage.getItem('tatakai_torrent_max_conns') || 3));
     const [bgBehavior, setBgBehavior] = useState(() => localStorage.getItem('tatakai_torrent_bg_behavior') || 'prompt');
     const [enableUpnp, setEnableUpnp] = useState(() => localStorage.getItem('tatakai_torrent_upnp') !== 'false');
@@ -22,6 +25,7 @@ export function TorrentSettings() {
     const [cleanupMaxCacheGb, setCleanupMaxCacheGb] = useState(() => Number(localStorage.getItem('tatakai_torrent_cleanup_max_cache_gb') || 50));
     const [cleanupMaxAgeHours, setCleanupMaxAgeHours] = useState(() => Number(localStorage.getItem('tatakai_torrent_cleanup_max_age_hours') || 72));
     const [cleanupOnPlaybackEnd, setCleanupOnPlaybackEnd] = useState(() => localStorage.getItem('tatakai_torrent_cleanup_on_end') !== 'false');
+    const [customTrackers, setCustomTrackers] = useState(() => localStorage.getItem('tatakai_torrent_custom_trackers') || '');
     const [torrentStoragePath, setTorrentStoragePath] = useState<string>('');
     const [torrentCachePath, setTorrentCachePath] = useState<string>('');
     const [storageLoading, setStorageLoading] = useState(false);
@@ -108,6 +112,9 @@ export function TorrentSettings() {
         localStorage.setItem('tatakai_torrent_cleanup_max_cache_gb', String(cleanupMaxCacheGb));
         localStorage.setItem('tatakai_torrent_cleanup_max_age_hours', String(cleanupMaxAgeHours));
         localStorage.setItem('tatakai_torrent_cleanup_on_end', String(cleanupOnPlaybackEnd));
+        localStorage.setItem('tatakai_torrent_custom_trackers', customTrackers);
+
+        const customTrackerList = customTrackers.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
 
         // Sync with main process
         if ((window as any).tatakaiRuntime?.updateTorrentSettings) {
@@ -121,6 +128,7 @@ export function TorrentSettings() {
                 cleanupMaxCacheGb,
                 cleanupMaxAgeHours,
                 cleanupOnPlaybackEnd,
+                customTrackers: customTrackerList,
             });
         }
 
@@ -128,7 +136,7 @@ export function TorrentSettings() {
     };
 
     const clearCache = async () => {
-        if (window.confirm('Clear all torrent cache and data? This will stop active sessions.')) {
+        if (await confirm({ title: 'Clear all torrent cache and data? This will stop active sessions.', destructive: true })) {
             if ((window as any).tatakaiRuntime?.clearAllTorrentData) {
                 const res = await (window as any).tatakaiRuntime.clearAllTorrentData();
                 if (res.success) {
@@ -141,33 +149,26 @@ export function TorrentSettings() {
     };
 
     return (
-        <div className="space-y-6 mt-8">
-            <div>
-                <h3 className="text-lg font-bold flex items-center gap-2 mb-2">
-                    <Zap className="w-5 h-5 text-primary" />
-                    Torrent Engine
-                </h3>
-                <p className="text-xs text-muted-foreground">Configure the internal WebTorrent engine for professional streaming.</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <GlassPanel className="p-4 space-y-3 md:col-span-2">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                        <div className="space-y-1">
-                            <Label className="text-xs font-bold uppercase tracking-widest">Torrent Storage Location</Label>
-                            <p className="text-[10px] text-muted-foreground">
-                                Where torrent files and cache are stored. New sessions use this path.
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Button size="sm" variant="outline" onClick={handleOpenTorrentPath} disabled={!torrentStoragePath || storageLoading}>
-                                Open
-                            </Button>
-                            <Button size="sm" onClick={handleChangeTorrentPath} disabled={storageLoading}>
-                                Change
-                            </Button>
-                        </div>
+        <SettingsSection
+            title="Torrent Engine"
+            description="Configure the internal WebTorrent engine for professional streaming."
+            bodyClassName="space-y-1"
+        >
+            <SettingRow
+                title="Torrent Storage Location"
+                description="Where torrent files and cache are stored. New sessions use this path."
+                control={
+                    <div className="flex items-center gap-2">
+                        <Button size="sm" variant="outline" onClick={handleOpenTorrentPath} disabled={!torrentStoragePath || storageLoading}>
+                            Open
+                        </Button>
+                        <Button size="sm" onClick={handleChangeTorrentPath} disabled={storageLoading}>
+                            Change
+                        </Button>
                     </div>
+                }
+            >
+                <div className="space-y-2">
                     <Input
                         value={storageLoading ? 'Loading...' : (torrentStoragePath || 'Default (app data)')}
                         readOnly
@@ -179,102 +180,115 @@ export function TorrentSettings() {
                             Reset
                         </Button>
                     </div>
-                </GlassPanel>
-                <GlassPanel className="p-4 space-y-4">
-                    <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase tracking-widest">Max Connections</Label>
-                        <div className="flex items-center gap-4">
-                            <Slider 
-                                value={[maxConns]} 
-                                min={1} 
-                                max={500} 
-                                step={1} 
-                                onValueChange={([v]) => setMaxConns(v)}
-                                className="flex-1"
-                            />
-                            <span className="text-sm font-mono w-8">{maxConns}</span>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground">Lower values reduce connections; higher values can improve speed but use more CPU/RAM.</p>
-                    </div>
+                </div>
+            </SettingRow>
+            <SettingRow
+                title="Max Connections"
+                description="Lower values reduce connections; higher values can improve speed but use more CPU/RAM."
+            >
+                <div className="flex items-center gap-4">
+                    <Slider
+                        value={[maxConns]}
+                        min={1}
+                        max={500}
+                        step={1}
+                        onValueChange={([v]) => setMaxConns(v)}
+                        className="flex-1"
+                    />
+                    <span className="text-sm font-mono w-8 text-right">{maxConns}</span>
+                </div>
+            </SettingRow>
 
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <Label className="text-xs font-bold uppercase tracking-widest">Enable UPnP</Label>
-                            <p className="text-[10px] text-muted-foreground">Automatic port forwarding for better connectivity.</p>
-                        </div>
-                        <Switch checked={enableUpnp} onCheckedChange={setEnableUpnp} />
-                    </div>
-                </GlassPanel>
+            <SettingRow
+                title="Enable UPnP"
+                description="Automatic port forwarding for better connectivity."
+                control={<Switch checked={enableUpnp} onCheckedChange={setEnableUpnp} />}
+            />
 
-                <GlassPanel className="p-4 space-y-4">
-                    <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase tracking-widest">Background Behavior</Label>
-                        <select 
-                            value={bgBehavior} 
-                            onChange={(e) => setBgBehavior(e.target.value)}
-                            className="w-full bg-background border border-white/10 rounded-md p-2 text-sm outline-none focus:border-primary/50"
-                        >
-                            <option value="prompt">Always Prompt</option>
-                            <option value="keep">Keep Running (Background)</option>
-                            <option value="stop">Stop Automatically</option>
-                        </select>
-                        <p className="text-[10px] text-muted-foreground">What to do when you leave the watch page.</p>
-                    </div>
-                </GlassPanel>
+            <SettingRow
+                title="Custom Trackers"
+                description="One tracker URL per line (udp://, http(s)://, or wss://). Added alongside the built-in public trackers."
+            >
+                <textarea
+                    value={customTrackers}
+                    onChange={(e) => setCustomTrackers(e.target.value)}
+                    rows={4}
+                    spellCheck={false}
+                    placeholder={'udp://tracker.example.com:1337/announce\nwss://tracker.example.org'}
+                    className="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-1 focus:ring-primary/40"
+                />
+            </SettingRow>
 
-                <GlassPanel className="p-4 space-y-4">
-                    <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase tracking-widest">Download Limit (MB/s)</Label>
-                        <Input 
-                            type="number" 
-                            value={limitDownload} 
-                            onChange={(e) => setLimitDownload(Number(e.target.value))}
-                            placeholder="0 for unlimited"
-                            className="bg-white/5 border-white/10"
-                        />
-                    </div>
-                </GlassPanel>
+            <SettingRow
+                title="Background Behavior"
+                description="What to do when you leave the watch page."
+                control={(ids) => (
+                    <Select value={bgBehavior} onValueChange={setBgBehavior}>
+                        <SelectTrigger aria-labelledby={ids.labelId} aria-describedby={ids.descriptionId} className="w-52">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="prompt">Always Prompt</SelectItem>
+                            <SelectItem value="keep">Keep Running (Background)</SelectItem>
+                            <SelectItem value="stop">Stop Automatically</SelectItem>
+                        </SelectContent>
+                    </Select>
+                )}
+            />
 
-                <GlassPanel className="p-4 space-y-4">
-                    <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase tracking-widest">Upload Limit (MB/s)</Label>
-                        <Input 
-                            type="number" 
-                            value={limitUpload} 
-                            onChange={(e) => setLimitUpload(Number(e.target.value))}
-                            placeholder="0 for unlimited"
-                            className="bg-white/5 border-white/10"
-                        />
-                    </div>
-                </GlassPanel>
+            <SettingRow
+                title="Download Limit (MB/s)"
+                description="0 for unlimited."
+                control={(ids) => (
+                    <Input
+                        type="number"
+                        value={limitDownload}
+                        onChange={(e) => setLimitDownload(Number(e.target.value))}
+                        placeholder="0"
+                        aria-labelledby={ids.labelId}
+                        className="w-28 bg-white/5 border-white/10"
+                    />
+                )}
+            />
 
-                <GlassPanel className="p-4 space-y-4">
-                    <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase tracking-widest">Bandwidth Schedule</Label>
-                        <select 
-                            value={bandwidthSchedule} 
-                            onChange={(e) => setBandwidthSchedule(e.target.value)}
-                            className="w-full bg-background border border-white/10 rounded-md p-2 text-sm outline-none focus:border-primary/50"
-                        >
-                            <option value="default">Standard (Adaptive)</option>
-                            <option value="night-owl">Night Owl (Max speed 2AM-7AM)</option>
-                            <option value="gaming">Gaming (Minimum Latency)</option>
-                        </select>
-                        <p className="text-[10px] text-muted-foreground">Automatically adjusts engine behavior based on time of day.</p>
-                    </div>
-                </GlassPanel>
+            <SettingRow
+                title="Upload Limit (MB/s)"
+                description="0 for unlimited."
+                control={(ids) => (
+                    <Input
+                        type="number"
+                        value={limitUpload}
+                        onChange={(e) => setLimitUpload(Number(e.target.value))}
+                        placeholder="0"
+                        aria-labelledby={ids.labelId}
+                        className="w-28 bg-white/5 border-white/10"
+                    />
+                )}
+            />
 
-                <GlassPanel className="p-4 space-y-4 md:col-span-2">
-                    <div className="flex items-center justify-between gap-4">
-                        <div className="space-y-1">
-                            <Label className="text-xs font-bold uppercase tracking-widest">Free Torrent Space Automatically</Label>
-                            <p className="text-[10px] text-muted-foreground">
-                                Deletes temporary torrent data after usage and trims old cache without touching active sessions.
-                            </p>
-                        </div>
-                        <Switch checked={autoFreeSpace} onCheckedChange={setAutoFreeSpace} />
-                    </div>
+            <SettingRow
+                title="Bandwidth Schedule"
+                description="Automatically adjusts engine behavior based on time of day."
+                control={(ids) => (
+                    <Select value={bandwidthSchedule} onValueChange={setBandwidthSchedule}>
+                        <SelectTrigger aria-labelledby={ids.labelId} aria-describedby={ids.descriptionId} className="w-56">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="default">Standard (Adaptive)</SelectItem>
+                            <SelectItem value="night-owl">Night Owl (Max speed 2AM-7AM)</SelectItem>
+                            <SelectItem value="gaming">Gaming (Minimum Latency)</SelectItem>
+                        </SelectContent>
+                    </Select>
+                )}
+            />
 
+            <SettingRow
+                tone="accent"
+                title="Free Torrent Space Automatically"
+                description="Deletes temporary torrent data after usage and trims old cache without touching active sessions."
+                control={<Switch checked={autoFreeSpace} onCheckedChange={setAutoFreeSpace} />}
+            >
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div className="space-y-2">
                             <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Max Cache (GB)</Label>
@@ -310,10 +324,9 @@ export function TorrentSettings() {
                             />
                         </div>
                     </div>
-                </GlassPanel>
-            </div>
+            </SettingRow>
 
-            <div className="flex gap-4">
+            <div className="flex gap-4 pt-4">
                 <Button onClick={save} className="flex-1 font-bold">
                     Save Torrent Config
                 </Button>
@@ -322,6 +335,6 @@ export function TorrentSettings() {
                     Clear Cache
                 </Button>
             </div>
-        </div>
+        </SettingsSection>
     );
 }

@@ -267,7 +267,7 @@ describe('createAllowlistedFetch() — unit tests', () => {
         logger: silentLogger,
       });
 
-      const result = await guardedFetch('http://localhost:3000/api');
+      const result = await guardedFetch('http:/localhost:3000//api');
       expect(result.ok).toBe(true);
     });
   });

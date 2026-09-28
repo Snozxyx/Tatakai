@@ -7,7 +7,7 @@ import { updateAniListAnimeStatus, mapTatakaiStatusToAniList, disconnectAniList 
 
 export type WatchlistStatus = 'watching' | 'completed' | 'plan_to_watch' | 'dropped' | 'on_hold';
 
-interface WatchlistItem {
+export interface WatchlistItem {
   id: string;
   user_id: string;
   anime_id: string;

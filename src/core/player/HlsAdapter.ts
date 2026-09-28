@@ -3,6 +3,7 @@ import { AbstractSourceAdapter, AdapterLoadOptions } from './SourceAdapterRegist
 import { PlaybackMode } from './player-core';
 import { playbackEventBus, PlayerEvents } from './PlaybackEventBus';
 import { buildProxyCandidateUrls, isLoopbackProxyUrl } from './stream-resolver';
+import { getProfileKnobs } from '@/lib/memoryProfile';
 
 export class HlsAdapter extends AbstractSourceAdapter {
   readonly mode: PlaybackMode = 'hls';
@@ -37,13 +38,16 @@ export class HlsAdapter extends AbstractSourceAdapter {
 
     const referer = (source as any).headers?.Referer;
     const userAgent = (source as any).headers?.['User-Agent'];
+    // Ordered referer alternates the extension shipped for this CDN, if any.
+    // The proxy is content-agnostic, so these are the only referers it tries.
+    const refererCandidates = (source as any).refererCandidates as string[] | undefined;
 
     // A loopback URL is already the in-app proxy (the extension host registered
     // the source's headers with it), so there is nothing to wrap it in — going
     // through the remote proxy would just strip the headers that make it work.
     this.candidates =
       source.url.startsWith('http') && !isLoopbackProxyUrl(source.url)
-        ? buildProxyCandidateUrls(source.url, referer, userAgent)
+        ? buildProxyCandidateUrls(source.url, referer, userAgent, undefined, undefined, refererCandidates)
         : [source.url];
     if (this.candidates.length === 0) this.candidates = [source.url];
     this.candidateIndex = 0;
@@ -63,12 +67,17 @@ export class HlsAdapter extends AbstractSourceAdapter {
       return;
     }
 
+    // Buffer sizes come from the active memory profile (read per-load so a mid-
+    // session profile change applies to the next source). Unlimited restores the
+    // historical 300/600/1200; Balanced/Low shrink the resident buffer.
+    const { backBufferLength, maxBufferLength, maxMaxBufferLength } = getProfileKnobs().hls;
+
     this.hls = new Hls({
       enableWorker: true,
       lowLatencyMode: true,
-      backBufferLength: 300, // Keep more in back buffer for seeking
-      maxBufferLength: 600,  // Increase forward buffer
-      maxMaxBufferLength: 1200,
+      backBufferLength,
+      maxBufferLength,
+      maxMaxBufferLength,
       startFragPrefetch: true,
       abrEwmaDefaultEstimate: 5000000, // 5Mbps initial estimate
       fragLoadingMaxRetry: 6,

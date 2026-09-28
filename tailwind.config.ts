@@ -61,6 +61,10 @@ export default {
           glow: "hsl(var(--amber-glow))",
         },
         orange: "hsl(var(--orange))",
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",

@@ -183,6 +183,29 @@ export interface DownloadHistoryEntry {
   retryCount: number;
 }
 
+/**
+ * A single downloaded manga chapter, available for fully offline reading.
+ * Pages live on disk under `localDir`; the reader loads them through the
+ * `tatakai-media://` protocol (no raw file paths reach the renderer).
+ */
+export interface OfflineChapter {
+  /** Composite key: `${anilistId}:${chapterKey}` */
+  id: string;
+  anilistId: number;
+  title: string;
+  chapterKey: string;
+  chapterNumber?: number | null;
+  volume?: number | string | null;
+  /** Absolute chapter folder on disk (main process owns it). */
+  localDir: string;
+  pageCount: number;
+  sizeBytes: number;
+  /** Sub-provider that served the pages. */
+  provider?: string | null;
+  /** ISO timestamp of download completion. */
+  downloadedAt: string;
+}
+
 // ── Database ──────────────────────────────────────────────────────────────────
 
 class TatakaiDB extends Dexie {
@@ -194,6 +217,8 @@ class TatakaiDB extends Dexie {
   downloadRules!: EntityTable<DownloadRule, 'id'>;
   /** v4: Immutable log of every download attempt. */
   downloadHistory!: EntityTable<DownloadHistoryEntry, 'id'>;
+  /** v5: Downloaded manga chapters for offline reading. */
+  offlineChapters!: EntityTable<OfflineChapter, 'id'>;
 
   constructor() {
     super('tatakai');
@@ -238,6 +263,19 @@ class TatakaiDB extends Dexie {
       kv: 'key',
       downloadRules: 'id, animeId, enabled',
       downloadHistory: 'id, animeId, status, startedAt',
+    });
+
+    // Version 5 adds offlineChapters for downloaded manga (offline reading).
+    // Append-only: every prior table is carried forward unchanged.
+    this.version(5).stores({
+      cachedMedia: 'id, anilistId, malId, *genres, cachedAt',
+      watchProgress: 'id, mediaId, updatedAt',
+      offlineEpisodes: 'id, mediaId, downloadedAt',
+      extensions: 'id, name',
+      kv: 'key',
+      downloadRules: 'id, animeId, enabled',
+      downloadHistory: 'id, animeId, status, startedAt',
+      offlineChapters: 'id, anilistId, downloadedAt',
     });
   }
 }

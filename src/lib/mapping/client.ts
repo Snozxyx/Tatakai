@@ -15,7 +15,16 @@
  * detail", never to a failed page render.
  */
 
-const API_BASE = import.meta.env.VITE_TATAKAI_API_URL || "https://api.tatakai.app/api/v3";
+import { evictToCap, sweepExpired } from "@/lib/cache/boundedMap";
+import { getProfileKnobs } from "@/lib/memoryProfile";
+import { resolveApiV3Base } from "@/lib/api/backendOrigin";
+
+// Resolve the backend `/api/v3` base the same way every other client does
+// (VITE_BACKEND_ORIGIN → origin of VITE_TATAKAI_API_URL → http page origin →
+// relative "/api/v3" for web dev). The old hardcoded "https://api.tatakai.app"
+// fallback pointed at a dead host, so ani.zip episode enrichment silently
+// returned null on desktop (app:// origin) and every non-configured build.
+const API_BASE = resolveApiV3Base();
 
 const REQUEST_TIMEOUT_MS = 20_000;
 
@@ -27,6 +36,15 @@ interface CacheEntry {
 
 const cache = new Map<string, CacheEntry>();
 const inFlight = new Map<string, Promise<unknown>>();
+
+/**
+ * Store a cache entry and enforce the memory-profile entry cap. Every write path
+ * (hit, 404, error) funnels through here so the map can never outgrow the cap.
+ */
+function setCache(url: string, entry: CacheEntry): void {
+  cache.set(url, entry);
+  evictToCap(cache, getProfileKnobs().cacheCaps.mapping);
+}
 
 /**
  * GET a mapping endpoint and unwrap the `{success, data}` envelope.
@@ -50,10 +68,16 @@ export async function fetchMapping<T>(
   const request = (async (): Promise<T | null> => {
     try {
       const res = await fetch(url, {
+        // Only the CORS-safelisted `Accept` header here — no X-Tatakai-Client/
+        // Version. Those are non-safelisted, so cross-origin (web → api.tatakai.me,
+        // desktop app:// → api) they force a CORS preflight, and the API's
+        // preflight only allows Content-Type,Authorization,X-Admin-Secret. The
+        // unlisted headers made the browser block the GET → fetch threw → this
+        // returned null → ani.zip enrichment vanished (no episode thumbnails, so
+        // the list fell back to the numbered-pill layout). A bare GET has no
+        // preflight and the API answers with `access-control-allow-origin: *`.
         headers: {
           Accept: "application/json",
-          "X-Tatakai-Client": "web",
-          "X-Tatakai-Version": "6.0.0",
         },
         signal: options.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
@@ -62,16 +86,16 @@ export async function fetchMapping<T>(
       // It is cached like any other answer so an unmapped title doesn't re-request
       // on every mount.
       if (!res.ok) {
-        cache.set(url, { at: Date.now(), ttlMs: options.ttlMs, value: null });
+        setCache(url, { at: Date.now(), ttlMs: options.ttlMs, value: null });
         return null;
       }
 
       const body = (await res.json()) as { success?: boolean; data?: T };
       const value = body?.success === true ? (body.data ?? null) : null;
-      cache.set(url, { at: Date.now(), ttlMs: options.ttlMs, value });
+      setCache(url, { at: Date.now(), ttlMs: options.ttlMs, value });
       return value;
     } catch {
-      cache.set(url, { at: Date.now(), ttlMs: options.ttlMs, value: null });
+      setCache(url, { at: Date.now(), ttlMs: options.ttlMs, value: null });
       return null;
     } finally {
       inFlight.delete(url);
@@ -90,5 +114,14 @@ export function clearMappingCache(match?: string): void {
   }
   for (const key of [...cache.keys()]) {
     if (key.includes(match)) cache.delete(key);
+  }
+}
+
+/** Remove expired mapping entries; called from the idle sweep. Returns count. */
+export function sweepMappingCache(now: number = Date.now()): number {
+  try {
+    return sweepExpired(cache, (e) => e.at + e.ttlMs, now);
+  } catch {
+    return 0;
   }
 }

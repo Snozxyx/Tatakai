@@ -194,6 +194,8 @@ async function createPlaybackManifest(params, getStreamUrl, torrent, options = {
                 length: streamResult.length,
                 fileIndex: streamResult.fileIndex,
                 infoHash: streamResult.infoHash,
+                transcoded: Boolean(streamResult.transcoded),
+                isM3U8: Boolean(streamResult.isM3U8),
             };
         }
     }
@@ -221,8 +223,14 @@ async function createPlaybackManifest(params, getStreamUrl, torrent, options = {
     // transcode_not_ready because the manifest doesn't exist yet. We keep
     // retrying here (not in WatchPage) so the player receives a URL only
     // once playback is truly ready.
-    const TRANSCODE_POLL_MS = 1000;
-    const TRANSCODE_TIMEOUT_MS = 45_000;
+    //
+    // The budget covers more than one ffmpeg pass: when a stream copy dies on a
+    // codec MP4 cannot carry, session-manager transparently restarts with an
+    // audio re-encode and keeps reporting `transcode_not_ready`. Cutting the
+    // poll at the old 45 s meant the fallback never got the chance to produce
+    // its first segment.
+    const TRANSCODE_POLL_MS = 700;
+    const TRANSCODE_TIMEOUT_MS = 90_000;
     const transcodeStart = Date.now();
     let streamResult;
     while (true) {
@@ -240,6 +248,9 @@ async function createPlaybackManifest(params, getStreamUrl, torrent, options = {
             url: null,
             ready: false,
             error: timedOut ? 'transcode_timeout' : err,
+            // Every remux strategy failed; `detail` is ffmpeg's own reason, which
+            // is the only thing that makes `transcode_error` actionable.
+            detail: streamResult?.detail,
             prebuffered,
         };
     }
@@ -254,6 +265,11 @@ async function createPlaybackManifest(params, getStreamUrl, torrent, options = {
         length: streamResult.length,
         fileIndex: streamResult.fileIndex,
         infoHash: streamResult.infoHash,
+        // Without these the renderer treated a remuxed `.m3u8` as a progressive
+        // file and assigned it straight to `<video src>`, which Chromium cannot
+        // play — the "Empty src attribute" / media-error path.
+        transcoded: Boolean(streamResult.transcoded),
+        isM3U8: Boolean(streamResult.isM3U8),
     };
 }
 

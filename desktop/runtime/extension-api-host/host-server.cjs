@@ -279,6 +279,10 @@ async function fetchAniListTitles(anilistId, logger) {
  */
 const STREAM_TTL_MS = 10 * 60 * 1000;
 const TORRENT_TTL_MS = 30 * 60 * 1000;
+// Chapter lists change rarely and are expensive (AniList + per-provider search +
+// list), so they cache longer. Only the flat chapter rows are cached — pages
+// carry proxy tokens and are re-minted per request, so they are never cached.
+const MANGA_TTL_MS = 30 * 60 * 1000;
 const MAX_CACHE_SIZE = 200;
 
 const resultCache = new Map(); // key → { entries, providerStatus, expiresAt }
@@ -358,6 +362,55 @@ async function optionsFromQuery(searchParams, logger) {
     };
 }
 
+// ── Manga request parsing & flattening ─────────────────────────────────────────
+
+/**
+ * Parse `MangaChapterParams` from the query string. Unlike anime sources, manga
+ * providers accept an explicit `title`/`titles[]` (deterministic MangaDex
+ * mapping ignores them; fuzzy providers like AllManga rely on them). No AniList
+ * pre-fetch here — the bundle's `enrichMangaParams` does that once internally.
+ */
+function mangaParamsFromQuery(searchParams) {
+    const anilistId = Number(searchParams.get('anilistId'));
+    const malId = Number(searchParams.get('malId'));
+    const titles = parseTitles(searchParams);
+    const title = searchParams.get('title') || undefined;
+    return {
+        ...(Number.isFinite(anilistId) && anilistId > 0 ? { anilistId } : {}),
+        ...(Number.isFinite(malId) && malId > 0 ? { malId } : {}),
+        ...(title ? { title } : {}),
+        ...(titles.length ? { titles } : {}),
+    };
+}
+
+/**
+ * Flatten nested `MangaChapterEntry[]` (one entry per chapter number, each with
+ * N provider sources) into the flat rows the app's manga runtime consumes: one
+ * row per (chapter, source). The `provider` field is the SUB-PROVIDER name
+ * (e.g. `mangadex`, `allmanga`) — the same value that flows through the reader
+ * URL and back into `manga/pages`.
+ */
+function flattenMangaChapters(entries) {
+    const rows = [];
+    for (const ch of Array.isArray(entries) ? entries : []) {
+        const sources = Array.isArray(ch?.sources) ? ch.sources : [];
+        for (const src of sources) {
+            rows.push({
+                number: ch.number,
+                title: ch.title ?? null,
+                volume: ch.volume ?? null,
+                provider: src.provider,
+                chapterKey: src.chapterKey,
+                providerChapterId: src.providerChapterId ?? null,
+                language: src.language ?? null,
+                scanlator: src.scanlator ?? null,
+                releaseDate: src.releaseDate ?? null,
+            });
+        }
+    }
+    return rows;
+}
+
 // ── SSE helpers (ported from server.js) ────────────────────────────────────────
 
 function startSSE(res) {
@@ -424,8 +477,19 @@ function createBundleLoader(logger) {
                 || typeof instance.torrentAll === 'function');
         const hasOneShot = instance
             && (typeof instance.batch === 'function' || typeof instance.single === 'function');
-        if (!hasProgressive && !hasOneShot) {
-            throw new Error('Extension bundle does not expose sourcesAll/streamAll/torrentAll or batch/single');
+        // A manga-only extension implements neither streaming contract — it still
+        // loads, so long as it answers the manga contract.
+        const hasManga = instance
+            && (typeof instance.getMangaChapters === 'function'
+                || typeof instance.getMangaPages === 'function');
+        // A custom-source extension (custom-source-v1) exposes customHome plus at
+        // least one of customWatch/customRead. It may implement none of the above.
+        const hasCustomSource = instance
+            && typeof instance.customHome === 'function'
+            && (typeof instance.customWatch === 'function'
+                || typeof instance.customRead === 'function');
+        if (!hasProgressive && !hasOneShot && !hasManga && !hasCustomSource) {
+            throw new Error('Extension bundle does not expose sourcesAll/streamAll/torrentAll, batch/single, getMangaChapters/getMangaPages, or customHome + customWatch/customRead');
         }
         cache.set(bundlePath, instance);
         logger?.info?.(`[ExtHost] bundle loaded (${instance.constructor?.name || 'bundle'}) from ${bundlePath}`);
@@ -545,6 +609,12 @@ function createHostApp({ registry, localProxy, logger }) {
             const entry = registry.lookup(id);
             const api = entry?.manifest?.apiServer;
             if (api && api.namespace && entry.manifest.sideloaded === true) {
+                const capabilities = Array.isArray(entry.manifest.capabilities)
+                    ? entry.manifest.capabilities
+                    : [];
+                const customSources = Array.isArray(entry.manifest.customSources)
+                    ? entry.manifest.customSources
+                    : [];
                 out.push({
                     namespace: api.namespace,
                     extensionId: id,
@@ -553,6 +623,16 @@ function createHostApp({ registry, localProxy, logger }) {
                     // Always mounted for a streaming-sources-v3 bundle — see the
                     // per-provider handlers below.
                     providerRoutes: ['providers', 'providers/:name'],
+                    // Surfaced so the renderer can route manga to the right
+                    // extension(s) without hardcoding a name — any extension whose
+                    // manifest declares "manga" answers the manga routes below.
+                    capabilities,
+                    // Isolated read/watch verticals + the always-mounted custom/*
+                    // routes that serve them. Empty for non-custom-source bundles.
+                    customSources,
+                    customRoutes: customSources.length
+                        ? ['custom/home', 'custom/search', 'custom/info', 'custom/watch', 'custom/read']
+                        : [],
                 });
             }
         }
@@ -799,6 +879,381 @@ function createHostApp({ registry, localProxy, logger }) {
     }
 
     /**
+     * `GET /api/v3/<ns>/manga/chapters` — flat chapter rows for a title.
+     *
+     * Gated on the bundle exposing `getMangaChapters` (501 otherwise), so a
+     * streaming-only extension returns a clear "not supported" rather than a
+     * crash. Rows are cached (chapter lists are expensive and stable); the
+     * `provider` on each row is the sub-provider name, which round-trips through
+     * the reader URL back into `manga/pages`.
+     */
+    async function handleMangaChapters(res, entry, namespace, searchParams) {
+        let bundle;
+        try {
+            bundle = bundleLoader.load(entry.bundlePath);
+        } catch (err) {
+            res.writeHead(502, JSON_HEADERS);
+            return res.end(JSON.stringify({ namespace, chapters: [], count: 0, error: err.message }));
+        }
+
+        if (typeof bundle.getMangaChapters !== 'function') {
+            res.writeHead(501, JSON_HEADERS);
+            return res.end(JSON.stringify({
+                namespace,
+                chapters: [],
+                count: 0,
+                error: "bundle does not implement getMangaChapters() — this extension does not provide manga",
+            }));
+        }
+
+        const params = mangaParamsFromQuery(searchParams);
+        const bypassCache = searchParams.get('refresh') === '1' || searchParams.get('nocache') === '1';
+        const key = [
+            'manga-chapters', namespace,
+            params.anilistId || 0, params.malId || 0,
+            params.title || '', (params.titles || []).join('|'),
+        ].join(':');
+
+        if (!bypassCache) {
+            const hit = cacheGet(key);
+            if (hit) {
+                res.writeHead(200, JSON_HEADERS);
+                return res.end(JSON.stringify({
+                    namespace, provider: namespace,
+                    count: hit.chapters.length, chapters: hit.chapters,
+                    providerStatus: hit.providerStatus || [],
+                    cached: true, fetchedAt: nowISO(),
+                }));
+            }
+        }
+
+        let chapters;
+        // Per-sub-provider diagnostics (mangadex, mangapill, …). Prefer the
+        // bundle's debug variant so the renderer can log each provider and its
+        // chapter count — the same trace the anime path prints. Falls back to
+        // the plain aggregate for an older bundle that lacks debugMangaChapters.
+        let providerStatus = [];
+        try {
+            let entries;
+            if (typeof bundle.debugMangaChapters === 'function') {
+                const debug = await bundle.debugMangaChapters(params);
+                entries = debug && Array.isArray(debug.results) ? debug.results : [];
+                providerStatus = debug && Array.isArray(debug.diagnostics) ? debug.diagnostics : [];
+            } else {
+                entries = await bundle.getMangaChapters(params);
+            }
+            chapters = flattenMangaChapters(entries);
+            const perProviderTrace = providerStatus.length
+                ? providerStatus.map((d) => `${d.provider}=${d.resultCount}(${d.status})`).join(' ')
+                : '(no diagnostics)';
+            logger?.info?.(`[ExtHost] ${namespace}/manga/chapters bundle returned entries=${Array.isArray(entries) ? entries.length : typeof entries} → flattened=${chapters.length} providers=[${perProviderTrace}] (params=${JSON.stringify(params)})`);
+        } catch (err) {
+            logger?.warn?.(`[ExtHost] ${namespace}/manga/chapters failed: ${err && err.stack ? err.stack : err.message}`);
+            res.writeHead(502, JSON_HEADERS);
+            return res.end(JSON.stringify({ namespace, chapters: [], count: 0, error: err.message }));
+        }
+
+        if (chapters.length > 0) cacheSet(key, { chapters, providerStatus }, MANGA_TTL_MS);
+        logger?.info?.(`[ExtHost] ${namespace}/manga/chapters params=${key} chapters=${chapters.length}`);
+
+        res.writeHead(200, JSON_HEADERS);
+        return res.end(JSON.stringify({
+            namespace, provider: namespace,
+            count: chapters.length, chapters, providerStatus,
+            cached: false, fetchedAt: nowISO(),
+        }));
+    }
+
+    /**
+     * `GET /api/v3/<ns>/manga/pages` — pages for one chapter.
+     *
+     * Each page image is registered with the local proxy so the CDN Referer/
+     * Origin headers the provider attached are replayed during load (many manga
+     * CDNs 403 an unproxied request), yielding a `proxiedImageUrl` the renderer
+     * can fetch directly. Never cached — proxy tokens expire in ~15 minutes.
+     */
+    async function handleMangaPages(res, entry, namespace, searchParams) {
+        let bundle;
+        try {
+            bundle = bundleLoader.load(entry.bundlePath);
+        } catch (err) {
+            res.writeHead(502, JSON_HEADERS);
+            return res.end(JSON.stringify({ namespace, pages: [], count: 0, error: err.message }));
+        }
+
+        if (typeof bundle.getMangaPages !== 'function') {
+            res.writeHead(501, JSON_HEADERS);
+            return res.end(JSON.stringify({
+                namespace, pages: [], count: 0,
+                error: "bundle does not implement getMangaPages() — this extension does not provide manga",
+            }));
+        }
+
+        const chapterKey = String(searchParams.get('chapterKey') || '').trim();
+        if (!chapterKey) {
+            res.writeHead(400, JSON_HEADERS);
+            return res.end(JSON.stringify({ namespace, pages: [], count: 0, error: 'chapterKey is required' }));
+        }
+        const anilistId = Number(searchParams.get('anilistId'));
+        const pageParams = {
+            chapterKey,
+            provider: searchParams.get('provider') || undefined,
+            providerChapterId: searchParams.get('providerChapterId') || undefined,
+            ...(Number.isFinite(anilistId) && anilistId > 0 ? { anilistId } : {}),
+        };
+
+        let rawPages;
+        try {
+            rawPages = await bundle.getMangaPages(pageParams);
+        } catch (err) {
+            const notFound = /not found/i.test(err.message || '');
+            logger?.warn?.(`[ExtHost] ${namespace}/manga/pages ${chapterKey} failed: ${err.message}`);
+            res.writeHead(notFound ? 404 : 502, JSON_HEADERS);
+            return res.end(JSON.stringify({ namespace, pages: [], count: 0, error: err.message }));
+        }
+
+        const canProxy = localProxy && typeof localProxy.registerSource === 'function';
+        const pages = (Array.isArray(rawPages) ? rawPages : [])
+            .filter((p) => p && p.imageUrl)
+            .map((p) => {
+                let proxiedImageUrl = p.imageUrl;
+                const hasHeaders = p.headers && typeof p.headers === 'object' && Object.keys(p.headers).length > 0;
+                if (canProxy && hasHeaders && /^https?:\/\//i.test(p.imageUrl)) {
+                    try {
+                        proxiedImageUrl = localProxy.registerSource({ url: p.imageUrl, headers: p.headers });
+                    } catch (err) {
+                        logger?.warn?.(`[ExtHost] manga page proxy failed: ${err.message}`);
+                    }
+                }
+                return {
+                    pageNumber: p.pageNumber,
+                    imageUrl: p.imageUrl,
+                    proxiedImageUrl,
+                    width: p.width ?? null,
+                    height: p.height ?? null,
+                };
+            });
+
+        if (pages.length === 0) {
+            res.writeHead(404, JSON_HEADERS);
+            return res.end(JSON.stringify({ namespace, pages: [], count: 0, error: `Chapter not found: ${chapterKey}` }));
+        }
+
+        res.writeHead(200, JSON_HEADERS);
+        return res.end(JSON.stringify({ namespace, count: pages.length, pages, fetchedAt: nowISO() }));
+    }
+
+    // ── Custom sources (`custom-source-v1`) ─────────────────────────────────────
+    //
+    // Isolated read/watch verticals. Like the manga routes these are ungated —
+    // any extension whose bundle implements the `custom*` methods answers here,
+    // and a bundle missing the method returns 501. Custom sources are NEVER tied
+    // to the anime/manga watchlist or readlist; they render generic app UI over
+    // the data these handlers relay.
+
+    /** Load the namespace's bundle or write a 502; returns null on failure. */
+    function loadCustomBundle(res, entry, namespace, emptyShape) {
+        try {
+            return bundleLoader.load(entry.bundlePath);
+        } catch (err) {
+            res.writeHead(502, JSON_HEADERS);
+            res.end(JSON.stringify({ namespace, ...emptyShape, error: err.message }));
+            return null;
+        }
+    }
+
+    /** 501 helper for a bundle that doesn't implement a custom method. */
+    function customNotImplemented(res, namespace, method, emptyShape) {
+        res.writeHead(501, JSON_HEADERS);
+        res.end(JSON.stringify({
+            namespace, ...emptyShape,
+            error: `bundle does not implement ${method}() — this extension does not provide this custom source`,
+        }));
+    }
+
+    /** `GET /api/v3/<ns>/custom/home?sourceId=…` → { sections }. */
+    async function handleCustomHome(res, entry, namespace, searchParams) {
+        const empty = { sections: [] };
+        const bundle = loadCustomBundle(res, entry, namespace, empty);
+        if (!bundle) return;
+        if (typeof bundle.customHome !== 'function') return customNotImplemented(res, namespace, 'customHome', empty);
+
+        const sourceId = String(searchParams.get('sourceId') || '').trim();
+        if (!sourceId) {
+            res.writeHead(400, JSON_HEADERS);
+            return res.end(JSON.stringify({ namespace, ...empty, error: 'sourceId is required' }));
+        }
+        try {
+            const result = await bundle.customHome(sourceId);
+            const sections = Array.isArray(result?.sections) ? result.sections : [];
+            res.writeHead(200, JSON_HEADERS);
+            return res.end(JSON.stringify({ namespace, sourceId, sections, fetchedAt: nowISO() }));
+        } catch (err) {
+            logger?.warn?.(`[ExtHost] ${namespace}/custom/home ${sourceId} failed: ${err.message}`);
+            res.writeHead(502, JSON_HEADERS);
+            return res.end(JSON.stringify({ namespace, ...empty, error: err.message }));
+        }
+    }
+
+    /** `GET /api/v3/<ns>/custom/search?sourceId=…&q=…&page=…` → { results, hasNextPage? }. */
+    async function handleCustomSearch(res, entry, namespace, searchParams) {
+        const empty = { results: [] };
+        const bundle = loadCustomBundle(res, entry, namespace, empty);
+        if (!bundle) return;
+        if (typeof bundle.customSearch !== 'function') return customNotImplemented(res, namespace, 'customSearch', empty);
+
+        const sourceId = String(searchParams.get('sourceId') || '').trim();
+        const query = String(searchParams.get('q') || searchParams.get('query') || '').trim();
+        const pageNum = Number(searchParams.get('page'));
+        const page = Number.isFinite(pageNum) && pageNum > 0 ? pageNum : 1;
+        if (!sourceId) {
+            res.writeHead(400, JSON_HEADERS);
+            return res.end(JSON.stringify({ namespace, ...empty, error: 'sourceId is required' }));
+        }
+        try {
+            const result = await bundle.customSearch(sourceId, query, page);
+            const results = Array.isArray(result?.results) ? result.results : [];
+            res.writeHead(200, JSON_HEADERS);
+            return res.end(JSON.stringify({
+                namespace, sourceId, results,
+                hasNextPage: !!result?.hasNextPage, fetchedAt: nowISO(),
+            }));
+        } catch (err) {
+            logger?.warn?.(`[ExtHost] ${namespace}/custom/search ${sourceId} failed: ${err.message}`);
+            res.writeHead(502, JSON_HEADERS);
+            return res.end(JSON.stringify({ namespace, ...empty, error: err.message }));
+        }
+    }
+
+    /** `GET /api/v3/<ns>/custom/info?sourceId=…&id=…` → { id,title,…,entries }. */
+    async function handleCustomInfo(res, entry, namespace, searchParams) {
+        const empty = { entries: [] };
+        const bundle = loadCustomBundle(res, entry, namespace, empty);
+        if (!bundle) return;
+        if (typeof bundle.customInfo !== 'function') return customNotImplemented(res, namespace, 'customInfo', empty);
+
+        const sourceId = String(searchParams.get('sourceId') || '').trim();
+        const id = String(searchParams.get('id') || '').trim();
+        if (!sourceId || !id) {
+            res.writeHead(400, JSON_HEADERS);
+            return res.end(JSON.stringify({ namespace, ...empty, error: 'sourceId and id are required' }));
+        }
+        try {
+            const info = await bundle.customInfo(sourceId, id);
+            if (!info || typeof info !== 'object') {
+                res.writeHead(404, JSON_HEADERS);
+                return res.end(JSON.stringify({ namespace, ...empty, error: `Not found: ${id}` }));
+            }
+            res.writeHead(200, JSON_HEADERS);
+            return res.end(JSON.stringify({
+                namespace, sourceId,
+                id: info.id ?? id,
+                title: info.title ?? '',
+                image: info.image ?? null,
+                description: info.description ?? null,
+                meta: info.meta && typeof info.meta === 'object' ? info.meta : {},
+                entries: Array.isArray(info.entries) ? info.entries : [],
+                fetchedAt: nowISO(),
+            }));
+        } catch (err) {
+            logger?.warn?.(`[ExtHost] ${namespace}/custom/info ${sourceId}/${id} failed: ${err.message}`);
+            res.writeHead(502, JSON_HEADERS);
+            return res.end(JSON.stringify({ namespace, ...empty, error: err.message }));
+        }
+    }
+
+    /**
+     * `GET /api/v3/<ns>/custom/watch?sourceId=…&id=…&episodeId=…` → { sources }.
+     *
+     * Reuses the streaming `SourceResult` shape so the existing VideoPlayer
+     * consumes it unchanged. Each source is normalized and run through the local
+     * proxy (Referer/Origin replay for HLS/MP4 + subtitle tracks) exactly like
+     * the anime path.
+     */
+    async function handleCustomWatch(res, entry, namespace, searchParams) {
+        const empty = { sources: [] };
+        const bundle = loadCustomBundle(res, entry, namespace, empty);
+        if (!bundle) return;
+        if (typeof bundle.customWatch !== 'function') return customNotImplemented(res, namespace, 'customWatch', empty);
+
+        const sourceId = String(searchParams.get('sourceId') || '').trim();
+        const id = String(searchParams.get('id') || '').trim();
+        const episodeId = String(searchParams.get('episodeId') || '').trim();
+        if (!sourceId || !id || !episodeId) {
+            res.writeHead(400, JSON_HEADERS);
+            return res.end(JSON.stringify({ namespace, ...empty, error: 'sourceId, id and episodeId are required' }));
+        }
+        try {
+            const result = await bundle.customWatch(sourceId, id, episodeId);
+            const raw = Array.isArray(result?.sources) ? result.sources : [];
+            const sources = raw
+                .filter((s) => s && typeof s === 'object' && s.url)
+                .map((s) => applyProxy(normalizeSource(s), s.headers, localProxy, logger));
+            logger?.info?.(`[ExtHost] ${namespace}/custom/watch ${sourceId}/${id}/${episodeId} → ${sources.length} sources`);
+            res.writeHead(200, JSON_HEADERS);
+            return res.end(JSON.stringify({
+                namespace, sourceId, count: sources.length, sources,
+                ...categorize(sources), fetchedAt: nowISO(),
+            }));
+        } catch (err) {
+            logger?.warn?.(`[ExtHost] ${namespace}/custom/watch ${sourceId}/${id}/${episodeId} failed: ${err.message}`);
+            res.writeHead(502, JSON_HEADERS);
+            return res.end(JSON.stringify({ namespace, ...empty, error: err.message }));
+        }
+    }
+
+    /**
+     * `GET /api/v3/<ns>/custom/read?sourceId=…&id=…&chapterId=…` → { pages }.
+     *
+     * Reuses the manga-page shape so the existing reader consumes it unchanged.
+     * Page images with headers are registered with the local proxy (many CDNs
+     * 403 an unproxied request), yielding a `proxiedImageUrl`.
+     */
+    async function handleCustomRead(res, entry, namespace, searchParams) {
+        const empty = { pages: [] };
+        const bundle = loadCustomBundle(res, entry, namespace, empty);
+        if (!bundle) return;
+        if (typeof bundle.customRead !== 'function') return customNotImplemented(res, namespace, 'customRead', empty);
+
+        const sourceId = String(searchParams.get('sourceId') || '').trim();
+        const id = String(searchParams.get('id') || '').trim();
+        const chapterId = String(searchParams.get('chapterId') || '').trim();
+        if (!sourceId || !id || !chapterId) {
+            res.writeHead(400, JSON_HEADERS);
+            return res.end(JSON.stringify({ namespace, ...empty, error: 'sourceId, id and chapterId are required' }));
+        }
+        try {
+            const result = await bundle.customRead(sourceId, id, chapterId);
+            const rawPages = Array.isArray(result?.pages) ? result.pages : [];
+            const canProxy = localProxy && typeof localProxy.registerSource === 'function';
+            const pages = rawPages
+                .filter((p) => p && p.imageUrl)
+                .map((p) => {
+                    let proxiedImageUrl = p.imageUrl;
+                    const hasHeaders = p.headers && typeof p.headers === 'object' && Object.keys(p.headers).length > 0;
+                    if (canProxy && hasHeaders && /^https?:\/\//i.test(p.imageUrl)) {
+                        try {
+                            proxiedImageUrl = localProxy.registerSource({ url: p.imageUrl, headers: p.headers });
+                        } catch (err) {
+                            logger?.warn?.(`[ExtHost] custom page proxy failed: ${err.message}`);
+                        }
+                    }
+                    return { pageNumber: p.pageNumber, imageUrl: p.imageUrl, proxiedImageUrl };
+                });
+            if (pages.length === 0) {
+                res.writeHead(404, JSON_HEADERS);
+                return res.end(JSON.stringify({ namespace, ...empty, error: `Chapter not found: ${chapterId}` }));
+            }
+            res.writeHead(200, JSON_HEADERS);
+            return res.end(JSON.stringify({ namespace, sourceId, count: pages.length, pages, fetchedAt: nowISO() }));
+        } catch (err) {
+            logger?.warn?.(`[ExtHost] ${namespace}/custom/read ${sourceId}/${id}/${chapterId} failed: ${err.message}`);
+            res.writeHead(502, JSON_HEADERS);
+            return res.end(JSON.stringify({ namespace, ...empty, error: err.message }));
+        }
+    }
+
+    /**
      * Reachability check for a URL the renderer cannot test itself.
      *
      * Embed sources are loaded in an `<iframe>`, and an iframe gives the page no
@@ -952,6 +1407,60 @@ function createHostApp({ registry, localProxy, logger }) {
                     res.end(JSON.stringify({ provider: providerName, sources: [], count: 0, error: err.message }));
                 } else {
                     try { res.end(); } catch (_) { /* noop */ }
+                }
+            }
+            return;
+        }
+
+        // Manga routes — available whenever the bundle implements the manga
+        // contract, independent of `apiServer.routes` (which gate the streaming
+        // routes). Any extension, not just Toko, gets these by exposing
+        // getMangaChapters/getMangaPages; the 501 inside each handler covers a
+        // streaming-only bundle.
+        if (route === 'manga/chapters') {
+            try {
+                await handleMangaChapters(res, found.entry, namespace, searchParams);
+            } catch (err) {
+                logger?.error?.(`[ExtHost] manga chapters handler crashed: ${err.message}`);
+                if (!res.headersSent) {
+                    res.writeHead(502, JSON_HEADERS);
+                    res.end(JSON.stringify({ namespace, chapters: [], count: 0, error: err.message }));
+                }
+            }
+            return;
+        }
+        if (route === 'manga/pages') {
+            try {
+                await handleMangaPages(res, found.entry, namespace, searchParams);
+            } catch (err) {
+                logger?.error?.(`[ExtHost] manga pages handler crashed: ${err.message}`);
+                if (!res.headersSent) {
+                    res.writeHead(502, JSON_HEADERS);
+                    res.end(JSON.stringify({ namespace, pages: [], count: 0, error: err.message }));
+                }
+            }
+            return;
+        }
+
+        // Custom-source routes — ungated like the manga routes. Any extension
+        // whose bundle implements the `custom*` methods answers here; the 501
+        // inside each handler covers a bundle that doesn't. These verticals are
+        // isolated from the anime/manga watchlist/readlist by design.
+        const customHandlers = {
+            'custom/home': handleCustomHome,
+            'custom/search': handleCustomSearch,
+            'custom/info': handleCustomInfo,
+            'custom/watch': handleCustomWatch,
+            'custom/read': handleCustomRead,
+        };
+        if (customHandlers[route]) {
+            try {
+                await customHandlers[route](res, found.entry, namespace, searchParams);
+            } catch (err) {
+                logger?.error?.(`[ExtHost] ${route} handler crashed: ${err.message}`);
+                if (!res.headersSent) {
+                    res.writeHead(502, JSON_HEADERS);
+                    res.end(JSON.stringify({ namespace, error: err.message }));
                 }
             }
             return;

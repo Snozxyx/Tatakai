@@ -9,9 +9,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const navLinks = [
   { name: "Browse",       href: "/browse"      },
-  { name: "Collections",  href: "/collections" },
-  { name: "Trending",     href: "/trending"    },
-  { name: "Suggestions",  href: "/suggestions" },
+  { name: "Favorites",  href: "/favorites" },
+  { name: "Community",     href: "/community"    },
+  { name: "Calendar",  href: "/calendar" },
   { name: "Download",     href: "/download"    },
 ];
 

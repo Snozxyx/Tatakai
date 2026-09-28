@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { EyeOff, Sparkles, Compass, ArrowRight, Flame} from "lucide-react";
 import { useContentSafetySettings } from "@/hooks/user/useContentSafetySettings";
+import { HomeSectionHeading } from "@/components/home/HomeSectionHeading";
 
 const HENTAI_GENRE = "hentai";
 
@@ -20,7 +21,7 @@ const BASE_GENRES: GenreConfig[] = [
   {
     genre: "action",
     label: "Action",
-    poster: "https://cdn.atsu.moe/static/posters/PpYZrYu1LUs0GVYT.jpg",
+    poster: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx106130-yPNeuSu75ey1.jpg",
     accent: "from-amber-600/60 via-orange-700/30 to-black/80",
     glowColor: "shadow-amber-500/30",
     textColor: "text-amber-300",
@@ -28,7 +29,7 @@ const BASE_GENRES: GenreConfig[] = [
   {
     genre: "fantasy",
     label: "Fantasy",
-    poster: "https://cdn.atsu.moe/static/posters/N3HO30V76uWZV9iG.jpg",
+    poster: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx98263-kIeaTXrAbGkj.jpg",
     accent: "from-cyan-600/60 via-blue-700/30 to-black/80",
     glowColor: "shadow-cyan-500/30",
     textColor: "text-cyan-300",
@@ -36,7 +37,7 @@ const BASE_GENRES: GenreConfig[] = [
   {
     genre: "romance",
     label: "Romance",
-    poster: "https://cdn.atsu.moe/static/posters/LOSrlEEmNxpdYVMq.jpg",
+    poster: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx140475-QEGtrmdvbpOv.jpg",
     accent: "from-rose-500/60 via-pink-700/30 to-black/80",
     glowColor: "shadow-rose-500/30",
     textColor: "text-rose-300",
@@ -44,7 +45,7 @@ const BASE_GENRES: GenreConfig[] = [
   {
     genre: "comedy",
     label: "Comedy",
-    poster: "https://cdn.atsu.moe/static/posters/rGVzeEHgpwXHagMM.png",
+    poster: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx105778-euxXZEIfDY2u.png",
     accent: "from-yellow-500/60 via-amber-700/30 to-black/80",
     glowColor: "shadow-yellow-400/30",
     textColor: "text-yellow-300",
@@ -52,7 +53,7 @@ const BASE_GENRES: GenreConfig[] = [
   {
     genre: "drama",
     label: "Drama",
-    poster: "https://cdn.atsu.moe/static/posters/smyw3jl9NabpSky6.jpg",
+    poster: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx146983-pLf4apCkFwKL.jpg",
     accent: "from-fuchsia-500/60 via-purple-700/30 to-black/80",
     glowColor: "shadow-fuchsia-500/30",
     textColor: "text-fuchsia-300",
@@ -60,7 +61,7 @@ const BASE_GENRES: GenreConfig[] = [
   {
     genre: "adventure",
     label: "Adventure",
-    poster: "https://cdn.atsu.moe/static/posters/N3HO30V76uWZV9iG.jpg",
+    poster: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx120980-RZ9WLd0o9hyo.jpg",
     accent: "from-emerald-500/60 via-teal-700/30 to-black/80",
     glowColor: "shadow-emerald-500/30",
     textColor: "text-emerald-300",
@@ -68,7 +69,7 @@ const BASE_GENRES: GenreConfig[] = [
   {
     genre: "historical",
     label: "Historical",
-    poster: "https://cdn.atsu.moe/static/posters/PpYZrYu1LUs0GVYT.jpg",
+    poster: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx105393-oiHumQoBGKG5.jpg",
     accent: "from-stone-500/60 via-amber-900/30 to-black/80",
     glowColor: "shadow-stone-400/30",
     textColor: "text-stone-300",
@@ -76,7 +77,7 @@ const BASE_GENRES: GenreConfig[] = [
   {
     genre: "isekai",
     label: "Isekai",
-    poster: "https://cdn.atsu.moe/static/posters/LOSrlEEmNxpdYVMq.jpg",
+    poster: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/nx86399-NwbRFVh5koqc.jpg",
     accent: "from-sky-500/60 via-indigo-700/30 to-black/80",
     glowColor: "shadow-sky-400/30",
     textColor: "text-sky-300",
@@ -87,7 +88,7 @@ const HENTAI_CONFIG: GenreConfig = {
   genre: "hentai",
   label: "18+ / Hentai",
   poster:
-    "https://media.discordapp.net/attachments/1403660216687398996/1532009365295333456/10800.jpg?ex=6a6b4a68&is=6a69f8e8&hm=b93d31b07ff122ffed575c37ff7e0dc8a99dee20ef7bd757965c60995cb6078c&=&format=webp&width=1070&height=675",
+    "https://s4.anilist.co/file/anilistcdn/media/manga/cover/medium/b142439-vDUZOsE2s28s.jpg",
   accent: "from-rose-700/70 via-red-900/40 to-black/90",
   glowColor: "shadow-rose-600/50",
   textColor: "text-rose-300",
@@ -228,12 +229,10 @@ export function MangaGenreSlider() {
 
   return (
     <section className="mb-16 relative">
-         <div className="flex items-center gap-3 mb-8">
-        <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center border border-primary/30">
-          <Flame className="w-5 h-5 text-primary" />
-        </div>
-        <h2 className="text-2xl lg:text-3xl font-bold font-display tracking-tight">Manga Genres</h2>
-      </div>
+      <HomeSectionHeading
+        icon={<Flame className="w-5 h-5 text-primary" />}
+        title="Manga Genres"
+      />
 
       {/* ── Bento Grid ─────────────────────────────────────────────
           Layout (3 cols):

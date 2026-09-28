@@ -1,4 +1,5 @@
 import { datadogLogs } from '@datadog/browser-logs';
+import type { AnalyticsProvider } from '@/core/extensions/ExtensionRegistry';
 
 declare global {
     interface Window {
@@ -23,6 +24,8 @@ class AnalyticsService {
     private initialized = false;
     private datadogDisabled = false;
     private errorCount = 0;
+    /** Extension-injected analytics sinks, fanned out to after the built-in calls. */
+    private providers: AnalyticsProvider[] = [];
 
     private constructor() { }
 
@@ -31,6 +34,30 @@ class AnalyticsService {
             AnalyticsService.instance = new AnalyticsService();
         }
         return AnalyticsService.instance;
+    }
+
+    // --- Extension provider registry ---
+
+    /** Register an extension analytics sink. Idempotent by `id`. */
+    public registerProvider(provider: AnalyticsProvider) {
+        if (!provider || !provider.id) return;
+        if (this.providers.some((p) => p.id === provider.id)) return;
+        this.providers.push(provider);
+        console.log(`[Analytics] Registered provider: ${provider.id}`);
+    }
+
+    public unregisterProvider(providerId: string) {
+        this.providers = this.providers.filter((p) => p.id !== providerId);
+    }
+
+    private fanOut(fn: (p: AnalyticsProvider) => void) {
+        for (const p of this.providers) {
+            try {
+                fn(p);
+            } catch (e) {
+                console.warn(`[Analytics] provider ${p.id} threw`, e);
+            }
+        }
     }
 
     public init() {
@@ -117,6 +144,9 @@ class AnalyticsService {
                 // Ignore
             }
         }
+
+        // Fan out to extension-injected providers.
+        this.fanOut((p) => p.trackPageView(path, title));
     }
 
     public trackEvent(eventName: string, params?: Record<string, any>) {
@@ -134,6 +164,9 @@ class AnalyticsService {
                 // Ignore
             }
         }
+
+        // Fan out to extension-injected providers.
+        this.fanOut((p) => p.trackEvent(eventName, params));
     }
 
     public trackError(error: Error, context?: Record<string, any>) {
@@ -155,6 +188,9 @@ class AnalyticsService {
                 ...context
             });
         }
+
+        // Fan out to extension-injected providers.
+        this.fanOut((p) => p.trackError?.(error, context));
     }
 
     public trackAnimeInteraction(type: 'view' | 'search' | 'add_to_list' | 'remove_from_list', animeId: string, metadata?: Record<string, any>) {

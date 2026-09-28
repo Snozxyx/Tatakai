@@ -1,10 +1,53 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { getOrCreateDeviceId, getDeviceName } from '@/lib/deviceInfo';
 
 export function useActiveSession(enabled: boolean = true) {
     const { user } = useAuth();
     const heartbeatInterval = useRef<any>(null);
+    /** user.id we've already recorded a session for this app run (fires once/login). */
+    const recordedForUser = useRef<string | null>(null);
+
+    // Device-ban enforcement on boot: if this device id is banned, sign out.
+    // Fail-soft — the RPC/table come from the unapplied ban-device migration.
+    useEffect(() => {
+        if (!enabled) return;
+        const deviceId = getOrCreateDeviceId();
+        if (!deviceId) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const { data, error } = await supabase.rpc('is_device_banned', { p_device_id: deviceId });
+                if (cancelled || error) return;
+                if (data === true) {
+                    await supabase.auth.signOut();
+                }
+            } catch {
+                // RPC absent until migration applied — ignore.
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [enabled, user?.id]);
+
+    // Record a session row once per login (stamps profiles.last_login_at + device_name).
+    // Fail-soft — RPC comes from the unapplied user_sessions migration.
+    useEffect(() => {
+        if (!enabled || !user) return;
+        if (recordedForUser.current === user.id) return;
+        recordedForUser.current = user.id;
+        (async () => {
+            try {
+                await supabase.rpc('record_user_session', {
+                    p_device_id: getOrCreateDeviceId() || null,
+                    p_device_name: getDeviceName(),
+                    p_user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+                });
+            } catch {
+                // RPC absent until migration applied — ignore.
+            }
+        })();
+    }, [enabled, user]);
 
     useEffect(() => {
         if (!enabled) return;

@@ -1,30 +1,42 @@
-import { LayoutGrid, Search, User, LogIn, Users, Heart, TrendingUp, Settings, Shield, Bell, BookOpen } from "lucide-react";
+import { LayoutGrid, Search, User, LogIn, Users, Heart, TrendingUp, Settings, Shield, Bell, BookOpen, Plus } from "lucide-react";
 import { NavIcon } from "@/components/ui/NavIcon";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSettingsModal } from "@/contexts/SettingsModalContext";
 import { useNotifications } from "@/hooks/community/useNotifications";
 import { useIsMobileApp } from "@/hooks/ui/useIsNativeApp";
 import { useHaptics } from "@/hooks/ui/useHaptics";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { NotificationModal } from "@/components/profile/NotificationModal";
+import { NotificationSheet } from "@/components/community/NotificationSheet";
 import { cn } from "@/lib/utils";
+import { useCustomSources } from "@/hooks/api/useCustomSource";
+import type { CustomSourceEntry } from "@/core/content/custom-source-runtime";
 import { useState, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const POPUP_VISIBILITY_EVENT = 'tatakai-v5-popup-visibility';
-const POPUP_ACTIVE_CLASS = 'v5-popup-active';
+const POPUP_VISIBILITY_EVENT = 'tatakai-v6-popup-visibility';
+const POPUP_ACTIVE_CLASS = 'v6-popup-active';
 
 export function MobileNav() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, profile, isBanned, isModerator } = useAuth();
+  const { openSettings } = useSettingsModal();
   const { unreadCount } = useNotifications();
+  const { data: customSources } = useCustomSources();
+  const customByNamespace = (customSources ?? []).reduce<Record<string, CustomSourceEntry[]>>((acc, src) => {
+    (acc[src.namespace] ||= []).push(src);
+    return acc;
+  }, {});
+  const hasCustomSources = (customSources?.length ?? 0) > 0;
   const isMobileNative = useIsMobileApp(); // Only Capacitor Android/iOS
   const { impact } = useHaptics();
   const [showNotifications, setShowNotifications] = useState(false);
@@ -146,6 +158,48 @@ export function MobileNav() {
         aria-label="Manga"
       />
 
+      {/* Custom sources ("+") — extension-provided verticals; hidden when none installed. */}
+      {hasCustomSources && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <div
+              className="nav-icon group relative cursor-pointer focus:outline-none"
+              aria-label="Custom sources"
+            >
+              <Plus className={cn(
+                "w-5 h-5",
+                location.pathname.startsWith("/x/")
+                  ? "text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              )} />
+            </div>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="center" side="top" className="mb-2 w-56">
+            {Object.entries(customByNamespace).map(([namespace, sources], groupIdx) => (
+              <div key={namespace}>
+                {groupIdx > 0 && <DropdownMenuSeparator />}
+                <DropdownMenuLabel className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  {namespace}
+                </DropdownMenuLabel>
+                {sources.map((src) => (
+                  <DropdownMenuItem
+                    key={`${src.namespace}:${src.id}`}
+                    onClick={() => hapticNavigate(`/x/${src.namespace}/${src.id}`)}
+                  >
+                    {src.kind === "read" ? (
+                      <BookOpen className="w-4 h-4 mr-2" />
+                    ) : (
+                      <LayoutGrid className="w-4 h-4 mr-2" />
+                    )}
+                    <span className="min-w-0 flex-1 truncate">{src.name}</span>
+                  </DropdownMenuItem>
+                ))}
+              </div>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+
       {/* Downloads removed from mobile nav - use desktop/electron only */}
 
       <NavIcon
@@ -193,7 +247,7 @@ export function MobileNav() {
                 Admin Panel
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem onClick={() => hapticNavigate("/settings")}>
+            <DropdownMenuItem onClick={() => { if (getHapticEnabled()) impact('light'); openSettings(); }}>
               <Settings className="w-4 h-4 mr-2" />
               Settings
             </DropdownMenuItem>
@@ -207,7 +261,7 @@ export function MobileNav() {
           aria-label="Sign in"
         />
       )}
-      <NotificationModal open={showNotifications} onOpenChange={setShowNotifications} />
+      <NotificationSheet open={showNotifications} onOpenChange={setShowNotifications} />
     </div>
   );
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Background } from '@/components/layout/Background';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { SimpleCaptcha } from '@/components/ui/SimpleCaptcha';
+import { TurnstileWidget, type TurnstileWidgetHandle } from '@/components/security/TurnstileWidget';
+import { isTurnstileEnabled, verifyTurnstileToken } from '@/lib/security/turnstile';
 import { supabase } from '@/integrations/supabase/client';
 import { ArrowLeft, Lightbulb, Send, Loader2, Upload, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -37,6 +39,9 @@ export default function SuggestionsPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [captchaValid, setCaptchaValid] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileWidgetHandle>(null);
+  const turnstileEnabled = isTurnstileEnabled();
   
   const { data: suggestions = [], isLoading } = useUserSuggestions();
   const createSuggestion = useCreateSuggestion();
@@ -97,8 +102,20 @@ export default function SuggestionsPage() {
       toast.error('Please fill in all fields');
       return;
     }
-    
-    if (!captchaValid) {
+
+    if (turnstileEnabled) {
+      if (!captchaToken) {
+        toast.error('Please complete the verification challenge');
+        return;
+      }
+      const ok = await verifyTurnstileToken(captchaToken);
+      if (!ok) {
+        toast.error('Verification failed. Please try again.');
+        turnstileRef.current?.reset();
+        setCaptchaToken(null);
+        return;
+      }
+    } else if (!captchaValid) {
       toast.error('Please complete the captcha');
       return;
     }
@@ -119,6 +136,8 @@ export default function SuggestionsPage() {
     setDescription('');
     setCategory('feature');
     removeImage();
+    turnstileRef.current?.reset();
+    setCaptchaToken(null);
   };
 
   if (!user) {
@@ -241,11 +260,25 @@ export default function SuggestionsPage() {
                 </div>
 
                 {/* Captcha */}
-                <SimpleCaptcha onValidate={setCaptchaValid} />
+                {turnstileEnabled ? (
+                  <TurnstileWidget
+                    ref={turnstileRef}
+                    action="suggestion"
+                    onToken={setCaptchaToken}
+                    onExpire={() => setCaptchaToken(null)}
+                    onError={() => setCaptchaToken(null)}
+                  />
+                ) : (
+                  <SimpleCaptcha onValidate={setCaptchaValid} />
+                )}
 
                 <Button
                   type="submit"
-                  disabled={createSuggestion.isPending || isUploading || !captchaValid}
+                  disabled={
+                    createSuggestion.isPending ||
+                    isUploading ||
+                    (turnstileEnabled ? !captchaToken : !captchaValid)
+                  }
                   className="w-full gap-2"
                 >
                   {createSuggestion.isPending || isUploading ? (

@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWatchHistory } from '@/hooks/user/useWatchHistory';
 import { useWatchStreaks } from '@/hooks/user/useWatchStreaks';
+import { useReadingTrackTotals } from '@/hooks/user/useMangaReadlist';
 import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from '@/hooks/ui/useIsNativeApp';
 import { useIsMobile } from '@/hooks/ui/use-mobile';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -14,7 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { getProxiedImageUrl } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { getRankTier, getRankImageUrl, getNextRankTier } from '@/lib/rankUtils';
+import { getRankTier, getRankImageUrl, getNextRankTier, getRankNameStyleForRank, computeRankScore, getRankBadges, getBadgeHoverClass } from '@/lib/rankUtils';
 import {
   ArrowLeft, Clock, Tv2, Flame, Trophy, Star,
   TrendingUp, Calendar, BarChart3, Sparkles, Film,
@@ -68,6 +69,14 @@ export default function WrappedPage() {
   const { user, profile } = useAuth();
   const { data: history = [] } = useWatchHistory();
   const { streak, achievements, stats } = useWatchStreaks();
+  const { data: readingTotals } = useReadingTrackTotals();
+  const rankScore = computeRankScore({
+    episodes: stats.totalEpisodes,
+    manga: readingTotals?.manga ?? 0,
+    manhwa: readingTotals?.manhwa ?? 0,
+    comic: readingTotals?.comic ?? 0,
+  });
+  const rankBadges = getRankBadges(rankScore);
   const isMobileApp = useIsMobileApp();
   const isMobile = useIsMobile();
   const isDesktopApp = useIsDesktopApp();
@@ -200,9 +209,10 @@ export default function WrappedPage() {
         </motion.div>
 
         {/* Rank Badge */}
-        {stats.totalEpisodes > 0 && (() => {
-          const rankTier = getRankTier(stats.totalEpisodes);
-          const nextRank = getNextRankTier(stats.totalEpisodes);
+        {rankScore > 0 && (() => {
+          const rankTier = getRankTier(rankScore);
+          const nextRank = getNextRankTier(rankScore);
+          const rankStyle = getRankNameStyleForRank(rankTier.rank);
           const progressPct = nextRank
             ? Math.min(100, (nextRank.progress / (nextRank.progress + nextRank.needed)) * 100)
             : 100;
@@ -221,15 +231,15 @@ export default function WrappedPage() {
                 />
                 <div className="flex-1 min-w-0 text-center sm:text-left">
                   <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest mb-1">Your Current Rank</p>
-                  <h2 className={cn('text-2xl font-black font-display', rankTier.color)}>{rankTier.name}</h2>
+                  <h2 className={cn('text-2xl font-black font-display', rankStyle.className)} style={rankStyle.style}>{rankTier.name}</h2>
                   <p className="text-sm text-muted-foreground mt-0.5">
-                    {stats.totalEpisodes.toLocaleString()} episodes watched
+                    {rankScore.toLocaleString()} RP · {stats.totalEpisodes.toLocaleString()} episodes
                   </p>
                   {nextRank && (
                     <div className="mt-3 space-y-1">
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Progress to <span className={nextRank.tier.color}>{nextRank.tier.name}</span></span>
-                        <span>{nextRank.needed} more episodes</span>
+                        <span>Progress to <span className={getRankNameStyleForRank(nextRank.tier.rank).className}>{nextRank.tier.name}</span></span>
+                        <span>{nextRank.needed} RP left</span>
                       </div>
                       <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                         <motion.div
@@ -319,9 +329,9 @@ export default function WrappedPage() {
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-2">
                 <Trophy className="w-4 h-4 text-amber-400" />
-                <h2 className="font-display font-bold text-base">Achievements</h2>
+                <h2 className="font-display font-bold text-base">Rank Badges</h2>
                 <span className="text-xs text-muted-foreground">
-                  {unlockedAchievements.length}/{achievements.length} unlocked
+                  {rankBadges.filter((b) => b.unlocked).length}/{rankBadges.length} unlocked
                 </span>
               </div>
             </div>
@@ -331,47 +341,39 @@ export default function WrappedPage() {
               <motion.div
                 className="h-full bg-gradient-to-r from-primary to-secondary rounded-full"
                 initial={{ width: 0 }}
-                animate={{ width: `${(unlockedAchievements.length / achievements.length) * 100}%` }}
+                animate={{ width: `${(rankBadges.filter((b) => b.unlocked).length / rankBadges.length) * 100}%` }}
                 transition={{ duration: 1, ease: 'easeOut', delay: 0.4 }}
               />
             </div>
 
-            <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-10 gap-3">
-              {achievements.map((achievement, i) => {
-                // Map achievement to a rank image
-                const rankMap: Record<string, number> = {
-                  'first-episode':    1,
-                  'ten-episodes':     3,
-                  'hundred-episodes': 8,
-                  'marathon':         11,
-                  'streak-7':         4,
-                  'streak-30':        9,
-                  'completionist':    6,
-                  'explorer':         5,
-                  'binge':            7,
-                  'otaku':            12,
-                };
-                const rankNum = rankMap[achievement.id] ?? 1;
+            <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-8 gap-3">
+              {rankBadges.map((badge, i) => {
+                const ns = getRankNameStyleForRank(badge.rank);
                 return (
                   <motion.div
-                    key={achievement.id}
+                    key={badge.rank}
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.35 + i * 0.03, duration: 0.2 }}
-                    title={`${achievement.title}: ${achievement.description}`}
+                    title={`${badge.name}: ${badge.description}`}
                     className={cn(
-                      'flex flex-col items-center gap-1 p-2 rounded-xl border text-center cursor-default transition-all',
-                      achievement.unlocked
-                        ? 'border-border/40 bg-muted/20 hover:bg-muted/40'
+                      'flex flex-col items-center gap-1 p-2 rounded-xl border text-center cursor-default',
+                      badge.unlocked
+                        ? cn('border-border/40 bg-muted/20', getBadgeHoverClass(badge.rank))
                         : 'border-border/20 bg-muted/10 opacity-35 grayscale'
                     )}
                   >
                     <img
-                      src={getRankImageUrl(rankNum)}
-                      alt={achievement.title}
+                      src={getRankImageUrl(badge.rank)}
+                      alt={badge.name}
                       className="w-8 h-8 object-contain leading-none"
                     />
-                    <span className="text-[9px] font-semibold leading-tight text-center">{achievement.title}</span>
+                    <span
+                      className={cn('text-[9px] font-semibold leading-tight text-center', badge.unlocked && ns.className)}
+                      style={badge.unlocked ? ns.style : {}}
+                    >
+                      {badge.name}
+                    </span>
                   </motion.div>
                 );
               })}

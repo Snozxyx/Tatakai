@@ -1,508 +1,169 @@
-import { useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Sidebar } from '@/components/layout/Sidebar';
+import { useNavigate, useParams } from 'react-router-dom';
+import type { FC } from 'react';
+import { motion } from 'framer-motion';
+import { toast } from 'sonner';
+import { ArrowLeft, Trash2, Pin, Loader2 } from 'lucide-react';
+import { CommunitySidebar } from '@/components/community/feed/CommunitySidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-// import { StatusVideoBackground } from '@/components/layout/StatusVideoBackground';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import {
-  useForumPost,
-  useForumComments,
-  useCreateForumComment,
-  useForumVote,
-  useDeleteForumPost,
-  useDeleteForumComment,
-  type ForumComment,
-} from '@/hooks/community/useForum';
-import { useAuth } from '@/contexts/AuthContext';
-import { formatDistanceToNow } from 'date-fns';
-import { motion } from 'framer-motion';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { cn } from '@/lib/utils';
-import { getProxiedImageUrl } from '@/lib/api';
-import {
-  ArrowUp,
-  ArrowDown,
-  MessageCircle,
-  Eye,
-  ArrowLeft,
-  Send,
-  Trash2,
-  AlertTriangle,
-  Pin,
-  Lock,
-} from 'lucide-react';
-import { useToast } from '@/hooks/ui/use-toast';
-
-function CommentCard({ comment, postId }: { comment: ForumComment; postId: string }) {
-  const { user } = useAuth();
-  const { toast } = useToast();
-  const vote = useForumVote();
-  const deleteComment = useDeleteForumComment();
-  const [isReplying, setIsReplying] = useState(false);
-  const [replyContent, setReplyContent] = useState('');
-  const createComment = useCreateForumComment();
-  const score = comment.upvotes - comment.downvotes;
-
-  const handleVote = (voteType: 1 | -1) => {
-    if (!user) {
-      toast({ title: 'Please sign in to vote', variant: 'destructive' });
-      return;
-    }
-
-    vote.mutate({
-      commentId: comment.id,
-      voteType,
-      currentVote: comment.user_vote,
-    });
-  };
-
-  const handleReply = async () => {
-    if (!replyContent.trim()) return;
-
-    try {
-      await createComment.mutateAsync({
-        postId,
-        content: replyContent,
-        parentId: comment.id,
-      });
-      setReplyContent('');
-      setIsReplying(false);
-      toast({ title: 'Reply posted!' });
-    } catch (error) {
-      toast({ title: 'Failed to post reply', variant: 'destructive' });
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!confirm('Delete this comment?')) return;
-
-    try {
-      await deleteComment.mutateAsync({ commentId: comment.id, postId });
-      toast({ title: 'Comment deleted' });
-    } catch (error) {
-      toast({ title: 'Failed to delete comment', variant: 'destructive' });
-    }
-  };
-
-  const canDelete = user && (user.id === comment.user_id);
-
-  return (
-    <div className="flex gap-4">
-      {/* Vote buttons */}
-      <div className="flex flex-col items-center gap-1 text-muted-foreground">
-        <button
-          onClick={() => handleVote(1)}
-          className={cn(
-            'p-1 rounded hover:bg-primary/10 transition-colors',
-            comment.user_vote === 1 && 'text-primary'
-          )}
-        >
-          <ArrowUp className="w-4 h-4" />
-        </button>
-        <span
-          className={cn(
-            'text-sm font-bold',
-            score > 0 && 'text-primary',
-            score < 0 && 'text-destructive'
-          )}
-        >
-          {score}
-        </span>
-        <button
-          onClick={() => handleVote(-1)}
-          className={cn(
-            'p-1 rounded hover:bg-destructive/10 transition-colors',
-            comment.user_vote === -1 && 'text-destructive'
-          )}
-        >
-          <ArrowDown className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 min-w-0 space-y-3">
-        {/* Header */}
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          {comment.profiles && (
-            <Link
-              to={`/@${comment.profiles.username}`}
-              className="flex items-center gap-2 hover:text-foreground transition-colors"
-            >
-              <Avatar className="w-5 h-5">
-                <AvatarImage src={comment.profiles.avatar_url || undefined} />
-                <AvatarFallback className="text-[10px]">
-                  {(comment.profiles.display_name || comment.profiles.username || 'U')[0].toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <span>{comment.profiles.username || comment.profiles.display_name || 'Anonymous'}</span>
-            </Link>
-          )}
-          <span>•</span>
-          <span>{formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}</span>
-        </div>
-
-        {/* Content */}
-        <div className={cn('text-sm', comment.is_spoiler && 'blur-sm hover:blur-none transition-all')}>
-          {comment.content}
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => setIsReplying(!isReplying)}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Reply
-          </button>
-          {canDelete && (
-            <button
-              onClick={handleDelete}
-              className="text-xs text-muted-foreground hover:text-destructive transition-colors"
-            >
-              Delete
-            </button>
-          )}
-        </div>
-
-        {/* Reply form */}
-        {isReplying && (
-          <div className="space-y-2">
-            <Textarea
-              value={replyContent}
-              onChange={(e) => setReplyContent(e.target.value)}
-              placeholder="Write a reply..."
-              className="min-h-[80px] bg-muted/30"
-            />
-            <div className="flex gap-2">
-              <Button onClick={handleReply} size="sm" disabled={!replyContent.trim()}>
-                Post Reply
-              </Button>
-              <Button onClick={() => setIsReplying(false)} size="sm" variant="ghost">
-                Cancel
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Nested replies */}
-        {comment.replies && comment.replies.length > 0 && (
-          <div className="ml-4 space-y-4 border-l-2 border-muted pl-4">
-            {comment.replies.map((reply) => (
-              <CommentCard key={reply.id} comment={reply} postId={postId} />
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+import { useIsNativeApp, useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
+import { useAuth } from '@/contexts/AuthContext';
+import { useForumPost, useDeleteForumPost, usePinForumPost } from '@/hooks/community/useForum';
+import { usePostPoll } from '@/hooks/community/usePostPolls';
+import { PostCard } from '@/components/community/feed/PostCard';
+import { ModerationMenu } from '@/components/moderation/ModerationMenu';
+import type { FeedPost } from '@/hooks/community/useFeed';
+import { WatchTogetherWidget } from '@/components/community/feed/WatchTogetherWidget';
+import { AiringWidget } from '@/components/community/feed/AiringWidget';
+import { SocialWidget } from '@/components/community/feed/SocialWidget';
+import { TrendingRail } from '@/components/community/feed/TrendingRail';
+import { HashtagsWidget } from '@/components/community/feed/HashtagsWidget';
+import { Seo } from '@/components/seo/Seo';
 
 export default function ForumPostPage() {
   const { postId } = useParams<{ postId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { toast } = useToast();
-  const [commentContent, setCommentContent] = useState('');
-
-  const { data: post, isLoading: loadingPost } = useForumPost(postId!);
-  const { data: comments = [], isLoading: loadingComments } = useForumComments(postId!);
-  const createComment = useCreateForumComment();
-  const vote = useForumVote();
+  const isNative = useIsNativeApp();
+  const isDesktopApp = useIsDesktopApp();
+  const { user, isAdmin } = useAuth();
+  const { data: post, isLoading } = useForumPost(postId!);
+  const { data: poll } = usePostPoll(postId);
   const deletePost = useDeleteForumPost();
+  const pinPost = usePinForumPost();
+  const confirm = useConfirm();
 
-  if (!postId) {
-    return <div>Invalid post ID</div>;
-  }
+  if (!postId) return <div className="p-8">Invalid post ID</div>;
 
-  const handleVote = (voteType: 1 | -1) => {
-    if (!user) {
-      toast({ title: 'Please sign in to vote', variant: 'destructive' });
-      return;
-    }
-
-    vote.mutate({
-      postId,
-      voteType,
-      currentVote: post?.user_vote,
-    });
-  };
-
-  const handleComment = async () => {
-    if (!commentContent.trim()) return;
-
-    try {
-      await createComment.mutateAsync({
-        postId,
-        content: commentContent,
-      });
-      setCommentContent('');
-      toast({ title: 'Comment posted!' });
-    } catch (error) {
-      toast({ title: 'Failed to post comment', variant: 'destructive' });
-    }
-  };
+  const canDelete = !!user && (post?.user_id === user.id || isAdmin);
 
   const handleDelete = async () => {
-    if (!confirm('Delete this post?')) return;
-
+    if (!(await confirm({ title: 'Delete this post?', destructive: true }))) return;
     try {
       await deletePost.mutateAsync(postId);
-      toast({ title: 'Post deleted' });
+      toast.success('Post deleted');
       navigate('/community');
-    } catch (error) {
-      toast({ title: 'Failed to delete post', variant: 'destructive' });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete');
     }
   };
 
-  const score = post ? post.upvotes - post.downvotes : 0;
-  const canDelete = user && post && user.id === post.user_id;
+  const feedPost: FeedPost | null = post
+    ? (() => {
+        const metadata = (post.metadata || {}) as Record<string, any>;
+        const images: string[] | null =
+          Array.isArray(metadata.images) && metadata.images.length ? metadata.images : post.image_url ? [post.image_url] : null;
+        return {
+          ...post,
+          poll: poll || null,
+          gif_url: metadata.gif_url || null,
+          images,
+          watch_room_id: metadata.watch_room_id || null,
+          quoted_post_id: metadata.quoted_post_id || null,
+          media_type: metadata.media_type || (post.anime_id ? 'anime' : null),
+        } as FeedPost;
+      })()
+    : null;
+
+  const rail: FC<{ className?: string }>[] = [WatchTogetherWidget, AiringWidget, SocialWidget, TrendingRail, HashtagsWidget];
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      {/* <StatusVideoBackground /> */}
-      <Sidebar />
+    <div className="relative min-h-screen bg-background text-foreground antialiased">
+      {post && (
+        <Seo
+          title={(post as any).title || `Post by ${post.profiles?.display_name || 'a member'}`}
+          description={post.content || undefined}
+          image={post.image_url || (post.metadata as any)?.images?.[0] || post.anime_poster || undefined}
+          canonicalPath={`/community/forum/${postId}`}
+          kind="article"
+          suffix=" — Tatakai Community"
+        />
+      )}
+      {/* Ambient background mesh — matches /community */}
+      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+        <div className="absolute -top-[10%] left-1/2 -translate-x-1/2 h-[600px] w-[1200px] rounded-full bg-radial from-rose-500/10 via-primary/5 to-transparent blur-3xl" />
+        <div className="absolute top-[20%] -left-[10%] h-[500px] w-[500px] rounded-full bg-violet-600/5 blur-3xl" />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/90 to-background" />
+      </div>
 
-      <main className="relative z-10 pl-0 md:pl-20 lg:pl-24 w-full">
-        <div className="max-w-4xl mx-auto px-4 md:px-8 py-8">
-          {/* Back button */}
-          <Button variant="ghost" onClick={() => navigate('/community')} className="mb-6 gap-2">
-            <ArrowLeft className="w-4 h-4" />
-            Back to Community
-          </Button>
+      <CommunitySidebar />
 
-          {loadingPost ? (
-            <GlassPanel className="p-8">
-              <div className="h-8 bg-muted rounded animate-pulse mb-4" />
-              <div className="h-32 bg-muted rounded animate-pulse" />
-            </GlassPanel>
-          ) : post ? (
-            <div className="space-y-6">
-              {/* Post */}
-              <GlassPanel className="p-6">
-                <div className="flex gap-4">
-                  {/* Vote buttons */}
-                  <div className="flex flex-col items-center gap-1 text-muted-foreground">
-                    <button
-                      onClick={() => handleVote(1)}
-                      className={cn(
-                        'p-2 rounded hover:bg-primary/10 transition-colors',
-                        post.user_vote === 1 && 'text-primary'
-                      )}
-                    >
-                      <ArrowUp className="w-6 h-6" />
-                    </button>
-                    <span
-                      className={cn(
-                        'text-lg font-bold',
-                        score > 0 && 'text-primary',
-                        score < 0 && 'text-destructive'
-                      )}
-                    >
-                      {score}
-                    </span>
-                    <button
-                      onClick={() => handleVote(-1)}
-                      className={cn(
-                        'p-2 rounded hover:bg-destructive/10 transition-colors',
-                        post.user_vote === -1 && 'text-destructive'
-                      )}
-                    >
-                      <ArrowDown className="w-6 h-6" />
-                    </button>
-                  </div>
+      <main className={cn('relative z-10 w-full transition-all duration-300', isDesktopApp ? 'pl-24 lg:pl-28' : isNative ? 'pl-0' : 'pl-0 md:pl-20 lg:pl-24')}>
+        <div className="mx-auto max-w-[1536px] px-4 pt-6 md:px-8 md:pt-10">
+          <div className="mb-6 flex items-center justify-between">
+            <Button variant="ghost" onClick={() => navigate('/community')} className="gap-2">
+              <ArrowLeft className="h-4 w-4" /> Community
+            </Button>
+            {post && (
+              <div className="flex items-center gap-1">
+                {isAdmin && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => pinPost.mutate({ postId, isPinned: !post.is_pinned })}
+                  >
+                    <Pin className={cn('h-4 w-4', post.is_pinned && 'fill-current text-primary')} />
+                    {post.is_pinned ? 'Unpin' : 'Pin'}
+                  </Button>
+                )}
+                {canDelete && (
+                  <Button variant="ghost" size="sm" className="gap-1.5 text-destructive hover:text-destructive" onClick={handleDelete}>
+                    <Trash2 className="h-4 w-4" /> Delete
+                  </Button>
+                )}
+                {/* Shared moderation toolbar — report + staff flag toggles / ban / admin.
+                    Delete lives in the dedicated button above, so it's omitted here. */}
+                <ModerationMenu
+                  contentType="forum_post"
+                  contentId={post.id}
+                  authorUserId={post.user_id}
+                  authorName={post.profiles?.display_name ?? undefined}
+                  showPauseComments
+                  showRepostControls
+                />
+              </div>
+            )}
+          </div>
 
-                  {/* Content */}
-                  <div className="flex-1 min-w-0 space-y-4">
-                    {/* Flair and metadata */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {post.is_pinned && (
-                        <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-500 text-xs font-bold flex items-center gap-1">
-                          <Pin className="w-3 h-3" />
-                          Pinned
-                        </span>
-                      )}
-                      {post.is_locked && (
-                        <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-500 text-xs font-bold flex items-center gap-1">
-                          <Lock className="w-3 h-3" />
-                          Locked
-                        </span>
-                      )}
-                      {post.flair && (
-                        <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary text-xs font-medium">
-                          {post.flair}
-                        </span>
-                      )}
-                      {post.is_spoiler && (
-                        <span className="px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-500 text-xs font-bold flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3" />
-                          Spoiler
-                        </span>
-                      )}
-                      {post.anime_name && (
-                        <Link
-                          to={`/anime/${post.anime_id}`}
-                          className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-xs hover:text-foreground transition-colors"
-                        >
-                          {post.anime_name}
-                        </Link>
-                      )}
-                    </div>
-
-                    {/* Title */}
-                    <h1 className="text-3xl font-bold">{post.title}</h1>
-
-                    {/* Author and metadata */}
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      {post.profiles && (
-                        <Link
-                          to={`/@${post.profiles.username}`}
-                          className="flex items-center gap-2 hover:text-foreground transition-colors"
-                        >
-                          <Avatar className="w-6 h-6">
-                            <AvatarImage src={post.profiles.avatar_url || undefined} />
-                            <AvatarFallback className="text-xs">
-                              {(post.profiles.display_name || post.profiles.username || 'U')[0].toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span>{post.profiles.username || post.profiles.display_name || 'Anonymous'}</span>
-                        </Link>
-                      )}
-                      <span>•</span>
-                      <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
-                      <span className="flex items-center gap-1">
-                        <Eye className="w-4 h-4" />
-                        {post.views_count}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <MessageCircle className="w-4 h-4" />
-                        {post.comments_count}
-                      </span>
-                    </div>
-
-                    {/* Content */}
-                    <div className="prose prose-invert max-w-none">
-                      <p className="whitespace-pre-wrap">{post.content}</p>
-                    </div>
-
-                    {/* Forum post image if present */}
-                    {post.image_url && (
-                      <div className="mt-4">
-                        <img
-                          src={getProxiedImageUrl(post.image_url)}
-                          alt="Forum post image"
-                          className="max-w-full h-auto rounded-lg border border-white/10"
-                        />
-                      </div>
-                    )}
-
-                    {/* Actions */}
-                    {canDelete && (
-                      <div className="flex gap-2 pt-4 border-t border-white/5">
-                        <Button onClick={handleDelete} variant="destructive" size="sm" className="gap-2">
-                          <Trash2 className="w-4 h-4" />
-                          Delete Post
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Anime poster thumbnail if present */}
-                  {post.anime_poster && (
-                    <div className="hidden sm:block w-32 h-44 rounded-lg overflow-hidden flex-shrink-0">
-                      <img
-                        src={getProxiedImageUrl(post.anime_poster)}
-                        alt={post.anime_name || ''}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  )}
+          <div className="flex items-start gap-8 xl:gap-12 pb-12">
+            {/* Main post column */}
+            <div className="w-full min-w-0 flex-1 max-w-[720px]">
+              {isLoading ? (
+                <div className="flex justify-center py-16">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
-              </GlassPanel>
-
-              {/* Comment form */}
-              {user && !post.is_locked ? (
-                <GlassPanel className="p-6">
-                  <h3 className="text-lg font-bold mb-4">Add a Comment</h3>
-                  <div className="space-y-4">
-                    <Textarea
-                      value={commentContent}
-                      onChange={(e) => setCommentContent(e.target.value)}
-                      placeholder="What are your thoughts?"
-                      className="min-h-[120px] bg-muted/30"
-                    />
-                    <Button onClick={handleComment} disabled={!commentContent.trim()} className="gap-2">
-                      <Send className="w-4 h-4" />
-                      Post Comment
-                    </Button>
-                  </div>
-                </GlassPanel>
-              ) : !user ? (
-                <GlassPanel className="p-6 text-center">
-                  <p className="text-muted-foreground mb-4">Sign in to leave a comment</p>
-                  <Button onClick={() => navigate('/auth')}>Sign In</Button>
-                </GlassPanel>
+              ) : feedPost ? (
+                <PostCard post={feedPost} defaultShowComments />
               ) : (
-                <GlassPanel className="p-6 text-center">
-                  <Lock className="w-12 h-12 mx-auto text-muted-foreground/30 mb-4" />
-                  <p className="text-muted-foreground">This post is locked</p>
+                <GlassPanel className="rounded-[2rem] p-16 text-center">
+                  <h3 className="font-display text-lg font-bold tracking-tight">Post not found</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">It may have been removed.</p>
                 </GlassPanel>
               )}
-
-              {/* Comments */}
-              <div>
-                <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                  <MessageCircle className="w-5 h-5" />
-                  Comments ({post.comments_count})
-                </h3>
-
-                {loadingComments ? (
-                  <div className="space-y-4">
-                    {[...Array(3)].map((_, i) => (
-                      <GlassPanel key={i} className="p-4">
-                        <div className="h-4 bg-muted rounded animate-pulse mb-2" />
-                        <div className="h-16 bg-muted rounded animate-pulse" />
-                      </GlassPanel>
-                    ))}
-                  </div>
-                ) : comments.length > 0 ? (
-                  <div className="space-y-6">
-                    {comments.map((comment, index) => (
-                      <motion.div
-                        key={comment.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                      >
-                        <GlassPanel className="p-4">
-                          <CommentCard comment={comment} postId={postId} />
-                        </GlassPanel>
-                      </motion.div>
-                    ))}
-                  </div>
-                ) : (
-                  <GlassPanel className="p-8 text-center">
-                    <MessageCircle className="w-12 h-12 mx-auto text-muted-foreground/30 mb-4" />
-                    <p className="text-muted-foreground">No comments yet. Be the first!</p>
-                  </GlassPanel>
-                )}
-              </div>
             </div>
-          ) : (
-            <GlassPanel className="p-12 text-center">
-              <h2 className="text-2xl font-bold mb-2">Post not found</h2>
-              <p className="text-muted-foreground mb-6">This post may have been deleted or doesn't exist.</p>
-              <Button onClick={() => navigate('/community')}>Back to Community</Button>
-            </GlassPanel>
-          )}
+
+            {/* Right rail — same follow-along widgets as /community */}
+            <aside className="hidden w-[380px] 2xl:w-[420px] shrink-0 xl:block">
+              <div className="sticky top-6 flex flex-col gap-6 w-full">
+                {rail.map((Widget, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: i * 0.05, ease: 'easeOut' }}
+                  >
+                    <Widget className="w-full" />
+                  </motion.div>
+                ))}
+              </div>
+            </aside>
+          </div>
         </div>
       </main>
-
       <MobileNav />
     </div>
   );
 }
-
-

@@ -1,23 +1,48 @@
-import { Background } from "@/components/layout/Background";
-import { Sidebar } from "@/components/layout/Sidebar";
-import { MobileNav } from "@/components/layout/MobileNav";
-import { AnimeCardWithPreview } from "@/components/anime/AnimeCardWithPreview";
-import { Skeleton } from "@/components/ui/skeleton-custom";
-import { useTrendingAnime, formatViewCount } from "@/hooks/user/useViews";
-import { fetchHome, TrendingAnime as ApiTrendingAnime, AnimeCard } from "@/lib/api";
-import { fetchAniListDiscover, fetchAniListMediaById, AniListMedia } from "@/lib/externalIntegrations";
-import { Flame, TrendingUp, Clock, Sparkles, Heart } from "lucide-react";
+/**
+ * Trending board (docs/Plans.md §2 "Trending Page"), rebuilt in the discover
+ * design language of docs/image-8.png: a board hero with the fanned top seven,
+ * a timeframe pill row, then the rest of the ranking as shared `PosterCard`s.
+ *
+ * The ranking is rendered directly rather than through `VirtualAnimeGrid`.
+ * `FeatureFlag.VIRTUAL_GRID` defaults to on (feature-flags.ts:85), so for
+ * default users the old page's rank badges and pulse sparklines never rendered
+ * at all — the flag routed every row into a virtualized grid that knows nothing
+ * about ranks. Fifty posters is well under the size virtualization is for.
+ *
+ * The data layer is unchanged: the internal `get_trending_anime` RPC, with the
+ * streaming API's homepage as both fallback and id-reconciliation source, since
+ * RPC rows carry view counts but not always a resolvable route id.
+ */
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Clock, Flame, Heart, Sparkles, TrendingUp } from 'lucide-react';
+import { Background } from '@/components/layout/Background';
+import { Sidebar } from '@/components/layout/Sidebar';
+import { MobileNav } from '@/components/layout/MobileNav';
+import { MangaTrendingSection } from '@/components/manga/MangaTrendingSection';
 import { Sparkline } from '@/components/ui/Sparkline';
-import { useState, useMemo, useCallback, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { motion, AnimatePresence } from "framer-motion";
-import { useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
-import { cn } from "@/lib/utils";
-import { VirtualAnimeGrid } from "@/components/virtualized/VirtualAnimeGrid";
-import { FeatureFlag, useFeatureFlag } from "@/core/feature-flags";
-import { useScrollRestoration } from "@/hooks/ui/useScrollRestoration";
-import { MangaTrendingSection } from "@/components/manga/MangaTrendingSection";
+import { PillGroup, type PillOption } from '@/components/anime/discover/PillGroup';
+import { PosterCard } from '@/components/anime/discover/PosterCard';
+import {
+  POSTER_GRID_CLASS,
+  PosterGridSkeleton,
+} from '@/components/anime/discover/DiscoverPosterGrid';
+import { SectionHeading } from '@/components/anime/discover/SectionHeading';
+import { BoardHero } from '@/components/anime/discover/BoardHero';
+import {
+  animeCardToPosterItem,
+  RAIL_LENGTH,
+  type PosterItem,
+} from '@/components/anime/discover/types';
+import { useIsNativeApp } from '@/hooks/ui/useIsNativeApp';
+import { useScrollRestoration } from '@/hooks/ui/useScrollRestoration';
+import { formatViewCount, useTrendingAnime, type TrendingAnime } from '@/hooks/user/useViews';
+import { fetchHome, type AnimeCard, type TrendingAnime as ApiTrendingAnime } from '@/lib/api';
+import {
+  fetchAniListDiscover,
+  fetchAniListMediaById,
+  type AniListMedia,
+} from '@/lib/externalIntegrations';
 import {
   buildExternalAnimeRouteId,
   buildPreferredAnimeRouteId,
@@ -26,9 +51,75 @@ import {
   parseExternalAnimeId,
   registerAnimeIdMappings,
   toPositiveInt,
-} from "@/lib/animeIdMapping";
+} from '@/lib/animeIdMapping';
+import { cn } from '@/lib/utils';
+import { useContentSafetySettings } from '@/hooks/user/useContentSafetySettings';
+import { filterAdultAnime } from '@/lib/contentSafety';
 
 type TimeFrame = 'today' | 'week' | 'month' | 'all';
+
+/**
+ * `TrendingAnime` in useViews only declares the three view counters; the RPC
+ * also returns the title, poster and a daily series the old page read through
+ * `any`. Declared structurally here so the sparkline stays typed on the way
+ * into the chart.
+ */
+interface TrendingRow extends TrendingAnime {
+  anime_name?: string;
+  poster?: string;
+  sparkline?: { date: string; count: number }[];
+}
+
+interface BoardFrame extends PillOption<TimeFrame> {
+  eyebrow: string;
+  heading: string;
+  description: string;
+  /** Suffix for the hero's view chip — the counter differs per window. */
+  viewsLabel: string;
+}
+
+const TIME_FRAMES: ReadonlyArray<BoardFrame> = [
+  {
+    id: 'today',
+    label: 'Today',
+    icon: <Clock className="h-3.5 w-3.5" />,
+    eyebrow: 'Right now',
+    heading: 'Trending today',
+    description:
+      'What the community started watching in the last 24 hours. It moves fast, so this order rarely survives the day.',
+    viewsLabel: 'views today',
+  },
+  {
+    id: 'week',
+    label: 'This week',
+    icon: <TrendingUp className="h-3.5 w-3.5" />,
+    eyebrow: 'This week',
+    heading: 'Popular this week',
+    description:
+      "Tatakai's most watched titles over the last seven days, ranked gold, silver and bronze.",
+    viewsLabel: 'views this week',
+  },
+  {
+    id: 'month',
+    label: 'This month',
+    icon: <Flame className="h-3.5 w-3.5" />,
+    eyebrow: 'This month',
+    heading: "The month's heat",
+    description:
+      'Thirty days of watch activity, so a strong finale still shows up long after its own week has passed.',
+    viewsLabel: 'views this month',
+  },
+  {
+    id: 'all',
+    label: 'All time',
+    icon: <Sparkles className="h-3.5 w-3.5" />,
+    eyebrow: 'All time',
+    heading: 'Most watched ever',
+    description:
+      'Every view ever recorded here, with no time window at all. Slow to move, and the closest thing to a canon.',
+    viewsLabel: 'total views',
+  },
+];
 
 const normalizeAnimeName = (value?: string | null) =>
   String(value || '')
@@ -37,10 +128,21 @@ const normalizeAnimeName = (value?: string | null) =>
     .replace(/\s+/g, ' ')
     .trim();
 
-// Convert API trending anime to AnimeCard format for our component
+/** The counter that matches the selected window, falling back as the RPC allows. */
+function viewsForFrame(row: TrendingRow, frame: TimeFrame): number | undefined {
+  if (frame === 'today') return row.views_today ?? row.views_week ?? row.total_views;
+  if (frame === 'week') return row.views_week ?? row.total_views;
+  return row.total_views ?? row.views_week;
+}
+
+/** Converts an API trending row to the card shape, preserving the resolved id. */
 function trendingToCard(trending: ApiTrendingAnime, routeIdOverride?: string): AnimeCard {
-  const malId = toPositiveInt((trending as any)?.malId ?? (trending as any)?.malID ?? (trending as any)?.mal_id);
-  const anilistId = toPositiveInt((trending as any)?.anilistId ?? (trending as any)?.anilistID ?? (trending as any)?.anilist_id);
+  const malId = toPositiveInt(
+    (trending as any)?.malId ?? (trending as any)?.malID ?? (trending as any)?.mal_id,
+  );
+  const anilistId = toPositiveInt(
+    (trending as any)?.anilistId ?? (trending as any)?.anilistID ?? (trending as any)?.anilist_id,
+  );
   return {
     id: routeIdOverride || trending.id,
     name: trending.name,
@@ -53,93 +155,35 @@ function trendingToCard(trending: ApiTrendingAnime, routeIdOverride?: string): A
   };
 }
 
-function TrendingHero({ anime, rank, views }: { anime: AnimeCard; rank: number; views?: number }) {
-  const animeLink = anime.id
-    ? `/anime/${anime.id}`
-    : `/search?q=${encodeURIComponent(anime.name)}`;
+/** One row of the ranked board: the card, its rank, and its pulse if we have one. */
+interface BoardEntry {
+  item: PosterItem;
+  rank: number;
+  views?: number;
+  sparkline?: { date: string; count: number }[];
+}
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="relative w-full aspect-[16/9] md:aspect-[21/9] rounded-2xl md:rounded-3xl overflow-hidden mb-8 md:mb-12 group border border-white/10"
-    >
-      <div className="absolute inset-0">
-        <img
-          src={anime.poster}
-          className="w-full h-full object-cover scale-105 group-hover:scale-100 transition-transform duration-1000"
-          alt={anime.name}
-          loading="eager"
-          decoding="async"
-          fetchPriority="high"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/60 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
-      </div>
-
-      <div className="absolute inset-0 p-4 md:p-8 flex flex-col justify-end max-w-2xl">
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.2 }}
-          className="flex items-center gap-3 mb-4"
-        >
-          <div className="px-4 py-1.5 rounded-full bg-orange-500 text-white text-sm font-bold shadow-lg shadow-orange-500/40">
-            # {rank} Trending
-          </div>
-          {views && (
-            <div className="px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md text-white/80 text-sm font-medium border border-white/10">
-              <span className="text-orange-400 font-bold mr-1">{formatViewCount(views)}</span> viewing now
-            </div>
-          )}
-        </motion.div>
-
-        <motion.h2
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.3 }}
-          className="text-2xl sm:text-4xl md:text-5xl lg:text-7xl font-black font-display mb-3 md:mb-4 tracking-tight leading-tight"
-        >
-          {anime.name}
-        </motion.h2>
-
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
-          className="flex items-center gap-4"
-        >
-          <Link
-            to={animeLink}
-            className="px-4 md:px-8 py-2 md:py-3 bg-white text-black rounded-xl md:rounded-2xl text-sm md:text-base font-bold hover:scale-105 transition-transform"
-          >
-            Watch Now
-          </Link>
-          <Link
-            to={animeLink}
-            className="px-4 md:px-8 py-2 md:py-3 bg-white/10 backdrop-blur-md text-white rounded-xl md:rounded-2xl text-sm md:text-base font-bold hover:bg-white/20 transition-all border border-white/10"
-          >
-            Details
-          </Link>
-        </motion.div>
-      </div>
-
-      {/* Decorative Glow */}
-      <div className="absolute -bottom-10 -right-10 w-64 h-64 bg-primary/20 blur-[100px] rounded-full" />
-    </motion.div>
-  );
+/** A card plus the metric its AniList section is ordered by. */
+interface MetricEntry {
+  item: PosterItem;
+  metric: string;
 }
 
 export default function TrendingPage() {
   const [timeFrame, setTimeFrame] = useState<TimeFrame>('week');
   const [showExtendedDiscover, setShowExtendedDiscover] = useState(false);
-  const useVirtualGrid = useFeatureFlag(FeatureFlag.VIRTUAL_GRID);
+  const isNative = useIsNativeApp();
   useScrollRestoration('trending', { useWindow: true });
 
-  // Use improved trending RPC with timeframe
+  const frame = TIME_FRAMES.find((entry) => entry.id === timeFrame) ?? TIME_FRAMES[1];
+
   const { data: internalTrending, isLoading: loadingInternal } = useTrendingAnime(50, timeFrame);
 
-  // Fallback to API trending
+  // Hide mature (18+) titles from the board unless the user opts in globally.
+  const { settings: contentSafetySettings } = useContentSafetySettings();
+  const showAdult = contentSafetySettings.showAdultEverywhere;
+
+  // Fallback ranking, and the source the internal rows are reconciled against.
   const { data: homepageData, isLoading: loadingHomepage } = useQuery({
     queryKey: ['home'],
     queryFn: fetchHome,
@@ -164,26 +208,31 @@ export default function TrendingPage() {
     gcTime: 30 * 60 * 1000,
   });
 
+  // The two AniList sections are below the fold; holding them back keeps the
+  // board itself off a queue of three concurrent requests.
   useEffect(() => {
     if (loadingInternal || loadingHomepage) {
       setShowExtendedDiscover(false);
       return;
     }
-
-    const timer = window.setTimeout(() => {
-      setShowExtendedDiscover(true);
-    }, 350);
-
+    const timer = window.setTimeout(() => setShowExtendedDiscover(true), 350);
     return () => window.clearTimeout(timer);
   }, [loadingInternal, loadingHomepage, timeFrame]);
 
   const isLoading = loadingInternal || loadingHomepage;
+  // Memoized so the empty-array fallbacks keep a stable identity: everything
+  // below derives from them through useMemo, which would otherwise recompute on
+  // every render while either query is still pending.
+  const internalRows = useMemo(
+    () => filterAdultAnime((internalTrending ?? []) as TrendingRow[], showAdult, (r) => ({ name: r.anime_name })),
+    [internalTrending, showAdult],
+  );
+  const apiTrending = useMemo(
+    () => filterAdultAnime(homepageData?.trendingAnimes ?? [], showAdult),
+    [homepageData, showAdult],
+  );
+  const hasInternalData = internalRows.length > 0;
 
-  // If we have internal trending data, use it; otherwise fall back to API
-  const hasInternalData = internalTrending && internalTrending.length > 0;
-
-  // Get anime cards from API homepage data
-  const apiTrending = homepageData?.trendingAnimes || [];
   const homeIdMappingIndex = useMemo(() => {
     const index = createAnimeIdMappingIndex();
     registerAnimeIdMappings(index, collectAnimeCandidatesFromHome(homepageData));
@@ -198,7 +247,7 @@ export default function TrendingPage() {
       const preferredId = buildPreferredAnimeRouteId(item as any, homeIdMappingIndex);
       const fallbackExternalId = buildExternalAnimeRouteId(
         (item as any)?.malId ?? (item as any)?.malID ?? (item as any)?.mal_id,
-        (item as any)?.anilistId ?? (item as any)?.anilistID ?? (item as any)?.anilist_id
+        (item as any)?.anilistId ?? (item as any)?.anilistID ?? (item as any)?.anilist_id,
       );
 
       if (preferredId) routeKeys.add(preferredId);
@@ -222,104 +271,129 @@ export default function TrendingPage() {
     return map;
   }, [apiTrending]);
 
-  const resolveInternalTrendingCard = useCallback((entry: any): AnimeCard => {
-    const rawEntryId = String(entry?.anime_id || '').trim();
-    const safeRawEntryId = /^(mal|anilist)[:-]/i.test(rawEntryId) ? '' : rawEntryId;
+  /**
+   * An RPC row only reliably has `anime_id` and `anime_name`, and `anime_id` is
+   * whatever the player recorded — sometimes a provider slug, sometimes an
+   * external `mal:`/`anilist:` id. Matching it against the homepage payload by
+   * id and then by normalized name is what gives the card a working link.
+   */
+  const resolveInternalTrendingCard = useCallback(
+    (entry: TrendingRow): AnimeCard => {
+      const rawEntryId = String(entry?.anime_id || '').trim();
+      const safeRawEntryId = /^(mal|anilist)[:-]/i.test(rawEntryId) ? '' : rawEntryId;
 
-    const preferredRouteId = buildPreferredAnimeRouteId(
-      {
-        id: entry?.anime_id,
-        name: entry?.anime_name,
-        malId: entry?.malId,
-        malID: entry?.malID,
-        anilistId: entry?.anilistId,
-        anilistID: entry?.anilistID,
-      },
-      homeIdMappingIndex
-    );
-
-    const directResolved =
-      (preferredRouteId && apiTrendingById.get(preferredRouteId)) ||
-      apiTrendingById.get(String(entry?.anime_id || '').trim()) ||
-      apiTrendingByName.get(normalizeAnimeName(entry?.anime_name));
-
-    if (directResolved) {
-      const resolvedRouteId =
-        buildPreferredAnimeRouteId(directResolved as any, homeIdMappingIndex) ||
-        directResolved.id;
-      return trendingToCard(directResolved, resolvedRouteId);
-    }
-
-    return {
-      id: preferredRouteId || safeRawEntryId || '',
-      name: entry?.anime_name || safeRawEntryId || 'Unknown Anime',
-      poster: entry?.poster || '',
-      type: 'TV',
-      episodes: { sub: 0, dub: 0 },
-      rating: undefined,
-    };
-  }, [homeIdMappingIndex, apiTrendingById, apiTrendingByName]);
-
-  const aniListToCard = (media: AniListMedia): AnimeCard => {
-    const title = media?.title?.english || media?.title?.romaji || media?.title?.native || `AniList #${media.id}`;
-    const malId = toPositiveInt(media?.idMal);
-    const anilistId = toPositiveInt(media?.id);
-    const fallbackExternalId = buildExternalAnimeRouteId(malId, anilistId);
-    const routeId =
-      buildPreferredAnimeRouteId(
+      const preferredRouteId = buildPreferredAnimeRouteId(
         {
-          id: fallbackExternalId || undefined,
-          name: title,
-          malId,
-          anilistId,
+          id: entry?.anime_id,
+          name: entry?.anime_name,
+          malId: (entry as any)?.malId,
+          malID: (entry as any)?.malID,
+          anilistId: (entry as any)?.anilistId,
+          anilistID: (entry as any)?.anilistID,
         },
-        homeIdMappingIndex
-      ) ||
-      fallbackExternalId ||
-      String(media.id);
+        homeIdMappingIndex,
+      );
 
-    return {
-      id: routeId,
-      name: title,
-      poster: media?.coverImage?.large || media?.coverImage?.medium || '',
-      type: media?.format || 'TV',
-      episodes: { sub: Number(media?.episodes || 0), dub: 0 },
-      rating: media?.averageScore ? (media.averageScore / 10).toFixed(1) : undefined,
-      malId: malId || undefined,
-      anilistId: anilistId || undefined,
-    };
-  };
+      const directResolved =
+        (preferredRouteId && apiTrendingById.get(preferredRouteId)) ||
+        apiTrendingById.get(rawEntryId) ||
+        apiTrendingByName.get(normalizeAnimeName(entry?.anime_name));
 
-  const heroInternalAnime = useMemo(() => {
-    if (!hasInternalData) return null;
-    const first = internalTrending[0] as any;
-    return resolveInternalTrendingCard(first);
-  }, [hasInternalData, internalTrending, resolveInternalTrendingCard]);
+      if (directResolved) {
+        const resolvedRouteId =
+          buildPreferredAnimeRouteId(directResolved as any, homeIdMappingIndex) ||
+          directResolved.id;
+        return trendingToCard(directResolved, resolvedRouteId);
+      }
 
-  const heroBaseAnime = useMemo(() => {
-    if (hasInternalData) return heroInternalAnime;
+      return {
+        id: preferredRouteId || safeRawEntryId || '',
+        name: entry?.anime_name || safeRawEntryId || 'Unknown Anime',
+        poster: entry?.poster || '',
+        type: 'TV',
+        episodes: { sub: 0, dub: 0 },
+        rating: undefined,
+      };
+    },
+    [homeIdMappingIndex, apiTrendingById, apiTrendingByName],
+  );
+
+  const aniListToCard = useCallback(
+    (media: AniListMedia): AnimeCard => {
+      const title =
+        media?.title?.english || media?.title?.romaji || media?.title?.native || `AniList #${media.id}`;
+      const malId = toPositiveInt(media?.idMal);
+      const anilistId = toPositiveInt(media?.id);
+      const fallbackExternalId = buildExternalAnimeRouteId(malId, anilistId);
+      const routeId =
+        buildPreferredAnimeRouteId({ id: fallbackExternalId || undefined, name: title, malId, anilistId }, homeIdMappingIndex) ||
+        fallbackExternalId ||
+        String(media.id);
+
+      return {
+        id: routeId,
+        name: title,
+        poster: media?.coverImage?.large || media?.coverImage?.medium || '',
+        type: media?.format || 'TV',
+        episodes: { sub: Number(media?.episodes || 0), dub: 0 },
+        rating: media?.averageScore ? (media.averageScore / 10).toFixed(1) : undefined,
+        malId: malId || undefined,
+        anilistId: anilistId || undefined,
+      };
+    },
+    [homeIdMappingIndex],
+  );
+
+  // ─── The board ──────────────────────────────────────────────────────────────
+
+  const board = useMemo<BoardEntry[]>(() => {
+    if (hasInternalData) {
+      return internalRows.map((row, index) => ({
+        item: animeCardToPosterItem(resolveInternalTrendingCard(row), index),
+        rank: index + 1,
+        views: viewsForFrame(row, timeFrame),
+        sparkline: row.sparkline,
+      }));
+    }
+    return apiTrending.map((row, index) => ({
+      item: animeCardToPosterItem(
+        trendingToCard(row, buildPreferredAnimeRouteId(row as any, homeIdMappingIndex) || row.id),
+        index,
+      ),
+      rank: index + 1,
+    }));
+  }, [hasInternalData, internalRows, apiTrending, resolveInternalTrendingCard, homeIdMappingIndex, timeFrame]);
+
+  const podium = board.slice(0, RAIL_LENGTH);
+  const rest = board.slice(RAIL_LENGTH);
+
+  /** Resolved separately from `board` because the banner query needs the ids. */
+  const leaderCard = useMemo<AnimeCard | null>(() => {
+    if (hasInternalData) return resolveInternalTrendingCard(internalRows[0]);
     if (!apiTrending[0]) return null;
     return trendingToCard(
       apiTrending[0],
-      buildPreferredAnimeRouteId(apiTrending[0] as any, homeIdMappingIndex) || apiTrending[0].id
+      buildPreferredAnimeRouteId(apiTrending[0] as any, homeIdMappingIndex) || apiTrending[0].id,
     );
-  }, [hasInternalData, heroInternalAnime, apiTrending, homeIdMappingIndex]);
+  }, [hasInternalData, internalRows, apiTrending, resolveInternalTrendingCard, homeIdMappingIndex]);
 
   const heroExternalIds = useMemo(() => {
-    if (!heroBaseAnime) return { anilistId: null as number | null, malId: null as number | null };
+    if (!leaderCard) return { anilistId: null as number | null, malId: null as number | null };
 
-    let anilistId = toPositiveInt(heroBaseAnime.anilistId) || null;
-    let malId = toPositiveInt(heroBaseAnime.malId) || null;
+    let anilistId = toPositiveInt(leaderCard.anilistId) || null;
+    let malId = toPositiveInt(leaderCard.malId) || null;
 
-    if ((!anilistId && !malId) && heroBaseAnime.id) {
-      const parsed = parseExternalAnimeId(heroBaseAnime.id);
+    // The ids are often only present inside the route id we just built.
+    if (!anilistId && !malId && leaderCard.id) {
+      const parsed = parseExternalAnimeId(leaderCard.id);
       if (parsed?.provider === 'anilist') anilistId = parsed.id;
       if (parsed?.provider === 'mal') malId = parsed.id;
     }
 
     return { anilistId, malId };
-  }, [heroBaseAnime]);
+  }, [leaderCard]);
 
+  // The board's own rows only have portrait posters; the hero needs wide art.
   const { data: heroAniListMedia } = useQuery({
     queryKey: ['anilist-trending-hero-banner', heroExternalIds.anilistId, heroExternalIds.malId],
     queryFn: () =>
@@ -327,280 +401,207 @@ export default function TrendingPage() {
         anilistId: heroExternalIds.anilistId,
         malId: heroExternalIds.malId,
       }),
-    enabled: Boolean(heroBaseAnime && (heroExternalIds.anilistId || heroExternalIds.malId)),
+    enabled: Boolean(leaderCard && (heroExternalIds.anilistId || heroExternalIds.malId)),
     staleTime: 10 * 60 * 1000,
   });
 
-  const heroDisplayAnime = useMemo(() => {
-    if (!heroBaseAnime) return null;
-    const banner = heroAniListMedia?.bannerImage || '';
-    if (!banner) return heroBaseAnime;
-    return {
-      ...heroBaseAnime,
-      poster: banner,
-    };
-  }, [heroBaseAnime, heroAniListMedia]);
+  const stats = useMemo(() => {
+    const chips: string[] = [];
+    const leaderViews = board[0]?.views;
+    if (leaderViews) chips.push(`${formatViewCount(leaderViews)} ${frame.viewsLabel}`);
+    if (board.length) chips.push(`${board.length} titles ranked`);
+    return chips;
+  }, [board, frame.viewsLabel]);
 
-  const timeFrameButtons: { id: TimeFrame; label: string; icon: React.ReactNode }[] = [
-    { id: 'today', label: 'Today', icon: <Clock className="w-4 h-4" /> },
-    { id: 'week', label: 'This Week', icon: <TrendingUp className="w-4 h-4" /> },
-    { id: 'month', label: 'This Month', icon: <Flame className="w-4 h-4" /> },
-    { id: 'all', label: 'All Time', icon: <Sparkles className="w-4 h-4" /> },
-  ];
+  const globalPulse = useMemo<MetricEntry[]>(
+    () =>
+      filterAdultAnime(aniListTrending, showAdult)
+        .slice(0, 12)
+        .map((media, index) => ({
+          item: animeCardToPosterItem(aniListToCard(media), index),
+          metric: `Trending score ${media.trending ?? media.popularity ?? '—'}`,
+        })),
+    [aniListTrending, aniListToCard, showAdult],
+  );
 
-  const isNative = useIsNativeApp();
+  const fanFavorites = useMemo<MetricEntry[]>(
+    () =>
+      filterAdultAnime(aniListFavorites, showAdult)
+        .slice(0, 12)
+        .map((media, index) => ({
+          item: animeCardToPosterItem(aniListToCard(media), index),
+          metric: `${media.favourites?.toLocaleString() ?? '—'} favorites`,
+        })),
+    [aniListFavorites, aniListToCard, showAdult],
+  );
 
   return (
-    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
+    <div className="min-h-screen overflow-x-hidden bg-background text-foreground">
       <Background />
       <Sidebar />
 
-      {/* Dynamic Background Pattern */}
-      <div className="fixed inset-0 pointer-events-none opacity-10">
-        <div className="absolute inset-0 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:40px_40px] [mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,#000_70%,transparent_100%)] animate-float-slow"></div>
-      </div>
+      <main
+        className={cn(
+          'relative z-10 mx-auto max-w-[1800px] py-4 pb-24 pr-4 md:py-6 md:pb-6 md:pr-6',
+          isNative ? 'pl-4' : 'pl-4 md:pl-32',
+        )}
+      >
+        <BoardHero
+          className="mt-2"
+          eyebrow={frame.eyebrow}
+          heading={frame.heading}
+          description={frame.description}
+          leader={podium[0]?.item}
+          stats={stats}
+          backdrop={heroAniListMedia?.bannerImage || undefined}
+          items={podium.map((entry) => entry.item)}
+          isLoading={isLoading}
+        >
+          <PillGroup
+            options={TIME_FRAMES}
+            value={timeFrame}
+            // Wrapped rather than passed as the setter itself: `SetStateAction`
+            // accepts an updater function, and that extra candidate makes TS
+            // infer the pill group's id type as bare `string`.
+            onChange={(id) => setTimeFrame(id)}
+            label="Timeframe"
+          />
+        </BoardHero>
 
-      <main className={cn(
-        "relative z-10 pr-4 md:pr-6 py-4 md:py-6 max-w-[1800px] mx-auto pb-24 md:pb-6",
-        isNative ? "pl-4" : "pl-4 md:pl-32"
-      )}>
-        {/* Header */}
-        <div className="mb-6 md:mb-8">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-3 rounded-2xl bg-gradient-to-br from-orange-500 via-red-500 to-rose-500 shadow-lg shadow-orange-500/30 animate-pulse-slow">
-              <Flame className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold">Trending Anime</h1>
-              <p className="text-muted-foreground text-sm">
-                See what everyone's watching right now
+        <section className="mt-12">
+          <SectionHeading
+            eyebrow="The full board"
+            title={hasInternalData ? 'Ranked by watch time' : 'Ranked by popularity'}
+            meta={
+              rest.length > 0
+                ? `Ranks ${rest[0].rank}–${rest[rest.length - 1].rank}`
+                : undefined
+            }
+          />
+
+          {isLoading ? (
+            <PosterGridSkeleton className="mt-6" count={14} />
+          ) : board.length === 0 ? (
+            <div className="mt-6 flex flex-col items-center gap-2 rounded-3xl border border-white/[0.07] bg-white/[0.02] py-20 text-center">
+              <Flame className="h-7 w-7 text-white/25" />
+              <p className="text-base font-bold text-white/70">Nothing is trending yet</p>
+              <p className="max-w-sm text-sm text-white/40">
+                This window has no recorded views. Try a longer timeframe.
               </p>
             </div>
-          </div>
-
-          {/* Time Frame Selector */}
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap">
-            {timeFrameButtons.map(btn => (
-              <button
-                key={btn.id}
-                onClick={() => setTimeFrame(btn.id)}
-                className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl text-xs md:text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 ${timeFrame === btn.id
-                  ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25'
-                  : 'bg-card/60 hover:bg-card text-muted-foreground hover:text-foreground border border-border/30'
-                  }`}
-              >
-                {btn.icon}
-                {btn.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Stats Bar */}
-        {hasInternalData && (
-          <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-orange-500/20 via-red-500/20 to-pink-500/20 border border-orange-500/30 backdrop-blur-md shadow-inner">
-            <div className="flex flex-wrap gap-6 text-sm">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-orange-400" />
-                <span className="text-muted-foreground font-medium">Tracking</span>
-                <span className="font-bold text-foreground">{internalTrending.length}</span>
-                <span className="text-muted-foreground">anime</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Flame className="w-4 h-4 text-rose-500" />
-                <span className="text-muted-foreground font-medium">Top anime has</span>
-                <span className="font-black text-rose-500 text-base">
-                  {formatViewCount(internalTrending[0]?.views_week || 0)}
-                </span>
-                <span className="text-muted-foreground">weekly views</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Content */}
-        <AnimatePresence mode="wait">
-          {isLoading ? (
-            <motion.div
-              key="loader"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="space-y-8 animate-pulse"
-            >
-              {/* Hero Banner Skeleton */}
-              <div className="relative w-full aspect-[16/9] md:aspect-[21/9] rounded-2xl md:rounded-3xl bg-muted/40 overflow-hidden border border-white/5 flex items-end p-6 md:p-10">
-                <div className="space-y-4 max-w-xl">
-                  <div className="w-32 h-7 bg-orange-500/30 rounded-full" />
-                  <div className="w-4/5 h-10 md:h-16 bg-white/15 rounded-2xl" />
-                  <div className="flex gap-4 pt-2">
-                    <div className="w-32 h-12 bg-white/20 rounded-xl" />
-                    <div className="w-28 h-12 bg-white/10 rounded-xl" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Grid Skeleton */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
-                {Array.from({ length: 18 }).map((_, i) => (
-                  <Skeleton key={`trending-skel-${i}`} className="aspect-[3/4] rounded-2xl" />
-                ))}
-              </div>
-            </motion.div>
+          ) : rest.length === 0 ? (
+            <p className="mt-6 text-sm text-white/40">
+              The whole board fits on the podium above.
+            </p>
           ) : (
-
-            <motion.div
-              key="content"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ staggerChildren: 0.05 }}
-              className="space-y-12"
-            >
-              {/* Hero for #1 */}
-              {heroDisplayAnime ? (
-                <TrendingHero
-                  anime={heroDisplayAnime}
-                  rank={1}
-                  views={hasInternalData ? internalTrending[0]?.views_week : undefined}
-                />
-              ) : null}
-
-              {useVirtualGrid ? (
-                <VirtualAnimeGrid
-                  compact
-                  animes={
-                    hasInternalData
-                      ? internalTrending.slice(1).map((t: any) => resolveInternalTrendingCard(t))
-                      : apiTrending.slice(1).map((t: any) =>
-                        trendingToCard(
-                          t,
-                          buildPreferredAnimeRouteId(t as any, homeIdMappingIndex) || t.id
-                        )
-                      )
+            <div className={cn(POSTER_GRID_CLASS, 'mt-6')}>
+              {rest.map((entry) => (
+                <PosterCard
+                  key={entry.item.key}
+                  item={entry.item}
+                  rank={entry.rank}
+                  preview
+                  footer={
+                    entry.views !== undefined ? (
+                      <PulseFooter views={entry.views} series={entry.sparkline} />
+                    ) : undefined
                   }
                 />
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-4 gap-y-10 md:gap-x-6 md:gap-y-12">
-                  {(hasInternalData ? internalTrending.slice(1) : apiTrending.slice(1)).map((t: any, index: number) => {
-                    const anime = hasInternalData
-                      ? resolveInternalTrendingCard(t)
-                      : trendingToCard(
-                        t,
-                        buildPreferredAnimeRouteId(t as any, homeIdMappingIndex) || t.id
-                      );
-                    const rank = index + 2;
-
-                    return (
-                      <motion.div
-                        key={`${anime.id || 'anime'}-${index}`}
-                        layout
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="relative group"
-                      >
-                        {/* Premium Rank Badge */}
-                        <div className="absolute -top-4 -left-4 z-20 flex flex-col items-center">
-                          <div className="relative">
-                            <div className="absolute inset-0 bg-primary blur-md opacity-40 group-hover:opacity-100 transition-opacity" />
-                            <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-500 via-rose-500 to-pink-600 flex items-center justify-center text-white text-xl font-black shadow-xl ring-4 ring-background transform group-hover:-rotate-12 transition-transform duration-500">
-                              {rank}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="group-hover:translate-y-[-8px] transition-transform duration-500">
-                          <AnimeCardWithPreview anime={anime} />
-
-                          {hasInternalData && (
-                            <div className="mt-4 px-2 space-y-2 hidden md:block">
-                              <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Pulse</span>
-                                <span className="text-[10px] font-bold text-orange-400">{formatViewCount(t.views_week || 0)}</span>
-                              </div>
-                              <div className="h-[30px] w-full opacity-60 group-hover:opacity-100 transition-opacity">
-                                <Sparkline series={t.sparkline as any} />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              )}
-
-              <div className="space-y-12">
-                <section>
-                  <div className="flex items-center gap-2 mb-5">
-                    <TrendingUp className="w-5 h-5 text-sky-400" />
-                    <h2 className="text-xl md:text-2xl font-bold">Global Trending Pulse</h2>
-                  </div>
-                  {!showExtendedDiscover || loadingAniListTrending ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                      {Array.from({ length: 6 }).map((_, idx) => (
-                        <Skeleton key={`anilist-trending-skeleton-${idx}`} className="aspect-[3/4] rounded-xl" />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6">
-                      {aniListTrending.slice(0, 12).map((media) => {
-                        const anime = aniListToCard(media);
-                        return (
-                          <div key={`anilist-trending-${media.id}`} className="space-y-2">
-                            <AnimeCardWithPreview anime={anime} />
-                            <div className="px-1 text-[10px] uppercase font-bold tracking-widest text-muted-foreground">
-                              Trending Score: {media.trending ?? media.popularity ?? 'N/A'}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </section>
-
-                <section>
-                  <div className="flex items-center gap-2 mb-5">
-                    <Heart className="w-5 h-5 text-pink-400" />
-                    <h2 className="text-xl md:text-2xl font-bold">Fan Favorites</h2>
-                  </div>
-                  {!showExtendedDiscover || loadingAniListFavorites ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                      {Array.from({ length: 6 }).map((_, idx) => (
-                        <Skeleton key={`anilist-fav-skeleton-${idx}`} className="aspect-[3/4] rounded-xl" />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6">
-                      {aniListFavorites.slice(0, 12).map((media) => {
-                        const anime = aniListToCard(media);
-                        return (
-                          <div key={`anilist-fav-${media.id}`} className="space-y-2">
-                            <AnimeCardWithPreview anime={anime} />
-                            <div className="px-1 text-[10px] uppercase font-bold tracking-widest text-muted-foreground">
-                              Favorites: {media.favourites ?? 'N/A'}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </section>
-              </div>
-
-              {/* ── Manga & Manhwa Trending ───────────────────────────────── */}
-              <MangaTrendingSection
-                title="Trending Manga & Manhwa"
-                defaultTab="manga"
-                showTabs
-                limit={18}
-              />
-            </motion.div>
+              ))}
+            </div>
           )}
-        </AnimatePresence>
-      </main >
+        </section>
+
+        <section className="mt-14">
+          <SectionHeading
+            eyebrow="Beyond Tatakai"
+            title="Global trending pulse"
+            meta="From AniList"
+          />
+          {!showExtendedDiscover || loadingAniListTrending ? (
+            <PosterGridSkeleton className="mt-6" count={12} />
+          ) : (
+            <div className={cn(POSTER_GRID_CLASS, 'mt-6')}>
+              {globalPulse.map((entry) => (
+                <PosterCard
+                  key={entry.item.key}
+                  item={entry.item}
+                  preview
+                  footer={<MetricFooter label={entry.metric} />}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="mt-14">
+          <SectionHeading
+            eyebrow="Most loved"
+            title="Fan favorites"
+            action={
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-white/40">
+                <Heart className="h-3.5 w-3.5 text-destructive/80" />
+                All-time AniList favorites
+              </span>
+            }
+          />
+          {!showExtendedDiscover || loadingAniListFavorites ? (
+            <PosterGridSkeleton className="mt-6" count={12} />
+          ) : (
+            <div className={cn(POSTER_GRID_CLASS, 'mt-6')}>
+              {fanFavorites.map((entry) => (
+                <PosterCard
+                  key={entry.item.key}
+                  item={entry.item}
+                  preview
+                  footer={<MetricFooter label={entry.metric} />}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+
+        <div className="mt-14">
+          <MangaTrendingSection
+            title="Trending manga & manhwa"
+            defaultTab="manga"
+            showTabs
+            limit={18}
+          />
+        </div>
+      </main>
 
       <MobileNav />
-    </div >
+    </div>
   );
 }
 
+/** The board's pulse row: the window's count plus its daily series. */
+function PulseFooter({
+  views,
+  series,
+}: {
+  views: number;
+  series?: { date: string; count: number }[];
+}) {
+  return (
+    <div className="mt-3 hidden md:block">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-white/35">Pulse</span>
+        <span className="text-[10px] font-bold tabular-nums text-primary">
+          {formatViewCount(views)}
+        </span>
+      </div>
+      <div className="mt-1 text-primary/70 opacity-60 transition-opacity group-hover:opacity-100">
+        <Sparkline series={series} width={140} height={26} />
+      </div>
+    </div>
+  );
+}
+
+/** The ordering metric under an AniList card, so the sort order is legible. */
+function MetricFooter({ label }: { label: string }) {
+  return (
+    <p className="mt-1.5 text-[11px] font-bold uppercase tracking-widest text-white/35">{label}</p>
+  );
+}

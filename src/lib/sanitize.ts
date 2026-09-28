@@ -5,6 +5,11 @@
 
 import { sanitizeHTML, escapeHTML, validateInput } from './security';
 
+// Render-time sanitization. Everything above sanitizes on the way *in*; this is the
+// pass that has to run on the way *out*, over rows written by older builds. Re-exported
+// here so callers only ever import from one module.
+export { sanitizeRichTextHTML, installRichTextSanitizerHooks } from './security';
+
 /**
  * Sanitize user-generated content (comments, titles, descriptions)
  */

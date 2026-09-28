@@ -61,11 +61,12 @@ const GH_REPO  = 'Tatakai'
  * @param {import('electron-updater').AppUpdater} opts.autoUpdater   - electron-updater AppUpdater instance.
  * @param {import('./_types.cjs').LogService}     opts.logger        - Structured logger.
  * @param {Electron.App}                          opts.app           - Electron app object.
+ * @param {string}                               [opts.appCID]       - Per-device client id, sent as the X-Client-Id header on update requests.
  * @param {string}                               [opts.supabaseUrl]  - Supabase project URL.
  * @param {string}                               [opts.supabaseKey]  - Supabase anon (read-only) key (Req 9.5).
  * @returns {UpdateManager}
  */
-function createUpdateManager({ ipcMain, autoUpdater, logger, app, supabaseUrl, supabaseKey }) {
+function createUpdateManager({ ipcMain, autoUpdater, logger, app, appCID, supabaseUrl, supabaseKey }) {
   // ── Internal log helpers ──────────────────────────────────────────────────
 
   function _debug(msg, ctx) {
@@ -666,10 +667,19 @@ function createUpdateManager({ ipcMain, autoUpdater, logger, app, supabaseUrl, s
     // ── update:check ────────────────────────────────────────────────────
     ipcMain.handle('update:check', async (_event, channel) => {
       try {
+        if (!app.isPackaged) {
+          // Dev: bypass the Supabase-policy flow and hit the feed directly so
+          // the button is testable. autoUpdater events (wired below) drive the
+          // renderer state; a missing dev-app-update.yml surfaces as `error`.
+          _broadcast({ type: 'checking' })
+          await autoUpdater.checkForUpdates()
+          return { success: true }
+        }
         await checkOnStartup(channel)
         return { success: true }
       } catch (err) {
         _error('[UpdateManager] IPC update:check error', { err: String(err) })
+        _broadcast({ type: 'error', message: err && err.message ? err.message : String(err) })
         return { error: err && err.message ? err.message : String(err) }
       }
     })
@@ -757,7 +767,63 @@ function createUpdateManager({ ipcMain, autoUpdater, logger, app, supabaseUrl, s
     _debug('[UpdateManager] IPC handlers registered')
   }
 
-  // Register IPC handlers immediately at factory init time
+  // ── Feed + header configuration (single source of truth) ────────────────
+
+  /**
+   * Configures the shared `autoUpdater` singleton: logger, manual-download
+   * mode, the GitHub release feed, and the per-device `X-Client-Id` header
+   * consumed by the Supabase update-policy edge function.
+   *
+   * This is the ONLY place the feed URL and client-id header are set — it
+   * replaces the legacy duplicate that used to live in `ipc-system.cjs`.
+   * The network feed is only wired when the app is packaged (Req 5.17
+   * dev-mode bypass); logger + autoDownload are always applied.
+   */
+  function _configureAutoUpdater() {
+    try {
+      autoUpdater.logger = logger
+      autoUpdater.autoDownload = false
+      // Silent-update UX: the renderer's update-orchestrator pulls the download
+      // in the background the moment an update is `available`, and we let
+      // electron-updater apply it on the next natural quit so nothing ever
+      // interrupts the user. The Dynamic Island offers an optional "Restart"
+      // shortcut for those who'd rather not wait. Mandatory policies still
+      // force quitAndInstall in checkOnStartup regardless of this flag.
+      autoUpdater.autoInstallOnAppQuit = true
+
+      if (!app.isPackaged) {
+        // Dev mode: electron-updater normally refuses to run unpackaged. Point
+        // it at dev-app-update.yml (repo root) so a manual `update:check` can be
+        // exercised end-to-end against the real GitHub feed without producing an
+        // installer. Startup checks stay suppressed (see checkOnStartup).
+        try {
+          autoUpdater.forceDevUpdateConfig = true
+          autoUpdater.setFeedURL({ provider: 'github', owner: GH_OWNER, repo: GH_REPO })
+          autoUpdater.requestHeaders = { 'X-Client-Id': appCID || 'unknown' }
+          _debug('[UpdateManager] Dev mode — forceDevUpdateConfig enabled (dev-app-update.yml)')
+        } catch (devErr) {
+          _debug('[UpdateManager] Dev update config unavailable', { err: String(devErr) })
+        }
+        return
+      }
+
+      autoUpdater.setFeedURL({ provider: 'github', owner: GH_OWNER, repo: GH_REPO })
+      autoUpdater.requestHeaders = { 'X-Client-Id': appCID || 'unknown' }
+
+      // macOS auto-update requires a signed + notarized build. Until signing
+      // certs exist the feed is still wired, but a check surfaces a friendly
+      // `error` broadcast (handled below) rather than crashing; mac users
+      // update by re-downloading. See docs/guides/desktop-signing.md.
+      if (process.platform === 'darwin') {
+        _warn('[UpdateManager] macOS auto-update is limited until the build is code-signed')
+      }
+    } catch (err) {
+      _error('[UpdateManager] Failed to configure autoUpdater feed', { err: String(err) })
+    }
+  }
+
+  // Configure the feed + register IPC handlers immediately at factory init time
+  _configureAutoUpdater()
   registerIpcHandlers()
 
   // ── Public API ────────────────────────────────────────────────────────────

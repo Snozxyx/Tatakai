@@ -37,3 +37,19 @@ src-tauri/target
 temp/
 dist*
 dist.zip
+
+# ── Desktop packaging: keep large / generated binaries out of git ────────────
+# cloudflared is fetched per-platform at build time — locally by
+# scripts/fetch-cloudflared.cjs, on GitHub by the "Download cloudflared" CI step
+# — so the ~55 MB binary never enters the repo.
+resources/bin/cloudflared
+resources/bin/cloudflared.exe
+!resources/bin/.gitkeep
+
+# NSIS installer graphics are generated from brand tokens by
+# scripts/generate-installer-assets.cjs (locally + in CI). Keep the generated
+# BMPs/PNGs out of git; the hand-authored build/installer.nsh stays tracked.
+build/installerSidebar.bmp
+build/uninstallerSidebar.bmp
+build/installerHeader.bmp
+build/preview-*.png

@@ -1,13 +1,17 @@
+import { useEffect } from "react";
 import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import {
   searchManga,
   getMangaDetail,
   getMangaChapters,
   getMangaReadByKey,
+  mangaChaptersCacheKey,
   type MangaSearchOptions,
 } from "@/core/content/manga-client";
 import { fetchMangaBakaSeries, type MangaBakaSeries } from "@/lib/mapping/mangabaka";
 import { fetchKitsuChapterHierarchy, type KitsuChapterHierarchy } from "@/lib/mapping/kitsu";
+import { readCachedItemsSync, hydrateCachedItems } from "@/lib/cache/extensionResultCache";
+import type { MangaChapterResponse, MappedMangaChapter } from "@/types/manga";
 
 // Detect mobile for longer cache times
 const isMobileNative = typeof window !== 'undefined' && 
@@ -116,6 +120,17 @@ export function useMangaDetail(id: string | undefined) {
 }
 
 export function useMangaChapters(id: string | undefined, providers?: string, language?: string) {
+  const cacheKey = id ? mangaChaptersCacheKey(id, providers, language) : "";
+
+  // Warm the in-memory cache tier from Dexie on mount so revisits after an app
+  // restart can seed instantly too. Correctness is already handled inside
+  // getMangaChapters (which hydrates + unions); this just primes the Map so a
+  // later render's synchronous placeholderData has something to show.
+  useEffect(() => {
+    if (!cacheKey) return;
+    void hydrateCachedItems<MappedMangaChapter>(cacheKey);
+  }, [cacheKey]);
+
   return useQuery({
     queryKey: ["manga-chapters", id, providers, language],
     queryFn: () => getMangaChapters(id!, providers, language),
@@ -124,6 +139,28 @@ export function useMangaChapters(id: string | undefined, providers?: string, lan
     refetchOnMount: FORCE_FRESH_MANGA_READS ? "always" : true,
     refetchOnWindowFocus: FORCE_FRESH_MANGA_READS,
     refetchOnReconnect: FORCE_FRESH_MANGA_READS,
+    // Instant display on revisit: seed from the persistent cache while the
+    // background refetch unions in any updates. FORCE_FRESH still refetches —
+    // this only removes the blank/loader frame; nothing is dropped.
+    placeholderData: () => {
+      if (!cacheKey) return undefined;
+      const cached = readCachedItemsSync<MappedMangaChapter>(cacheKey);
+      if (!cached || !cached.length) return undefined;
+      const anilistId = Number(String(id).replace(/^anilist:/i, ""));
+      const providersAvailable = Array.from(
+        new Set(
+          cached.flatMap((c) => (c.sources || []).map((s) => s.provider).filter(Boolean)),
+        ),
+      );
+      return {
+        anilistId: Number.isFinite(anilistId) ? anilistId : 0,
+        partial: true,
+        failedProviders: [],
+        chapters: [],
+        mappedChapters: cached,
+        ...(providersAvailable.length ? ({ providersAvailable } as any) : {}),
+      } as MangaChapterResponse;
+    },
   });
 }
 
