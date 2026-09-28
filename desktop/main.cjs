@@ -26,7 +26,12 @@ const { createPlatformAdapter } = require('./services/platform-adapter.cjs');
 const { createUpdateManager } = require('./services/update-manager.cjs');
 const { adBlocker } = require('./security/ad-blocker.cjs');
 
-const isDev = !app.isPackaged;
+// isDev normally means "running unpackaged". An explicit NODE_ENV=production
+// overrides that so you can launch the *built* app from source (`npm run start`
+// → `electron .`): it then loads the bundled dist via the app:// scheme instead
+// of expecting the Vite dev server on :8090. The dev flow (electron:dev) leaves
+// NODE_ENV unset, so it still points at localhost:8090 as before.
+const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production';
 const DESKTOP_DIR = __dirname;
 
 // ── Silence benign transitive-dep deprecation noise ───────────────────────────

@@ -117,7 +117,7 @@ export function Sidebar() {
         {/* Subtle glow effect behind the logo on hover */}
         <div className="absolute inset-0 bg-primary/30 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
         <img
-          src="https://raw.githubusercontent.com/Snozxyx/Tatakai/refs/heads/main/public/tatakai-logo-square.png"
+          src={`${import.meta.env.BASE_URL}assets/logo/tatakai-logo-square.png`}
           alt="Tatakai Logo"
           className={cn(
             "relative z-10 object-contain transition-all duration-300 group-hover:scale-110",

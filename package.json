@@ -1,7 +1,7 @@
 {
   "name": "tatakai",
   "private": true,
-  "version": "6.0.0",
+  "version": "6.0.1",
   "description": "Tatakai — an extension-based otaku community for tracking anime & manga",
   "author": {
     "name": "Tatakai",
@@ -25,7 +25,7 @@
     "test": "bun test tests",
     "test:watch": "bun test --watch tests",
     "preview": "vite preview --host 0.0.0.0",
-    "start": "node .",
+    "start": "cross-env NODE_ENV=production electron .",
     "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:8090 && cross-env ELECTRON_DEVTOOLS=1 electron desktop/main.cjs\"",
     "assets:installer": "node scripts/generate-installer-assets.cjs",
     "assets:cloudflared": "node scripts/fetch-cloudflared.cjs",
@@ -127,6 +127,7 @@
     "i18next-browser-languagedetector": "^8.2.1",
     "icon-gen": "^5.0.0",
     "input-otp": "^1.4.2",
+    "jszip": "^3.10.2",
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",
     "playwright": "^1.62.1",
@@ -143,6 +144,7 @@
     "react-router-dom": "^6.30.1",
     "react-textarea-autosize": "^8.5.9",
     "recharts": "^2.15.4",
+    "semver": "^7.8.5",
     "sharp": "^0.34.5",
     "sonner": "^1.7.4",
     "supabase": "^2.72.3",

@@ -4,6 +4,18 @@ All notable changes to Tatakai are documented here.
 
 ---
 
+## [6.0.1] - 2026-09-28
+
+**Patch release.** Restores site-wide authentication and refreshes app branding.
+
+### Fixed
+- **Site-Wide Authentication (401)** — Realigned the Supabase `anon` / `service_role` keys with the backend `JWT_SECRET` so REST, RPC, and realtime requests authenticate again. The community feed, profiles, tier lists, playlists, and watch rooms now load for both guests and signed-in users instead of failing with `401 Unauthorized`.
+
+### Changed
+- **Favicon** — App favicon now uses the rounded Tatakai logo mark.
+
+---
+
 ## [6.0.0] - 2026-09-27
 
 **Tatakai V6 — Major Platform Overhaul & Architecture Redesign.** This is the

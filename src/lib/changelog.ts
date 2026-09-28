@@ -14,6 +14,14 @@ export interface ChangelogRelease {
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '6.0.1',
+    date: '2026-09-28',
+    changes: [
+      'Sign-In & Data Loading Fix: Resolved a site-wide authentication error that returned "401 Unauthorized" on every request — the community feed, profiles, tier lists, playlists, watch rooms, and realtime updates now load correctly for both guests and signed-in users',
+      'Branding: The app favicon now uses the rounded Tatakai logo mark',
+    ],
+  },
+  {
     version: '6.0.0',
     date: '2026-09-27',
     changes: [

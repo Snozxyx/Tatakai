@@ -28,7 +28,7 @@ export function withClientHeaders(headers: Record<string, string> = {}) {
   return {
     ...headers,
     "X-Tatakai-Client": "web",
-    "X-Tatakai-Version": "6.0.0",
+    "X-Tatakai-Version": "6.0.1",
   };
 }
 
