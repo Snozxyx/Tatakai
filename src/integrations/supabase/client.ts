@@ -7,14 +7,48 @@ const VITE_SUPABASE_URL = String(import.meta.env.VITE_SUPABASE_URL || '').trim()
 const SUPABASE_PUBLISHABLE_KEY = String(import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
 const SUPABASE_URL = VITE_SUPABASE_URL || DEFAULT_LOCAL_SUPABASE_URL;
 
+// A build compiled without VITE_SUPABASE_ANON_KEY (e.g. a CI/release build that
+// never received the client env) used to `throw` here. Because this module is
+// imported during app bootstrap, that throw aborted the whole SPA and left an
+// empty #root over the dark window background — a silent black screen, with no
+// clue why (prod builds disable devTools + console forwarding). Instead of a
+// throw, fail LOUD and LEGIBLE: log, then paint a fixed-position error screen so
+// a mis-packaged binary explains itself rather than showing a black void.
 if (!SUPABASE_PUBLISHABLE_KEY) {
-  throw new Error('Missing VITE_SUPABASE_ANON_KEY for Supabase client initialization.');
+  const message =
+    'Missing VITE_SUPABASE_ANON_KEY: this build was compiled without Supabase credentials.';
+  // eslint-disable-next-line no-console
+  console.error(`[supabase] ${message} Backend requests will fail.`);
+  if (typeof document !== 'undefined') {
+    const paint = () => {
+      if (document.getElementById('tatakai-config-error')) return;
+      const el = document.createElement('div');
+      el.id = 'tatakai-config-error';
+      el.setAttribute('role', 'alert');
+      el.style.cssText =
+        'position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;' +
+        'justify-content:center;padding:24px;background:#09090b;color:#fafafa;text-align:center;' +
+        'font:15px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif';
+      el.innerHTML =
+        '<div style="max-width:520px"><div style="font-size:18px;font-weight:600;margin-bottom:12px">' +
+        'Configuration error</div><div style="opacity:.85">This build of Tatakai is missing its ' +
+        'backend credentials (<code>VITE_SUPABASE_ANON_KEY</code>) and can\'t start. This is a ' +
+        'packaging problem, not something you did — please reinstall the latest release or report it.' +
+        '</div></div>';
+      document.body.appendChild(el);
+    };
+    if (document.body) paint();
+    else document.addEventListener('DOMContentLoaded', paint);
+  }
 }
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+// createClient throws on an empty key, so fall back to a placeholder when the key
+// is missing: the visible error above already explains the misconfiguration, and
+// this keeps every `import { supabase }` resolvable instead of re-crashing boot.
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY || 'anon-key-missing', {
   auth: {
     storage: localStorage,
     persistSession: true,

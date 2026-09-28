@@ -12,6 +12,7 @@ import {
   useAllReleases,
   platformForAsset,
   platformKeyForName,
+  pickPrimaryAsset,
   formatCompact,
   formatBytes,
   firstLine,
@@ -40,10 +41,7 @@ const DEFAULT_DOWNLOADS: DownloadItem[] = [
     description: "Windows 10 / 11 Installer (.exe & Portable)",
     requirements: "Windows 10 or later (64-bit)",
     link: "https://github.com/snozxyx/tatakai/releases",
-    versions: [
-      { version: "5.2.0", date: "2025-01-20", size: "85 MB", notes: "Latest release with high performance streaming and native electron integration." },
-      { version: "5.1.0", date: "2025-01-05", size: "82 MB", notes: "Improved torrent engine and background downloading." },
-    ]
+    versions: []
   },
   {
     name: "macOS",
@@ -52,9 +50,7 @@ const DEFAULT_DOWNLOADS: DownloadItem[] = [
     description: "Apple Silicon & Intel Macs (.dmg)",
     requirements: "macOS 11.0 Big Sur or later",
     link: "https://github.com/snozxyx/tatakai/releases",
-    versions: [
-      { version: "5.2.0", date: "2025-01-20", size: "88 MB", notes: "Universal binary supporting M1/M2/M3 and Intel CPUs." },
-    ]
+    versions: []
   },
   {
     name: "Linux",
@@ -63,9 +59,7 @@ const DEFAULT_DOWNLOADS: DownloadItem[] = [
     description: "AppImage & Debian Package (.deb)",
     requirements: "Ubuntu 20.04+, Fedora 34+, Arch",
     link: "https://github.com/snozxyx/tatakai/releases",
-    versions: [
-      { version: "5.2.0", date: "2025-01-20", size: "79 MB", notes: "Includes hardware acceleration and MPV player backend support." },
-    ]
+    versions: []
   },
   {
     name: "Android",
@@ -124,7 +118,7 @@ export function DownloadSection() {
         if (!key || item.inProgress) return item; // iOS / in-progress mobile builds — no GitHub download
         const versions = releases
           .map((rel) => {
-            const asset = rel.assets.find((a) => platformForAsset(a.name) === key);
+            const asset = pickPrimaryAsset(rel.assets, key);
             if (!asset) return null;
             return {
               version: rel.tag_name.replace(/^v/i, ""),
@@ -135,7 +129,7 @@ export function DownloadSection() {
             };
           })
           .filter(Boolean) as DownloadItem["versions"];
-        const latestAsset = latest.assets.find((a) => platformForAsset(a.name) === key);
+        const latestAsset = pickPrimaryAsset(latest.assets, key);
         return {
           ...item,
           link: latestAsset?.browser_download_url || item.link,
@@ -433,7 +427,7 @@ export function DownloadSection() {
               </div>
               <div>
                 <p className="text-[11px] text-white/50 font-mono mb-1">Latest Version</p>
-                <p className="text-xs font-semibold text-white">v{selectedDownload?.versions[0]?.version || "5.2.0"}</p>
+                <p className="text-xs font-semibold text-white">{selectedDownload?.versions[0]?.version ? `v${selectedDownload.versions[0].version}` : "—"}</p>
               </div>
             </div>
 

@@ -88,6 +88,25 @@ jobs:
         env:
           PATH: /bin:/usr/bin:/usr/local/bin:$PATH
 
+      # Vite inlines import.meta.env.VITE_* at BUILD time. With no .env present on
+      # CI (it's gitignored), every VITE_* becomes '' in the bundle — and
+      # src/integrations/supabase/client.ts then hits a missing anon key, which
+      # black-screened the packaged renderer. The full client env lives in ONE repo
+      # secret, DESKTOP_DOTENV, holding the .env file contents; Vite auto-loads
+      # .env, so this reproduces a local `electron:build` 1:1. Passed via env: (not
+      # inlined into the shell) so a value with special chars can't break the step.
+      - name: Write build-time .env (client VITE_* vars)
+        shell: bash
+        env:
+          DESKTOP_DOTENV: ${{ secrets.DESKTOP_DOTENV }}
+        run: |
+          if [ -n "$DESKTOP_DOTENV" ]; then
+            printf '%s\n' "$DESKTOP_DOTENV" > .env
+            echo "Wrote .env for the Vite build ($(grep -c . .env) non-empty lines)."
+          else
+            echo "::warning::DESKTOP_DOTENV secret is empty — VITE_* will be blank in this build; the packaged app will show a configuration-error screen instead of connecting to the backend."
+          fi
+
       # ELECTRON_BUILD=true makes vite emit base:'./' so assets resolve under
       # file:// in the packaged app (without it, base is '/' and the packaged
       # renderer loads a blank page).

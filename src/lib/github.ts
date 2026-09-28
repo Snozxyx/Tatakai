@@ -85,6 +85,35 @@ export function platformForAsset(fileName: string): PlatformKey | null {
   return null;
 }
 
+/**
+ * Pick the primary download asset for a platform from a release's assets.
+ *
+ * Windows ships two artifacts that both match `platformForAsset` → "windows":
+ * the NSIS installer (`Tatakai-<v>-win-x64.exe`) and the portable build
+ * (`Tatakai-<v>-win-x64-portable.exe`). A plain `.find()` returns whichever
+ * GitHub happens to list first, which surfaced the portable as the main link.
+ * Prefer the installer (a `.exe`/`.msi` without "portable") so the primary
+ * "Download" always hands users the installer; fall back to any match.
+ */
+export function pickPrimaryAsset(
+  assets: GitHubReleaseAsset[],
+  key: PlatformKey,
+): GitHubReleaseAsset | undefined {
+  const matches = assets.filter((a) => platformForAsset(a.name) === key);
+  if (matches.length === 0) return undefined;
+  if (key === "windows") {
+    return (
+      matches.find((a) => /\.(exe|msi)$/i.test(a.name) && !/portable/i.test(a.name)) ||
+      matches.find((a) => /setup|install/i.test(a.name)) ||
+      matches.find((a) => !/portable/i.test(a.name)) ||
+      matches[0]
+    );
+  }
+  if (key === "macos") return matches.find((a) => /\.dmg$/i.test(a.name)) || matches[0];
+  if (key === "linux") return matches.find((a) => /\.appimage$/i.test(a.name)) || matches[0];
+  return matches[0];
+}
+
 export function platformKeyForName(name: string): PlatformKey | null {
   switch (name.toLowerCase()) {
     case "windows":
