@@ -31,7 +31,9 @@ interface ServiceStatus {
 interface ProxyStatusNode {
   id: string; url: string; failures: number; successes: number;
   lastLatencyMs: number; cooldownUntil: number;
-  status: 'online' | 'degraded' | 'offline';
+  // The backend's /api/proxy/status returns raw health counters and OMITS an
+  // explicit status, so treat it as optional and derive one from the counters.
+  status?: 'online' | 'degraded' | 'offline';
 }
 interface ProxyDisplayNode {
   id: string; url: string; type: string;
@@ -50,18 +52,55 @@ const BACKEND_ORIGIN = resolveBackendOrigin();
 const PROXY_STATUS_ENDPOINT = BACKEND_ORIGIN ? `${BACKEND_ORIGIN}/api/proxy/status` : '/api/proxy/status';
 const BACKEND_HEALTH_ENDPOINT = BACKEND_ORIGIN ? `${BACKEND_ORIGIN}/health` : DEFAULT_BACKEND_HEALTH_URL;
 
-type KnownProxyNode = { id: string; url: string; type: string };
-const KNOWN_PROXY_NODES: KnownProxyNode[] = [
-  { id: 'proxy-node-hoko', url: 'https://hoko.tatakai.me/api/v1/streamingProxy', type: 'nodejs' },
-];
+// Proxies the app is actually configured to stream through (from .env). The
+// board probes these directly whenever the backend aggregator is unreachable OR
+// only reports loopback/dev nodes, so the pool reflects the real public edge.
+const ENV_CF_PROXY_URL = String(import.meta.env.VITE_PROXY_CF_URL || '').trim();
+const ENV_NODE_PROXY_URL = String(
+  import.meta.env.VITE_STREAM_PROXY_URL || import.meta.env.VITE_PROXY_NODE_URL ||
+  'https://hoko.tatakai.me/api/v1/streamingProxy'
+).trim();
+// Host of the configured Cloudflare worker so classifyProxyType can tag it 'cf'
+// even behind a custom domain (e.g. moko.tatakai.me) with no cloudflare marker.
+const CF_PROXY_HOST = (() => {
+  try { return ENV_CF_PROXY_URL ? new URL(ENV_CF_PROXY_URL).hostname.toLowerCase() : ''; }
+  catch { return ''; }
+})();
 
 function classifyProxyType(url: string): string {
   const lower = (url || '').toLowerCase();
-  if (lower.includes('workers.dev') || lower.includes('cloudflare') || lower.includes('kira.tatakai.me')) return 'cf';
+  if (CF_PROXY_HOST && lower.includes(CF_PROXY_HOST)) return 'cf';
+  if (lower.includes('workers.dev') || lower.includes('cloudflare') || lower.includes('kira.tatakai.me') || lower.includes('moko.tatakai.me')) return 'cf';
   if (lower.includes('hoko.tatakai.me')) return 'nodejs';
   if (lower.includes('bun')) return 'bun';
   return 'nodejs';
 }
+
+/** A loopback / private-range proxy URL is a backend dev-config artifact and is
+ *  meaningless on a public status board, so we drop it and probe the real edge. */
+function isLoopbackProxyUrl(url: string): boolean {
+  try {
+    const h = new URL(url).hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    return h === 'localhost' || h.endsWith('.localhost') || h === '127.0.0.1' || h === '::1' ||
+      /^10\./.test(h) || /^192\.168\./.test(h) || /^172\.(1[6-9]|2\d|3[01])\./.test(h);
+  } catch { return false; }
+}
+
+/** Derive a display status from the counters the backend actually sends (it
+ *  omits `status`); a fresh 0/0 node that isn't cooling down is available. */
+function deriveProxyStatus(node: ProxyStatusNode): ProxyDisplayNode['status'] {
+  if (node.status === 'online' || node.status === 'degraded' || node.status === 'offline') return node.status;
+  if (node.cooldownUntil && node.cooldownUntil > Date.now()) return 'offline';
+  if (node.failures > 0 && node.successes === 0) return 'offline';
+  if (node.failures > node.successes) return 'degraded';
+  return 'online';
+}
+
+type KnownProxyNode = { id: string; url: string; type: string };
+const KNOWN_PROXY_NODES: KnownProxyNode[] = [
+  ...(ENV_CF_PROXY_URL ? [{ id: 'proxy-cf-edge', url: ENV_CF_PROXY_URL, type: 'cf' }] : []),
+  { id: 'proxy-node-hoko', url: ENV_NODE_PROXY_URL, type: 'nodejs' },
+];
 
 function buildProxyProbeUrls(proxyUrl: string, proxyPassword: string): string[] {
   const normalized = String(proxyUrl || '').trim().replace(/\/$/, '');
@@ -86,18 +125,21 @@ async function probeKnownProxyNode(node: KnownProxyNode, proxyPassword: string):
     } catch { /* try next probe url */ }
   }
   return { id: node.id, url: node.url, type: node.type, status: 'offline', latencyMs: 0, score: 0 };
-}
+}     
 
 // Stable, long-lived CDN assets the app actually pulls posters/thumbs from. An
 // <img> load isn't CORS-gated the way fetch() is, so this measures real image
 // delivery instead of poking an unrelated JSON API (the old api.nekosapi.com
 // probe 404'd, which is why Image Delivery always showed "down").
 const IMAGE_DELIVERY_PROBES = [
+  // Tiny, always-present site assets first (fast + hash-free, so they don't rot
+  // like a specific cover path can); the anime cover stays as a real-world check.
+  'https://cdn.myanimelist.net/images/favicon.ico',
   'https://cdn.myanimelist.net/img/sp/icon/apple-touch-icon-256.png',
   'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx1-CXtrrkMpJ8Zq.png',
 ];
 
-function probeImageLoad(src: string, timeoutMs = 6000): Promise<number> {
+function probeImageLoad(src: string, timeoutMs = 8000): Promise<number> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const start = performance.now();
@@ -187,8 +229,7 @@ export default function StatusPage() {
     { name: 'Jikan API', status: 'checking', icon: <Server className="w-5 h-5" />, description: 'MyAnimeList metadata provider', url: 'https://api.jikan.moe/v4' },
     { name: 'AniList API', status: 'checking', icon: <Server className="w-5 h-5" />, description: 'AniList metadata provider', url: 'https://graphql.anilist.co' },
     { name: 'Image Delivery', status: 'checking', icon: <ImageIcon className="w-5 h-5" />, description: 'Posters, banners & thumbnails', url: 'https://cdn.myanimelist.net' },
-    { name: 'Streaming Edge', status: 'checking', icon: <Play className="w-5 h-5" />, description: 'Video proxy & delivery pool' },
-  ]);
+    ]);
   const [uptimeHistory, setUptimeHistory] = useState<Record<string, Health[]>>({});
   const [lastChecked, setLastChecked] = useState<Date>(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -239,14 +280,18 @@ export default function StatusPage() {
       if (response.ok) {
         const json = await response.json();
         const nodes: ProxyStatusNode[] = Array.isArray(json?.nodes) ? json.nodes : [];
-        mapped = nodes.map((node) => ({
-          id: node.id,
-          url: node.url,
-          type: classifyProxyType(node.url),
-          status: node.status,
-          latencyMs: node.lastLatencyMs || 0,
-          score: Math.max(0, node.successes - node.failures),
-        }));
+        // Drop the backend's loopback/dev entries (e.g. http://localhost:3000)
+        // and derive a status from its counters, since it never sends `status`.
+        mapped = nodes
+          .filter((node) => !isLoopbackProxyUrl(node.url))
+          .map((node) => ({
+            id: node.id,
+            url: node.url,
+            type: classifyProxyType(node.url),
+            status: deriveProxyStatus(node),
+            latencyMs: node.lastLatencyMs || 0,
+            score: Math.max(0, node.successes - node.failures),
+          }));
       }
     } catch { /* fall back to direct node probes */ }
 

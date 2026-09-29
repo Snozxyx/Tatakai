@@ -1,0 +1,29 @@
+# Tatakai Streaming Proxy — Cloudflare Worker
+#
+# Drop-in edge implementation of the same `/api/v1/streamingProxy` contract the
+# Node proxy serves, so it plugs straight into VITE_PROXY_CF_URL:
+#
+#   VITE_PROXY_CF_URL=https://tatakai-streaming-proxy.<subdomain>.workers.dev/api/v1/streamingProxy
+#
+# Deploy:  npm install && npx wrangler deploy
+# Secret:  npx wrangler secret put PROXY_PASSWORD   (must match VITE_STREAM_PROXY_PASSWORD)
+
+name = "tatakai-streaming-proxy"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+
+# Stream large media bodies through without buffering; the free plan is fine for
+# pass-through since we never read the video body into memory.
+workers_dev = true
+
+[observability]
+enabled = true
+
+# PROXY_PASSWORD is a secret, set it with `wrangler secret put` (never commit it).
+# Non-secret knobs can live here:
+[vars]
+# Comma-separated extra hostnames to allow as upstream targets. Empty = allow any
+# public host (the proxy is open by design, gated by PROXY_PASSWORD + SSRF guard).
+ALLOWED_UPSTREAM_HOSTS = ""
+# Comma-separated hostnames to always block, in addition to the private-range guard.
+BLOCKED_UPSTREAM_HOSTS = ""

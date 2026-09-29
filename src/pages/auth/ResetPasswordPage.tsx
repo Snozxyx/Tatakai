@@ -1,48 +1,129 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { Background } from '@/components/layout/Background';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Mail, Loader2, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Mail, Loader2, Lock, Eye, EyeOff, ShieldCheck, KeyRound } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { OtpCodeInput } from '@/components/auth/OtpCodeInput';
+import { TurnstileWidget, type TurnstileWidgetHandle } from '@/components/security/TurnstileWidget';
+import { isTurnstileEnabled } from '@/lib/security/turnstile';
 
 const emailSchema = z.string().email('Please enter a valid email');
+const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
+
+type Step = 'email' | 'code' | 'password';
 
 export default function ResetPasswordPage() {
   const navigate = useNavigate();
+  const { sendPasswordResetCode, verifyPasswordResetCode } = useAuth();
+
+  const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
+  const [otp, setOtp] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileWidgetHandle>(null);
+  const turnstileEnabled = isTurnstileEnabled();
 
-  const handleResetPassword = async (e: React.FormEvent) => {
+  const resetCaptcha = () => {
+    turnstileRef.current?.reset();
+    setCaptchaToken(null);
+  };
+
+  const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    try {
-      emailSchema.parse(email);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        toast.error(error.errors[0].message);
-        return;
-      }
+    const parsed = emailSchema.safeParse(email);
+    if (!parsed.success) {
+      toast.error(parsed.error.errors[0].message);
+      return;
     }
-
+    if (turnstileEnabled && !captchaToken) {
+      toast.error('Please complete the verification challenge');
+      return;
+    }
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/update-password`,
-      });
+      const { error } = await sendPasswordResetCode(email, captchaToken ?? undefined);
+      if (error) {
+        toast.error(error.message);
+        resetCaptcha();
+      } else {
+        toast.success(`We sent a 6-digit code to ${email}`);
+        setOtp('');
+        setStep('code');
+        resetCaptcha();
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-      if (error) throw error;
+  const handleVerifyCode = async (codeOverride?: string) => {
+    const code = (codeOverride ?? otp).trim();
+    if (code.length !== 6) {
+      toast.error('Enter the 6-digit code');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const { error } = await verifyPasswordResetCode(email, code);
+      if (error) {
+        toast.error(error.message.toLowerCase().includes('expired') ? 'That code expired — request a new one.' : 'Invalid code. Please try again.');
+        setOtp('');
+      } else {
+        // A recovery session now exists; let the user choose a new password.
+        setStep('password');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-      setEmailSent(true);
-      toast.success('Password reset email sent! Check your inbox.');
-    } catch (error: any) {
-      console.error('Reset password error:', error);
-      toast.error(error.message || 'Failed to send reset email');
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsed = passwordSchema.safeParse(password);
+    if (!parsed.success) {
+      toast.error(parsed.error.errors[0].message);
+      return;
+    }
+    if (password !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) {
+        toast.error(error.message);
+      } else {
+        toast.success('Password updated — you are signed in.');
+        navigate('/');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (turnstileEnabled) {
+      toast.info('Head back and complete the challenge to get a fresh code.');
+      setStep('email');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const { error } = await sendPasswordResetCode(email);
+      if (error) toast.error(error.message);
+      else toast.success(`New code sent to ${email}`);
     } finally {
       setIsLoading(false);
     }
@@ -57,29 +138,27 @@ export default function ResetPasswordPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate('/auth')}
+            onClick={() => (step === 'code' ? setStep('email') : navigate('/auth'))}
             className="gap-2"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to Login
+            {step === 'code' ? 'Back' : 'Back to Login'}
           </Button>
 
           {/* Logo */}
-            <div className="text-center mb-6">
+          <div className="text-center mb-6">
             <img src={`${import.meta.env.BASE_URL}assets/logo/tatakai-logo.png`} alt="Tatakai Logo" className="mx-auto h-52 w-282 transition-transform duration-300 hover:scale-105 hover:drop-shadow-lg" />
-            </div>
+          </div>
 
-          {/* Reset Form */}
           <GlassPanel className="p-6 md:p-8">
-            {!emailSent ? (
-              <form onSubmit={handleResetPassword} className="space-y-4">
+            {step === 'email' && (
+              <form onSubmit={handleSendCode} className="space-y-4">
                 <div className="space-y-2">
                   <h2 className="text-2xl font-display font-semibold">Forgot Password?</h2>
                   <p className="text-sm text-muted-foreground">
-                    Enter your email address and we'll send you a link to reset your password.
+                    Enter your email address and we'll send you a 6-digit code to reset your password.
                   </p>
                 </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="email">Email Address</Label>
                   <div className="relative">
@@ -96,55 +175,119 @@ export default function ResetPasswordPage() {
                     />
                   </div>
                 </div>
-
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={isLoading || !email}
-                >
+                {turnstileEnabled && (
+                  <TurnstileWidget
+                    ref={turnstileRef}
+                    action="password_reset"
+                    onToken={setCaptchaToken}
+                    onExpire={() => setCaptchaToken(null)}
+                    onError={() => setCaptchaToken(null)}
+                    className="flex justify-center"
+                  />
+                )}
+                <Button type="submit" className="w-full" disabled={isLoading || !email || (turnstileEnabled && !captchaToken)}>
                   {isLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Sending...
-                    </>
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending...</>
                   ) : (
-                    <>
-                      <Mail className="w-4 h-4 mr-2" />
-                      Send Reset Link
-                    </>
+                    <><Mail className="w-4 h-4 mr-2" /> Send me a code</>
                   )}
                 </Button>
               </form>
-            ) : (
-              <div className="text-center space-y-4">
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-                  <CheckCircle className="w-8 h-8 text-primary" />
-                </div>
+            )}
+
+            {step === 'code' && (
+              <div className="space-y-5">
                 <div className="space-y-2">
-                  <h2 className="text-2xl font-display font-semibold">Check Your Email</h2>
+                  <h2 className="text-2xl font-display font-semibold">Enter your code</h2>
                   <p className="text-sm text-muted-foreground">
-                    We've sent a password reset link to <strong>{email}</strong>
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Click the link in the email to reset your password. The link will expire in 1 hour.
+                    We sent a 6-digit code to <strong>{email}</strong>. Enter it below.
                   </p>
                 </div>
-                <div className="flex flex-col gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setEmailSent(false)}
-                    className="w-full"
-                  >
-                    Try Different Email
-                  </Button>
-                  <Button
-                    onClick={() => navigate('/auth')}
-                    className="w-full"
-                  >
-                    Back to Login
-                  </Button>
+                <OtpCodeInput
+                  value={otp}
+                  onChange={setOtp}
+                  onComplete={(code) => handleVerifyCode(code)}
+                  disabled={isLoading}
+                  autoFocus
+                />
+                <Button
+                  type="button"
+                  onClick={() => handleVerifyCode()}
+                  className="w-full"
+                  disabled={isLoading || otp.length !== 6}
+                >
+                  {isLoading ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Verifying...</>
+                  ) : (
+                    <><ShieldCheck className="w-4 h-4 mr-2" /> Verify code</>
+                  )}
+                </Button>
+                <div className="flex items-center justify-between text-sm">
+                  <button type="button" onClick={() => setStep('email')} className="text-muted-foreground hover:text-foreground transition-colors">
+                    Use a different email
+                  </button>
+                  <button type="button" onClick={handleResend} disabled={isLoading} className="text-primary hover:underline font-medium disabled:opacity-50">
+                    Resend code
+                  </button>
                 </div>
               </div>
+            )}
+
+            {step === 'password' && (
+              <form onSubmit={handleUpdatePassword} className="space-y-4">
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-display font-semibold">Set a new password</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Choose a new password for <strong>{email}</strong>.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-password">New Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      id="new-password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pl-10 pr-10"
+                      required
+                      disabled={isLoading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-password">Confirm Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      id="confirm-password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="pl-10"
+                      required
+                      disabled={isLoading}
+                    />
+                  </div>
+                </div>
+                <Button type="submit" className="w-full" disabled={isLoading || !password || !confirmPassword}>
+                  {isLoading ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Updating...</>
+                  ) : (
+                    <><KeyRound className="w-4 h-4 mr-2" /> Update password</>
+                  )}
+                </Button>
+              </form>
             )}
           </GlassPanel>
 
@@ -158,14 +301,14 @@ export default function ResetPasswordPage() {
                 className="text-primary hover:underline"
               >
                 Contact Support
-              </button> 
+              </button>
               &nbsp;or submit a
-               <button
+              <button
                 onClick={() => window.open('/suggestions', '_blank')}
                 className="text-primary hover:underline"
               >
-                 &nbsp;Ticket
-              </button> 
+                &nbsp;Ticket
+              </button>
             </p>
           </div>
         </div>

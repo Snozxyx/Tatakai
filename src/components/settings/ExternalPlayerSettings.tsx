@@ -137,20 +137,20 @@ export function ExternalPlayerSettings() {
           <button
             onClick={handleClear}
             className={cn(
-              'flex items-center justify-between p-3 rounded-xl border text-left transition-colors',
+              'flex w-full items-center justify-between gap-3 p-3 rounded-xl border text-left transition-colors',
               !selectedPath
                 ? 'bg-primary/5 border-primary/40'
                 : 'bg-background/50 border-border hover:bg-muted/40'
             )}
           >
-            <div className="flex items-center gap-3">
-              <PlaySquare className={cn('w-5 h-5', !selectedPath ? 'text-primary' : 'text-muted-foreground')} />
-              <div>
-                <p className="text-sm font-medium text-foreground">Built-in Player</p>
-                <p className="text-xs text-muted-foreground">Tatakai's internal video player</p>
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <PlaySquare className={cn('w-5 h-5 shrink-0', !selectedPath ? 'text-primary' : 'text-muted-foreground')} />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">Built-in Player</p>
+                <p className="text-xs text-muted-foreground truncate">Tatakai's internal video player</p>
               </div>
             </div>
-            {!selectedPath && <CheckCircle2 className="w-5 h-5 text-primary" />}
+            {!selectedPath && <CheckCircle2 className="w-5 h-5 shrink-0 text-primary" />}
           </button>
 
           {/* Detected External Players */}
@@ -161,22 +161,22 @@ export function ExternalPlayerSettings() {
                 key={player.executablePath}
                 onClick={() => handleSelect(player.executablePath)}
                 className={cn(
-                  'flex items-center justify-between p-3 rounded-xl border text-left transition-colors',
+                  'flex w-full items-center justify-between gap-3 p-3 rounded-xl border text-left transition-colors',
                   isSelected
                     ? 'bg-primary/5 border-primary/40'
                     : 'bg-background/50 border-border hover:bg-muted/40'
                 )}
               >
-                <div className="flex items-center gap-3">
-                  <Settings2 className={cn('w-5 h-5', isSelected ? 'text-primary' : 'text-muted-foreground')} />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{player.name}</p>
-                    <p className="text-xs text-muted-foreground truncate max-w-[200px] sm:max-w-[300px]">
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <Settings2 className={cn('w-5 h-5 shrink-0', isSelected ? 'text-primary' : 'text-muted-foreground')} />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{player.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">
                       {player.executablePath}
                     </p>
                   </div>
                 </div>
-                {isSelected && <CheckCircle2 className="w-5 h-5 text-primary" />}
+                {isSelected && <CheckCircle2 className="w-5 h-5 shrink-0 text-primary" />}
               </button>
             );
           })}

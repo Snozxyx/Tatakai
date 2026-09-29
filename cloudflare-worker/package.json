@@ -1,0 +1,16 @@
+{
+  "name": "tatakai-streaming-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cloudflare Worker: edge streaming proxy for Tatakai video (incl. preview/trailer), HLS playlists, subtitles and image assets. Drop-in for VITE_PROXY_CF_URL.",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "secret": "wrangler secret put PROXY_PASSWORD"
+  },
+  "devDependencies": {
+    "wrangler": "^3.90.0"
+  }
+}

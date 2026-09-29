@@ -14,6 +14,27 @@ export interface ChangelogRelease {
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '6.0.3',
+    date: '2026-09-29',
+    changes: [
+      '6-Digit Email Codes: Signup verification, password reset, and email changes now use a 6-digit code you type in the app instead of an email link — codes never redirect, so they no longer expire early, get pre-fetched by mail scanners, or fail with "email link is invalid or has expired"',
+      'Secure Email Change: Changing your account email now confirms a code sent to your current inbox first, then a code sent to the new one, before switching — your stored address stays masked until you reveal it',
+      'Password Reset Rebuilt: A single guided flow — enter email, type the 6-digit code, set a new password — all on one page, with no more expiring reset links',
+      'Branded Auth Emails: New dark, Tatakai-branded templates for signup, password recovery, and email change that show your 6-digit code front and centre',
+      'Status Page Fixes: The Cloudflare proxy node no longer shows falsely offline, and the Image Delivery check no longer throws transient false alarms',
+      'Desktop System Info: Settings now shows the running app version and Electron version',
+    ],
+  },
+  {
+    version: '6.0.2',
+    date: '2026-09-28',
+    changes: [
+      'Packaged Desktop Fix: Resolved a black screen on launch in shipped desktop builds — release binaries now embed the correct client configuration at build time instead of booting with an empty key',
+      'Graceful Config Errors: A missing configuration key now shows a readable error screen instead of a silent black window',
+      'Download Page: The primary download now prefers the Windows installer over the portable build, and all version numbers come straight from GitHub Releases',
+    ],
+  },
+  {
     version: '6.0.1',
     date: '2026-09-28',
     changes: [

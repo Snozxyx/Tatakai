@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Background } from '@/components/layout/Background';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, BookOpen, User, Shield, Heart, Sparkles, ArrowRight, PlayCircle, Globe, AlertCircle, MessageSquare, Eye, Lock, Palette, Zap, Camera, RefreshCw, Loader2, Check, Activity, Cpu } from 'lucide-react';
+import { CheckCircle, BookOpen, User, Shield, Heart, Sparkles, ArrowRight, PlayCircle, Globe, AlertCircle, MessageSquare, Eye, EyeOff, Lock, Palette, Zap, Camera, RefreshCw, Loader2, Check, Activity, Cpu, ShieldAlert, Megaphone, ThumbsDown, TrendingUp, Users, ScrollText, ExternalLink, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { THEME_INFO, Theme, useTheme } from '@/hooks/ui/useTheme';
 import { useRandomProfileImages, useRandomBannerImages, useUpdateProfileAvatar, useUpdateProfileBanner } from '@/hooks/user/useProfileFeatures';
@@ -92,7 +92,7 @@ function ProfileSetupStep() {
       <GlassCard className="shadow-2xl shadow-black/5">
         <div className="h-40 w-full relative group">
           {selectedBanner ? (
-            <img src={selectedBanner} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Banner" />
+            <img src={selectedBanner} loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Banner" />
           ) : (
             <div className="w-full h-full bg-gradient-to-tr from-primary/20 via-muted to-primary/10" />
           )}
@@ -175,7 +175,7 @@ function ProfileSetupStep() {
                       : "hover:ring-2 hover:ring-border hover:ring-offset-2 hover:ring-offset-background opacity-80 hover:opacity-100"
                   )}
                 >
-                  <img src={img.url} className="w-full h-full object-cover" alt="Avatar option" />
+                  <img src={img.url} loading="lazy" decoding="async" className="w-full h-full object-cover" alt="Avatar option" />
                 </button>
               ))}
             </div>
@@ -210,7 +210,7 @@ function ProfileSetupStep() {
                       : "hover:ring-2 hover:ring-border hover:ring-offset-2 hover:ring-offset-background opacity-80 hover:opacity-100"
                   )}
                 >
-                  <img src={img.url} className="w-full h-full object-cover" alt="Banner option" />
+                  <img src={img.url} loading="lazy" decoding="async" className="w-full h-full object-cover" alt="Banner option" />
                 </button>
               ))}
             </div>
@@ -330,6 +330,62 @@ function ThemeSelectionStep() {
   );
 }
 
+const COMMUNITY_RULES: { title: string; tagline: string; icon: React.ReactNode }[] = [
+  { title: 'Be respectful', tagline: 'Disagree with the take, not the person.', icon: <Heart className="w-4 h-4" /> },
+  { title: 'No hate speech', tagline: "It's about what you do with a word, not that it exists.", icon: <ShieldAlert className="w-4 h-4" /> },
+  { title: 'Keep it safe for work', tagline: 'The 18+ gate exists; everything outside it stays SFW.', icon: <Eye className="w-4 h-4" /> },
+  { title: 'Tag your spoilers', tagline: 'Let everyone read and watch at their own pace.', icon: <EyeOff className="w-4 h-4" /> },
+  { title: "Don't spam", tagline: 'One good comment beats twenty copy-pasted ones.', icon: <MessageSquare className="w-4 h-4" /> },
+  { title: 'No advertising', tagline: "Don't use Tatakai to promote your stuff, or anyone's.", icon: <Megaphone className="w-4 h-4" /> },
+  { title: "Don't farm reputation", tagline: 'Earn reactions by being good, not by grinding for them.', icon: <TrendingUp className="w-4 h-4" /> },
+  { title: "Don't weaponize votes", tagline: 'The vote and report buttons are for bad posts, not people.', icon: <ThumbsDown className="w-4 h-4" /> },
+  { title: 'One person, one account', tagline: 'Alts used to break rules only make it worse.', icon: <Users className="w-4 h-4" /> },
+  { title: 'Respect privacy', tagline: "If it isn't yours to share, don't post it.", icon: <Lock className="w-4 h-4" /> },
+];
+
+function CommunityRulesStep() {
+  const navigate = useNavigate();
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {COMMUNITY_RULES.map((rule, i) => (
+          <motion.div
+            key={rule.title}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: Math.min(i * 0.04, 0.3), duration: 0.2 }}
+            className="flex items-start gap-3 p-4 rounded-2xl bg-muted/30 border border-transparent hover:border-border transition-colors"
+          >
+            <div className="shrink-0 w-9 h-9 rounded-xl bg-background border border-border/50 shadow-sm flex items-center justify-center text-primary">
+              {rule.icon}
+            </div>
+            <div className="min-w-0">
+              <h4 className="font-semibold text-sm text-foreground">{rule.title}</h4>
+              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{rule.tagline}</p>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      <div className="flex items-start gap-3 p-4 rounded-2xl border border-red-500/30 bg-red-500/10">
+        <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+        <p className="text-xs text-foreground leading-relaxed">
+          <span className="font-semibold text-red-400">Zero tolerance:</span> Sexualizing minors — real or fictional — and doxxing or endangering another user are instant, permanent bans.
+        </p>
+      </div>
+
+      <button
+        onClick={() => navigate('/community-guidelines')}
+        className="w-full flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground hover:text-primary transition-colors py-2"
+      >
+        <ScrollText className="w-4 h-4" />
+        Read the full Community Guidelines
+        <ExternalLink className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+
 const onboardingSteps: OnboardingStep[] = [
   {
     id: 'welcome',
@@ -374,7 +430,7 @@ const onboardingSteps: OnboardingStep[] = [
     title: 'Desktop Enhancements',
     description: 'Exclusive features enabled in the app.',
     icon: <Cpu className="w-8 h-8 text-orange-500" />,
-    condition: () => !!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__,
+    condition: () => !!(window as any).electron || !!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__,
     content: (
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {[
@@ -399,32 +455,7 @@ const onboardingSteps: OnboardingStep[] = [
     title: 'Community Guidelines',
     description: 'Help us maintain a positive atmosphere.',
     icon: <Heart className="w-8 h-8 text-pink-500" />,
-    content: (
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {[
-          { title: "Be Respectful", desc: "No hate speech or toxic behavior.", icon: <Heart className="w-5 h-5" /> },
-          { title: "No Spoilers", desc: "Respect the first-watch experience.", icon: <Eye className="w-5 h-5" /> },
-          { title: "Quality Talk", desc: "Engage in meaningful discussions.", icon: <MessageSquare className="w-5 h-5" /> },
-          { title: "Stay Safe", desc: "Don't share personal info.", icon: <Lock className="w-5 h-5" /> }
-        ].map((rule, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1 }}
-            className="p-5 rounded-3xl bg-muted/30 border border-transparent hover:border-border transition-all flex flex-col gap-3"
-          >
-            <div className="w-10 h-10 rounded-full bg-background flex items-center justify-center text-foreground shadow-sm border border-border/50">
-              {rule.icon}
-            </div>
-            <div>
-              <h4 className="font-semibold text-sm text-foreground">{rule.title}</h4>
-              <p className="text-xs text-muted-foreground mt-1">{rule.desc}</p>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-    ),
+    content: <CommunityRulesStep />,
   },
   {
     id: 'profile',
@@ -543,10 +574,10 @@ export default function OnboardingPage() {
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentStep}
-                initial={{ opacity: 0, x: 20, filter: 'blur(4px)' }}
-                animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
-                exit={{ opacity: 0, x: -20, filter: 'blur(4px)' }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.25, ease: "easeOut" }}
                 className="w-full"
               >
                 {filteredSteps[currentStep].content}

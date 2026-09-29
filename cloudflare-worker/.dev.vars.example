@@ -1,0 +1,6 @@
+# Copy to `.dev.vars` for `wrangler dev`. In production set these with
+# `wrangler secret put PROXY_PASSWORD`. Never commit real values.
+
+# Shared secret the app appends as `?password=`. Must equal VITE_STREAM_PROXY_PASSWORD
+# in the app's .env. Leave blank to run the proxy open (not recommended in prod).
+PROXY_PASSWORD=your-shared-proxy-password

@@ -4,6 +4,39 @@ All notable changes to Tatakai are documented here.
 
 ---
 
+## [6.0.3] - 2026-09-29
+
+**Patch release.** Moves every authentication email to an in-app 6-digit code, adds a secure email-change flow, and clears false alarms on the status page.
+
+### Added
+- **6-Digit Email Codes** — Signup verification, password reset, and email changes now use a 6-digit code typed directly in the app instead of an email link. Codes never redirect, so they can't be pre-fetched by mail scanners, arrive already "used", or break with the `otp_expired` / "Email link is invalid or has expired" errors that plagued self-hosted deployments.
+- **Secure Email Change** — Updating your account email now runs a two-step verification: confirm a code sent to your **current** inbox, then a code sent to the **new** one, before the address switches. The stored email is masked until you choose to reveal and edit it.
+- **Branded Auth Emails** — New dark, Tatakai-branded email templates for signup confirmation, password recovery, and email change, each showing the 6-digit code prominently.
+- **Cloudflare Streaming Proxy** — Added an edge streaming-proxy worker (`cloudflare-worker/`) exposing `/api/v1/streamingProxy` and `/health` as an additional proxy node.
+
+### Changed
+- **Password Reset** — Rebuilt into a single guided flow: enter email → type the 6-digit code → set a new password, all on one page. No more expiring reset links.
+- **Desktop System Info** — Settings now surfaces the running app version and Electron version.
+
+### Fixed
+- **Status Page — Proxy Node** — The Cloudflare proxy node (`proxy-1 (cf)`) no longer shows falsely offline. Node health is now derived from success/failure counters when the backend omits an explicit status, loopback/localhost nodes are filtered out, and configured edge proxies are probed directly as a fallback.
+- **Status Page — Image Delivery** — Hardened the image-delivery health check with a stable probe target and a longer timeout to eliminate transient false-negatives.
+
+---
+
+## [6.0.2] - 2026-09-28
+
+**Patch release.** Fixes a black screen in packaged desktop builds and cleans up the download page.
+
+### Fixed
+- **Packaged Desktop Black Screen** — The release build now writes its `.env` from the `DESKTOP_DOTENV` CI secret before the Vite build, so packaged binaries embed the client `VITE_*` values. An empty Supabase anon key was black-screening the shipped app at boot.
+- **Visible Config Error Instead of Black Screen** — A missing `VITE_SUPABASE_ANON_KEY` now paints a readable configuration-error screen instead of throwing during boot and leaving a silent black window.
+
+### Changed
+- **Download Page** — Prefers the Windows installer over the portable build for the primary download, and removes hardcoded version numbers — all versions now come from GitHub Releases.
+
+---
+
 ## [6.0.1] - 2026-09-28
 
 **Patch release.** Restores site-wide authentication and refreshes app branding.

@@ -8,3 +8,19 @@ verify_jwt = false
 
 [functions.embed-proxy]
 verify_jwt = false
+
+# Auth email templates — 6-digit codes ({{ .Token }}), typed in-app (no links).
+# NOTE: local/CLI templates document intent. The hosted project ALSO needs these
+# pasted in Dashboard → Authentication → Email Templates (must contain {{ .Token }}),
+# and Site URL set off localhost in URL Configuration.
+[auth.email.template.confirmation]
+subject = "Confirm your Tatakai account 🌸"
+content_path = "./supabase/templates/confirm-signup.html"
+
+[auth.email.template.recovery]
+subject = "Reset your Tatakai password 🌸"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.email.template.email_change]
+subject = "Confirm your Tatakai email change 🌸"
+content_path = "./supabase/templates/email-change.html"

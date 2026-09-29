@@ -378,7 +378,7 @@ export function DesktopSettings() {
     if (!isNative) return null;
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-8 min-w-0">
             {/* GENERAL */}
             <SettingsSection title="General" bodyClassName="space-y-1">
                 {(window as any).electron?.setAutoLaunch && (
@@ -399,7 +399,7 @@ export function DesktopSettings() {
                     description="Episodes will be saved to this folder organized by anime title."
                 >
                     <div className="flex flex-wrap items-center gap-2">
-                        <div className="flex-1 min-w-[10rem] px-3 py-2 rounded-md bg-background/50 border border-border text-sm font-mono truncate">
+                        <div className="flex-1 basis-full sm:basis-0 min-w-0 px-3 py-2 rounded-md bg-background/50 border border-border text-sm font-mono truncate">
                             {downloadPath || 'Default'}
                         </div>
                         <Button
@@ -523,32 +523,32 @@ export function DesktopSettings() {
                 {systemInfo && (
                     <SettingRow title="System information">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="text-muted-foreground">App Version</span>
-                                    <Badge variant="secondary">{systemInfo.version}</Badge>
+                            <div className="space-y-2 min-w-0">
+                                <div className="flex items-center justify-between gap-3 text-sm">
+                                    <span className="text-muted-foreground shrink-0">App Version</span>
+                                    <Badge variant="secondary" className="shrink-0">{systemInfo.version}</Badge>
                                 </div>
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="text-muted-foreground">Platform</span>
-                                    <span className="font-mono">{systemInfo.platform} ({systemInfo.arch})</span>
+                                <div className="flex items-center justify-between gap-3 text-sm">
+                                    <span className="text-muted-foreground shrink-0">Platform</span>
+                                    <span className="font-mono min-w-0 truncate text-right">{systemInfo.platform} ({systemInfo.arch})</span>
                                 </div>
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="text-muted-foreground">Electron</span>
-                                    <span className="font-mono">v{systemInfo.electronVersion}</span>
+                                <div className="flex items-center justify-between gap-3 text-sm">
+                                    <span className="text-muted-foreground shrink-0">Electron</span>
+                                    <span className="font-mono min-w-0 truncate text-right">v{systemInfo.electronVersion}</span>
                                 </div>
                             </div>
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="text-muted-foreground">CPU Cores</span>
-                                    <span className="font-mono">{systemInfo.cpus}</span>
+                            <div className="space-y-2 min-w-0">
+                                <div className="flex items-center justify-between gap-3 text-sm">
+                                    <span className="text-muted-foreground shrink-0">CPU Cores</span>
+                                    <span className="font-mono min-w-0 truncate text-right">{systemInfo.cpus}</span>
                                 </div>
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="text-muted-foreground">Total RAM</span>
-                                    <span className="font-mono">{systemInfo.totalMemory} GB</span>
+                                <div className="flex items-center justify-between gap-3 text-sm">
+                                    <span className="text-muted-foreground shrink-0">Total RAM</span>
+                                    <span className="font-mono min-w-0 truncate text-right">{systemInfo.totalMemory} GB</span>
                                 </div>
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="text-muted-foreground">Free RAM</span>
-                                    <span className="font-mono">{systemInfo.freeMemory} GB</span>
+                                <div className="flex items-center justify-between gap-3 text-sm">
+                                    <span className="text-muted-foreground shrink-0">Free RAM</span>
+                                    <span className="font-mono min-w-0 truncate text-right">{systemInfo.freeMemory} GB</span>
                                 </div>
                             </div>
                         </div>

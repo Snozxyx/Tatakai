@@ -5,12 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Eye, EyeOff, Mail, Lock, User, Play, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Play, ArrowLeft, ShieldCheck } from 'lucide-react';
 import { z } from 'zod';
 import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from '@/hooks/ui/useIsNativeApp';
 import { cn } from '@/lib/utils';
 import { TurnstileWidget, type TurnstileWidgetHandle } from '@/components/security/TurnstileWidget';
 import { isTurnstileEnabled } from '@/lib/security/turnstile';
+import { OtpCodeInput } from '@/components/auth/OtpCodeInput';
 
 const emailSchema = z.string().email('Please enter a valid email');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
@@ -52,11 +53,20 @@ const TEXT_VARIATIONS = [
 
 export default function AuthPage() {
   const navigate = useNavigate();
-  const { signIn, signUp, user } = useAuth();
+  const {
+    signIn,
+    signUp,
+    user,
+    verifySignupCode,
+    resendSignupCode,
+  } = useAuth();
+
   const [isLogin, setIsLogin] = useState(true);
+  const [step, setStep] = useState<'form' | 'verify'>('form');
+  const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -70,6 +80,10 @@ export default function AuthPage() {
     return VIDEO_SOURCES[Math.floor(Math.random() * VIDEO_SOURCES.length)];
   }, []);
 
+  const isNative = useIsNativeApp();
+  const isDesktopApp = useIsDesktopApp();
+  const isMobileApp = useIsMobileApp();
+
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
@@ -81,46 +95,54 @@ export default function AuthPage() {
     return null;
   }
 
+  const resetCaptcha = () => {
+    turnstileRef.current?.reset();
+    setCaptchaToken(null);
+  };
+
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
-    
+
     const emailResult = emailSchema.safeParse(email);
     if (!emailResult.success) {
       newErrors.email = emailResult.error.errors[0].message;
     }
-    
+
     const passwordResult = passwordSchema.safeParse(password);
     if (!passwordResult.success) {
       newErrors.password = passwordResult.error.errors[0].message;
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateForm()) return;
+  const goToVerify = () => {
+    setOtp('');
+    setStep('verify');
+    resetCaptcha();
+  };
 
+  const backToForm = () => {
+    setStep('form');
+    setOtp('');
+    resetCaptcha();
+  };
+
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateForm()) return;
     if (turnstileEnabled && !captchaToken) {
       toast.error('Please complete the verification challenge');
       return;
     }
-
     setIsLoading(true);
-
     try {
       if (isLogin) {
         const { error } = await signIn(email, password, captchaToken ?? undefined);
         if (error) {
-          if (error.message.includes('Invalid login credentials')) {
-            toast.error('Invalid email or password');
-          } else {
-            toast.error(error.message);
-          }
-          turnstileRef.current?.reset();
-          setCaptchaToken(null);
+          toast.error(error.message.includes('Invalid login credentials') ? 'Invalid email or password' : error.message);
+          resetCaptcha();
         } else {
           toast.success('Welcome back!');
           navigate('/');
@@ -128,16 +150,11 @@ export default function AuthPage() {
       } else {
         const { error } = await signUp(email, password, displayName, captchaToken ?? undefined);
         if (error) {
-          if (error.message.includes('already registered')) {
-            toast.error('This email is already registered');
-          } else {
-            toast.error(error.message);
-          }
-          turnstileRef.current?.reset();
-          setCaptchaToken(null);
+          toast.error(error.message.includes('already registered') ? 'This email is already registered' : error.message);
+          resetCaptcha();
         } else {
-          toast.success('Account created! You can now sign in.');
-          navigate('/');
+          toast.success(`Almost there — we sent a 6-digit code to ${email}`);
+          goToVerify();
         }
       }
     } finally {
@@ -145,28 +162,70 @@ export default function AuthPage() {
     }
   };
 
-  const isNative = useIsNativeApp();
-  const isDesktopApp = useIsDesktopApp();
-  const isMobileApp = useIsMobileApp();
+  const handleVerify = async (codeOverride?: string) => {
+    const code = (codeOverride ?? otp).trim();
+    if (code.length !== 6) {
+      toast.error('Enter the 6-digit code');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const { error } = await verifySignupCode(email, code);
+      if (error) {
+        toast.error(error.message.toLowerCase().includes('expired') ? 'That code expired — request a new one.' : 'Invalid code. Please try again.');
+        setOtp('');
+      } else {
+        toast.success('Email verified — welcome to Tatakai!');
+        // New accounts go straight into onboarding (theme, profile, rules).
+        navigate('/onboarding');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (turnstileEnabled) {
+      toast.info('Head back and complete the challenge to get a fresh code.');
+      backToForm();
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const { error } = await resendSignupCode(email);
+      if (error) toast.error(error.message);
+      else toast.success(`New code sent to ${email}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const switchAuthMode = () => {
+    setIsLogin((prev) => !prev);
+    setStep('form');
+    setOtp('');
+    setPassword('');
+    setErrors({});
+    resetCaptcha();
+  };
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
-      {/* Left Side - Form with opaque background */}
+      {/* Left Side - Form */}
       <div className={cn(
         "w-full lg:w-1/2 min-h-screen bg-background flex flex-col justify-center items-center p-6 lg:p-12 relative",
-        // Only hide right panel on mobile apps, keep 50/50 on desktop apps
         isMobileApp && "lg:w-full"
       )}>
         {/* Back button */}
-        <button 
-          onClick={() => navigate('/')} 
+        <button
+          onClick={() => (step === 'verify' ? backToForm() : navigate('/'))}
           className={cn(
             "absolute top-6 flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors group",
             isNative ? "left-4" : "left-6"
           )}
         >
           <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-          <span className="text-sm font-medium">Back to Home</span>
+          <span className="text-sm font-medium">{step === 'verify' ? 'Back' : 'Back to Home'}</span>
         </button>
 
         <div className="w-full max-w-md">
@@ -179,202 +238,179 @@ export default function AuthPage() {
               <h1 className="font-display text-3xl font-bold gradient-text">Tatakai</h1>
             </div>
             <h2 className="text-2xl lg:text-3xl font-bold text-foreground mb-2">
-              {isLogin ? 'Welcome back!' : 'Create your account'}
+              {step === 'verify' ? 'Enter your code' : isLogin ? 'Welcome back!' : 'Create your account'}
             </h2>
             <p className="text-muted-foreground">
-              {isLogin 
-                ? 'Enter your credentials to access your account.' 
-                : 'Join thousands of anime lovers today.'}
+              {step === 'verify' ? (
+                <>We sent a 6-digit code to <span className="text-foreground font-medium">{email}</span>. Enter it below.</>
+              ) : isLogin ? 'Enter your credentials to access your account.' : 'Join thousands of anime lovers today.'}
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {!isLogin && (
-              <div className="space-y-2">
-                <Label htmlFor="displayName" className="text-foreground font-medium">
-                  Display Name
-                </Label>
-                <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <Input
-                    id="displayName"
-                    type="text"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="Your display name"
-                    className="h-12 pl-12 bg-muted/30 border-border hover:border-primary/50 focus:border-primary transition-colors"
-                  />
-                </div>
-              </div>
-            )}
-            
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-foreground font-medium">
-                Email
-              </Label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    setErrors(prev => ({ ...prev, email: undefined }));
-                  }}
-                  placeholder="you@example.com"
-                  className={`h-12 pl-12 bg-muted/30 border-border hover:border-primary/50 focus:border-primary transition-colors ${errors.email ? 'border-destructive' : ''}`}
-                />
-              </div>
-              {errors.email && (
-                <p className="text-sm text-destructive">{errors.email}</p>
-              )}
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-foreground font-medium">
-                Password
-              </Label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <Input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    setErrors(prev => ({ ...prev, password: undefined }));
-                  }}
-                  placeholder="••••••••"
-                  className={`h-12 pl-12 pr-12 bg-muted/30 border-border hover:border-primary/50 focus:border-primary transition-colors ${errors.password ? 'border-destructive' : ''}`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+          {step === 'verify' ? (
+            <div className="space-y-6">
+              <OtpCodeInput
+                value={otp}
+                onChange={setOtp}
+                onComplete={(code) => handleVerify(code)}
+                disabled={isLoading}
+                autoFocus
+              />
+              <Button
+                type="button"
+                onClick={() => handleVerify()}
+                disabled={isLoading || otp.length !== 6}
+                className="w-full h-12 bg-gradient-to-r from-primary to-secondary hover:opacity-90 font-semibold text-lg shadow-lg shadow-primary/25 transition-all hover:shadow-xl hover:shadow-primary/30"
+              >
+                {isLoading ? (
+                  <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                ) : (
+                  <span className="flex items-center gap-2"><ShieldCheck className="w-5 h-5" /> Verify</span>
+                )}
+              </Button>
+              <div className="flex items-center justify-between text-sm">
+                <button type="button" onClick={backToForm} className="text-muted-foreground hover:text-foreground transition-colors">
+                  Use a different email
+                </button>
+                <button type="button" onClick={handleResend} disabled={isLoading} className="text-primary hover:underline font-medium disabled:opacity-50">
+                  Resend code
                 </button>
               </div>
-              {errors.password && (
-                <p className="text-sm text-destructive">{errors.password}</p>
-              )}
-              {isLogin && (
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => navigate('/reset-password')}
-                    className="text-sm text-primary hover:underline"
-                  >
-                    Forgot password?
-                  </button>
+            </div>
+          ) : (
+            <form onSubmit={handleFormSubmit} className="space-y-5">
+              {!isLogin && (
+                <div className="space-y-2">
+                  <Label htmlFor="displayName" className="text-foreground font-medium">Display Name</Label>
+                  <div className="relative">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      id="displayName"
+                      type="text"
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                      placeholder="Your display name"
+                      className="h-12 pl-12 bg-muted/30 border-border hover:border-primary/50 focus:border-primary transition-colors"
+                    />
+                  </div>
                 </div>
               )}
-            </div>
-            
-            {turnstileEnabled && (
-              <TurnstileWidget
-                ref={turnstileRef}
-                action={isLogin ? 'login' : 'signup'}
-                onToken={setCaptchaToken}
-                onExpire={() => setCaptchaToken(null)}
-                onError={() => setCaptchaToken(null)}
-                className="flex justify-center"
-              />
-            )}
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-foreground font-medium">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => { setEmail(e.target.value); setErrors(prev => ({ ...prev, email: undefined })); }}
+                    placeholder="you@example.com"
+                    className={`h-12 pl-12 bg-muted/30 border-border hover:border-primary/50 focus:border-primary transition-colors ${errors.email ? 'border-destructive' : ''}`}
+                  />
+                </div>
+                {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
+              </div>
 
-            <Button
-              type="submit"
-              disabled={isLoading || (turnstileEnabled && !captchaToken)}
-              className="w-full h-12 bg-gradient-to-r from-primary to-secondary hover:opacity-90 font-semibold text-lg shadow-lg shadow-primary/25 transition-all hover:shadow-xl hover:shadow-primary/30"
-            >
-              {isLoading ? (
-                <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-              ) : isLogin ? (
-                'Sign In'
-              ) : (
-                'Create Account'
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-foreground font-medium">Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => { setPassword(e.target.value); setErrors(prev => ({ ...prev, password: undefined })); }}
+                    placeholder="••••••••"
+                    className={`h-12 pl-12 pr-12 bg-muted/30 border-border hover:border-primary/50 focus:border-primary transition-colors ${errors.password ? 'border-destructive' : ''}`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
+                {isLogin && (
+                  <div className="flex justify-end">
+                    <button type="button" onClick={() => navigate('/reset-password')} className="text-sm text-primary hover:underline">
+                      Forgot password?
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {turnstileEnabled && (
+                <TurnstileWidget
+                  ref={turnstileRef}
+                  action={isLogin ? 'login' : 'signup'}
+                  onToken={setCaptchaToken}
+                  onExpire={() => setCaptchaToken(null)}
+                  onError={() => setCaptchaToken(null)}
+                  className="flex justify-center"
+                />
               )}
-            </Button>
-          </form>
-          
-          <div className="mt-8 text-center">
-            <p className="text-muted-foreground">
-              {isLogin ? "Don't have an account?" : 'Already have an account?'}
-              <button
-                onClick={() => {
-                  setIsLogin(!isLogin);
-                  setErrors({});
-                }}
-                className="ml-2 text-primary hover:underline font-semibold"
-              >
-                {isLogin ? 'Sign Up' : 'Sign In'}
-              </button>
-            </p>
-          </div>
 
-          {/* Decorative element */}
+              <Button
+                type="submit"
+                disabled={isLoading || (turnstileEnabled && !captchaToken)}
+                className="w-full h-12 bg-gradient-to-r from-primary to-secondary hover:opacity-90 font-semibold text-lg shadow-lg shadow-primary/25 transition-all hover:shadow-xl hover:shadow-primary/30"
+              >
+                {isLoading ? (
+                  <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                ) : isLogin ? (
+                  'Sign In'
+                ) : (
+                  'Create Account'
+                )}
+              </Button>
+            </form>
+          )}
+          {step !== 'verify' && (
+            <div className="mt-8 text-center">
+              <p className="text-muted-foreground">
+                {isLogin ? "Don't have an account?" : 'Already have an account?'}
+                <button onClick={switchAuthMode} className="ml-2 text-primary hover:underline font-semibold">
+                  {isLogin ? 'Sign Up' : 'Sign In'}
+                </button>
+              </p>
+            </div>
+          )}
+
+          {/* Decorative / terms element */}
           <div className="mt-12 pt-8 border-t border-border/50">
             <p className="text-xs text-muted-foreground text-center">
               By continuing, you agree to our{' '}
-              <button
-                onClick={() => navigate('/terms')}
-                className="text-primary hover:underline"
-              >
-                Terms of Service
-              </button>
+              <button onClick={() => navigate('/terms')} className="text-primary hover:underline">Terms of Service</button>
               ,{' '}
-              <button
-                onClick={() => navigate('/privacy')}
-                className="text-primary hover:underline"
-              >
-                Privacy Policy
-              </button>
+              <button onClick={() => navigate('/privacy')} className="text-primary hover:underline">Privacy Policy</button>
               ,{' '}
-              <button
-                onClick={() => navigate('/dmca')}
-                className="text-primary hover:underline"
-              >
-                DMCA Policy
-              </button>
+              <button onClick={() => navigate('/dmca')} className="text-primary hover:underline">DMCA Policy</button>
               , and{' '}
-              <button
-                onClick={() => navigate('/community-guidelines')}
-                className="text-primary hover:underline"
-              >
-                Community Guidelines
-              </button>
+              <button onClick={() => navigate('/community-guidelines')} className="text-primary hover:underline">Community Guidelines</button>
               .
             </p>
           </div>
         </div>
       </div>
-
       {/* Right Side - Video with overlay - show on web and desktop apps, hide only on mobile apps */}
       <div className={cn(
         "hidden lg:block w-1/2 h-screen relative overflow-hidden",
         isMobileApp && "lg:hidden"
       )}>
         {/* Video Background */}
-        <video
-          autoPlay
-          muted
-          loop
-          playsInline
-          className="absolute inset-0 w-full h-full object-cover"
-        >
+        <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover">
           <source src={randomVideoSrc} type={randomVideoSrc.endsWith('.webm') ? 'video/webm' : 'video/mp4'} />
         </video>
-        
+
         {/* 30% Dark Overlay */}
         <div className="absolute inset-0 bg-black/30" />
-        
+
         {/* Content over video */}
         <div className="absolute inset-0 flex flex-col justify-end p-12">
           <div className="max-w-md">
-            <h3 className="text-3xl font-bold text-white mb-4 drop-shadow-lg">
-              Your Gateway to Anime
-            </h3>
+            <h3 className="text-3xl font-bold text-white mb-4 drop-shadow-lg">Your Gateway to Anime</h3>
             <p className="text-white/80 text-lg drop-shadow-md">
               Stream thousands of anime titles, track your progress, and join a community of passionate fans.
             </p>
@@ -387,4 +423,3 @@ export default function AuthPage() {
     </div>
   );
 }
-

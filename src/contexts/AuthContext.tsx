@@ -51,6 +51,23 @@ interface AuthContextType {
   signUp: (email: string, password: string, displayName?: string, captchaToken?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  // Passwordless / verification via 6-digit email codes (no email links → no redirect).
+  /** Verify the code from the signup confirmation email. */
+  verifySignupCode: (email: string, token: string) => Promise<{ error: Error | null }>;
+  /** Resend the signup confirmation code (no duplicate signup side effects). */
+  resendSignupCode: (email: string, captchaToken?: string) => Promise<{ error: Error | null }>;
+  /** Send a password-reset code. */
+  sendPasswordResetCode: (email: string, captchaToken?: string) => Promise<{ error: Error | null }>;
+  /** Verify a password-reset code; on success a recovery session is established. */
+  verifyPasswordResetCode: (email: string, token: string) => Promise<{ error: Error | null }>;
+  /**
+   * Start an email change. With Supabase "Secure email change" enabled this mails
+   * a 6-digit `email_change` code to BOTH the current and the new address; the
+   * change only completes once both are verified via `verifyEmailChangeCode`.
+   */
+  sendEmailChangeCode: (newEmail: string) => Promise<{ error: Error | null }>;
+  /** Verify one side of an email change (pass the address the code was sent to). */
+  verifyEmailChangeCode: (email: string, token: string) => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -307,6 +324,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error };
   };
 
+  // --- 6-digit email code flows -------------------------------------------
+  // These avoid email *links* entirely: Supabase mails a `{{ .Token }}` code the
+  // user types in-app, so there is no redirect URL to misconfigure or expire.
+
+  const verifySignupCode = async (email: string, token: string) => {
+    const { error } = await supabase.auth.verifyOtp({ email, token, type: 'signup' });
+    return { error };
+  };
+
+  const resendSignupCode = async (email: string, captchaToken?: string) => {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      ...(captchaToken ? { options: { captchaToken } } : {}),
+    });
+    return { error };
+  };
+
+  const sendPasswordResetCode = async (email: string, captchaToken?: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(
+      email,
+      captchaToken ? { captchaToken } : undefined,
+    );
+    return { error };
+  };
+
+  const verifyPasswordResetCode = async (email: string, token: string) => {
+    const { error } = await supabase.auth.verifyOtp({ email, token, type: 'recovery' });
+    return { error };
+  };
+
+  const sendEmailChangeCode = async (newEmail: string) => {
+    // Secure email change (Dashboard setting) fans this out to both the old and
+    // new inbox as `email_change` codes; no redirect URL involved.
+    const { error } = await supabase.auth.updateUser({ email: newEmail });
+    return { error };
+  };
+
+  const verifyEmailChangeCode = async (email: string, token: string) => {
+    const { error } = await supabase.auth.verifyOtp({ email, token, type: 'email_change' });
+    return { error };
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
   };
@@ -326,6 +386,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signUp,
       signOut,
       refreshProfile,
+      verifySignupCode,
+      resendSignupCode,
+      sendPasswordResetCode,
+      verifyPasswordResetCode,
+      sendEmailChangeCode,
+      verifyEmailChangeCode,
     }}>
       {children}
     </AuthContext.Provider>

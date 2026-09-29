@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Check, Eye, EyeOff, Image as ImageIcon, Loader2, LogOut, Lock, Mail, User } from 'lucide-react';
+import { ArrowRight, Check, Eye, EyeOff, Image as ImageIcon, Loader2, LogOut, Lock, Mail, ShieldCheck, User, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { AvatarPickerSheet } from '@/components/profile/AvatarPickerSheet';
+import { OtpCodeInput } from '@/components/auth/OtpCodeInput';
 import {
   SettingRow,
   SettingsEmptyState,
@@ -28,7 +29,7 @@ const formatDate = (value?: string | null) => {
  * + log out of all devices). Built fresh for the settings modal.
  */
 export function AccountPanel() {
-  const { user, session, profile, refreshProfile } = useAuth();
+  const { user, session, profile, refreshProfile, sendEmailChangeCode, verifyEmailChangeCode } = useAuth();
 
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
@@ -37,6 +38,10 @@ export function AccountPanel() {
   const [email, setEmail] = useState('');
   const [showEmail, setShowEmail] = useState(false);
   const [savingEmail, setSavingEmail] = useState(false);
+  // Two-step OTP email change: verify the OLD inbox, then the NEW inbox.
+  const [emailStep, setEmailStep] = useState<'idle' | 'verify-old' | 'verify-new'>('idle');
+  const [pendingEmail, setPendingEmail] = useState('');
+  const [emailOtp, setEmailOtp] = useState('');
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -85,7 +90,7 @@ export function AccountPanel() {
     }
   };
 
-  const handleChangeEmail = async () => {
+  const handleStartEmailChange = async () => {
     if (!user) return;
     const next = email.trim();
     if (!next || next === user.email) {
@@ -94,16 +99,63 @@ export function AccountPanel() {
     }
     setSavingEmail(true);
     try {
-      const { error } = await supabase.auth.updateUser({ email: next });
+      const { error } = await sendEmailChangeCode(next);
       if (error) throw error;
-      toast.success('Confirmation email sent', {
-        description: 'Confirm from both your current and new inbox to finish the change.',
+      setPendingEmail(next);
+      setEmailOtp('');
+      setEmailStep('verify-old');
+      toast.success('Verification codes sent', {
+        description: `Check ${user.email} first, then ${next}.`,
       });
     } catch (e: any) {
-      toast.error(e?.message || 'Failed to update email');
+      toast.error(e?.message || 'Failed to start email change');
     } finally {
       setSavingEmail(false);
     }
+  };
+
+  const handleVerifyEmailStep = async (codeOverride?: string) => {
+    if (!user?.email) return;
+    const code = (codeOverride ?? emailOtp).trim();
+    if (code.length !== 6) {
+      toast.error('Enter the 6-digit code');
+      return;
+    }
+    // 'verify-old' confirms the current inbox; 'verify-new' the incoming address.
+    const target = emailStep === 'verify-old' ? user.email : pendingEmail;
+    setSavingEmail(true);
+    try {
+      const { error } = await verifyEmailChangeCode(target, code);
+      if (error) {
+        toast.error(error.message.toLowerCase().includes('expired') ? 'That code expired — start over.' : 'Invalid code. Please try again.');
+        setEmailOtp('');
+        return;
+      }
+      if (emailStep === 'verify-old') {
+        setEmailOtp('');
+        setEmailStep('verify-new');
+        toast.success('Current email confirmed', { description: `Now enter the code sent to ${pendingEmail}.` });
+      } else {
+        toast.success('Email updated');
+        await refreshProfile();
+        setEmailStep('idle');
+        setPendingEmail('');
+        setEmailOtp('');
+        setShowEmail(false);
+      }
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to verify code');
+    } finally {
+      setSavingEmail(false);
+    }
+  };
+
+  const handleCancelEmailChange = () => {
+    setEmailStep('idle');
+    setPendingEmail('');
+    setEmailOtp('');
+    if (user?.email) setEmail(user.email);
+    setShowEmail(false);
   };
 
   const handleChangePassword = async () => {
@@ -256,33 +308,99 @@ export function AccountPanel() {
         icon={Mail}
         eyebrow="Sign-in"
         title="Email address"
-        description="Changing your email sends a confirmation link to both the old and new address."
+        description="Updating your email sends a 6-digit code to both your current and new inbox — confirm each to finish."
       >
-        <div className="space-y-4">
-          <div className="relative">
-            <Input
-              type={showEmail ? 'text' : 'email'}
-              value={showEmail ? email : email.replace(/(.{2}).*(@.*)/, '$1•••••$2')}
-              onChange={(e) => setEmail(e.target.value)}
-              readOnly={!showEmail}
-              className="pr-10"
-            />
-            <button
-              type="button"
-              onClick={() => setShowEmail((v) => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              aria-label={showEmail ? 'Hide email' : 'Reveal and edit email'}
-            >
-              {showEmail ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
+        {emailStep === 'idle' ? (
+          <div className="space-y-4">
+            <div className="relative">
+              <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type={showEmail ? 'text' : 'email'}
+                value={showEmail ? email : email.replace(/(.{2}).*(@.*)/, '$1•••••$2')}
+                onChange={(e) => setEmail(e.target.value)}
+                readOnly={!showEmail}
+                className="pl-10 pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowEmail((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label={showEmail ? 'Hide email' : 'Reveal and edit email'}
+              >
+                {showEmail ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-muted-foreground">
+                {showEmail ? 'Enter a new address, then verify both inboxes.' : 'Reveal to edit your address.'}
+              </p>
+              <Button variant="outline" onClick={handleStartEmailChange} disabled={savingEmail || !showEmail} className="gap-2">
+                {savingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                Update Email
+              </Button>
+            </div>
           </div>
-          <div className="flex justify-end">
-            <Button variant="outline" onClick={handleChangeEmail} disabled={savingEmail || !showEmail} className="gap-2">
-              {savingEmail && <Loader2 className="h-4 w-4 animate-spin" />}
-              Update Email
-            </Button>
+        ) : (
+          <div className="space-y-5">
+            {/* Progress: current inbox → new inbox */}
+            <div className="flex items-center gap-2 text-xs">
+              <span
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1 ${
+                  emailStep === 'verify-old' ? 'bg-primary/15 text-primary' : 'bg-emerald-500/15 text-emerald-400'
+                }`}
+              >
+                {emailStep === 'verify-old' ? <span className="h-1.5 w-1.5 rounded-full bg-primary" /> : <Check className="h-3 w-3" />}
+                Current email
+              </span>
+              <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+              <span
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1 ${
+                  emailStep === 'verify-new' ? 'bg-primary/15 text-primary' : 'bg-muted/40 text-muted-foreground'
+                }`}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${emailStep === 'verify-new' ? 'bg-primary' : 'bg-muted-foreground/40'}`} />
+                New email
+              </span>
+            </div>
+
+            <div className="rounded-xl border border-white/5 bg-muted/20 p-4">
+              <p className="text-sm text-foreground">
+                Enter the code sent to{' '}
+                <span className="font-medium text-primary">
+                  {emailStep === 'verify-old' ? user.email : pendingEmail}
+                </span>
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {emailStep === 'verify-old'
+                  ? 'Step 1 of 2 — confirm you own your current address.'
+                  : 'Step 2 of 2 — confirm your new address to finish.'}
+              </p>
+              <div className="mt-4">
+                <OtpCodeInput
+                  value={emailOtp}
+                  onChange={setEmailOtp}
+                  onComplete={(code) => handleVerifyEmailStep(code)}
+                  disabled={savingEmail}
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={handleCancelEmailChange}
+                className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" /> Cancel
+              </button>
+              <Button onClick={() => handleVerifyEmailStep()} disabled={savingEmail || emailOtp.length !== 6} className="gap-2">
+                {savingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                {emailStep === 'verify-old' ? 'Verify & continue' : 'Verify & finish'}
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </SettingsSection>
 
       {/* Password */}
