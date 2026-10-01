@@ -50,12 +50,17 @@ Then:
 2. Set `"notarize": true` in the `build.mac` block of `package.json` (it is
    `false` today). electron-builder notarizes via the `APPLE_*` vars using the
    notary API.
+3. Flip `"hardenedRuntime": false` back to `true` when signing — it is
+   intentionally `false` while unsigned so the `xattr -cr` Gatekeeper
+   workaround reliably works for the unsigned `.dmg`.
 
-The hardened-runtime entitlements are already in `build/entitlements.mac.plist`
+The hardened-runtime entitlements are in `build/entitlements.mac.plist`
 (JIT, unsigned-executable-memory, library-validation-disabled for the bundled
 `node-datachannel`/ffmpeg native modules, network client/server, user-selected
-file access). `hardenedRuntime: true` and `gatekeeperAssess: false` are already
-set; they are inert until a signing identity is present.
+file access). While unsigned, `hardenedRuntime: false` and
+`gatekeeperAssess: false` are set so macOS Gatekeeper treats the app as a
+plain unsigned app (clear quarantine with `xattr -cr`) instead of reporting
+it as "damaged".
 
 ## Local unsigned build
 

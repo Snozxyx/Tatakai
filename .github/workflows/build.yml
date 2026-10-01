@@ -356,15 +356,28 @@ jobs:
           body: |
             ## Downloads
 
-            ### Desktop (auto-updates enabled)
-            | Platform | Installer | Portable |
-            |----------|-----------|----------|
-            | Windows  | `.exe`    | `.zip`   |
-            | macOS    | `.dmg`    | `.zip`   |
-            | Linux    | `.AppImage` | `.deb` |
+            ### Desktop
+            | Platform | Installer | Portable / alt |
+            |----------|-----------|----------------|
+            | Windows (x64) | `.exe` | `.zip` (portable) |
+            | macOS Apple Silicon (M1/M2/M3, arm64) | `Tatakai-*-mac-arm64.dmg` | `Tatakai-*-mac-arm64.zip` |
+            | macOS Intel (x64) | `Tatakai-*-mac-x64.dmg` | `Tatakai-*-mac-x64.zip` |
+            | Linux (x64) | `.AppImage` | `.deb` |
 
-            > Desktop apps update automatically via electron-updater.
+            > Windows + Linux update automatically via electron-updater.
             > Each device is identified by a unique Client ID (CID) sent with update checks.
+
+            ### macOS — unsigned build, first-launch fix
+            > Mac builds are **unsigned** until code signing + notarization lands.
+            > After downloading, drag `Tatakai.app` to `/Applications`, then clear the
+            > browser quarantine flag once:
+            > ```bash
+            > xattr -cr /Applications/Tatakai.app
+            > ```
+            > Then open normally (or Right-click → Open → Open). If macOS says the app
+            > “is damaged”, the `xattr` step above fixes it — the file is not corrupt.
+            > macOS auto-update is disabled on unsigned builds: update by
+            > re-downloading the latest `.dmg` for your chip (arm64 vs x64).
 
             ### Web
             - Visit [tatakai.me](https://tatakai.me)

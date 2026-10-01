@@ -278,7 +278,7 @@
       "icon": "resources/icon.icns",
       "category": "public.app-category.entertainment",
       "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
-      "hardenedRuntime": true,
+      "hardenedRuntime": false,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
