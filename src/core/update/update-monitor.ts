@@ -29,6 +29,8 @@ export interface UpdateState {
   progress: number;
   /** A mandatory policy is driving this — the main process installs on its own. */
   mandatory: boolean;
+  /** macOS unsigned builds only offer a manual release download. */
+  manual: boolean;
   /** Last error message when phase === 'error'. */
   message?: string;
   /** User hid the ready-to-install pill; keep the update but stop nagging. */
@@ -39,6 +41,7 @@ const IDLE: UpdateState = {
   phase: 'idle',
   progress: 0,
   mandatory: false,
+  manual: false,
   dismissed: false,
 };
 
@@ -68,6 +71,7 @@ export interface UpdaterEvent {
   progress?: { percent?: number } | null;
   message?: string;
   dismissible?: boolean;
+  manual?: boolean;
 }
 
 /**
@@ -87,6 +91,7 @@ export function ingestUpdaterEvent(event: UpdaterEvent): void {
         phase: 'available',
         version: event.info?.version ?? state.version,
         mandatory: false,
+        manual: event.manual === true,
         dismissed: false,
         message: undefined,
       });

@@ -11,11 +11,16 @@ providing the env vars below turns signing on with no config changes.
   `electron-updater` diff downloads all function; users just dismiss the
   SmartScreen prompt once.
 - **Linux** — no signing concept for AppImage/deb; auto-update works.
-- **macOS** — `electron-updater` **requires a signed + notarized** app to apply
-  updates (Squirrel.Mac verifies the code signature). Until certs exist, mac
-  users update by re-downloading the latest `.dmg`. The updater surfaces a
-  friendly `error` toast on mac rather than crashing (see
-  `desktop/services/update-manager.cjs` → `_configureAutoUpdater`).
+- **macOS** — unsigned builds still check the GitHub release feed for newer
+  versions. When one is available, a persistent **Download manually** notice
+  links to GitHub Releases; Settings offers the same action. Users choose the
+  DMG for their chip and replace Tatakai in `/Applications`.
+  Automatic downloads, quit-time installation, mandatory-policy installation,
+  and in-app rollback are blocked on macOS. Windows/Linux behavior is unchanged.
+  Rebuilding the same app version does not generate an update notice.
+  When signed Mac updates are introduced, remove the macOS manual-update guards
+  in `desktop/services/update-manager.cjs` and
+  `src/core/update/useUpdateOrchestrator.ts` after testing the signed update path.
 
 ## Enabling signing
 
@@ -50,12 +55,17 @@ Then:
 2. Set `"notarize": true` in the `build.mac` block of `package.json` (it is
    `false` today). electron-builder notarizes via the `APPLE_*` vars using the
    notary API.
+3. Flip `"hardenedRuntime": false` back to `true` when signing — it is
+   intentionally `false` while unsigned so the `xattr -cr` Gatekeeper
+   workaround reliably works for the unsigned `.dmg`.
 
-The hardened-runtime entitlements are already in `build/entitlements.mac.plist`
+The hardened-runtime entitlements are in `build/entitlements.mac.plist`
 (JIT, unsigned-executable-memory, library-validation-disabled for the bundled
 `node-datachannel`/ffmpeg native modules, network client/server, user-selected
-file access). `hardenedRuntime: true` and `gatekeeperAssess: false` are already
-set; they are inert until a signing identity is present.
+file access). While unsigned, `hardenedRuntime: false` and
+`gatekeeperAssess: false` are set so macOS Gatekeeper treats the app as a
+plain unsigned app (clear quarantine with `xattr -cr`) instead of reporting
+it as "damaged".
 
 ## Local unsigned build
 

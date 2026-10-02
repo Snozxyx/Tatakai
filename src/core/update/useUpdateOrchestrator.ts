@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { toast } from 'sonner';
 import {
   ingestUpdaterEvent,
   markInstalling,
@@ -12,7 +13,8 @@ import {
  *   1. subscribes to the main-process `updater-event` broadcast and folds each
  *      event into the shared update-monitor store, and
  *   2. kicks off a SILENT background download the moment a non-mandatory update
- *      becomes available — the user never has to press "Download".
+ *      becomes available on Windows/Linux. macOS instead shows a persistent
+ *      manual-download notice with a link to GitHub Releases.
  *
  * Mandatory updates are left alone: update-manager.cjs downloads and installs
  * those itself. Downloaded updates install on the next natural quit
@@ -24,6 +26,12 @@ interface ElectronUpdaterBridge {
   onUpdaterEvent?: (cb: (data: UpdaterEvent) => void) => (() => void) | void;
   updateDownload?: () => void;
   updateInstall?: () => void;
+  platform?: string;
+  openExternal?: (url: string) => unknown;
+}
+
+export function openManualUpdateDownload(): void {
+  void bridge()?.openExternal?.('https://github.com/snozxyx/Tatakai/releases/latest');
 }
 
 function bridge(): ElectronUpdaterBridge | null {
@@ -42,6 +50,17 @@ export function useUpdateOrchestrator(): void {
 
     const unsubscribe = el.onUpdaterEvent((data: UpdaterEvent) => {
       ingestUpdaterEvent(data);
+
+      if (data.type === 'available' && data.manual) {
+        toast.info(`Tatakai ${data.info?.version ?? ''} is available`, {
+          id: 'mac-manual-update',
+          description: 'Please update manually: download the DMG for your Mac and replace Tatakai in Applications.',
+          duration: Infinity,
+          closeButton: true,
+          action: { label: 'Download manually', onClick: openManualUpdateDownload },
+        });
+        return;
+      }
 
       // Silent auto-download: the standard/recommended feed reports `available`
       // with autoDownload off, so we start the download ourselves. Mandatory
@@ -65,6 +84,10 @@ export function useUpdateOrchestrator(): void {
 /** Trigger the quit-and-install now (used by the Dynamic Island restart pill). */
 export function installUpdateNow(): void {
   const el = bridge();
+  if (el?.platform === 'darwin') {
+    openManualUpdateDownload();
+    return;
+  }
   try {
     el?.updateInstall?.();
     markInstalling();
