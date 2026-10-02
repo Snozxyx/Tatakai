@@ -376,8 +376,9 @@ jobs:
             > ```
             > Then open normally (or Right-click → Open → Open). If macOS says the app
             > “is damaged”, the `xattr` step above fixes it — the file is not corrupt.
-            > macOS auto-update is disabled on unsigned builds: update by
-            > re-downloading the latest `.dmg` for your chip (arm64 vs x64).
+            > macOS checks for newer versions and shows a **Download manually** notice.
+            > Download the latest `.dmg` for your chip (arm64 vs x64) and replace
+            > the app in `/Applications`. Unsigned Mac builds never auto-download or install updates.
 
             ### Web
             - Visit [tatakai.me](https://tatakai.me)

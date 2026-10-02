@@ -11,11 +11,16 @@ providing the env vars below turns signing on with no config changes.
   `electron-updater` diff downloads all function; users just dismiss the
   SmartScreen prompt once.
 - **Linux** — no signing concept for AppImage/deb; auto-update works.
-- **macOS** — `electron-updater` **requires a signed + notarized** app to apply
-  updates (Squirrel.Mac verifies the code signature). Until certs exist, mac
-  users update by re-downloading the latest `.dmg`. The updater surfaces a
-  friendly `error` toast on mac rather than crashing (see
-  `desktop/services/update-manager.cjs` → `_configureAutoUpdater`).
+- **macOS** — unsigned builds still check the GitHub release feed for newer
+  versions. When one is available, a persistent **Download manually** notice
+  links to GitHub Releases; Settings offers the same action. Users choose the
+  DMG for their chip and replace Tatakai in `/Applications`.
+  Automatic downloads, quit-time installation, mandatory-policy installation,
+  and in-app rollback are blocked on macOS. Windows/Linux behavior is unchanged.
+  Rebuilding the same app version does not generate an update notice.
+  When signed Mac updates are introduced, remove the macOS manual-update guards
+  in `desktop/services/update-manager.cjs` and
+  `src/core/update/useUpdateOrchestrator.ts` after testing the signed update path.
 
 ## Enabling signing
 

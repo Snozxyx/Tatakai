@@ -71,7 +71,8 @@ pick `*-mac-arm64.dmg` for Apple Silicon (M1/M2/M3) or `*-mac-x64.dmg` for Intel
 > **macOS note (unsigned build):** after moving `Tatakai.app` to `/Applications`,
 > run `xattr -cr /Applications/Tatakai.app` once, then open normally
 > (or Right-click → Open). If macOS reports the app “is damaged”, this step fixes it.
-> Mac auto-update is disabled until signing lands — update by re-downloading the latest `.dmg`.
+> On macOS, Tatakai checks for newer versions and shows a **Download manually** notice.
+> Download the latest `.dmg` for your chip and replace the app in `/Applications`; automatic download and installation are disabled while builds are unsigned.
 
 ## Features
 
