@@ -77,8 +77,8 @@ jobs:
           APP=$(find dist_electron -maxdepth 2 -name Tatakai.app -type d -print -quit)
           test -n "$APP"
           test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$APP/Contents/Info.plist")" = 6.0.3
-          lipo -verify_arch "$MACHO_ARCH" "$APP/Contents/MacOS/Tatakai"
-          lipo -verify_arch "$MACHO_ARCH" "$APP/Contents/Resources/bin/cloudflared"
+          lipo "$APP/Contents/MacOS/Tatakai" -verify_arch "$MACHO_ARCH"
+          lipo "$APP/Contents/Resources/bin/cloudflared" -verify_arch "$MACHO_ARCH"
           "$APP/Contents/Resources/bin/cloudflared" --version
           mkdir -p manual-downloads
           cp "dist_electron/Tatakai-6.0.3-mac-$TARGET_ARCH-r1.dmg" manual-downloads/
