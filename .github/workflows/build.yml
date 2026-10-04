@@ -244,7 +244,7 @@ jobs:
         shell: bash
         run: |
           sdkmanager "platforms;android-36" "build-tools;36.0.0"
-          sdkmanager --list --installed | grep -E 'platforms;android-36|build-tools;36.0.0'
+          sdkmanager --list_installed | grep -E 'platforms;android-36|build-tools;36.0.0'
 
       # The release build self-signs with the local Android debug keystore
       # (android/app/build.gradle). A clean CI runner has no ~/.android yet, so
