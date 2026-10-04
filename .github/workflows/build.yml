@@ -230,6 +230,8 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       # The release build self-signs with the local Android debug keystore
       # (android/app/build.gradle). A clean CI runner has no ~/.android yet, so
