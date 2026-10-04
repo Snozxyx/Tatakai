@@ -3,6 +3,7 @@ import { ChevronRight, History, ScrollText, SlidersHorizontal } from 'lucide-rea
 import { Switch } from '@/components/ui/switch';
 import { DesktopSettings } from '@/components/settings/DesktopSettings';
 import { TorrentSessionHistory } from '@/components/settings/TorrentSessionHistory';
+import { ChangelogPanel } from '@/components/settings/panels/ChangelogPanel';
 import { StorageSettingsPanel } from '@/components/settings/StorageSettingsPanel';
 import { PerformanceSettingsPanel } from '@/components/settings/PerformanceSettingsPanel';
 import { ProxySettingsPanel } from '@/components/settings/ProxySettingsPanel';
@@ -39,6 +40,7 @@ const SECTION_LABELS: Record<string, string> = {
   'extension-port': 'Extensions',
   'torrent-history': 'Torrent History',
   'desktop-logs': 'Diagnostics',
+  changelog: 'Changelog',
 };
 
 /** One searchable setting, mapped to the section that renders it. */
@@ -69,6 +71,7 @@ const SETTING_INDEX: IndexedSetting[] = [
   { title: 'Discord Rich Presence', keywords: 'discord rich presence rpc status', section: 'desktop' },
   { title: 'App Version & Updates', keywords: 'version update upgrade check release channel', section: 'desktop' },
   { title: 'System Information', keywords: 'system cpu ram memory platform electron', section: 'desktop' },
+  { title: 'Changelog', keywords: 'changelog releases what new version history patch notes updates', section: 'changelog' },
   { title: 'Developer Mode', keywords: 'developer mode debug advanced', section: 'desktop' },
   { title: 'Export Application Logs', keywords: 'export logs troubleshoot developer', section: 'desktop' },
   { title: 'Runtime Diagnostics', keywords: 'runtime diagnostics events proxy', section: 'desktop' },
@@ -201,6 +204,14 @@ export function AppSettingsPanel({ section }: { section?: string }) {
             </div>
           </SettingsSection>
         ),
+      },
+      {
+        id: 'changelog',
+        keywords: [
+          'changelog', 'changes', 'releases', 'release', 'version history', 'history',
+          'what new', 'whats new', 'patch', 'notes', 'update', 'updates', 'latest', 'new features',
+        ],
+        render: () => <ChangelogPanel />,
       },
     ],
     [keepTorrentSessionHistory],

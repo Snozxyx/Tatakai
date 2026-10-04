@@ -9,6 +9,7 @@ import {
   Info,
   RefreshCw,
   RotateCcw,
+  ScrollText,
   Smartphone,
   Vibrate,
 } from 'lucide-react';
@@ -26,6 +27,7 @@ import {
   type OrientationLock,
   type StatusBarStyle,
 } from '@/hooks/ui/useMobileConfig';
+import { useSettingsModal } from '@/contexts/SettingsModalContext';
 import { useTheme } from '@/hooks/ui/useTheme';
 import { triggerHaptic } from '@/lib/haptics';
 import { isCapacitor, isIOS } from '@/lib/platform/platform';
@@ -154,6 +156,7 @@ async function clearWebCaches(): Promise<number> {
 export function MobileAppSettingsPanel(_props: { section?: string }) {
   const { config, updateConfig, resetConfig } = useMobileConfig();
   const { reduceMotion, setReduceMotion } = useTheme();
+  const { openSettings } = useSettingsModal();
   const mobileUpdate = useMobileUpdateState();
   const [device, setDevice] = useState<DeviceSummary>({});
   const [clearing, setClearing] = useState(false);
@@ -455,6 +458,23 @@ export function MobileAppSettingsPanel(_props: { section?: string }) {
             {mobileUpdate.message || 'The update check could not be completed.'}
           </p>
         )}
+        <SettingRow
+          icon={ScrollText}
+          title="What's new"
+          description="Read the changelog for this version."
+          control={
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => openSettings('changelog')}
+              className="gap-2"
+            >
+              <ScrollText className="h-4 w-4" />
+              Open
+            </Button>
+          }
+        />
       </SettingsSection>
 
       <SettingsSection title="Device" description="This device and app build.">

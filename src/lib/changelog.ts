@@ -14,6 +14,16 @@ export interface ChangelogRelease {
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '6.0.5',
+    date: '2026-10-04',
+    changes: [
+      'New App Versions: The latest release ships across every platform at once — Windows, macOS, Linux, Android, and iOS',
+      'Mobile Fixed: The Android app now builds and installs correctly from the release page',
+      'Desktop Reliability: Repackaged desktop builds verified green end to end before release',
+      'Changelog in Settings: Release notes are now reachable from Settings on desktop, mobile, and the About page',
+    ],
+  },
+  {
     version: '6.0.4',
     date: '2026-10-04',
     changes: [

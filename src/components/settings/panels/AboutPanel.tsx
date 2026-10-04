@@ -1,19 +1,25 @@
 import { useNavigate } from 'react-router-dom';
-import { FileText, Info, MessageSquarePlus, Scale, Users } from 'lucide-react';
+import { FileText, Info, MessageSquarePlus, Scale, ScrollText, Users } from 'lucide-react';
 import { useTheme } from '@/hooks/ui/useTheme';
 import { Button } from '@/components/ui/button';
 import { useSettingsModal } from '@/contexts/SettingsModalContext';
 import { SettingRow, SettingsSection } from '@/components/settings/SettingsPrimitives';
 
-/** About: app version, blurb, quick stats, and legal links. */
+/** About: app version, blurb, quick stats, changelog shortcut, and legal links. */
 export function AboutPanel() {
   const { themes } = useTheme();
   const navigate = useNavigate();
-  const { closeSettings } = useSettingsModal();
+  const { openSettings, closeSettings } = useSettingsModal();
 
   const go = (path: string) => {
     navigate(path);
     closeSettings();
+  };
+
+  // The `changelog` category is registered on every platform, so this is the
+  // one-tap route to release notes from desktop, mobile, and web alike.
+  const openChangelog = () => {
+    openSettings('changelog');
   };
 
   return (
@@ -34,6 +40,19 @@ export function AboutPanel() {
             <p className="text-sm text-muted-foreground">Anime</p>
           </div>
         </div>
+      </SettingsSection>
+
+      <SettingsSection icon={ScrollText} eyebrow="Releases" title="What's new">
+        <SettingRow
+          title="Changelog"
+          description="Every release and what changed in it."
+          icon={ScrollText}
+          control={
+            <Button variant="outline" size="sm" onClick={openChangelog}>
+              Open
+            </Button>
+          }
+        />
       </SettingsSection>
 
       <SettingsSection icon={Scale} eyebrow="Legal" title="Legal & policies">

@@ -190,7 +190,8 @@ const Index = () => {
       </main>
 
       {showDeferredSections && data && <ReviewPopup />}
-      {!isMobile && <MobileNav />}
+      {/* MobileNav hides itself above `md` and on auth/error routes. */}
+      <MobileNav />
       {!isMobile && !isMobileApp && <AppDownloadBanner />}
     </div>
   );

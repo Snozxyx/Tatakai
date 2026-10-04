@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Menu, X, LogOut } from "lucide-react";
@@ -47,13 +48,25 @@ export function Navigation() {
     navigate("/welcome");
   };
 
-  return (
-    <>
-      {/* Mobile Menu - Full Screen Overlay (rendered outside header to avoid stacking context issues) */}
+  // Full-screen mobile menu. Rendered through a portal to `document.body` for
+  // two reasons.
+  //
+  // 1. Containing block: some layout ancestors (the `main` in MainLayout) carry
+  //    `transform` and `will-change: scroll-position`, which makes them the
+  //    containing block for `position: fixed`. Anchored there, `inset-0`
+  //    stretched this overlay to the full *document* height (~11.5kpx) instead
+  //    of the viewport, and the links' `justify-center` parked them 5.7kpx
+  //    below the fold. Tapping the hamburger opened onto a black screen.
+  // 2. Stacking: portalling out keeps it above the page's decorative layers.
+  //    The hero's blurred orbs are `position: fixed`, so they are painted on top
+  //    of the first viewport of a body-anchored overlay; `overflow-hidden` while
+  //    open clips that bleed.
+  const renderMobileMenu = () => {
+    const overlay = (
       <div
-        className={`md:hidden fixed inset-0 bg-background z-[55] transition-all duration-500 ${
-          isMobileMenuOpen 
-            ? "opacity-100 pointer-events-auto" 
+        className={`md:hidden fixed inset-0 z-[55] bg-background overflow-hidden transition-all duration-500 ${
+          isMobileMenuOpen
+            ? "opacity-100 pointer-events-auto"
             : "opacity-0 pointer-events-none"
         }`}
       >
@@ -85,8 +98,8 @@ export function Navigation() {
                 to={link.href}
                 onClick={() => setIsMobileMenuOpen(false)}
                 className={`text-4xl font-display text-foreground hover:text-muted-foreground transition-all duration-500 ${
-                  isMobileMenuOpen 
-                    ? "opacity-100 translate-y-0" 
+                  isMobileMenuOpen
+                    ? "opacity-100 translate-y-0"
                     : "opacity-0 translate-y-4"
                 }`}
                 style={{ transitionDelay: isMobileMenuOpen ? `${i * 60}ms` : "0ms" }}
@@ -95,18 +108,18 @@ export function Navigation() {
               </Link>
             ))}
           </div>
-          
+
           {/* Bottom CTAs */}
           <div className={`flex gap-4 pt-8 border-t border-foreground/10 transition-all duration-500 ${
-            isMobileMenuOpen 
-              ? "opacity-100 translate-y-0" 
+            isMobileMenuOpen
+              ? "opacity-100 translate-y-0"
               : "opacity-0 translate-y-4"
           }`}
           style={{ transitionDelay: isMobileMenuOpen ? "250ms" : "0ms" }}
           >
             {user ? (
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="flex-1 rounded-full h-14 text-base gap-2"
                 onClick={handleSignOut}
               >
@@ -114,8 +127,8 @@ export function Navigation() {
                 Sign Out
               </Button>
             ) : (
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="flex-1 rounded-full h-14 text-base"
                 onClick={() => {
                   setIsMobileMenuOpen(false);
@@ -126,7 +139,7 @@ export function Navigation() {
               </Button>
             )}
 
-            <Button 
+            <Button
               className="flex-1 bg-foreground text-background rounded-full h-14 text-base"
               onClick={() => {
                 setIsMobileMenuOpen(false);
@@ -138,22 +151,30 @@ export function Navigation() {
           </div>
         </div>
       </div>
+    );
+
+    return typeof document !== "undefined" ? createPortal(overlay, document.body) : overlay;
+  };
+
+  return (
+    <>
+      {renderMobileMenu()}
 
       <header
         className={`fixed z-50 transition-all duration-500 ${
-          isScrolled 
-            ? "top-4 left-4 right-4" 
+          isScrolled
+            ? "top-4 left-4 right-4"
             : "top-0 left-0 right-0"
         }`}
       >
-        <nav 
+        <nav
           className={`mx-auto transition-all duration-500 ${
             isScrolled || isMobileMenuOpen
               ? "bg-background/80 backdrop-blur-xl border border-foreground/10 rounded-2xl shadow-lg max-w-[1200px]"
               : "bg-transparent max-w-[1400px]"
           }`}
         >
-          <div 
+          <div
             className={`flex items-center justify-between transition-all duration-500 px-6 lg:px-8 ${
               isScrolled ? "h-14" : "h-20"
             }`}
@@ -250,4 +271,3 @@ export function Navigation() {
     </>
   );
 }
-

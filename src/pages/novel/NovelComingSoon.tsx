@@ -88,7 +88,8 @@ export default function NovelComingSoon() {
         </div>
       </main>
 
-      {!isMobile && <MobileNav />}
+      {/* MobileNav hides itself above `md` and on auth/error routes. */}
+      <MobileNav />
     </div>
   );
 }

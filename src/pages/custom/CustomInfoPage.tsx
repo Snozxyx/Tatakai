@@ -155,7 +155,8 @@ export default function CustomInfoPage() {
         )}
       </main>
 
-      {!isMobile && <MobileNav />}
+      {/* MobileNav hides itself above `md` and on auth/error routes. */}
+      <MobileNav />
     </div>
   );
 }

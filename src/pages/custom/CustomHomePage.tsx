@@ -342,7 +342,8 @@ export default function CustomHomePage() {
         <ExtensionSlot slotId="custom-home-bottom" props={{ namespace, sourceId, kind }} />
       </main>
 
-      {!isMobile && <MobileNav />}
+      {/* MobileNav hides itself above `md` and on auth/error routes. */}
+      <MobileNav />
     </div>
   );
 }

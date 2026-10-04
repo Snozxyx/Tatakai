@@ -4,6 +4,24 @@ All notable changes to Tatakai are documented here.
 
 ---
 
+## [6.0.5] - 2026-10-04
+
+**Patch release.** Every platform finally ships a working build at the same time, and release notes become reachable from inside the app on desktop, mobile, and web.
+
+### Added
+- **Changelog in Settings** - Release notes are now reachable from **Settings -> About -> Changelog** on every platform, and from **Settings -> App Settings -> Changelog** on desktop. The mobile app settings gain a "What's new" shortcut in the App updates section, so an installed build can tell the user what changed without leaving the app.
+
+### Changed
+- **Unified Versioning** - `package.json`, `package-lock.json`, and the Android manifest (`versionCode` 605 / `versionName` 6.0.5) all advance together, so the shipped desktop app, the APK, and the Settings "Current version" badge all read 6.0.5.
+
+### Fixed
+- **Mobile Landing Menu** - The landing page hamburger menu opened onto a black screen. The overlay was a `position: fixed` child of a transformed ancestor (`main` carries `will-change: scroll-position`, which makes it the containing block for `fixed`), so `inset-0` stretched it to the full ~11.5kpx document height and `justify-center` pushed the nav links 5.7kpx below the fold. The overlay now renders through a portal to `document.body` and clips its own content.
+- **Mobile Landing Orbs** - With the menu anchored at the body level, the hero's `position: fixed` gradient orbs painted over its first viewport; the overlay now clips them.
+- **Inverted Mobile Nav Gates** - Home, custom-source home/info, manga home, novel coming-soon, and Wrapped rendered `<MobileNav />` behind `!isMobile`, which hid the bottom navigation bar from every phone. `MobileNav` already hides itself above `md` and on auth/error routes, so the guard is removed.
+- **Android CI** - The `build-android` job compiles with a Java 21 toolchain and installs the `android-36` platform and build tools explicitly, so the APK builds on a clean runner.
+
+---
+
 ## [6.0.4] - 2026-10-04
 
 **Feature release.** Ships the mobile and iOS apps, makes the app tablet-aware with the web's floating sidebar, fixes the macOS "damaged" install error, and removes dead weight from the repository.
