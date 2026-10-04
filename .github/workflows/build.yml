@@ -157,10 +157,26 @@ jobs:
         run: npx electron-builder --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Ship unsigned for now: never auto-discover a macOS signing identity.
-          # Signing/notarization activate when CSC_LINK / APPLE_* secrets are set
-          # and this is removed — see docs/DESKTOP_SIGNING.md.
+          # No paid certificates yet: never auto-discover a signing identity.
+          # macOS is still ad-hoc signed via `"identity": "-"` in package.json.
+          # Developer ID signing/notarization activate when CSC_LINK / APPLE_*
+          # secrets are set and this is removed — see docs/guides/desktop-signing.md.
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      # Apple Silicon refuses to launch a bundle whose code signature is broken
+      # and Gatekeeper reports it as "damaged". The mac build is ad-hoc signed
+      # (`"identity": "-"` in package.json), so fail here if any nested
+      # framework/helper/native module ends up with an invalid signature.
+      - name: Verify macOS code signature
+        if: matrix.platform == 'mac'
+        shell: bash
+        run: |
+          set -e
+          for app in dist_electron/mac*/Tatakai.app; do
+            echo "=== $app"
+            codesign --verify --deep --strict --verbose=2 "$app"
+            codesign -dv "$app" 2>&1 | grep -E 'Identifier|Signature|Sealed Resources'
+          done
 
       - name: Debug — list `dist_electron` contents
         shell: bash
@@ -365,6 +381,15 @@ jobs:
 
             > Desktop apps update automatically via electron-updater.
             > Each device is identified by a unique Client ID (CID) sent with update checks.
+
+            ### macOS — first launch
+            Pick `mac-arm64` for Apple Silicon (M1 and newer) or `mac-x64` for Intel.
+            The app is not notarized by Apple yet, so the first launch is blocked once:
+            1. Open the `.dmg` and drag **Tatakai** into **Applications**.
+            2. Open Tatakai. When macOS says it can't verify the app, click **Done**.
+            3. Go to **System Settings → Privacy & Security**, scroll down and click **Open Anyway**.
+
+            Or run this once in Terminal: `xattr -dr com.apple.quarantine /Applications/Tatakai.app`
 
             ### Web
             - Visit [tatakai.me](https://tatakai.me)
