@@ -226,7 +226,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
       # `android-actions/setup-android@v3` calls `sdkmanager tools` by default;
       # the `tools` package no longer exists in cmdline-tools 16.x, so it aborts
