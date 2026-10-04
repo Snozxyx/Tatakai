@@ -24,6 +24,20 @@ allprojects {
     }
 }
 
+// Capacitor 8 / AGP 8.13 compile with a Java 21 toolchain. The desktop job runs
+// Java 17, so without this the mobile job fails with
+// "invalid source release: 21" on :capacitor-android:compileReleaseJavaWithJavac.
+// Gradle auto-provisions the toolchain, so the CI runner JDK version doesn't matter.
+subprojects {
+    plugins.withType(JavaPlugin) {
+        java {
+            toolchain {
+                languageVersion = JavaLanguageVersion.of(21)
+            }
+        }
+    }
+}
+
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
