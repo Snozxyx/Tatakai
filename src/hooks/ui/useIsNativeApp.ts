@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { isNative, isDesktop, isMobileNative } from '@/lib/platform/platform';
+import { isNative, isDesktop, isMobileNative, isMacOS } from '@/lib/platform/platform';
 
 /**
  * Thin React bindings over `@/lib/platform/platform` (the single source of
@@ -19,4 +19,9 @@ export function useIsDesktopApp(): boolean {
 // Mobile apps only (Capacitor)
 export function useIsMobileApp(): boolean {
   return useMemo(() => isMobileNative(), []);
+}
+
+// macOS host (native traffic lights via hiddenInset — custom bar stays slim)
+export function useIsMacOS(): boolean {
+  return useMemo(() => isMacOS(), []);
 }

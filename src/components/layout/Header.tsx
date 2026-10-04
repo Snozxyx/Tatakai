@@ -2,7 +2,8 @@ import { Search, User, LogOut, Shield, Download, Camera, Loader2, X, Film, Play,
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
+import { useIsDesktopApp, useIsMacOS, useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
+import { useTitlebarHidden } from "@/hooks/ui/useTitlebarHidden";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { NotificationBell } from "@/components/ui/NotificationBell";
@@ -92,6 +93,13 @@ export function Header() {
   const location = useLocation();
   const { user, profile, isAdmin, isModerator, isBanned, signOut, isLoading } = useAuth();
   const isNative = useIsNativeApp();
+  const isDesktopApp = useIsDesktopApp();
+  const isMac = useIsMacOS();
+  const [titlebarHidden] = useTitlebarHidden();
+  // Windows/Linux paint a solid 32px TitleBar (z-9999) above the sticky header,
+  // so the header must stick 32px down or its icons slide underneath it.
+  // macOS is a transparent overlay with no layout bar → stick to the very top.
+  const hasSolidTitlebar = isDesktopApp && !titlebarHidden && !isMac;
 
   // Image search state
   const [showImageSearch, setShowImageSearch] = useState(false);
@@ -189,7 +197,7 @@ export function Header() {
 
   return (
     <>
-      <header className="md:hidden sticky top-0 z-50 bg-transparent">
+      <header className={cn("md:hidden sticky z-50 bg-transparent", hasSolidTitlebar ? "top-8" : "top-0")}>
         <div className="relative flex h-14 items-center justify-between bg-transparent px-3 pt-[env(safe-area-inset-top)]">
           <div className="relative z-10 flex h-10 w-10 items-center justify-center rounded-full">
             <NotificationBell />
@@ -230,7 +238,7 @@ export function Header() {
         </div>
       </header>
 
-      <header className="hidden md:flex items-center mb-4 px-1 sticky top-0 z-50 py-2">
+      <header className={cn("hidden md:flex items-center mb-4 px-1 sticky z-50 py-2", hasSolidTitlebar ? "top-8" : "top-0")}>
         <div className="flex w-full items-center justify-between gap-8 rounded-2xl border border-white/[0.08] bg-background/70 px-5 py-2.5 shadow-[0_8px_32px_-12px_rgba(0,0,0,0.5)] backdrop-blur-xl">
         {/* Left: welcome + status */}
         <div className="flex items-center gap-3 min-w-0">

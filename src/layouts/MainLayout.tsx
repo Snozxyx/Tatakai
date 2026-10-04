@@ -7,7 +7,7 @@ import { useTheme } from "@/hooks/ui/useTheme";
 import { usePageTracking } from "@/hooks/api/useAnalytics";
 import { useActiveSession } from "@/hooks/auth/useActiveSession";
 import { useClientId, setCachedClientId } from "@/hooks/ui/useClientId";
-import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from "@/hooks/ui/useIsNativeApp";
+import { useIsNativeApp, useIsDesktopApp, useIsMobileApp, useIsMacOS } from "@/hooks/ui/useIsNativeApp";
 import { useTitlebarHidden } from "@/hooks/ui/useTitlebarHidden";
 import { useIsPhone } from "@/hooks/ui/use-mobile";
 import { useSmartTV } from "@/hooks/ui/useSmartTV";
@@ -69,6 +69,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const isNative = useIsNativeApp();
   const isDesktopApp = useIsDesktopApp();
+  const isMac = useIsMacOS();
   const [titlebarHidden] = useTitlebarHidden();
   const isMobile = useIsPhone();
   const isMobileApp = useIsMobileApp();
@@ -187,8 +188,15 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
     const root = document.documentElement;
     if (isDesktopApp && titlebarHidden) root.classList.add('titlebar-hidden');
     else root.classList.remove('titlebar-hidden');
-    return () => root.classList.remove('titlebar-hidden');
-  }, [isDesktopApp, titlebarHidden]);
+    // macOS uses a transparent drag-only overlay (native traffic lights), so
+    // sheet/banner offsets keyed off .desktop-app can opt out via .mac-app.
+    if (isDesktopApp && isMac) root.classList.add('mac-app');
+    else root.classList.remove('mac-app');
+    return () => {
+      root.classList.remove('titlebar-hidden');
+      root.classList.remove('mac-app');
+    };
+  }, [isDesktopApp, titlebarHidden, isMac]);
 
   const [magnetModalOpen, setMagnetModalOpen] = useState(false);
   const [initialMagnet, setInitialMagnet] = useState<string | undefined>();
@@ -235,7 +243,9 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
       className={cn(
         "min-h-screen relative flex flex-col transition-[padding] duration-300",
         isDesktopApp && showSidebar && online && "lg:pl-[var(--sidebar-width)]",
-        isDesktopApp && !titlebarHidden && "pt-8"
+        // macOS keeps only a transparent drag overlay (native traffic lights),
+        // so it needs no 32px layout clearance — Windows/Linux keep the solid bar.
+        isDesktopApp && !titlebarHidden && !isMac && "pt-8"
       )}
     >
       <Toaster />

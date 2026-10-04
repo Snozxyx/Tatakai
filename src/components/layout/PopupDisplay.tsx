@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
-import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
+import { useIsDesktopApp, useIsMacOS } from '@/hooks/ui/useIsNativeApp';
 import { cn } from '@/lib/utils';
 
 interface Popup {
@@ -38,6 +38,9 @@ export function PopupDisplay() {
   const { user, profile } = useAuth();
   const location = useLocation();
   const isDesktop = useIsDesktopApp();
+  const isMac = useIsMacOS();
+  // macOS has no solid layout bar (transparent overlay) → banners sit at top-0.
+  const hasSolidTitlebar = isDesktop && !isMac;
   const [dismissedPopups, setDismissedPopups] = useState<Record<string, number>>({});
 
   // Load dismissed popups from localStorage
@@ -163,7 +166,7 @@ export function PopupDisplay() {
           }}
           className={cn(
             "fixed left-0 right-0 z-[10000] flex items-center justify-between px-4 py-3 shadow-lg transition-colors duration-500",
-            isDesktop ? "top-[32px]" : "top-0",
+            hasSolidTitlebar ? "top-[32px]" : "top-0",
             banner.use_theme_colors && "bg-card/95 backdrop-blur-xl border-b border-white/10 text-foreground"
           )}
         >
