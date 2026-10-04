@@ -228,10 +228,23 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      # `android-actions/setup-android@v3` calls `sdkmanager tools` by default;
+      # the `tools` package no longer exists in cmdline-tools 16.x, so it aborts
+      # with `Failed to find package 'tools'`. Overriding `packages` skips it.
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
+
+      # That action only installs platform-tools — it never fetches a compile
+      # platform, so a runner image without 36 fails later with
+      # "Failed to find target with hash string 'android-36'". Pin the platform
+      # this app compiles against (compileSdk 36) and its build tools explicitly.
+      - name: Install Android platform + build tools
+        shell: bash
+        run: |
+          yes | sdkmanager "platforms;android-36" "build-tools;36.0.0"
+          sdkmanager --list --installed | grep -E 'platforms;android-36|build-tools;36.0.0'
 
       # The release build self-signs with the local Android debug keystore
       # (android/app/build.gradle). A clean CI runner has no ~/.android yet, so
