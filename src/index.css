@@ -823,6 +823,27 @@ body[data-theme='brutalist-concrete'] .gradient-text {
   top: 32px;
 }
 
+/* ── macOS: transparent drag-only overlay (native hiddenInset lights) ─────────
+ * No solid 32px bar is painted and MainLayout adds no pt-8 clearance, so edge
+ * sheets reclaim the strip. Native traffic lights are OS-drawn above the
+ * window and stay reachable. Guards against any opaque titlebar styling.
+ */
+.mac-app.desktop-app [data-titlebar] {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.mac-app.desktop-app [data-sheet-side="left"],
+.mac-app.desktop-app [data-sheet-side="right"] {
+  top: 0;
+  height: 100%;
+}
+
+.mac-app.desktop-app [data-sheet-side="top"] {
+  top: 0;
+}
+
 /* ── App fullscreen mode (Electron) ───────────────────────────────────────────
  * Applied to <html> when the player enters OS-level fullscreen via IPC.
  * Hides TitleBar, Sidebar, and all chrome so the video fills the entire screen.

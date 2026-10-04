@@ -68,6 +68,26 @@ export function isDesktop(): boolean {
   return isElectron();
 }
 
+/**
+ * macOS host (Electron `darwin` platform, or a Mac browser UA).
+ * Used to slim the custom TitleBar: macOS already paints native traffic
+ * lights via `hiddenInset`, so a solid 32px bar only duplicates chrome and
+ * eats menu-bar-adjacent space.
+ */
+export function isMacOS(): boolean {
+  if (typeof window !== 'undefined') {
+    const w = window as any;
+    if (w.electron?.platform === 'darwin') return true;
+  }
+  if (typeof navigator !== 'undefined') {
+    const platform = (navigator as any).platform || '';
+    const ua = navigator.userAgent || '';
+    if (/Mac/i.test(platform)) return true;
+    if (/Macintosh|Mac OS X/i.test(ua)) return true;
+  }
+  return false;
+}
+
 /** Capacitor mobile only. Mirrors the old `useIsMobileApp`. */
 export function isMobileNative(): boolean {
   return isCapacitor();
