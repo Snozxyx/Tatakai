@@ -1,7 +1,7 @@
 {
   "name": "tatakai",
   "private": true,
-  "version": "6.0.3",
+  "version": "6.0.4",
   "description": "Tatakai — an extension-based otaku community for tracking anime & manga",
   "author": {
     "name": "Tatakai",
@@ -13,10 +13,9 @@
   "type": "module",
   "scripts": {
     "postinstall": "node scripts/fix-electron-install.cjs",
-    "dev": "concurrently \"npm:dev:web\" \"npm:dev:api-v3\"",
+    "dev": "concurrently \"npm:dev:web\" \"npm:dev:api\"",
     "dev:web": "vite",
-    "dev:api-v3": "npm run dev:toko-api",
-    "dev:api": "npm run dev:toko-api",
+    "dev:api": "npm --prefix TatakaiAPI start",
     "build": "cross-env NODE_ENV=production vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
@@ -32,13 +31,12 @@
     "electron:build": "npm run assets:installer && npm run assets:cloudflared && cross-env ELECTRON_BUILD=true vite build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --config.npmRebuild=false --config.electronDist=node_modules/electron/dist",
     "assets:generate": "node scripts/generate-assets.cjs",
     "mobile:dev": "npm run build && npx cap open android",
+    "mobile:ios": "npm run build && npx cap open ios",
     "mobile:sync": "npm run build && npx cap sync",
-    "mobile:build": "npx cap sync android && cd android && gradlew assembleRelease",
-    "build:toko": "npm --prefix extension/toko run build",
-    "api": "npm run build:toko && npm --prefix TatakaiAPI start",
-    "dev:toko-api": "npm --prefix extension/toko run build && npm --prefix extension/toko/api run dev",
-    "toko:build": "npm --prefix extension/toko run build",
-    "toko:api": "npm --prefix extension/toko run build && npm --prefix extension/toko/api start"
+    "mobile:sync:ios": "npm run build && npx cap sync ios",
+    "mobile:build": "npm run build && npx cap sync android && cd android && chmod +x gradlew && ./gradlew assembleRelease",
+    "mobile:build:ios": "npm run build && npx cap sync ios",
+    "mobile:build:ios:unsigned": "npm run build && npx cap sync ios && xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath ios/build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO clean build"
   },
   "dependencies": {
     "@capacitor-community/keep-awake": "^8.0.0",
@@ -113,7 +111,6 @@
     "cmdk": "^1.1.1",
     "date-fns": "^3.6.0",
     "dexie": "^4.4.2",
-    "disable-devtool": "^0.3.9",
     "discord-rpc": "^4.0.1",
     "dompurify": "^3.3.1",
     "electron-updater": "^6.7.3",
@@ -207,6 +204,7 @@
       "dist/**/*",
       "desktop/**/*",
       "resources/**/*",
+      "!resources/bin/**",
       "package.json"
     ],
     "extraResources": [
@@ -216,6 +214,13 @@
         "filter": [
           "*/manifest.json",
           "*/dist/bundle.js"
+        ]
+      },
+      {
+        "from": "resources/bin",
+        "to": "bin",
+        "filter": [
+          "**/*"
         ]
       }
     ],
@@ -278,7 +283,8 @@
       "icon": "resources/icon.icns",
       "category": "public.app-category.entertainment",
       "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
-      "hardenedRuntime": true,
+      "identity": "-",
+      "hardenedRuntime": false,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
