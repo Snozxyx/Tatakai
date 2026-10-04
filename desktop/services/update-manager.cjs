@@ -67,6 +67,11 @@ const GH_REPO  = 'Tatakai'
  * @returns {UpdateManager}
  */
 function createUpdateManager({ ipcMain, autoUpdater, logger, app, appCID, supabaseUrl, supabaseKey }) {
+  // Certificate-less macOS builds check for updates, but never download or
+  // install them through electron-updater. Users replace the app manually.
+  const manualUpdates = process.platform === 'darwin'
+  const manualUpdateMessage = 'macOS updates must be installed manually. Download the latest DMG from GitHub Releases.'
+
   // ── Internal log helpers ──────────────────────────────────────────────────
 
   function _debug(msg, ctx) {
@@ -344,6 +349,11 @@ function createUpdateManager({ ipcMain, autoUpdater, logger, app, appCID, supaba
 
     _broadcast({ type: 'checking' })
 
+    if (manualUpdates) {
+      await autoUpdater.checkForUpdates()
+      return
+    }
+
     const policy = await fetchPolicy(channel)
 
     if (policy === null) {
@@ -502,6 +512,7 @@ function createUpdateManager({ ipcMain, autoUpdater, logger, app, appCID, supaba
    * @returns {Promise<void>}
    */
   async function rollbackTo(version) {
+    if (manualUpdates) throw new Error(manualUpdateMessage)
     const currentVersion = app.getVersion()
 
     // No-op guard (Req 5.8)
@@ -686,6 +697,7 @@ function createUpdateManager({ ipcMain, autoUpdater, logger, app, appCID, supaba
 
     // ── update:download ─────────────────────────────────────────────────
     ipcMain.handle('update:download', async () => {
+      if (manualUpdates) return { error: manualUpdateMessage }
       try {
         await autoUpdater.downloadUpdate()
         return { success: true }
@@ -697,6 +709,7 @@ function createUpdateManager({ ipcMain, autoUpdater, logger, app, appCID, supaba
 
     // ── update:install ──────────────────────────────────────────────────
     ipcMain.handle('update:install', () => {
+      if (manualUpdates) return { error: manualUpdateMessage }
       try {
         autoUpdater.quitAndInstall()
         return { success: true }
@@ -745,7 +758,7 @@ function createUpdateManager({ ipcMain, autoUpdater, logger, app, appCID, supaba
     })
 
     autoUpdater.on('update-available', (info) => {
-      _broadcast({ type: 'available', info })
+      _broadcast({ type: 'available', info, manual: manualUpdates })
     })
 
     autoUpdater.on('update-not-available', (info) => {
@@ -789,7 +802,7 @@ function createUpdateManager({ ipcMain, autoUpdater, logger, app, appCID, supaba
       // interrupts the user. The Dynamic Island offers an optional "Restart"
       // shortcut for those who'd rather not wait. Mandatory policies still
       // force quitAndInstall in checkOnStartup regardless of this flag.
-      autoUpdater.autoInstallOnAppQuit = true
+      autoUpdater.autoInstallOnAppQuit = !manualUpdates
 
       if (!app.isPackaged) {
         // Dev mode: electron-updater normally refuses to run unpackaged. Point
@@ -810,12 +823,8 @@ function createUpdateManager({ ipcMain, autoUpdater, logger, app, appCID, supaba
       autoUpdater.setFeedURL({ provider: 'github', owner: GH_OWNER, repo: GH_REPO })
       autoUpdater.requestHeaders = { 'X-Client-Id': appCID || 'unknown' }
 
-      // macOS auto-update requires a signed + notarized build. Until signing
-      // certs exist the feed is still wired, but a check surfaces a friendly
-      // `error` broadcast (handled below) rather than crashing; mac users
-      // update by re-downloading. See docs/guides/desktop-signing.md.
-      if (process.platform === 'darwin') {
-        _warn('[UpdateManager] macOS auto-update is limited until the build is code-signed')
+      if (manualUpdates) {
+        _info('[UpdateManager] macOS updates use manual downloads; version checks remain enabled')
       }
     } catch (err) {
       _error('[UpdateManager] Failed to configure autoUpdater feed', { err: String(err) })

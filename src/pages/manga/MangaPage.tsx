@@ -116,6 +116,8 @@ function RelationTree({ relations }: { relations: MediaRelation[] }) {
 
 import { Helmet } from "react-helmet-async";
 import { useIsNativeApp } from '@/hooks/ui/useIsNativeApp';
+import { useIsMobile } from '@/hooks/ui/use-mobile';
+import { setViewingMangaRpc, clearDiscordRpc } from '@/lib/discordRpc';
 import { useContentSafetySettings } from "@/hooks/user/useContentSafetySettings";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -216,6 +218,7 @@ export default function MangaPage() {
   const { mangaId } = useParams<{ mangaId: string }>();
   const navigate = useNavigate();
   const isNative = useIsNativeApp();
+  const isMobileViewport = useIsMobile();
   const { user, profile, isAdmin } = useAuth();
   const { settings: contentSafetySettings, updateSettings: updateContentSafetySettings } = useContentSafetySettings();
   const [allowAdultForSession, setAllowAdultForSession] = useState(false);
@@ -332,6 +335,24 @@ export default function MangaPage() {
     setCoverFallbackTried(false);
     setCoverImageSrc(getProxiedImageUrl(rawCoverImage));
   }, [rawCoverImage]);
+
+  // Discord RPC — show "Viewing <title>" while on this page.
+  useEffect(() => {
+    if (!isNative) return;
+    const detail = mangaData?.detail;
+    if (!detail) return;
+    const title =
+      detail.canonicalTitle || detail.title?.english || detail.title?.romaji || '';
+    if (!title) return;
+    setViewingMangaRpc({
+      mangaTitle: title,
+      mangaImageUrl: detail.coverImage ?? null,
+      mangaUrl: `https://tatakai.me/manga/${mangaId}`,
+    });
+    return () => {
+      clearDiscordRpc();
+    };
+  }, [isNative, mangaData?.detail, mangaId]);
 
   // Banner + chapter/volume counts come from the server-proxied `by-anilist`
   // query (anilistMangaMeta), not a direct graphql.anilist.co call — the direct
@@ -769,7 +790,7 @@ export default function MangaPage() {
   }, [sortedChapters, preferredProvider, effectivePreferredLanguage]);
 
   // Desktop vs Mobile sidebar display
-  const showSidebar = !isNative;
+  const showSidebar = !isMobileViewport;
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -855,11 +876,17 @@ export default function MangaPage() {
   const recommendationTerms = useMemo(() => {
     if (!info) return [];
 
+    // Phones: 2 terms (title + top genre) instead of 4 — halves the parallel
+    // search fan-out, which was the main stall on mobile data.
+    const genreTerms = isMobileViewport
+      ? info.genres.slice(0, 1).map((genre) => `${genre} manga`)
+      : info.genres.slice(0, 3).map((genre) => `${genre} manga`);
+
     const terms = [
       info.canonicalTitle,
       info.title?.english,
       info.title?.romaji,
-      ...info.genres.slice(0, 3).map((genre) => `${genre} manga`),
+      ...genreTerms,
     ];
 
     return Array.from(
@@ -868,8 +895,8 @@ export default function MangaPage() {
           .map((term) => String(term || "").trim())
           .filter((term) => term.length > 0),
       ),
-    ).slice(0, 4);
-  }, [info]);
+    ).slice(0, isMobileViewport ? 2 : 4);
+  }, [info, isMobileViewport]);
 
   const { data: recommendationCards = [], isLoading: loadingRecommendations } = useQuery({
     queryKey: [
@@ -883,7 +910,7 @@ export default function MangaPage() {
 
       const batches = await Promise.all(
         recommendationTerms.map((term, index) =>
-          searchManga(term, 1, index === 0 ? 12 : 10, { provider: "all" }),
+          searchManga(term, 1, isMobileViewport ? 8 : (index === 0 ? 12 : 10), { provider: "all" }),
         ),
       );
 
@@ -930,10 +957,10 @@ export default function MangaPage() {
   const { recommendations: anilistMangaRecs } = useAniListRecommendations(info?.anilistId, {
     mediaType: "MANGA",
     includeAdult: includeAdultRecs,
-    limit: 24,
+    limit: isMobileViewport ? 12 : 24,
   });
   // The app's own personalized manga engine (same source as the Recommendations page).
-  const { recommendations: mangaEngineRecs } = useMangaRecommendationEngine({ limit: 24 });
+  const { recommendations: mangaEngineRecs } = useMangaRecommendationEngine({ limit: isMobileViewport ? 12 : 24 });
 
   // Merge AniList (primary) + engine (personalized) + search (fallback), deduped
   // and with the current title removed.
@@ -986,8 +1013,8 @@ export default function MangaPage() {
 
     for (const card of recommendationCards) push(card);
 
-    return out.slice(0, 16);
-  }, [anilistMangaRecs, mangaEngineRecs, recommendationCards, info?.anilistId, info?.malId, mangaId, includeAdultRecs]);
+    return out.slice(0, isMobileViewport ? 10 : 16);
+  }, [anilistMangaRecs, mangaEngineRecs, recommendationCards, info?.anilistId, info?.malId, mangaId, includeAdultRecs, isMobileViewport]);
 
   if (loadingInfo) {
     return (

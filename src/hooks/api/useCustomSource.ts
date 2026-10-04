@@ -6,7 +6,8 @@
  * stay independent.
  */
 
-import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   listAllCustomSources,
   fetchCustomHome,
@@ -21,9 +22,19 @@ import {
   type CustomWatchData,
   type CustomReadData,
 } from "@/core/content/custom-source-runtime";
+import type { CustomSearchFilters } from "@/core/extensions/sdk/types";
 
 /** Every custom source across every installed extension (powers the sidebar). */
 export function useCustomSources() {
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    const refresh = () => {
+      void queryClient.invalidateQueries({ queryKey: ["custom-sources"] });
+    };
+    window.addEventListener('tatakai-extensions-changed', refresh);
+    return () => window.removeEventListener('tatakai-extensions-changed', refresh);
+  }, [queryClient]);
+
   return useQuery<CustomSourceEntry[]>({
     queryKey: ["custom-sources"],
     queryFn: listAllCustomSources,
@@ -51,12 +62,24 @@ export function useCustomHome(namespace?: string, sourceId?: string) {
   });
 }
 
-export function useCustomSearch(namespace?: string, sourceId?: string, query = "", page = 1) {
+export function useCustomSearch(
+  namespace?: string,
+  sourceId?: string,
+  query = "",
+  page = 1,
+  filters?: CustomSearchFilters,
+) {
   const trimmed = query.trim();
+  const filterKey = filters ? JSON.stringify(filters) : "";
+  const hasFilters = Boolean(
+    filters &&
+      ((filters.tags && filters.tags.length) ||
+        Object.keys(filters).some((k) => k !== "tags" && filters[k])),
+  );
   return useQuery<CustomSearchData>({
-    queryKey: ["custom", namespace, sourceId, "search", trimmed, page],
-    queryFn: () => fetchCustomSearch(namespace!, sourceId!, trimmed, page),
-    enabled: Boolean(namespace && sourceId && trimmed),
+    queryKey: ["custom", namespace, sourceId, "search", trimmed, page, filterKey],
+    queryFn: () => fetchCustomSearch(namespace!, sourceId!, trimmed, page, filters),
+    enabled: Boolean(namespace && sourceId && (trimmed || hasFilters)),
     staleTime: 2 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
     refetchOnWindowFocus: false,

@@ -31,8 +31,8 @@ async function showNativeNotification(notification: Notification) {
                 title: notification.title,
                 body: notification.body,
                 id: Math.abs(notification.id.hashCode?.() || Date.now()) % 2147483647,
-                smallIcon: 'ic_stat_notification',
-                largeIcon: 'ic_launcher',
+                smallIcon: 'ic_notification',
+                largeIcon: 'ic_notification_large',
                 sound: 'default',
             }]
         });

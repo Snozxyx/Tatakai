@@ -1086,8 +1086,9 @@ function createHostApp({ registry, localProxy, logger }) {
         try {
             const result = await bundle.customHome(sourceId);
             const sections = Array.isArray(result?.sections) ? result.sections : [];
+            const filters = result?.filters && typeof result.filters === 'object' ? result.filters : null;
             res.writeHead(200, JSON_HEADERS);
-            return res.end(JSON.stringify({ namespace, sourceId, sections, fetchedAt: nowISO() }));
+            return res.end(JSON.stringify({ namespace, sourceId, sections, filters, fetchedAt: nowISO() }));
         } catch (err) {
             logger?.warn?.(`[ExtHost] ${namespace}/custom/home ${sourceId} failed: ${err.message}`);
             res.writeHead(502, JSON_HEADERS);
@@ -1106,12 +1107,22 @@ function createHostApp({ registry, localProxy, logger }) {
         const query = String(searchParams.get('q') || searchParams.get('query') || '').trim();
         const pageNum = Number(searchParams.get('page'));
         const page = Number.isFinite(pageNum) && pageNum > 0 ? pageNum : 1;
+        // Optional filter payload (tag chips + dropdown selections), JSON-encoded
+        // by the renderer. Shape is extension-defined; we pass it through verbatim.
+        let filters;
+        const filtersRaw = searchParams.get('filters');
+        if (filtersRaw) {
+            try {
+                const parsed = JSON.parse(filtersRaw);
+                if (parsed && typeof parsed === 'object') filters = parsed;
+            } catch { /* ignore malformed filters */ }
+        }
         if (!sourceId) {
             res.writeHead(400, JSON_HEADERS);
             return res.end(JSON.stringify({ namespace, ...empty, error: 'sourceId is required' }));
         }
         try {
-            const result = await bundle.customSearch(sourceId, query, page);
+            const result = await bundle.customSearch(sourceId, query, page, filters);
             const results = Array.isArray(result?.results) ? result.results : [];
             res.writeHead(200, JSON_HEADERS);
             return res.end(JSON.stringify({

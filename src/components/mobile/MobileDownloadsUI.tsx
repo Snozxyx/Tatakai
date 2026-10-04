@@ -3,7 +3,6 @@
  */
 import { useState } from 'react';
 import { Download, X, RotateCcw, Trash2, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
-import { Capacitor } from '@capacitor/core';
 import { useMobileDownload } from '@/hooks/media/useMobileDownload';
 import { cn } from '@/lib/utils';
 
@@ -85,8 +84,12 @@ export function MobileDownloadsUI() {
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-white font-medium truncate">{item.animeTitle}</p>
-                      <p className="text-zinc-400 text-sm">S{item.season} E{item.episode}</p>
+                      <p className="text-white font-medium truncate">{item.animeTitle || item.title}</p>
+                      <p className="text-zinc-400 text-sm">
+                        {item.kind === 'manga'
+                          ? (item.subtitle || 'Chapter')
+                          : (item.subtitle || (item.episode != null ? `Episode ${item.episode}` : 'Episode'))}
+                      </p>
 
                       {/* Progress */}
                       {(item.status === 'downloading' || item.status === 'queued') && (

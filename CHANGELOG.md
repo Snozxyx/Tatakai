@@ -4,6 +4,24 @@ All notable changes to Tatakai are documented here.
 
 ---
 
+## [6.0.4] - 2026-10-04
+
+**Feature release.** Ships the mobile and iOS apps, makes the app tablet-aware with the web's floating sidebar, fixes the macOS "damaged" install error, and removes dead weight from the repository.
+
+### Added
+- **Mobile (Android) App** — Tatakai can now be downloaded for Android. The build publishes a **signed** APK alongside the desktop installers on GitHub Releases, so it installs straight from the release page, and the download page surfaces a dedicated Android button when the asset exists.
+- **iOS App** — An iOS build is now produced by CI as well. It ships unsigned (developer build) and is uploaded as an artifact, because it carries no Apple signing identity.
+- **Tablet Layout** — On tablet-sized screens (768px and up) the app now uses the same floating web sidebar instead of the bottom navigation bar, giving a consistent experience from tablet up. Phones keep the bottom nav.
+- **Mobile Download Stats** — The admin analytics dashboard now splits download counts into mobile (Android + iOS) and desktop, and the landing page hero shows mobile downloads separately.
+- **Repo Cleanup** — Removed the vendored `hentaidb/` fork and other unreferenced scaffolding from the main codebase, including dead scratch scripts, leftover build output directories, and a duplicate lockfile.
+
+### Fixed
+- **macOS "App is damaged"** — The macOS desktop build is now ad-hoc signed (`identity: "-"`) in CI, so Gatekeeper no longer reports the download as damaged or from an unverified developer. Verified with a `codesign --verify --deep --strict` CI gate.
+- **Profile Banner API (403 / CORS)** — The landscape banner feed no longer calls `api.waifu.im` from the renderer, which the browser blocks with `403` and a CORS error. Those requests are routed through the backend's `/api/proxy/json` passthrough, and the dead call site that only produced console noise was removed.
+- **GitHub Mobile Builds** — The release workflow now builds and uploads the Android APK and the iOS archive in addition to the desktop app.
+
+---
+
 ## [6.0.3] - 2026-09-29
 
 **Patch release.** Moves every authentication email to an in-app 6-digit code, adds a secure email-change flow, and clears false alarms on the status page.

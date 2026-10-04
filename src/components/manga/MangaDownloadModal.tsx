@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Download, X, CheckCircle2, Circle, FolderOpen, Loader2, Play, BookOpen, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GlassPanel } from '@/components/ui/GlassPanel';
@@ -9,6 +10,7 @@ import { mangaJobId } from '@/core/download/manga-download-monitor';
 import type { MappedMangaChapter, MangaChapterSource } from '@/types/manga';
 import type { MangaDownloadChapter, MangaKind } from '@/types/electron-bridge';
 import { toast } from 'sonner';
+import { triggerHaptic } from '@/lib/haptics';
 
 // Same reliability order the reader uses for cross-source fallback (mirrors
 // MangaPage's MANGA_PROVIDER_RELIABILITY). Deterministic mappers first,
@@ -101,6 +103,7 @@ export const MangaDownloadModal = ({
   }, [chapters, anilistId]);
 
   const toggle = (key: string) => {
+    void triggerHaptic('select');
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key); else next.add(key);
@@ -109,6 +112,7 @@ export const MangaDownloadModal = ({
   };
 
   const selectAll = () => {
+    void triggerHaptic('select');
     setSelected((prev) => (prev.size === rows.length ? new Set() : new Set(rows.map((r) => r.key))));
   };
 
@@ -117,6 +121,7 @@ export const MangaDownloadModal = ({
     const from = parseFloat(rangeFrom);
     const to = parseFloat(rangeTo);
     if (!Number.isFinite(from) && !Number.isFinite(to)) return;
+    void triggerHaptic('select');
     const lo = Number.isFinite(from) ? from : -Infinity;
     const hi = Number.isFinite(to) ? to : Infinity;
     setSelected((prev) => {
@@ -131,6 +136,7 @@ export const MangaDownloadModal = ({
   const handleDownload = async () => {
     const picked = rows.filter((r) => selected.has(r.key));
     if (!picked.length) return;
+    void triggerHaptic('medium');
     setIsStarting(true);
     try {
       const res = await enqueueAll(
@@ -138,12 +144,14 @@ export const MangaDownloadModal = ({
         picked.map((r) => r.payload),
       );
       if (res.ok) {
+        void triggerHaptic('success');
         toast.success(`Queued ${picked.length} chapter${picked.length > 1 ? 's' : ''} for download`);
       } else if (res.reason === 'not_desktop') {
         toast.error('Manga downloads require the Tatakai desktop app');
       } else if (res.reason === 'feature_disabled') {
         toast.error('Manga downloads are disabled');
       } else {
+        void triggerHaptic('error');
         toast.error('Failed to queue downloads', {
           description: typeof res.error === 'string' ? res.error : undefined,
         });
@@ -155,10 +163,13 @@ export const MangaDownloadModal = ({
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in inset-x-0 top-[32px] bottom-0">
-      <div className="w-full max-w-2xl max-h-[90vh] overflow-hidden">
-        <GlassPanel className="p-4 sm:p-6 space-y-4 sm:space-y-5 max-h-[90vh] overflow-y-auto">
+  // Portal to <body>: page trees contain transformed ancestors (animations,
+  // parallax) that turn `position: fixed` into page-relative positioning —
+  // the sheet would land mid-page instead of on the visible screen.
+  const sheet = (
+    <div className="fixed z-[100] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in inset-0 sm:p-4 p-0">
+      <div className="w-full sm:max-w-2xl max-h-[92dvh] sm:max-h-[90vh] overflow-hidden flex flex-col">
+        <GlassPanel className="p-4 sm:p-6 space-y-4 sm:space-y-5 max-h-[92dvh] sm:max-h-[90vh] overflow-y-auto overscroll-contain rounded-t-3xl sm:rounded-2xl rounded-b-none sm:rounded-b-2xl pb-[max(1rem,env(safe-area-inset-bottom))]">
           {/* Header */}
           <div className="flex items-center justify-between">
             <h2 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
@@ -173,7 +184,7 @@ export const MangaDownloadModal = ({
           {!isEnabled && (
             <div className="flex items-center gap-2 rounded-xl bg-amber-500/10 border border-amber-500/30 p-3 text-xs text-amber-200">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              Manga downloads require the Tatakai desktop app.
+              Manga downloads require the Tatakai native app.
             </div>
           )}
 
@@ -217,8 +228,8 @@ export const MangaDownloadModal = ({
                 </Button>
               </div>
 
-              {/* Chapter list */}
-              <ScrollArea className="h-[220px] sm:h-[300px] rounded-xl border border-white/10 bg-white/[0.03]">
+              {/* Chapter list — taller on mobile bottom-sheet so fewer scrolls */}
+              <ScrollArea className="h-[38dvh] sm:h-[300px] min-h-[220px] rounded-xl border border-white/10 bg-white/[0.03]">
                 <div className="grid grid-cols-1 gap-1.5 p-1.5">
                   {rows.map((r) => {
                     const state = downloadStates[r.jobId];
@@ -228,7 +239,7 @@ export const MangaDownloadModal = ({
                       <div
                         key={r.key}
                         onClick={() => !busy && toggle(r.key)}
-                        className={`flex items-center justify-between p-2 sm:p-2.5 rounded-lg border transition-all cursor-pointer ${
+                        className={`flex items-center justify-between p-2 sm:p-2.5 rounded-lg border transition-colors cursor-pointer ${
                           isSelected ? 'bg-primary/10 border-primary/30' : 'bg-white/[0.02] border-transparent hover:border-white/10'
                         }`}
                       >
@@ -247,7 +258,7 @@ export const MangaDownloadModal = ({
                               <div className="text-right">
                                 <span className="text-[10px] sm:text-xs font-mono text-primary">{state.progress > 0 ? `${state.progress.toFixed(0)}%` : '...'}</span>
                                 <div className="w-12 sm:w-20 h-1 bg-muted rounded-full overflow-hidden mt-1">
-                                  <div className="h-full bg-primary transition-all duration-300" style={{ width: `${state.progress}%` }} />
+                                  <div className="h-full bg-primary transition-[width] duration-300" style={{ width: `${state.progress}%` }} />
                                 </div>
                               </div>
                             )}
@@ -270,7 +281,7 @@ export const MangaDownloadModal = ({
               <Button
                 onClick={handleDownload}
                 disabled={selected.size === 0 || isStarting || !isEnabled}
-                className="w-full h-14 sm:h-16 rounded-xl sm:rounded-2xl font-bold glow-primary flex-col gap-0.5"
+                className="sticky bottom-[max(0px,env(safe-area-inset-bottom))] z-20 w-full h-14 sm:h-16 rounded-xl sm:rounded-2xl font-bold glow-primary flex-col gap-0.5 shadow-[0_-18px_36px_hsl(var(--background))]"
               >
                 {isStarting ? (
                   <span className="flex items-center text-base sm:text-lg"><Loader2 className="w-5 h-5 mr-2 animate-spin" />Queuing…</span>
@@ -287,4 +298,6 @@ export const MangaDownloadModal = ({
       </div>
     </div>
   );
+  if (typeof document === 'undefined') return sheet;
+  return createPortal(sheet, document.body);
 };

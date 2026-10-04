@@ -12,6 +12,8 @@ export function useVideoProgress({
   onProgressUpdate,
   animeName,
   episodeNumber,
+  animeImageUrl,
+  animeUrl,
 }: UseVideoProgressParams) {
   const progressIntervalRef = useRef<number | null>(null);
   const progressCallbackRef = useRef<typeof onProgressUpdate | null>(onProgressUpdate);
@@ -96,14 +98,18 @@ export function useVideoProgress({
         episode: episodeNumber ?? 0,
         currentTime,
         duration,
+        animeImageUrl,
+        animeUrl,
       });
     } else {
       setPausedRpc({
         animeTitle: animeName,
         episode: episodeNumber ?? 0,
+        animeImageUrl,
+        animeUrl,
       });
     }
-  }, [isNative, isPlaying, animeName, episodeNumber]);
+  }, [isNative, isPlaying, animeName, episodeNumber, animeImageUrl, animeUrl]);
 
   // Persist final progress on unload
   useEffect(() => {

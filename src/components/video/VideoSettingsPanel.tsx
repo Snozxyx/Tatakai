@@ -21,6 +21,7 @@ import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { useVideoSettings, VideoSettings } from '@/hooks/media/useVideoSettings';
+import { isMobileNative } from '@/lib/platform/platform';
 import { useKeybinds } from '@/hooks/media/useKeybinds';
 import {
   KEYBIND_ACTIONS,
@@ -398,18 +399,27 @@ function SettingsPanelBody({
                 <h3 className="text-sm font-medium">Anime4K Upscaling</h3>
               </div>
               <div className="flex flex-wrap gap-2">
-                {ANIME4K_OPTIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() => updateSetting('anime4kPreset', option.value)}
-                    className={pill(settings.anime4kPreset === option.value)}
-                  >
-                    {option.label}
-                  </button>
-                ))}
+                {ANIME4K_OPTIONS
+                  // On the mobile app the player clamps upscaling to the cheapest
+                  // ("light") mode, so only offer Off/Light there — Standard/High
+                  // would silently behave like Light.
+                  .filter((option) =>
+                    isMobileNative() ? option.value === 'off' || option.value === 'light' : true,
+                  )
+                  .map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => updateSetting('anime4kPreset', option.value)}
+                      className={pill(settings.anime4kPreset === option.value)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
               </div>
               <p className="text-xs text-muted-foreground">
-                GPU upscaling for anime. Higher presets need a stronger GPU.
+                {isMobileNative()
+                  ? 'GPU upscaling for anime. On mobile this uses the light preset and needs a capable device.'
+                  : 'GPU upscaling for anime. Higher presets need a stronger GPU.'}
               </p>
             </section>
 
@@ -892,7 +902,9 @@ export function VideoSettingsPanel({
     return <SettingsPanelBody showHeader={false} {...bodyProps} />;
   }
 
-  // Player mode: slide in from the right as a side sheet.
+  // Player mode: right-side sheet on desktop, bottom sheet on mobile.
+  // Same full tabbed body (playback / video / subtitles / audio / keys) on
+  // both — mobile just gets a thumb-friendly bottom sheet with safe-area pad.
   return (
     <Sheet
       open={isOpen}
@@ -902,9 +914,15 @@ export function VideoSettingsPanel({
     >
       <SheetContent
         side="right"
-        className="w-[400px] sm:max-w-[400px] overflow-y-auto bg-background/95 backdrop-blur-xl border-white/10"
+        className="flex flex-col gap-0 overflow-hidden border-white/10 bg-background/95 p-0 backdrop-blur-xl md:w-[400px] md:max-w-[400px] max-md:inset-x-2 max-md:bottom-2 max-md:top-auto max-md:h-auto max-md:max-h-[85dvh] max-md:w-auto max-md:rounded-3xl max-md:border max-md:shadow-2xl"
       >
-        <SettingsPanelBody showHeader {...bodyProps} />
+        {/* drag handle — mobile only */}
+        <div className="shrink-0 pt-2.5 md:hidden" aria-hidden>
+          <div className="mx-auto h-1 w-10 rounded-full bg-white/20" />
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-[max(1rem,env(safe-area-inset-bottom))] custom-scrollbar sm:p-6">
+          <SettingsPanelBody showHeader {...bodyProps} />
+        </div>
       </SheetContent>
     </Sheet>
   );

@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { triggerHaptic } from '@/lib/haptics';
 import { db } from '@/core/db/tatakai-db';
 import type { MangaKind } from '@/types/electron-bridge';
 
@@ -85,12 +86,12 @@ function upsert(jobId: string, patch: Partial<MangaDownloadEntry>) {
 /** Metadata cached at enqueue so the completed row can carry title/number/volume. */
 const jobMeta = new Map<
   string,
-  { title?: string; chapterNumber?: number | null; volume?: number | string | null; provider?: string | null }
+  { title?: string; posterUrl?: string | null; chapterNumber?: number | null; volume?: number | string | null; provider?: string | null }
 >();
 
 export function rememberMangaJobMeta(
   jobId: string,
-  meta: { title?: string; chapterNumber?: number | null; volume?: number | string | null; provider?: string | null },
+  meta: { title?: string; posterUrl?: string | null; chapterNumber?: number | null; volume?: number | string | null; provider?: string | null },
 ) {
   jobMeta.set(jobId, { ...jobMeta.get(jobId), ...meta });
 }
@@ -112,6 +113,7 @@ async function persistOfflineChapter(data: {
       id: `${data.anilistId}:${data.chapterKey}`,
       anilistId: data.anilistId,
       title: data.title || meta.title || 'Untitled',
+      posterUrl: meta.posterUrl ?? null,
       chapterKey: data.chapterKey,
       chapterNumber: data.chapterNumber ?? meta.chapterNumber ?? null,
       volume: data.volume ?? meta.volume ?? null,
@@ -171,6 +173,7 @@ export function ensureMangaDownloadMonitor() {
       pageCount: typeof data.pageCount === 'number' ? data.pageCount : undefined,
       sizeBytes: typeof data.sizeBytes === 'number' ? data.sizeBytes : undefined,
     });
+    void triggerHaptic('download-complete');
     if (data.localDir && Number(data.anilistId)) {
       void persistOfflineChapter({
         anilistId: Number(data.anilistId),
@@ -209,6 +212,50 @@ export function markMangaFailedStart(jobId: string, error: string) {
 }
 export function markMangaCancelled(jobId: string) {
   upsert(jobId, { status: 'cancelled' });
+}
+
+// ── Mobile-driven progress (Capacitor manga downloader) ────────────────────
+// Desktop drives these via the manga IPC channels; mobile has no such bridge,
+// so the Capacitor manga downloader pushes progress/terminal states here and
+// persists the OfflineChapter row on completion — identical to the IPC path.
+export function markMangaProgress(
+  jobId: string,
+  patch: { anilistId?: number; chapterKey?: string; page?: number; totalPages?: number; percent?: number },
+) {
+  upsert(jobId, {
+    anilistId: patch.anilistId,
+    chapterKey: patch.chapterKey,
+    status: 'downloading',
+    progress: typeof patch.percent === 'number' ? patch.percent : 0,
+    page: patch.page,
+    totalPages: patch.totalPages,
+  });
+}
+export function markMangaCompleted(data: {
+  anilistId: number;
+  chapterKey: string;
+  chapterNumber?: number | null;
+  volume?: number | string | null;
+  provider?: string | null;
+  title?: string;
+  localDir: string;
+  pageCount: number;
+  sizeBytes: number;
+}) {
+  const jobId = mangaJobId(data.anilistId, data.chapterKey);
+  upsert(jobId, {
+    anilistId: data.anilistId,
+    chapterKey: data.chapterKey,
+    status: 'completed',
+    progress: 100,
+    localDir: data.localDir,
+    pageCount: data.pageCount,
+    sizeBytes: data.sizeBytes,
+  });
+  void persistOfflineChapter(data);
+}
+export function markMangaError(jobId: string, error: string) {
+  upsert(jobId, { status: error === 'cancelled' ? 'cancelled' : 'failed', error });
 }
 
 // ── React binding ──────────────────────────────────────────────────────────

@@ -16,6 +16,7 @@ import type { TatakaiMedia } from '@/core/content/types';
 import { buildTasteProfile } from '@/core/recommendations/tasteProfile';
 import { rankCandidates } from '@/core/recommendations/scoring';
 import { enrichAnimeMeta, toAnimeMeta } from '@/core/recommendations/metadataEnrich';
+import { isCapacitor } from '@/lib/platform/platform';
 import type {
   AnimeMeta,
   RecommendationFactors,
@@ -28,6 +29,33 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const MODEL_VERSION = 'v1';
 const MAX_SEEDS = 60; // cap metadata enrichment for the profile
 const MAX_STORED = 60; // how many recs to persist
+
+/**
+ * The model is identical on every platform; only the amount of remote work is
+ * reduced on mobile. A phone does not benefit from fetching hundreds of rows
+ * before rendering a 6–40 item rail, and the smaller pool materially improves
+ * first load on cellular connections.
+ */
+function recommendationBudget() {
+  if (!isCapacitor()) {
+    return {
+      history: 500,
+      seeds: MAX_SEEDS,
+      collaborative: 200,
+      missingCollaborative: 80,
+      genreCount: 3,
+      genrePageSize: 24,
+    };
+  }
+  return {
+    history: 240,
+    seeds: 36,
+    collaborative: 100,
+    missingCollaborative: 40,
+    genreCount: 2,
+    genrePageSize: 16,
+  };
+}
 
 export interface EngineRecommendation {
   anime: AnimeMeta;
@@ -128,7 +156,10 @@ function assembleSignals(
 
 // ── Candidate gathering ──────────────────────────────────────────────────────
 
-async function gatherCandidateMedia(topGenres: string[]): Promise<TatakaiMedia[]> {
+async function gatherCandidateMedia(
+  topGenres: string[],
+  budget: ReturnType<typeof recommendationBudget>,
+): Promise<TatakaiMedia[]> {
   const media: TatakaiMedia[] = [];
   const push = (arr?: TatakaiMedia[]) => { if (arr) media.push(...arr); };
 
@@ -144,8 +175,8 @@ async function gatherCandidateMedia(topGenres: string[]): Promise<TatakaiMedia[]
 
   // Genre-targeted search widens coverage beyond the homepage's popular set.
   const genreResults = await Promise.all(
-    topGenres.slice(0, 3).map((genre) =>
-      contentGraph.search({ genres: [genre], page: 1, perPage: 24 }).then((r) => r.media).catch(() => [] as TatakaiMedia[])),
+    topGenres.slice(0, budget.genreCount).map((genre) =>
+      contentGraph.search({ genres: [genre], page: 1, perPage: budget.genrePageSize }).then((r) => r.media).catch(() => [] as TatakaiMedia[])),
   );
   for (const arr of genreResults) push(arr);
   return media;
@@ -154,9 +185,10 @@ async function gatherCandidateMedia(topGenres: string[]): Promise<TatakaiMedia[]
 // ── The engine query ─────────────────────────────────────────────────────────
 
 async function computeEngine(userId: string): Promise<RecommendationEngineData> {
+  const budget = recommendationBudget();
   const [{ data: watchlist }, { data: history }, { data: ratings }, { data: feedback }] = await Promise.all([
     supabase.from('watchlist').select('*').eq('user_id', userId),
-    supabase.from('watch_history').select('*').eq('user_id', userId).order('watched_at', { ascending: false }).limit(500),
+    supabase.from('watch_history').select('*').eq('user_id', userId).order('watched_at', { ascending: false }).limit(budget.history),
     supabase.from('ratings').select('anime_id, rating').eq('user_id', userId),
     (supabase as any).from('recommendation_feedback').select('anime_id, feedback').eq('user_id', userId),
   ]);
@@ -172,7 +204,7 @@ async function computeEngine(userId: string): Promise<RecommendationEngineData> 
   const seedIds = signals
     .filter((s) => !s.disliked)
     .sort((a, b) => new Date(b.lastActivity ?? 0).getTime() - new Date(a.lastActivity ?? 0).getTime())
-    .slice(0, MAX_SEEDS)
+    .slice(0, budget.seeds)
     .map((s) => s.animeId);
   const seedMeta = await enrichAnimeMeta(seedIds);
 
@@ -184,7 +216,7 @@ async function computeEngine(userId: string): Promise<RecommendationEngineData> 
   try {
     const { data: collab } = await (supabase as any).rpc('get_user_collaborative_scores', {
       p_user_id: userId,
-      p_limit: 200,
+      p_limit: budget.collaborative,
     });
     const rows = (collab as Array<{ anime_id: string; score: number }>) ?? [];
     const maxScore = rows.reduce((m, r) => Math.max(m, Number(r.score) || 0), 0);
@@ -195,13 +227,15 @@ async function computeEngine(userId: string): Promise<RecommendationEngineData> 
   } catch { /* collaborative model optional until similarity is refreshed */ }
 
   // Candidates: content-graph media (free metadata) + collaborative ids (fetched).
-  const media = await gatherCandidateMedia(profile.topGenres.map((g) => g.genre));
+  const media = await gatherCandidateMedia(profile.topGenres.map((g) => g.genre), budget);
   const candidateMap = new Map<string, AnimeMeta>();
   for (const m of media) {
     const meta = toAnimeMeta(m);
     candidateMap.set(meta.id, meta);
   }
-  const missingCollab = collabIds.filter((id) => !candidateMap.has(id)).slice(0, 80);
+  const missingCollab = collabIds
+    .filter((id) => !candidateMap.has(id))
+    .slice(0, budget.missingCollaborative);
   const collabMeta = await enrichAnimeMeta(missingCollab);
   collabMeta.forEach((meta, id) => candidateMap.set(id, meta));
 
@@ -269,7 +303,7 @@ export function useRecommendationEngineData() {
   const { user } = useAuth();
   // Depend on list/history sizes so the engine recomputes when the user's data changes.
   const { data: watchlist } = useWatchlist();
-  const { data: history } = useWatchHistory(500);
+  const { data: history } = useWatchHistory(isCapacitor() ? 240 : 500);
 
   return useQuery({
     queryKey: ['recommendation-engine', user?.id, watchlist?.length, history?.length],

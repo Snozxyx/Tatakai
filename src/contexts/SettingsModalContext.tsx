@@ -19,6 +19,7 @@ export type SettingsCategoryId =
   | 'player'
   | 'reader'
   | 'app'
+  | 'mobile'
   | 'extensions'
   | 'about'
   | 'changelog';
@@ -29,6 +30,8 @@ const DEFAULT_CATEGORY: SettingsCategoryId = 'account';
 const TAB_ALIASES: Record<string, SettingsCategoryId> = {
   desktop: 'app',
   appsettings: 'app',
+  mobileapp: 'mobile',
+  mobilesettings: 'mobile',
   videoplayer: 'player',
   video: 'player',
   integration: 'integrations',
@@ -44,7 +47,7 @@ export function normalizeSettingsCategory(value?: string | null): SettingsCatego
   if (key in TAB_ALIASES) return TAB_ALIASES[key];
   const known: SettingsCategoryId[] = [
     'account', 'saved', 'privacy', 'integrations', 'appearance',
-    'display', 'player', 'reader', 'app', 'extensions', 'about', 'changelog',
+    'display', 'player', 'reader', 'app', 'mobile', 'extensions', 'about', 'changelog',
   ];
   return (known as string[]).includes(key) ? (key as SettingsCategoryId) : DEFAULT_CATEGORY;
 }

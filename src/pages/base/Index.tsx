@@ -58,7 +58,7 @@ const Index = () => {
   const [showDeferredSections, setShowDeferredSections] = useState(false);
 
   // Show sidebar on desktop (web or app), but not on mobile (web or app)
-  const showSidebar = !isMobile && !isMobileApp;
+  const showSidebar = !isMobile;
 
   useEffect(() => {
     setBrowsingRpc('Anime');
@@ -92,7 +92,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-      {!showSidebar && <Background />}
+      {!isMobile && <Background />}
       {showSidebar && <Sidebar />}
 
       <main className={cn(
@@ -190,8 +190,8 @@ const Index = () => {
       </main>
 
       {showDeferredSections && data && <ReviewPopup />}
-      {!showSidebar && <MobileNav />}
-      <AppDownloadBanner />
+      {!isMobile && <MobileNav />}
+      {!isMobile && !isMobileApp && <AppDownloadBanner />}
     </div>
   );
 };

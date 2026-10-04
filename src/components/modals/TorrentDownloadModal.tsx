@@ -66,7 +66,7 @@ export function TorrentDownloadModal({ open, onClose, downloadPath }: TorrentDow
 
   return (
     <Dialog open={open} onOpenChange={o => { if (!o) handleClose(); }}>
-      <DialogContent className="max-w-2xl bg-background border border-white/10 shadow-2xl max-h-[85vh] flex flex-col">
+      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-2xl bg-background border border-white/10 shadow-2xl max-h-[92dvh] sm:max-h-[85vh] flex flex-col overflow-y-auto overscroll-contain rounded-3xl sm:rounded-2xl p-4 sm:p-6 pb-[max(1rem,env(safe-area-inset-bottom))]">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold flex items-center gap-2">
             <Magnet className="w-5 h-5 text-primary" />

@@ -84,6 +84,9 @@ export function DownloadSection() {
           <Button
             variant="outline"
             onClick={() => window.open(linkFor('macos'), '_blank')}
+            className="h-16 px-8 rounded-2xl font-black text-lg border-white/10 bg-white/5 hover:bg-white/10 hover:border-primary/30 transition-all w-full justify-start gap-4 backdrop-blur-md"
+          >
+            <Apple className="w-6 h-6" />
             <div className="text-left">
               <div className="text-[10px] font-bold uppercase tracking-widest opacity-75">Download for</div>
               <div className="leading-tight">macOS</div>

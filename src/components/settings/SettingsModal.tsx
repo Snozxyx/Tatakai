@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSettingsModal } from '@/contexts/SettingsModalContext';
-import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
+import { useIsDesktopApp, useIsMobileApp } from '@/hooks/ui/useIsNativeApp';
 import { ProfileSettingsSheet } from '@/components/profile/ProfileSettingsSheet';
 import { ExtensionSlot } from '@/core/extensions/ExtensionSlot';
 import {
@@ -26,13 +26,14 @@ export function SettingsModal() {
   const { open, category, section, closeSettings, setCategory } = useSettingsModal();
   const { user, profile, signOut } = useAuth();
   const isDesktop = useIsDesktopApp();
+  const isMobile = useIsMobileApp();
 
   const [query, setQuery] = useState('');
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
 
   const categories = useMemo(
-    () => SETTINGS_CATEGORIES.filter((c) => (c.requiresNative ? isDesktop : true)),
-    [isDesktop],
+    () => SETTINGS_CATEGORIES.filter((c) => (c.requiresMobile ? isMobile : c.requiresNative ? isDesktop : true)),
+    [isDesktop, isMobile],
   );
 
   // Token-based search over each category's label, description and keywords, so
@@ -84,9 +85,9 @@ export function SettingsModal() {
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) closeSettings(); }}>
-      <DialogContent className="max-w-6xl w-[95vw] h-[88vh] p-0 gap-0 overflow-hidden bg-background/60 backdrop-blur-[40px] border-white/[0.08] rounded-2xl shadow-2xl">
+      <DialogContent className="z-[80] flex flex-col w-[95vw] max-w-6xl h-[88vh] max-h-[88vh] max-md:w-[calc(100vw-1rem)] max-md:h-[94dvh] max-md:max-h-[94dvh] p-0 gap-0 overflow-hidden bg-background/80 backdrop-blur-[40px] border-white/[0.08] rounded-2xl max-md:rounded-3xl shadow-2xl">
         <DialogTitle className="sr-only">Settings — {active.label}</DialogTitle>
-        <div className="flex h-full min-h-0">
+        <div className="flex flex-1 min-h-0 min-w-0">
           {/* Left rail */}
           <aside
             className={cn(
@@ -205,10 +206,10 @@ export function SettingsModal() {
             )}
           >
             {/* Sticky header */}
-            <header className="flex items-center gap-3 px-5 py-4 border-b border-white/[0.06] shrink-0">
+            <header className="flex items-center gap-2 px-4 py-3.5 border-b border-white/[0.06] shrink-0">
               <button
                 onClick={() => setMobilePanelOpen(false)}
-                className="md:hidden text-muted-foreground hover:text-foreground"
+                className="md:hidden flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-white/[0.06] active:scale-95"
                 aria-label="Back to categories"
               >
                 <ChevronLeft className="w-5 h-5" />

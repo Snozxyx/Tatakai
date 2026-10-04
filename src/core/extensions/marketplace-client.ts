@@ -11,14 +11,13 @@
 // Base URL
 // ---------------------------------------------------------------------------
 
-const BASE_URL = `${import.meta.env.VITE_BACKEND_ORIGIN}/api/v3`;
-
 /**
  * Absolute origin of the Tatakai backend (no `/api/v3` suffix). Prefers
  * `VITE_BACKEND_ORIGIN`, then the origin of `VITE_TATAKAI_API_URL`, then the
  * current page origin (web dev, where Vite proxies `/api/*`). Never returns a
  * bare relative path so `app://tatakai.me` on desktop can't intercept it.
  */
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 function resolveBackendOrigin(): string {
   const explicit = String(import.meta.env.VITE_BACKEND_ORIGIN || "").trim();
   if (/^https?:\/\//i.test(explicit)) return explicit.replace(/\/+$/, "");
@@ -29,10 +28,24 @@ function resolveBackendOrigin(): string {
   } catch {
     /* fall through */
   }
+  // Capacitor serves from a virtual host (tatakai.me/localhost) that is NOT the
+  // backend, so window.location.origin can't reach the marketplace API.
+  if (isCapacitorOrigin()) return "https://api.tatakai.me";
   if (typeof window !== "undefined" && window.location.protocol.startsWith("http")) {
     return window.location.origin;
   }
   return "";
+}
+
+/** Local Capacitor check — avoids importing the platform module into this
+ * low-level client (keeps its dependency surface tiny). */
+function isCapacitorOrigin(): boolean {
+  const cap = (globalThis as any).Capacitor;
+  try {
+    return !!cap && typeof cap.isNativePlatform === "function" && cap.isNativePlatform();
+  } catch {
+    return false;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -160,21 +173,34 @@ function mapRawToMarketplaceExtension(raw: RawManifestEntry): MarketplaceExtensi
 export async function fetchMarketplaceExtensions(
   filter?: MarketplaceFilter,
 ): Promise<MarketplaceExtension[]> {
-  const url = new URL(`${BASE_URL}/extensions/manifests`);
+  const url = new URL(`${resolveBackendOrigin()}/api/v3/extensions/manifests`);
 
   if (filter?.type) {
     url.searchParams.set("type", filter.type);
   }
 
-  const response = await fetch(url.toString());
-
-  if (!response.ok) {
-    throw new Error(
-      `fetchMarketplaceExtensions: HTTP ${response.status} ${response.statusText}`,
-    );
+  let envelope: ApiEnvelope<RawManifestEntry[]>;
+  if (Capacitor.isNativePlatform()) {
+    const response = await CapacitorHttp.get({
+      url: url.toString(),
+      headers: { Accept: 'application/json' },
+      connectTimeout: 6000,
+      readTimeout: 6000,
+      responseType: 'json',
+    });
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(`fetchMarketplaceExtensions: HTTP ${response.status}`);
+    }
+    envelope = response.data as ApiEnvelope<RawManifestEntry[]>;
+  } else {
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      throw new Error(
+        `fetchMarketplaceExtensions: HTTP ${response.status} ${response.statusText}`,
+      );
+    }
+    envelope = await response.json();
   }
-
-  const envelope: ApiEnvelope<RawManifestEntry[]> = await response.json();
 
   if (!envelope.success || !Array.isArray(envelope.data)) {
     throw new Error(
@@ -200,6 +226,44 @@ export async function fetchMarketplaceExtensions(
  * already answers every other renderer API call cross-origin) returns the
  * actual `.kai` bytes.
  */
+/**
+ * Turn a failed download response into a message worth putting in a toast.
+ *
+ * The marketplace download endpoint answers an unsigned/unverified release with
+ * `409 {"error":"This release has not been signed and verified; download
+ * blocked"}` — a deliberate gate, not a transient fault. Surfacing the raw
+ * `HTTP 409 Conflict — https://…supabase.co/…` string (what callers saw before)
+ * reads like a bug; instead we lift the server's own explanation and point at
+ * the one path that still works for an unsigned bundle: sideloading the `.kai`.
+ */
+async function describeDownloadFailure(response: Response, url: string): Promise<string> {
+  let detail = "";
+  try {
+    const text = await response.text();
+    if (text) {
+      try {
+        const json = JSON.parse(text);
+        detail = String(json?.error || json?.message || "").trim();
+      } catch {
+        detail = text.trim().slice(0, 200);
+      }
+    }
+  } catch {
+    /* body unreadable / already consumed */
+  }
+
+  if (response.status === 409) {
+    const reason =
+      detail ||
+      "This release has not been signed and verified by the marketplace, so it can't be downloaded here.";
+    return `${reason} You can still install it by sideloading the .kai file from the Extensions page.`;
+  }
+
+  return detail
+    ? `${detail} (HTTP ${response.status})`
+    : `downloadExtensionKai: HTTP ${response.status} ${response.statusText} — ${url}`;
+}
+
 export async function downloadExtensionKai(mainUrl: string): Promise<ArrayBuffer> {
   const isHttpUrl = /^https?:\/\//i.test(mainUrl);
 
@@ -220,9 +284,9 @@ export async function downloadExtensionKai(mainUrl: string): Promise<ArrayBuffer
   const response = await fetch(mainUrl);
 
   if (!response.ok) {
-    throw new Error(
-      `downloadExtensionKai: HTTP ${response.status} ${response.statusText} — ${mainUrl}`,
-    );
+    // Prefer the origin server's own explanation (e.g. the signature gate's 409)
+    // over a bare status line — see describeDownloadFailure.
+    throw new Error(await describeDownloadFailure(response, mainUrl));
   }
 
   return response.arrayBuffer();

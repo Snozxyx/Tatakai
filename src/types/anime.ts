@@ -192,6 +192,12 @@ export interface EpisodeServer {
   fileSize?: string;
   languageLabel?: string;
   audioLanguage?: string;
+  /** Provider-required request headers for manifests, segments, and files. */
+  headers?: Record<string, string>;
+  /** Ordered fallback Referers supplied by the extension result processor. */
+  refererCandidates?: string[];
+  /** Extension registry rank used to preserve its preferred-server order. */
+  providerPriority?: number;
   /**
    * The extension's own ranking of this server, lowest first.
    *
@@ -242,6 +248,9 @@ export interface StreamingSource {
   fileSize?: string;
   languageLabel?: string;
   audioLanguage?: string;
+  headers?: Record<string, string>;
+  refererCandidates?: string[];
+  providerPriority?: number;
   /**
    * Tracks the provider returned for *this* source. Kept per-source so switching
    * server switches subtitles; `StreamingData.subtitles` holds the union.
@@ -255,6 +264,11 @@ export interface Subtitle {
   label?: string;
   kind?: string;
   file?: string;
+  /** Real upstream URL retained when the mobile in-app proxy uses a token. */
+  originalUrl?: string;
+  /** Per-track/source replay headers (Referer/Origin/User-Agent). */
+  headers?: Record<string, string>;
+  default?: boolean;
 }
 
 export interface NextEpisodeEstimate {

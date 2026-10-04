@@ -9,7 +9,9 @@ import {
   Eye,
   History,
   List,
+  Pause,
   Play,
+  XCircle,
 } from 'lucide-react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { getProxiedImageUrl } from '@/lib/api';
@@ -54,7 +56,16 @@ const STATUS_LABELS: Record<string, { label: string; color: string; bg: string; 
   watching: { label: 'Watching', color: 'text-sky-400', bg: 'bg-sky-400/20', icon: Eye },
   completed: { label: 'Completed', color: 'text-emerald-400', bg: 'bg-emerald-400/20', icon: CheckCircle },
   plan_to_watch: { label: 'Plan', color: 'text-amber-400', bg: 'bg-amber-400/20', icon: Clock },
+  on_hold: { label: 'On Hold', color: 'text-orange-400', bg: 'bg-orange-400/20', icon: Pause },
+  dropped: { label: 'Dropped', color: 'text-rose-400', bg: 'bg-rose-400/20', icon: XCircle },
 };
+
+const FALLBACK_STATUS = STATUS_LABELS.plan_to_watch;
+
+function resolveWatchStatus(raw: unknown) {
+  const key = String(raw ?? 'plan_to_watch').trim().toLowerCase();
+  return STATUS_LABELS[key] ?? FALLBACK_STATUS;
+}
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -91,7 +102,7 @@ export const OverviewWidgetsRail = memo(function OverviewWidgetsRail({
         onMore={() => onNavigateTab('watchlist')}
       >
         {watchlist.slice(0, 3).map((item) => {
-          const status = STATUS_LABELS[item.status || 'plan_to_watch'];
+          const status = resolveWatchStatus(item?.status);
           const StatusIcon = status.icon;
           return (
             <Media

@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { Header } from "@/components/layout/Header";
 import { useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
+import { useIsMobile } from "@/hooks/ui/use-mobile";
 import { cn } from "@/lib/utils";
 import type { MangaSearchItem } from "@/types/manga";
 import { UnifiedMediaCard, UnifiedMediaCardProps } from "@/components/UnifiedMediaCard";
@@ -87,6 +88,7 @@ export default function MangaHomePage() {
   const navigate = useNavigate();
   const { openSettings } = useSettingsModal();
   const isNative = useIsNativeApp();
+  const isMobile = useIsMobile();
   const { settings: contentSafetySettings, updateSettings: updateContentSafetySettings } = useContentSafetySettings();
   const canShowAdultEverywhere = contentSafetySettings.showAdultEverywhere;
 
@@ -131,7 +133,7 @@ export default function MangaHomePage() {
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       {!isNative && <Background />}
-      {!isNative && <Sidebar />}
+      {!isMobile && <Sidebar />}
 
       <main className={cn(
         "relative z-10 pr-6 py-6 max-w-[1800px] mx-auto pb-24 md:pb-6",
@@ -290,7 +292,7 @@ export default function MangaHomePage() {
         <InfiniteMangaSections />
       </main>
 
-      {!isNative && <MobileNav />}
+      {!isMobile && <MobileNav />}
     </div>
   );
 }

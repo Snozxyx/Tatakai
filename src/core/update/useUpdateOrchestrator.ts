@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { toast } from 'sonner';
 import {
   ingestUpdaterEvent,
   markInstalling,
@@ -24,6 +25,14 @@ interface ElectronUpdaterBridge {
   onUpdaterEvent?: (cb: (data: UpdaterEvent) => void) => (() => void) | void;
   updateDownload?: () => void;
   updateInstall?: () => void;
+  platform?: string;
+  openExternal?: (url: string) => unknown;
+}
+
+export const LATEST_RELEASE_URL = 'https://github.com/snozxyx/Tatakai/releases/latest';
+
+export function openManualUpdateDownload(): void {
+  void bridge()?.openExternal?.(LATEST_RELEASE_URL);
 }
 
 function bridge(): ElectronUpdaterBridge | null {
@@ -42,6 +51,17 @@ export function useUpdateOrchestrator(): void {
 
     const unsubscribe = el.onUpdaterEvent((data: UpdaterEvent) => {
       ingestUpdaterEvent(data);
+
+      if (data.type === 'available' && data.manual) {
+        toast.info(`Tatakai ${data.info?.version ?? ''} is available`, {
+          id: 'mac-manual-update',
+          description: 'Download the DMG for your Mac and replace Tatakai in Applications.',
+          duration: Infinity,
+          closeButton: true,
+          action: { label: 'Download manually', onClick: openManualUpdateDownload },
+        });
+        return;
+      }
 
       // Silent auto-download: the standard/recommended feed reports `available`
       // with autoDownload off, so we start the download ourselves. Mandatory
@@ -65,6 +85,10 @@ export function useUpdateOrchestrator(): void {
 /** Trigger the quit-and-install now (used by the Dynamic Island restart pill). */
 export function installUpdateNow(): void {
   const el = bridge();
+  if (el?.platform === 'darwin') {
+    openManualUpdateDownload();
+    return;
+  }
   try {
     el?.updateInstall?.();
     markInstalling();

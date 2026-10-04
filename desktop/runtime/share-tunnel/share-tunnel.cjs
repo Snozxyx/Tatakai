@@ -60,23 +60,42 @@ function createShareTunnel({ logger, app, path, fs } = {}) {
         return path.join(app.getPath('userData'), 'bin');
     }
 
+    /**
+     * A path is spawnable only if it's a real file on disk. Files that live
+     * *inside* an asar archive (…/app.asar/…) pass `fs.existsSync` — Electron's
+     * asar-aware fs reports them as present — but cannot be executed by spawn(),
+     * which throws ENOENT. `app.asar.unpacked` is a real dir, so allow that.
+     * This is the exact bug behind the reported
+     * "spawn …\app.asar\resources\bin\cloudflared.exe ENOENT".
+     */
+    function isSpawnable(p) {
+        if (!p) return false;
+        const norm = String(p).replace(/\\/g, '/');
+        if (norm.includes('/app.asar/') && !norm.includes('/app.asar.unpacked/')) return false;
+        try { return fs.existsSync(p); } catch (_) { return false; }
+    }
+
     /** Locate the cloudflared binary: env override → bundled → dev → cache → PATH. */
     async function findBinary() {
         if (resolvedBinary !== undefined) return resolvedBinary;
 
         const candidates = [];
         if (process.env.CLOUDFLARED_PATH) candidates.push(process.env.CLOUDFLARED_PATH);
-        // Bundled (prod): <resources>/bin/cloudflared[.exe]
+        // Bundled (prod): <resources>/bin/cloudflared[.exe] — copied here by
+        // electron-builder `extraResources`, so it's a real spawnable file.
         if (process.resourcesPath) candidates.push(path.join(process.resourcesPath, 'bin', BINARY_NAME));
-        // Dev: <projectRoot>/resources/bin/cloudflared[.exe]
+        // Dev: <projectRoot>/resources/bin/cloudflared[.exe]. In a packaged build
+        // app.getAppPath() is …/app.asar, so this candidate resolves inside the
+        // archive — isSpawnable() rejects it (see above) and we fall through.
         try { candidates.push(path.join(app.getAppPath(), 'resources', 'bin', BINARY_NAME)); } catch (_) {}
+        // Unpacked variant, in case resources/bin is ever asarUnpack'd instead of
+        // shipped via extraResources.
+        try { candidates.push(path.join(app.getAppPath().replace(/app\.asar([\\/]|$)/, 'app.asar.unpacked$1'), 'resources', 'bin', BINARY_NAME)); } catch (_) {}
         // Previously auto-installed: <userData>/bin/cloudflared[.exe]
         try { candidates.push(path.join(cacheDir(), BINARY_NAME)); } catch (_) {}
 
         for (const c of candidates) {
-            try {
-                if (c && fs.existsSync(c)) { resolvedBinary = c; return c; }
-            } catch (_) {}
+            if (isSpawnable(c)) { resolvedBinary = c; return c; }
         }
 
         // PATH fallback

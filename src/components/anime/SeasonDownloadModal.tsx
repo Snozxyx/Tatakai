@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Download, X, CheckCircle2, Circle, FolderOpen, AlertCircle,
   Bot, Loader2, RefreshCw, Play, Languages, Server,
@@ -11,8 +12,13 @@ import { useDownload } from '@/hooks/media/useDownload';
 import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from '@/hooks/ui/useIsNativeApp';
 import { normalizeLanguage, getLanguageLabel } from '@/core/download/language-resolver';
 import { getSimpleServerDisplayName } from '@/lib/serverNames';
-import { streamExtensionSources } from '@/hooks/media/useExtensionSourceStream';
+import {
+  resolveExtensionApiBase,
+  streamExtensionSources,
+} from '@/hooks/media/useExtensionSourceStream';
+import { hasTorrentService, isCapacitor } from '@/lib/platform/platform';
 import { toast } from 'sonner';
+import { triggerHaptic } from '@/lib/haptics';
 
 interface Episode {
   episodeId: string;
@@ -39,6 +45,8 @@ interface DlSubtitle {
   url: string;
   lang: string;   // normalized code where possible, else raw
   label: string;  // human label shown in the player track menu
+  originalUrl?: string;
+  headers?: unknown;
 }
 
 interface DlSource {
@@ -51,6 +59,8 @@ interface DlSource {
   quality?: string;
   providerPriority: number;
   subtitles: DlSubtitle[]; // caption tracks to download alongside the video
+  headers?: Record<string, string>;
+  originalUrl?: string;
 }
 
 /**
@@ -72,7 +82,13 @@ function extractSubtitles(src: any): DlSubtitle[] {
     if (!rawLang || rawLang.toLowerCase() === 'thumbnails' || /thumbnails/i.test(url)) continue;
     seen.add(url);
     const langCode = normalizeLanguage(rawLang) || rawLang.toLowerCase();
-    out.push({ url, lang: langCode, label: String(t?.label || rawLang) });
+    out.push({
+      url,
+      lang: langCode,
+      label: String(t?.label || rawLang),
+      originalUrl: t?.originalUrl ? String(t.originalUrl) : undefined,
+      headers: t?.headers,
+    });
   }
   return out;
 }
@@ -89,7 +105,7 @@ const isEmbedSrc = (src: any): boolean => {
   if (typeof src.isEmbed === 'boolean') return src.isEmbed;
   const t = String(src.sourceType || '');
   if (t === 'hls' || t === 'mp4' || t === 'torrent') return false;
-  return !/\.m3u8($|[?#/])/i.test(String(src.url || ''));
+  return !/\.(?:m3u8|mp4|m4v|webm|mkv)(?:$|[?#/])/i.test(String(src.url || ''));
 };
 
 const DUB_LABELS: Record<string, string> = {
@@ -114,13 +130,15 @@ const rawLangLabel = (src: any, fallbackCategory: string): string => {
  * Distil a runtime `resolveEpisodeSources` result into downloadable HLS/torrent
  * sources, tagged with a normalized language code and a server key/name.
  */
-function normalizeDlSources(resolved: any, fallbackCategory = 'sub'): DlSource[] {
+function normalizeDlSources(resolved: any, fallbackCategory = 'sub', allowTorrent = true): DlSource[] {
   const raw: any[] = Array.isArray(resolved?.sources) ? resolved.sources : [];
   const out: DlSource[] = [];
   raw.forEach((src) => {
     const url = String(src?.url || '').trim();
     if (!url) return;
-    if (isEmbedSrc(src) && !isTorrentSrc(src)) return; // embeds aren't downloadable
+    const torrent = isTorrentSrc(src);
+    if (torrent && !allowTorrent) return;
+    if (isEmbedSrc(src) && !torrent) return; // embeds aren't downloadable
     const label = rawLangLabel(src, fallbackCategory);
     const langCode = normalizeLanguage(String(src.audioLanguage || label)) || 'ja';
     const serverKey = String(
@@ -135,12 +153,14 @@ function normalizeDlSources(resolved: any, fallbackCategory = 'sub'): DlSource[]
       serverName,
       langCode,
       langLabel: getLanguageLabel(langCode) || label,
-      isTorrent: isTorrentSrc(src),
+      isTorrent: torrent,
       quality: src.quality ? String(src.quality) : undefined,
       providerPriority: Number.isFinite(src?.providerPriority)
         ? Number(src.providerPriority)
         : Number.MAX_SAFE_INTEGER,
       subtitles: extractSubtitles(src),
+      headers: src.headers && typeof src.headers === 'object' ? src.headers : undefined,
+      originalUrl: src.originalUrl ? String(src.originalUrl) : undefined,
     });
   });
   return out.sort((a, b) => a.providerPriority - b.providerPriority);
@@ -158,17 +178,43 @@ function normalizeDlSources(resolved: any, fallbackCategory = 'sub'): DlSource[]
  * episodeId), so it works even when a provider's id mapping is missing.
  */
 async function resolveEpisode(episodeId: string, animeName: string, episodeNumber: number, anilistId?: number | null, malId?: number | null, category = 'sub'): Promise<{ sources: DlSource[]; headers?: Record<string, string> }> {
-  // 1. Reliable path: the player's Extension-API SSE stream.
+  const allowTorrent = hasTorrentService();
+
+  // Register cached mobile extensions before probing. The app startup already
+  // does this, but awaiting the deduped initializer here also covers deep links
+  // that open the dialog during the first native frame.
+  if (isCapacitor()) {
+    try {
+      const { initMobileExtensions } = await import('@/core/extensions/mobile/mobileExtensionInstaller');
+      await initMobileExtensions();
+    } catch {
+      /* the runtime fallback below may still resolve a source */
+    }
+  }
+
+  // 1. Reliable path: fan out through every mounted stream-capable extension.
   try {
-    const streamed = await streamExtensionSources('toko', {
+    const base = await resolveExtensionApiBase(isCapacitor());
+    const namespaces = (base.namespaces || [])
+      .filter((ns) => {
+        const routes = ns.routes || [];
+        return routes.includes('sources') || routes.includes('stream');
+      })
+      .map((ns) => ns.namespace);
+    if (!namespaces.length) namespaces.push('toko');
+    const params = {
       anilistId: anilistId ?? undefined,
       titles: animeName ? [animeName] : undefined,
       episode: episodeNumber,
       resolution: '1080p',
       preferredLanguage: category,
-      route: 'sources',
-    });
-    const dl = normalizeDlSources({ sources: streamed }, category);
+      route: 'sources' as const,
+    };
+    const settled = await Promise.allSettled(
+      [...new Set(namespaces)].map((namespace) => streamExtensionSources(namespace, params)),
+    );
+    const streamed = settled.flatMap((result) => result.status === 'fulfilled' ? result.value : []);
+    const dl = normalizeDlSources({ sources: streamed }, category, allowTorrent);
     if (dl.length > 0) return { sources: dl };
   } catch {
     /* fall through to the local runtime resolver */
@@ -188,7 +234,7 @@ async function resolveEpisode(episodeId: string, animeName: string, episodeNumbe
       method: 'single',
       resolution: '1080p',
     });
-    return { sources: normalizeDlSources(resolved, category), headers: (resolved as any)?.headers };
+    return { sources: normalizeDlSources(resolved, category, allowTorrent), headers: (resolved as any)?.headers };
   } catch {
     return { sources: [] };
   }
@@ -283,7 +329,7 @@ function AutoDownloadTab({
   return (
     <div className="space-y-6 py-4">
       {/* Status card */}
-      <div className={`rounded-2xl p-5 border transition-all ${isSubscribed
+      <div className={`rounded-2xl p-5 border transition-colors ${isSubscribed
         ? 'bg-primary/10 border-primary/30'
         : 'bg-white/5 border-white/10'}`}>
         <div className="flex items-center justify-between gap-4">
@@ -466,7 +512,12 @@ export const SeasonDownloadModal = ({
   // Warm up resolution for selected episodes in the background so Start is
   // instant. Capped count + low concurrency so we don't hammer the host.
   useEffect(() => {
-    if (!isOpen || !isNative) return;
+    // Desktop resolution lives in a separate process and can safely pre-warm.
+    // On mobile it runs inside this WebView; pre-warming 24 episodes launches
+    // overlapping provider batches and starves both the visible probe and the
+    // video player. Resolve the representative episode only, then resolve each
+    // selected episode on demand when Start is pressed.
+    if (!isOpen || !isNative || isMobile) return;
     let cancelled = false;
     const pending = episodes
       .filter(e => selectedIds.has(e.episodeId) && !resolvedCacheRef.current.has(`${e.episodeId}:sub`))
@@ -483,7 +534,7 @@ export const SeasonDownloadModal = ({
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, isNative, selectedIds, resolveEpisodeCached]);
+  }, [isOpen, isNative, isMobile, selectedIds, resolveEpisodeCached]);
 
   // Keep the chosen server valid as the language (and thus server list) changes.
   useEffect(() => {
@@ -493,17 +544,20 @@ export const SeasonDownloadModal = ({
   }, [serverOptions, selectedServerKey]);
 
   const toggleEpisode = (id: string) => {
+    void triggerHaptic('select');
     const next = new Set(selectedIds);
     if (next.has(id)) next.delete(id); else next.add(id);
     setSelectedIds(next);
   };
 
   const selectAll = () => {
+    void triggerHaptic('select');
     if (selectedIds.size === episodes.length) setSelectedIds(new Set());
     else setSelectedIds(new Set(episodes.map(e => e.episodeId)));
   };
 
   const handleDownload = async () => {
+    void triggerHaptic('medium');
     setIsStarting(true);
     const episodesToDownload = episodes.filter(e => selectedIds.has(e.episodeId));
     const basePath = downloadPath || localStorage.getItem('tatakai_download_path') || '';
@@ -518,6 +572,7 @@ export const SeasonDownloadModal = ({
     const langCode = selectedLangCode;
     const noSourceInLang: Episode[] = []; // chosen language had no downloadable source
     const allServersFailed: Episode[] = []; // sources existed but every server failed
+    let startedCount = 0;
 
     for (const ep of episodesToDownload) {
       const { sources, headers } = await resolveEpisodeCached(ep);
@@ -554,7 +609,11 @@ export const SeasonDownloadModal = ({
         for (const src of candidates) {
           const res = await startDownload({
             episodeId: ep.episodeId, animeName, episodeNumber: ep.number,
-            posterUrl, url: src.url, headers, downloadPath: basePath || undefined,
+            posterUrl,
+            url: src.url,
+            originalUrl: src.originalUrl,
+            headers: src.headers || headers,
+            downloadPath: basePath || undefined,
             subtitles: src.subtitles?.length ? src.subtitles : undefined,
             resolvedLanguage: src.langCode || langCode || undefined,
           });
@@ -562,7 +621,10 @@ export const SeasonDownloadModal = ({
         }
         if (!started) allServersFailed.push(ep);
       }
+      if (started) startedCount++;
     }
+    if (startedCount > 0) void triggerHaptic('success');
+    else if (episodesToDownload.length > 0) void triggerHaptic('error');
     if (allServersFailed.length > 0) {
       toast.error(
         `${allServersFailed.length} episode${allServersFailed.length > 1 ? 's' : ''} failed on every server`,
@@ -596,17 +658,30 @@ export const SeasonDownloadModal = ({
   const startSummary = [selLangLabel, selServerLabel].filter(Boolean).join(' · ');
   const showSourcePicker = isNative && (probing || languageOptions.length > 0 || (probed && !probing));
 
-  return (
-    <div className={`fixed z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in ${isDesktop ? 'inset-x-0 top-[32px] bottom-0' : 'inset-0'}`}>
-      <div className="w-full max-w-2xl max-h-[90vh] overflow-hidden">
-        <GlassPanel className="p-4 sm:p-6 space-y-4 sm:space-y-5 max-h-[90vh] overflow-y-auto">
+  // Portal to <body>: page trees contain transformed ancestors (animations,
+  // parallax) that turn `position: fixed` into page-relative positioning —
+  // the sheet would land mid-page instead of on the visible screen.
+  const sheet = (
+    <div className={`fixed z-[100] flex justify-center bg-black/80 backdrop-blur-sm animate-in fade-in ${isDesktop ? 'items-center inset-x-0 top-[32px] bottom-0 p-2 sm:p-4' : 'items-end sm:items-center inset-0 p-0 sm:p-4'}`}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Download ${animeName}`}
+        className="w-full sm:max-w-2xl max-h-[92dvh] sm:max-h-[90vh] overflow-hidden flex flex-col"
+      >
+        <GlassPanel className="p-4 sm:p-6 space-y-4 sm:space-y-5 max-h-[92dvh] sm:max-h-[90vh] overflow-y-auto overscroll-contain rounded-t-3xl sm:rounded-2xl rounded-b-none sm:rounded-b-2xl pb-[max(1rem,env(safe-area-inset-bottom))]">
           {/* Header */}
           <div className="flex items-center justify-between">
             <h2 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
               <Download className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
               Download
             </h2>
-            <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10 transition-colors">
+            <button
+              type="button"
+              aria-label="Close download dialog"
+              onClick={onClose}
+              className="p-2 rounded-full hover:bg-white/10 transition-colors"
+            >
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -640,7 +715,7 @@ export const SeasonDownloadModal = ({
                   </Button>
                 </div>
 
-                <ScrollArea className="h-[220px] sm:h-[300px] rounded-xl border border-white/10 bg-white/[0.03]">
+                <ScrollArea className="h-[32dvh] sm:h-[300px] min-h-[180px] rounded-xl border border-white/10 bg-white/[0.03]">
                   <div className="grid grid-cols-1 gap-1.5 p-1.5">
                     {episodes.map((ep) => {
                       const state = downloadStates[ep.episodeId];
@@ -649,7 +724,7 @@ export const SeasonDownloadModal = ({
                         <div
                           key={ep.episodeId}
                           onClick={() => state?.status !== 'downloading' && toggleEpisode(ep.episodeId)}
-                          className={`flex items-center justify-between p-2 sm:p-2.5 rounded-lg border transition-all cursor-pointer ${
+                          className={`flex items-center justify-between p-2 sm:p-2.5 rounded-lg border transition-colors cursor-pointer ${
                             isSelected ? 'bg-primary/10 border-primary/30' : 'bg-white/[0.02] border-transparent hover:border-white/10'
                           }`}
                         >
@@ -668,7 +743,7 @@ export const SeasonDownloadModal = ({
                                 <div className="text-right">
                                   <span className="text-[10px] sm:text-xs font-mono text-primary">{state.progress > 0 ? `${(state.progress).toFixed(0)}%` : '...'}</span>
                                   <div className="w-12 sm:w-20 h-1 bg-muted rounded-full overflow-hidden mt-1">
-                                    <div className="h-full bg-primary transition-all duration-300" style={{ width: `${state.progress}%` }} />
+                                    <div className="h-full bg-primary transition-[width] duration-300" style={{ width: `${state.progress}%` }} />
                                   </div>
                                 </div>
                               )}
@@ -718,7 +793,7 @@ export const SeasonDownloadModal = ({
                             <button
                               key={l.code}
                               onClick={() => setSelectedLangCode(l.code)}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                                 selectedLangCode === l.code
                                   ? 'bg-primary text-white border-primary'
                                   : 'bg-white/5 border-white/10 hover:border-white/20'
@@ -738,7 +813,7 @@ export const SeasonDownloadModal = ({
                           <div className="flex flex-wrap gap-2">
                             <button
                               onClick={() => setSelectedServerKey('auto')}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                                 selectedServerKey === 'auto'
                                   ? 'bg-primary text-white border-primary'
                                   : 'bg-white/5 border-white/10 hover:border-white/20'
@@ -750,7 +825,7 @@ export const SeasonDownloadModal = ({
                               <button
                                 key={s.key}
                                 onClick={() => setSelectedServerKey(s.key)}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                                   selectedServerKey === s.key
                                     ? 'bg-primary text-white border-primary'
                                     : 'bg-white/5 border-white/10 hover:border-white/20'
@@ -775,7 +850,7 @@ export const SeasonDownloadModal = ({
               <Button
                 onClick={handleDownload}
                 disabled={selectedIds.size === 0 || isStarting}
-                className="w-full h-14 sm:h-16 rounded-xl sm:rounded-2xl font-bold glow-primary flex-col gap-0.5"
+                className="sticky bottom-[max(0px,env(safe-area-inset-bottom))] z-20 w-full h-14 sm:h-16 rounded-xl sm:rounded-2xl font-bold glow-primary flex-col gap-0.5 shadow-[0_-18px_36px_hsl(var(--background))]"
               >
                 {isStarting ? (
                   <span className="flex items-center text-base sm:text-lg"><Loader2 className="w-5 h-5 mr-2 animate-spin" />Starting downloads…</span>
@@ -803,4 +878,6 @@ export const SeasonDownloadModal = ({
       </div>
     </div>
   );
+  if (typeof document === 'undefined') return sheet;
+  return createPortal(sheet, document.body);
 };

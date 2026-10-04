@@ -47,9 +47,9 @@ jobs:
         run: npm run test
         # Non-blocking: the unit suite carries pre-existing drift (stale import
         # paths after the desktop/runtime reorg, plus orphaned tests for modules
-        # that were removed — permission-guard, logLevel, extensionAnalytics, the
-        # extension/toko source tree). Keep it running and visible in CI, but don't
-        # gate the desktop build + release on it. Tracked for a separate repair pass.
+        # that were removed — permission-guard, logLevel, extensionAnalytics).
+        # Keep it running and visible in CI, but don't gate the desktop build +
+        # release on it. Tracked for a separate repair pass.
         continue-on-error: true
 
   # ──────────────────────────────────────────────────────
@@ -157,17 +157,12 @@ jobs:
         run: npx electron-builder --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # No paid certificates yet: never auto-discover a signing identity.
-          # macOS is still ad-hoc signed via `"identity": "-"` in package.json.
-          # Developer ID signing/notarization activate when CSC_LINK / APPLE_*
-          # secrets are set and this is removed — see docs/guides/desktop-signing.md.
+          # No paid certificate: never auto-discover a macOS signing identity.
+          # The bundle is still free ad-hoc signed through `identity: "-"`.
+          # Replace it with Developer ID signing/notarization when secrets exist.
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
-      # Apple Silicon refuses to launch a bundle whose code signature is broken
-      # and Gatekeeper reports it as "damaged". The mac build is ad-hoc signed
-      # (`"identity": "-"` in package.json), so fail here if any nested
-      # framework/helper/native module ends up with an invalid signature.
-      - name: Verify macOS code signature
+      - name: Verify macOS ad-hoc code signature
         if: matrix.platform == 'mac'
         shell: bash
         run: |
@@ -211,120 +206,183 @@ jobs:
           retention-days: 30
 
   # ──────────────────────────────────────────────────────
-  #  Android — Capacitor APK
+  #  Android — Capacitor APK (self-signed developer build)
   # ──────────────────────────────────────────────────────
-  # Strategy note: Android CI remains intentionally disabled in this workflow.
-  # Desktop releases are automated here; Android is currently a manual track
-  # until signing secrets and release cadence are finalized.
-  # build-android:
-  #   runs-on: ubuntu-latest
-  #   env:
-  #     ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
+  build-android:
+    needs: [quality-gates]
+    runs-on: ubuntu-latest
 
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-  #     - name: Setup Node.js
-  #       uses: actions/setup-node@v4
-  #       with:
-  #         node-version: ${{ env.NODE_VERSION }}
-  #         cache: 'npm'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
 
-  #     - name: Setup Java
-  #       uses: actions/setup-java@v4
-  #       with:
-  #         distribution: 'temurin'
-  #         java-version: '17'
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
 
-  #     - name: Java debug
-  #       run: |
-  #         echo "JAVA_HOME=$JAVA_HOME"
-  #         java -version || true
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
-  #     - name: Setup Android SDK
-  #       uses: android-actions/setup-android@v3
+      # The release build self-signs with the local Android debug keystore
+      # (android/app/build.gradle). A clean CI runner has no ~/.android yet, so
+      # generate the stock one with the alias + password the gradle file expects.
+      # Cached between runs on purpose: Android refuses to install an update whose
+      # signing key differs from the installed app's, so a fresh key per build
+      # would turn every release into a reinstall rather than an update.
+      - name: Cache Android debug keystore
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: android-debug-keystore-v1
+          restore-keys: android-debug-keystore-
 
-  #     - name: Install dependencies
-  #       run: npm ci
-  #       shell: bash
-  #       env:
-  #         PATH: /bin:/usr/bin:/usr/local/bin:$PATH
+      - name: Create Android debug keystore
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair \
+              -v -keystore "$HOME/.android/debug.keystore" \
+              -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass android -keypass android \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+          keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android | head -10
 
-  #     - name: Build web app
-  #       run: npx cross-env NODE_ENV=production vite build
+      - name: Install dependencies
+        run: npm ci
 
-  #     - name: Sync Capacitor
-  #       run: npx cap sync android
-  #       env:
-  #         JAVA_HOME: ${{ env.JAVA_HOME }}
-  #         PATH: ${{ env.JAVA_HOME }}/bin:$PATH
+      # Mobile builds must ship the WEB bundle (relative `/` base), not the
+      # desktop one — ELECTRON_BUILD=true rewrites base to './', which is what
+      # the packaged desktop app needs and would make the WebView assets resolve
+      # relative to the page URL.
+      - name: Write mobile build-time environment
+        shell: bash
+        env:
+          DESKTOP_DOTENV: ${{ secrets.DESKTOP_DOTENV }}
+        run: |
+          if [ -n "$DESKTOP_DOTENV" ]; then
+            printf '%s\n' "$DESKTOP_DOTENV" > .env
+            echo "Wrote .env for the mobile build ($(grep -c . .env) non-empty lines)."
+          else
+            echo "::warning::DESKTOP_DOTENV is empty — VITE_* will be blank, so the mobile app will not connect to the backend."
+          fi
 
-  #     - name: Build unsigned APK
-  #       run: cd android && chmod +x gradlew && ./gradlew assembleRelease
-  #       env:
-  #         JAVA_HOME: ${{ env.JAVA_HOME }}
-  #         PATH: ${{ env.JAVA_HOME }}/bin:$PATH
+      - name: Build web app
+        run: npx cross-env NODE_ENV=production vite build
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
 
-  #     - name: Rename APK with version
-  #       run: |
-  #         VERSION=$(node -p "require('./package.json').version")
-  #         APK_DIR="android/app/build/outputs/apk/release"
-  #         for f in "$APK_DIR"/*.apk; do
-  #           mv "$f" "$APK_DIR/Tatakai-${VERSION}-android.apk"
-  #         done
+      # `cap sync android` copies dist/ into android/app/src/main/assets/public
+      # and writes android/capacitor.settings.gradle. Without it gradle builds
+      # the stale checked-in WebView shell.
+      - name: Sync Capacitor Android
+        run: npx cap sync android
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
 
-  #     - name: Debug — list APK output folder
-  #       shell: bash
-  #       run: |
-  #         echo "=== android APK output ==="
-  #         ls -la android/app/build/outputs/apk/release || echo "APK output folder not present"
+      - name: Build signed Android release
+        run: cd android && chmod +x gradlew && ./gradlew assembleRelease --no-daemon
 
-  #     - name: Validate APK artifact exists
-  #       shell: bash
-  #       run: |
-  #         set -e
-  #         shopt -s nullglob || true
-  #         apks=(android/app/build/outputs/apk/release/*.apk)
-  #         if [ "${#apks[@]}" -eq 0 ]; then
-  #           echo "No APKs found in android/app/build/outputs/apk/release — failing to surface issue"
-  #           ls -la android/app/build/outputs/apk/release || true
-  #           exit 1
-  #         fi
+      - name: Name Android artifact
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          APK=$(find android/app/build/outputs/apk/release -name '*.apk' -print -quit)
+          test -n "$APK"
+          cp "$APK" "Tatakai-v${VERSION}-android.apk"
 
-  #     - name: Decode keystore
-  #       if: ${{ env.ANDROID_KEYSTORE != '' }}
-  #       run: echo "$ANDROID_KEYSTORE" | base64 -d > android/app/release.keystore
-  #       env:
-  #         ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
-
-  #     - name: Build signed APK
-  #       if: ${{ env.ANDROID_KEYSTORE != '' }}
-  #       run: |
-  #         cd android && ./gradlew assembleRelease \
-  #           -Pandroid.injected.signing.store.file=${{ github.workspace }}/android/app/release.keystore \
-  #           -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
-  #           -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
-  #           -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}"
-  #       env:
-  #         JAVA_HOME: ${{ env.JAVA_HOME }}
-  #         PATH: ${{ env.JAVA_HOME }}/bin:$PATH
-
-  #     - name: Upload APK
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: tatakai-android
-  #         path: android/app/build/outputs/apk/release/*.apk
-  #         if-no-files-found: warn
-  #         retention-days: 30
+      - name: Upload signed Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tatakai-android
+          path: Tatakai-*-android.apk
+          if-no-files-found: error
+          retention-days: 30
 
   # ──────────────────────────────────────────────────────
-  #  Finalize Release — mark non-draft and attach desktop artifacts
-  #  electron-builder created the draft release and uploaded
-  #  desktop installers + latest*.yml manifests
+  #  iOS — unsigned .ipa archive (no Apple signing identity, same as macOS)
   # ──────────────────────────────────────────────────────
+  build-ios-unsigned:
+    needs: [quality-gates]
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Write mobile build-time environment
+        shell: bash
+        env:
+          DESKTOP_DOTENV: ${{ secrets.DESKTOP_DOTENV }}
+        run: |
+          if [ -n "$DESKTOP_DOTENV" ]; then
+            printf '%s\n' "$DESKTOP_DOTENV" > .env
+            echo "Wrote .env for the mobile build ($(grep -c . .env) non-empty lines)."
+          else
+            echo "::warning::DESKTOP_DOTENV is empty — VITE_* will be blank, so the mobile app will not connect to the backend."
+          fi
+
+      - name: Build web app
+        run: npx cross-env NODE_ENV=production vite build
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+
+      - name: Sync Capacitor iOS
+        run: npx cap sync ios
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+
+      - name: Build unsigned iOS app
+        run: |
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath ios/build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            clean build
+
+      - name: Package unsigned IPA
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          APP_PATH="ios/build/Build/Products/Release-iphoneos/App.app"
+          test -d "$APP_PATH"
+          mkdir -p ios/package/Payload
+          ditto "$APP_PATH" ios/package/Payload/Tatakai.app
+          (cd ios/package && zip -qry "../../Tatakai-v${VERSION}-ios-unsigned.ipa" Payload)
+
+      - name: Upload unsigned iOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tatakai-ios-unsigned
+          path: Tatakai-*-ios-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30
+
   release:
-    needs: [build-desktop]
+    needs: [build-desktop, build-android, build-ios-unsigned]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
 
@@ -350,6 +408,18 @@ jobs:
           path: desktop-artifacts/linux
           if-no-files-found: warn
 
+      - name: Download signed Android artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tatakai-android
+          path: mobile-artifacts/android
+
+      - name: Download unsigned iOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tatakai-ios-unsigned
+          path: mobile-artifacts/ios
+
       - name: Upload all artifacts to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -366,30 +436,44 @@ jobs:
             desktop-artifacts/linux/*.AppImage
             desktop-artifacts/linux/*.deb
             desktop-artifacts/linux/latest-linux.yml
+            mobile-artifacts/android/*.apk
+            mobile-artifacts/ios/*.ipa
           draft: false
           prerelease: false
           append_body: true
           body: |
             ## Downloads
 
-            ### Desktop (auto-updates enabled)
-            | Platform | Installer | Portable |
-            |----------|-----------|----------|
-            | Windows  | `.exe`    | `.zip`   |
-            | macOS    | `.dmg`    | `.zip`   |
-            | Linux    | `.AppImage` | `.deb` |
+            ### Desktop
+            | Platform | Installer | Portable / alt |
+            |----------|-----------|----------------|
+            | Windows (x64) | `.exe` | `.zip` (portable) |
+            | macOS Apple Silicon (M1/M2/M3, arm64) | `Tatakai-*-mac-arm64.dmg` | `Tatakai-*-mac-arm64.zip` |
+            | macOS Intel (x64) | `Tatakai-*-mac-x64.dmg` | `Tatakai-*-mac-x64.zip` |
+            | Linux (x64) | `.AppImage` | `.deb` |
 
-            > Desktop apps update automatically via electron-updater.
+            > Windows + Linux update automatically via electron-updater.
             > Each device is identified by a unique Client ID (CID) sent with update checks.
 
-            ### macOS — first launch
-            Pick `mac-arm64` for Apple Silicon (M1 and newer) or `mac-x64` for Intel.
-            The app is not notarized by Apple yet, so the first launch is blocked once:
-            1. Open the `.dmg` and drag **Tatakai** into **Applications**.
-            2. Open Tatakai. When macOS says it can't verify the app, click **Done**.
-            3. Go to **System Settings → Privacy & Security**, scroll down and click **Open Anyway**.
+            ### macOS — certificate-less manual install
+            > Mac builds are ad-hoc signed for bundle integrity, but are not Developer
+            > ID signed or notarized. Pick `mac-arm64` for Apple Silicon or `mac-x64`
+            > for Intel, drag Tatakai into Applications, and approve the first launch
+            > with System Settings → Privacy & Security → Open Anyway.
+            > You can alternatively run:
+            > ```bash
+            > xattr -cr /Applications/Tatakai.app
+            > ```
+            > macOS updates remain manual: download the latest DMG and replace the app.
 
-            Or run this once in Terminal: `xattr -dr com.apple.quarantine /Applications/Tatakai.app`
+            ### Mobile — developer-signed manual install
+            - Android: download `Tatakai-*-android.apk` and install it directly. It is
+              signed with the developer key, not a Play Store distribution key, so
+              Play Protect flags the first install — allow it.
+            - iOS: download `Tatakai-*-ios-unsigned.ipa`, then sign and sideload it
+              with your own Apple account/tool (AltStore / SideStore / TrollStore).
+              iOS cannot install an unsigned IPA directly.
+            - Mobile update checks open this release page; the app never self-installs.
 
             ### Web
             - Visit [tatakai.me](https://tatakai.me)

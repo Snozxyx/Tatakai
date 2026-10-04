@@ -30,7 +30,7 @@ import { useCombinedSourcesWithRefetch } from '@/hooks/media/useCombinedSources'
 import { supabase } from '@/integrations/supabase/client';
 import { useReducedMotion } from 'framer-motion';
 import { toast } from 'sonner';
-import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
+import { useIsDesktopApp, useIsMobileApp } from '@/hooks/ui/useIsNativeApp';
 import { setActivity, clearActivity } from '@/core/activity/activity-monitor';
 import { groupProviderServers } from './watchRoomShared';
 
@@ -47,6 +47,7 @@ export function useWatchRoomController() {
     const { roomId } = useParams<{ roomId: string }>();
     const navigate = useNavigate();
     const isDesktopApp = useIsDesktopApp();
+    const isMobileApp = useIsMobileApp();
     const prefersReducedMotion = useReducedMotion();
     const { user, isModerator, isAdmin } = useAuth();
     const queryClient = useQueryClient();
@@ -449,6 +450,43 @@ export function useWatchRoomController() {
             }
         })();
     }, [isHost, isDesktopApp, roomId, isCustomRoom, localShare, resolvedSources, currentEpisodeId, selectedServer, selectedCategory]);
+
+    // ── Mobile host: publish the resolved REMOTE url directly (no tunnel) ──────
+    // A phone can't run a loopback proxy + cloudflared, but the extension runtime
+    // already resolves a public CDN url — so we publish that url straight into
+    // the room. Guests play it through their own player/proxy. Works only for
+    // remote/extension sources (not local files), and header-locked CDNs may
+    // need the guest to re-resolve — that's the documented mobile-host limit.
+    const mobilePublishTokenRef = useRef<string>('');
+    useEffect(() => {
+        if (!isHost || !roomId || !isMobileApp) return;
+        if (isCustomRoom) return; // already carries a shareable url
+
+        const primary = (resolvedSources?.sources || []).find((s: any) => !s.isEmbed);
+        if (!primary?.url) return; // embeds can't be clock-synced — leave inactive
+
+        const subUrl = (() => {
+            const all = [...(resolvedSources?.subtitles || []), ...(resolvedSources?.tracks || [])];
+            const def = all.find((s: any) => /eng/i.test(s?.lang || s?.label || '')) || all[0];
+            return def?.url || '';
+        })();
+
+        const token = `${currentEpisodeId}|${selectedServer}|${selectedCategory}|${primary.url}`;
+        if (mobilePublishTokenRef.current === token) return;
+        mobilePublishTokenRef.current = token;
+
+        updateRoom.mutate({
+            roomId,
+            updates: {
+                share_stream_url: primary.url,
+                share_stream_type: primary.isM3U8 ? 'hls' : 'direct',
+                share_subtitle_url: subUrl || null,
+                share_active: true,
+                share_host_platform: 'mobile',
+            } as any,
+        });
+    }, [isHost, isMobileApp, roomId, isCustomRoom, resolvedSources, currentEpisodeId, selectedServer, selectedCategory]);
+
     // Stop the tunnel + clear share fields when the host leaves/unmounts.
     useEffect(() => {
         if (!isHost) return;

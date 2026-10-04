@@ -15,6 +15,7 @@ export function DevConsole() {
   const [isOpen, setIsOpen] = useState(false);
   const [filter, setFilter] = useState<'all' | 'log' | 'warn' | 'error' | 'info'>('all');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const recentNetworkLogs = useRef(new Map<string, number>());
 
   useEffect(() => {
     // Only work on mobile platforms
@@ -39,6 +40,21 @@ export function DevConsole() {
       setLogs(prev => [...prev, entry].slice(-500));
     };
 
+    const expectedProviderFailure = (args: unknown[]) => {
+      let text = '';
+      try {
+        text = args.map((arg) => typeof arg === 'string' ? arg : JSON.stringify(arg)).join(' ').toLowerCase();
+      } catch {
+        text = String(args).toLowerCase();
+      }
+      const expected = [
+        'unknownhostexception', 'sockettimeoutexception', 'unable to resolve host',
+        'no address associated with hostname', 'failed to connect', 'read timed out',
+        'networkunavailableerror',
+      ].some((part) => text.includes(part));
+      return expected ? text.replace(/\s+/g, ' ').slice(0, 240) : null;
+    };
+
     console.log = (...args: unknown[]) => {
       originalLog(...args);
       appendLog('log', args);
@@ -51,6 +67,14 @@ export function DevConsole() {
 
     console.error = (...args: unknown[]) => {
       originalError(...args);
+      const networkKey = expectedProviderFailure(args);
+      if (networkKey) {
+        const lastSeen = recentNetworkLogs.current.get(networkKey) || 0;
+        if (Date.now() - lastSeen < 15_000) return;
+        recentNetworkLogs.current.set(networkKey, Date.now());
+        appendLog('warn', ['Provider skipped because its server is unavailable.', ...args]);
+        return;
+      }
       appendLog('error', args);
     };
 

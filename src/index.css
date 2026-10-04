@@ -1988,35 +1988,16 @@ body[data-theme="harvest"] .glass-panel {
 @keyframes bh-spin    { from { transform: rotate(0) scale(1.1); } to { transform: rotate(360deg) scale(1.1); } }
 
 /* ============================================================
-   BADGE ANIMATION — shimmering ring for animated badges
-   (booster, premium-pro/ultra, and select collectibles)
+   BADGE — premium static style (no flashy animation).
+   `.badge-animated` is kept as a no-op hook for legacy markup;
+   all motion was removed in favor of a refined static coin look.
    ============================================================ */
-@keyframes badge-shimmer {
-  0%, 100% { box-shadow: 0 0 4px 0 rgba(255, 255, 255, 0.25); }
-  50%      { box-shadow: 0 0 10px 2px rgba(255, 255, 255, 0.6); }
-}
-
 .badge-animated {
-  animation: badge-shimmer 2s ease-in-out infinite;
+  /* static: premium ring handled in UserBadges component */
 }
 
 .badge-animated img {
-  animation: badge-float 3s ease-in-out infinite;
-}
-
-@keyframes badge-float {
-  0%, 100% { transform: translateY(0) scale(1); }
-  50%      { transform: translateY(-1px) scale(1.05); }
-}
-
-/* Rarity ambient behind badge hover tooltips: legendary/mythic spin a conic
-   gradient; lower tiers gently pulse a radial wash. */
-@keyframes badge-ambient-spin {
-  to { transform: rotate(360deg); }
-}
-@keyframes badge-ambient-pulse {
-  0%, 100% { opacity: 0.4; transform: scale(1); }
-  50%      { opacity: 0.75; transform: scale(1.1); }
+  /* static: no float */
 }
 /* Skip layout/paint for sections far off-screen. Huge win for long feeds. */
 .home-section {
@@ -2035,4 +2016,24 @@ body[data-theme="harvest"] .glass-panel {
 
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-up { animation: none; }
+}
+
+@media (max-width: 767px) {
+  .video-player-container {
+    border-radius: 0.75rem;
+  }
+
+  .video-progress-track {
+    height: 6px;
+  }
+
+  .video-progress-track:active {
+    height: 8px;
+  }
+
+  .video-control-btn {
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+    padding: 0.625rem;
+  }
 }

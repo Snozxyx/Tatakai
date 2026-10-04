@@ -12,6 +12,7 @@
  * mirror the wire format exactly and `toStoreExtension` is the only place the
  * translation happens, so a field the service renames breaks in one file.
  */
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 
 /** A published build. `download_url` is the release asset itself. */
 export interface StoreVersionRow {
@@ -296,7 +297,22 @@ async function requestJson<T>(path: string, signal?: AbortSignal): Promise<T> {
     throw new Error('Extension service is not configured (VITE_EXTENSION_API_URL is empty)');
   }
 
-  const response = await fetch(`${EXTENSION_API_BASE}${path}`, {
+  const url = `${EXTENSION_API_BASE}${path}`;
+  if (Capacitor.isNativePlatform()) {
+    const response = await CapacitorHttp.get({
+      url,
+      headers: { accept: 'application/json' },
+      connectTimeout: 7000,
+      readTimeout: 7000,
+      responseType: 'json',
+    });
+    if (response.status < 200 || response.status >= 300) {
+      throw new StoreHttpError(response.status, path);
+    }
+    return response.data as T;
+  }
+
+  const response = await fetch(url, {
     headers: { accept: 'application/json' },
     signal,
   });

@@ -33,13 +33,26 @@ import { cn } from "@/lib/utils";
 import { formatTime } from "@/core/player/time-utils";
 import { buildSubtitleFetchCandidates, getSubtitleSelectionKey, isBrowserReadyVttUrl, normalizeSubtitleToVtt } from "@/core/player/subtitle-utils";
 import { UpNextOverlay } from "./overlays/UpNextOverlay";
+import { VideoSettingsPanel } from "./VideoSettingsPanel";
+import { buildSubtitleCueStyle } from "@/lib/video/subtitleStyle";
+import { ensureCustomSubtitleFontLoaded } from "@/lib/video/customSubtitleFont";
+import { useActiveCues } from "./hooks/useActiveCues";
+import { createNativeHlsLoader } from "@/core/extensions/mobile/nativeHlsLoader";
+import {
+  fetchMobileProxyText,
+  getMobileProxyMediaBlobUrl,
+  isMobileProxyUrl,
+  reregisterMobileSource,
+  resolveMobileProxy,
+  unwrapMobileProxyUrl,
+} from "@/core/extensions/mobile/mobileProxy";
 
 interface MobileVideoPlayerProps {
   sources: Array<{ url: string; isM3U8: boolean; quality?: string }>;
   subtitles?: Array<{ lang: string; url: string; label?: string }>;
-  headers?: { Referer?: string; "User-Agent"?: string };
+  headers?: { Referer?: string; Origin?: string; "User-Agent"?: string };
   poster?: string;
-  onError?: () => void;
+  onError?: (context?: { statusCode?: number; reason?: string }) => void;
   onServerSwitch?: () => void;
   onRetryCurrentServer?: () => void;
   isLoading?: boolean;
@@ -213,13 +226,29 @@ export function MobileVideoPlayer({
   const retryCountRef = useRef(0);
   const [currentSubtitle, setCurrentSubtitle] = useState<string>(settings.subtitleLanguage);
   const [showSubtitleMenu, setShowSubtitleMenu] = useState(false);
-  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [showFullSettings, setShowFullSettings] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [activeSkip, setActiveSkip] = useState<SkipSegment | null>(null);
-  const [playbackRate, setPlaybackRate] = useState(settings.playbackSpeed);
+  const [, setPlaybackRate] = useState(settings.playbackSpeed);
   const [subtitleBlobs, setSubtitleBlobs] = useState<Record<string, string>>({});
   // Auto-next Up-Next countdown (null = hidden).
   const [upNextCountdown, setUpNextCountdown] = useState<number | null>(null);
+
+  // HLS alternate audio (multi-audio streams): surfaced in the settings sheet
+  // like desktop's Audio tab. Native torrent audio stays in the native UI.
+  const [hlsAudioTracks, setHlsAudioTracks] = useState<Array<{ id: number; label: string; lang: string }>>([]);
+  const [currentHlsAudioTrack, setCurrentHlsAudioTrack] = useState<number>(-1);
+
+  // Full settings sheet options — same source as desktop (parity).
+  const settingsSubtitleOptions = useMemo(
+    () =>
+      subtitles.map((sub, idx) => ({
+        lang: sub.lang,
+        label: sub.label || sub.lang,
+        value: getSubtitleSelectionKey(sub, idx),
+      })),
+    [subtitles],
+  );
 
   const visibleSubtitles = useMemo(
     () =>
@@ -251,10 +280,65 @@ export function MobileVideoPlayer({
     [sources, settings.defaultQuality],
   );
   const sourceUrlKey = currentSource?.url || '';
-  const sourceTypeKey = currentSource?.isM3U8 ? 'm3u8' : 'file';
-  const playbackReferer = headers?.Referer || '';
-  const playbackUserAgent = headers?.["User-Agent"] || '';
+  const sourceTypeKey = currentSource?.isM3U8 || (currentSource as any)?.sourceType === 'hls' || /\.m3u8(?:$|[?#/])/i.test(currentSource?.url || '') ? 'm3u8' : 'file';
+  const sourceHeaders = (currentSource as any)?.headers as Record<string, string> | undefined;
+  const playbackReferer = sourceHeaders?.Referer || sourceHeaders?.referer || headers?.Referer || '';
+  const playbackUserAgent = sourceHeaders?.["User-Agent"] || sourceHeaders?.['user-agent'] || headers?.["User-Agent"] || '';
   const autoSkippedWindowRef = useRef<string | null>(null);
+
+  // A source failure replaces the video element with the error surface. This
+  // component is reused for server switches, so clear that source-local error
+  // whenever a different URL is selected; otherwise the new source never gets
+  // a video element or a chance to initialize.
+  useEffect(() => {
+    setVideoError(null);
+    retryCountRef.current = 0;
+    setRetryCount(0);
+    setIsBuffering(false);
+    setHlsAudioTracks([]);
+    setCurrentHlsAudioTrack(-1);
+    setUseDirectBlobFallback(false);
+  }, [sourceUrlKey]);
+
+  // In-app proxy direct file (MP4/WebM): `<video>` cannot play the opaque
+  // `mobile-proxy://` token, so resolve it to a blob URL through the native
+  // client (header replay). HLS never needs this — the native hls.js loader
+  // resolves tokens per-request (playlist rewrite included).
+  const isProxyDirectFile =
+    !isOffline &&
+    !!currentSource?.url &&
+    isMobileProxyUrl(currentSource.url) &&
+    sourceTypeKey !== 'm3u8';
+  const [directBlobUrl, setDirectBlobUrl] = useState<string | null>(null);
+  const [directBlobFailed, setDirectBlobFailed] = useState(false);
+  const [useDirectBlobFallback, setUseDirectBlobFallback] = useState(false);
+
+  useEffect(() => {
+    if (!isProxyDirectFile || !currentSource?.url || !useDirectBlobFallback) {
+      setDirectBlobUrl(null);
+      setDirectBlobFailed(false);
+      return;
+    }
+    let cancelled = false;
+    setDirectBlobUrl(null);
+    setDirectBlobFailed(false);
+    // Blob URLs are cached (and owned) by the proxy module — never revoke here.
+    getMobileProxyMediaBlobUrl(currentSource.url, {
+      originalUrl: (currentSource as any)?.originalUrl,
+      headers: (currentSource as any)?.headers,
+    }).then((blob) => {
+      if (cancelled) return;
+      if (blob) setDirectBlobUrl(blob);
+      else setDirectBlobFailed(true);
+    }).catch(() => {
+      if (!cancelled) setDirectBlobFailed(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // `currentSource` (not just its URL key) because the token's recovery
+    // headers ride on the source object itself.
+  }, [sourceUrlKey, isOffline, isProxyDirectFile, currentSource, useDirectBlobFallback]);
 
   // Fetch skip times for intro/outro
   useEffect(() => {
@@ -337,6 +421,14 @@ export function MobileVideoPlayer({
     setCurrentSubtitle(settings.subtitleLanguage);
   }, [settings.subtitleLanguage]);
 
+  // Custom subtitle overlay (desktop parity): tracks run in "hidden" mode and
+  // we paint active cues ourselves so size/font/color/BG/position/offset apply.
+  const activeCueLines = useActiveCues(videoRef, `${sourceUrlKey}|${currentSubtitle}`, settings.subtitleOffset);
+  const customCueStyle = useMemo(() => buildSubtitleCueStyle(settings), [settings]);
+  useEffect(() => {
+    void ensureCustomSubtitleFontLoaded();
+  }, []);
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -365,8 +457,10 @@ export function MobileVideoPlayer({
         }
       }
 
+      // "hidden" (not "showing") so the browser parses cues + fires cuechange
+      // but doesn't paint them — the custom overlay paints styled cues above.
       for (let i = 0; i < tracks.length; i += 1) {
-        tracks[i].mode = i === selectedIndex ? 'showing' : 'disabled';
+        tracks[i].mode = i === selectedIndex ? 'hidden' : 'disabled';
       }
     };
 
@@ -378,15 +472,104 @@ export function MobileVideoPlayer({
     };
   }, [currentSubtitle, subtitles, subtitleBlobs]);
 
+  // Desktop-parity playback modes: loop / sleep timer / stable volume.
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.loop = Boolean(settings.loopVideo);
+  }, [settings.loopVideo, sourceUrlKey]);
+
+  useEffect(() => {
+    if (!settings.sleepTimer || settings.sleepTimer === 'off' || settings.sleepTimer === 'end-of-episode') return;
+    const minutes = Number(settings.sleepTimer);
+    if (!Number.isFinite(minutes) || minutes <= 0) return;
+    const id = window.setTimeout(() => {
+      videoRef.current?.pause();
+      toast.info('Sleep timer: playback paused.');
+    }, minutes * 60 * 1000);
+    return () => window.clearTimeout(id);
+  }, [settings.sleepTimer, sourceUrlKey]);
+
+  // Stable volume via WebAudio compressor (best-effort; skipped for offline /
+  // native-loopback where the element is cross-origin tainted).
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !settings.stableVolume || isOffline) return;
+    let ctx: AudioContext | null = null;
+    let src: MediaElementAudioSourceNode | null = null;
+    let comp: DynamicsCompressorNode | null = null;
+    try {
+      const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AC) return;
+      ctx = new AC();
+      src = ctx.createMediaElementSource(video);
+      comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = -18;
+      comp.knee.value = 20;
+      comp.ratio.value = 6;
+      comp.attack.value = 0.003;
+      comp.release.value = 0.25;
+      src.connect(comp);
+      comp.connect(ctx.destination);
+      void ctx.resume().catch(() => {});
+    } catch {
+      try { src?.disconnect(); } catch { /* ignore */ }
+      try { void ctx?.close(); } catch { /* ignore */ }
+      return;
+    }
+    return () => {
+      try { src?.disconnect(); } catch { /* ignore */ }
+      try { comp?.disconnect(); } catch { /* ignore */ }
+      try { void ctx?.close(); } catch { /* ignore */ }
+    };
+  }, [settings.stableVolume, isOffline, sourceUrlKey]);
+
   // Initialize HLS
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !currentSource?.url) return;
 
     const source = currentSource;
-    const finalUrl = !isOffline && playbackReferer
-      ? getProxiedVideoUrl(source.url, playbackReferer, playbackUserAgent || undefined)
-      : source.url;
+    // Dead-token recovery: the in-app proxy map is in-memory, so a
+    // Dexie-seeded source from before a restart (or past the 15-minute token
+    // TTL) carries a token that no longer resolves. Re-mint it from the
+    // source's own upstream URL + headers instead of mounting an unloadable
+    // src (the "failed to load video" state).
+    let activeSourceUrl = source.url;
+    if (!isOffline && isMobileProxyUrl(activeSourceUrl) && !resolveMobileProxy(activeSourceUrl)) {
+      const fresh = reregisterMobileSource({
+        url: activeSourceUrl,
+        originalUrl: (source as any)?.originalUrl,
+        headers: (source as any)?.headers,
+      });
+      if (isMobileProxyUrl(fresh)) activeSourceUrl = fresh;
+    }
+    // Always route cross-origin http(s) sources through the streaming proxy on
+    // mobile — not only when a Referer is present. hls.js fetches the manifest
+    // and segments with XHR/fetch, which the raw origin blocks with no CORS
+    // header, so an un-proxied direct/HLS source failed to load and only embeds
+    // (iframes, no CORS) played. The proxy adds `Access-Control-Allow-Origin: *`
+    // and forwards Referer/UA. `getProxiedVideoUrl` leaves local-like URLs
+    // untouched (asset://, blob:, and the torrent loopback 127.0.0.1 server), so
+    // those still play directly.
+    const isHls = source.isM3U8 || (source as any).sourceType === 'hls' || /\.m3u8(?:$|[?#/])/i.test(activeSourceUrl);
+    const useNativeHlsTransport = !isOffline && isHls && Capacitor.isNativePlatform();
+    const finalUrl = !useNativeHlsTransport && !isOffline && /^https?:/i.test(activeSourceUrl)
+      ? getProxiedVideoUrl(activeSourceUrl, playbackReferer || undefined, playbackUserAgent || undefined)
+      : activeSourceUrl;
+
+    // A proxy token without the native transport (e.g. web preview of a mobile
+    // session): the default hls.js loader cannot resolve tokens, so fall back
+    // to the remote proxy over the recovered upstream URL (server-side header
+    // replay). On native, HLS keeps the token — the native loader resolves it.
+    let resolvedFinalUrl = finalUrl;
+    if (isMobileProxyUrl(finalUrl) && !useNativeHlsTransport && !isOffline) {
+      const upstream = unwrapMobileProxyUrl(finalUrl, {
+        originalUrl: (source as any)?.originalUrl,
+      });
+      resolvedFinalUrl = /^https?:/i.test(upstream)
+        ? getProxiedVideoUrl(upstream, playbackReferer || undefined, playbackUserAgent || undefined)
+        : upstream;
+    }
+    const finalUrlResolved = resolvedFinalUrl;
 
     // Cleanup previous HLS instance
     if (hlsRef.current) {
@@ -396,26 +579,73 @@ export function MobileVideoPlayer({
 
     let metadataAutoplayHandler: (() => void) | null = null;
 
-    if (source.isM3U8 && Hls.isSupported()) {
+    if (isHls && Hls.isSupported()) {
       const hls = new Hls({
         enableWorker: true,
-        lowLatencyMode: false,
-        backBufferLength: 90,
-        maxBufferLength: 30,
-        maxMaxBufferLength: 60,
+        lowLatencyMode: true,
+        autoStartLoad: true,
+        startFragPrefetch: true,
+        // Start with the smallest rendition for the first frame, then ramp up
+        // aggressively once the first native fragment reports throughput. The
+        // previous -1 auto start could choose a multi-megabyte 1080p fragment
+        // before the bridge had any bandwidth sample.
+        startLevel: 0,
+        abrEwmaDefaultEstimate: 5_000_000,
+        abrBandWidthFactor: 0.9,
+        abrBandWidthUpFactor: 0.8,
+        maxStarvationDelay: 2,
+        maxLoadingDelay: 2,
+        // Mobile-tuned: enough forward buffer to avoid immediate rebuffering,
+        // without making startup wait on a large memory target.
+        backBufferLength: 30,
+        maxBufferLength: 20,
+        maxMaxBufferLength: 40,
+        maxBufferSize: 60 * 1000 * 1000,
+        capLevelToPlayerSize: true,
+        manifestLoadingMaxRetry: 2,
+        levelLoadingMaxRetry: 3,
+        fragLoadingMaxRetry: 2,
+        manifestLoadingRetryDelay: 800,
+        levelLoadingRetryDelay: 800,
+        fragLoadingRetryDelay: 800,
+        ...(useNativeHlsTransport ? {
+          loader: createNativeHlsLoader({
+            referer: playbackReferer || undefined,
+            userAgent: playbackUserAgent || undefined,
+            origin: headers?.Origin,
+          }),
+        } : {}),
       });
 
-      hls.loadSource(finalUrl);
+      hls.loadSource(finalUrlResolved);
       hls.attachMedia(video);
       hlsRef.current = hls;
 
+      const syncAudioTracks = () => {
+        try {
+          const list = (hls.audioTracks || []).map((t: { id?: number; name?: string; lang?: string }, i: number) => ({
+            id: typeof t.id === 'number' ? t.id : i,
+            label: String(t.name || `Audio ${i + 1}`),
+            lang: String(t.lang || 'und'),
+          }));
+          setHlsAudioTracks(list);
+          setCurrentHlsAudioTrack(typeof hls.audioTrack === 'number' ? hls.audioTrack : -1);
+        } catch {
+          /* audio probe best-effort */
+        }
+      };
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        syncAudioTracks();
         if (initialSeekSeconds && initialSeekSeconds > 0) {
           video.currentTime = initialSeekSeconds;
         }
         if (settings.autoplay) {
           video.play().catch(console.error);
         }
+      });
+      hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, syncAudioTracks);
+      hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, (_: unknown, data: { id?: number }) => {
+        if (typeof data?.id === 'number') setCurrentHlsAudioTrack(data.id);
       });
 
       hls.on(Hls.Events.ERROR, (_, data) => {
@@ -426,15 +656,20 @@ export function MobileVideoPlayer({
               retryCountRef.current = next;
               return next;
             });
-            hls.loadSource(finalUrl);
+            hls.loadSource(finalUrlResolved);
           } else {
             setVideoError("Failed to load video. Please try another server.");
+            onError?.({
+              statusCode: Number((data as any)?.response?.code || 0) || undefined,
+              reason: `hls-${String(data.type || 'error')}-${String(data.details || 'fatal')}`,
+            });
           }
         }
       });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      // Safari native HLS support
-      video.src = finalUrl;
+      // Safari native HLS support (iOS has no hls.js MSE path — the native
+      // element fetches segments itself, so it needs a network URL).
+      video.src = finalUrlResolved;
       if (initialSeekSeconds && initialSeekSeconds > 0) {
         video.currentTime = initialSeekSeconds;
       }
@@ -452,8 +687,42 @@ export function MobileVideoPlayer({
         }
       }
     } else {
-      // Direct MP4
-      video.src = finalUrl;
+      // Direct MP4. A proxy token is opaque to `<video>` — play the resolved
+      // blob URL (native header replay); while it resolves, hold the loader
+      // instead of mounting an unloadable src (the "failed to load video"
+      // state came from exactly that). Blob failure falls back to the remote
+      // proxy over the recovered upstream URL.
+      let mp4Url = finalUrlResolved;
+      if (isMobileProxyUrl(activeSourceUrl) && !isOffline) {
+        const upstream = unwrapMobileProxyUrl(activeSourceUrl, {
+          originalUrl: (source as any)?.originalUrl,
+        });
+        if (!useDirectBlobFallback) {
+          // Open CDNs can go straight into the native media element. This
+          // avoids the hosted proxy's extra network hop and gives Android's
+          // player its own range requests / connection reuse. Header-gated
+          // sources still use the range-capable proxy and retain the native
+          // full-file fallback below if that route fails.
+          const tokenHeaders = resolveMobileProxy(activeSourceUrl)?.headers || (source as any)?.headers || {};
+          const needsHeaderReplay = Boolean(playbackReferer || headers?.Origin) ||
+            Object.keys(tokenHeaders).some((name) =>
+              ['referer', 'origin', 'cookie', 'authorization'].includes(name.toLowerCase()),
+            );
+          mp4Url = /^https?:/i.test(upstream) && needsHeaderReplay
+            ? getProxiedVideoUrl(upstream, playbackReferer || undefined, playbackUserAgent || undefined)
+            : upstream;
+        } else if (directBlobUrl) {
+          mp4Url = directBlobUrl;
+        } else if (directBlobFailed) {
+          setVideoError("Failed to load video. Please try another server.");
+          return;
+        } else {
+          setIsBuffering(true);
+          return;
+        }
+      }
+      setIsBuffering(false);
+      video.src = mp4Url;
       if (initialSeekSeconds && initialSeekSeconds > 0) {
         video.currentTime = initialSeekSeconds;
       }
@@ -482,9 +751,12 @@ export function MobileVideoPlayer({
         hlsRef.current = null;
       }
     };
-  }, [sourceUrlKey, sourceTypeKey, initialSeekSeconds, isOffline, playbackReferer, playbackUserAgent, settings.autoplay]);
+  }, [sourceUrlKey, sourceTypeKey, initialSeekSeconds, isOffline, playbackReferer, playbackUserAgent, headers?.Origin, settings.autoplay, directBlobUrl, directBlobFailed, useDirectBlobFallback, onError]);
 
-  // Load subtitles
+  // Load subtitles — parallel + incremental so the first (English) track mounts
+  // in ~1s instead of after every track serially times out. Each resolved track
+  // merges into state immediately, so `<track>` elements appear progressively
+  // and the selected subtitle shows even while the rest still fetch.
   useEffect(() => {
     if (!subtitles.length) {
       setSubtitleBlobs({});
@@ -494,77 +766,108 @@ export function MobileVideoPlayer({
     let mounted = true;
     const createdBlobUrls: string[] = [];
 
-    const loadSubtitles = async () => {
-      const blobs: Record<string, string> = {};
+    const fetchOne = async (sub: (typeof subtitles)[number], i: number) => {
+      const subtitleKey = getSubtitleSelectionKey(sub, i);
+      const subtitleSourceUrl = String(sub.url || '').trim();
+      if (!subtitleSourceUrl) return null;
 
-      for (let i = 0; i < subtitles.length; i += 1) {
-        const sub = subtitles[i];
-        const subtitleKey = getSubtitleSelectionKey(sub, i);
-        const subtitleSourceUrl = String(sub.url || '').trim();
-        if (!subtitleSourceUrl) continue;
-
-        if (subtitleSourceUrl.startsWith('asset://') || subtitleSourceUrl.includes('asset.localhost')) {
-          blobs[subtitleKey] = subtitleSourceUrl;
-          continue;
-        }
-
-        try {
-          const candidates = buildSubtitleFetchCandidates(
-            subtitleSourceUrl,
-            playbackReferer,
-            Boolean(isOffline),
-            (url, referer) => getProxiedSubtitleUrl(url, referer)
-          );
-
-          let normalizedText = '';
-          for (const candidateUrl of candidates) {
-            try {
-              const response = await fetch(candidateUrl, {
-                headers: {
-                  Accept: 'text/vtt, text/plain, */*',
-                },
-                signal: AbortSignal.timeout(10000),
-              });
-
-              if (!response.ok) {
-                continue;
-              }
-
-              normalizedText = normalizeSubtitleToVtt(await response.text());
-              if (normalizedText) {
-                break;
-              }
-            } catch {
-              // Try next subtitle URL candidate.
-            }
-          }
-
-          if (!normalizedText) {
-            console.warn('Failed to load subtitle:', sub.lang, subtitleSourceUrl);
-            continue;
-          }
-
-          const blob = new Blob([normalizedText], { type: 'text/vtt' });
-          const blobUrl = URL.createObjectURL(blob);
-          createdBlobUrls.push(blobUrl);
-          blobs[subtitleKey] = blobUrl;
-        } catch (e) {
-          console.warn('Failed to load subtitle:', sub.lang, e);
-        }
+      if (subtitleSourceUrl.startsWith('asset://') || subtitleSourceUrl.includes('asset.localhost')) {
+        return { key: subtitleKey, url: subtitleSourceUrl, blob: subtitleSourceUrl, raw: subtitleSourceUrl };
       }
 
-      if (mounted) {
-        setSubtitleBlobs(blobs);
+      try {
+        const candidates = buildSubtitleFetchCandidates(
+          subtitleSourceUrl,
+          playbackReferer,
+          Boolean(isOffline),
+          (url, referer) => getProxiedSubtitleUrl(url, referer)
+        );
+
+        let normalizedText = '';
+        for (const candidateUrl of candidates) {
+          try {
+            // In-app proxy track: resolve natively with header replay (the
+            // track CDN validates Referer exactly like the video CDN does —
+            // desktop proxies subtitles for the same reason).
+            if (isMobileProxyUrl(candidateUrl)) {
+              const text = await fetchMobileProxyText(candidateUrl, {
+                originalUrl: (sub as { originalUrl?: string }).originalUrl,
+                headers: (sub as { headers?: unknown }).headers,
+                timeoutMs: 8000,
+              });
+              if (!text) continue;
+              normalizedText = normalizeSubtitleToVtt(text);
+              if (normalizedText) break;
+              continue;
+            }
+            const response = await fetch(candidateUrl, {
+              headers: {
+                Accept: 'text/vtt, text/plain, */*',
+              },
+              signal: AbortSignal.timeout(8000),
+            });
+
+            if (!response.ok) {
+              continue;
+            }
+
+            normalizedText = normalizeSubtitleToVtt(await response.text());
+            if (normalizedText) {
+              break;
+            }
+          } catch {
+            // Try next subtitle URL candidate.
+          }
+        }
+
+        if (!normalizedText) {
+          console.warn('Failed to load subtitle:', sub.lang, subtitleSourceUrl);
+          return null;
+        }
+
+        const blob = new Blob([normalizedText], { type: 'text/vtt' });
+        const blobUrl = URL.createObjectURL(blob);
+        createdBlobUrls.push(blobUrl);
+        return { key: subtitleKey, url: subtitleSourceUrl, blob: blobUrl, raw: subtitleSourceUrl };
+      } catch (e) {
+        console.warn('Failed to load subtitle:', sub.lang, e);
+        return null;
       }
     };
 
     setSubtitleBlobs({});
-    loadSubtitles();
+    // English (or the user's preferred) first, rest in background — the
+    // selected track is almost always English, so prioritize it.
+    const ordered = subtitles
+      .map((sub, i) => ({ sub, i }))
+      .sort((a, b) => {
+        const aEn = subtitleMatchesPreference(a.sub, 'english') ? 0 : 1;
+        const bEn = subtitleMatchesPreference(b.sub, 'english') ? 0 : 1;
+        return aEn - bEn || a.i - b.i;
+      });
+    let idx = 0;
+    const CONCURRENCY = 4;
+    const worker = async () => {
+      while (mounted && idx < ordered.length) {
+        const { sub, i } = ordered[idx++];
+        const res = await fetchOne(sub, i);
+        if (!mounted || !res) continue;
+        // The selector addresses a track by its stable selection key while
+        // the rendered `<track>` addresses it by raw URL — index both.
+        setSubtitleBlobs((prev) => {
+          if (prev[res.key] === res.blob) return prev;
+          return { ...prev, [res.key]: res.blob, [res.raw]: res.blob };
+        });
+      }
+    };
+    void Promise.all(Array.from({ length: Math.min(CONCURRENCY, ordered.length) }, worker));
 
     return () => {
       mounted = false;
       createdBlobUrls.forEach((blobUrl) => {
-        URL.revokeObjectURL(blobUrl);
+        try {
+          if (!blobUrl.startsWith('asset://')) URL.revokeObjectURL(blobUrl);
+        } catch { /* ignore */ }
       });
     };
   }, [subtitles, playbackReferer, isOffline]);
@@ -621,8 +924,21 @@ export function MobileVideoPlayer({
       }
     };
     const handleError = () => {
+      if (isProxyDirectFile && !useDirectBlobFallback) {
+        // Only pay the full-file blob cost when the range-capable proxy is not
+        // reachable for this source.
+        video.removeEventListener('error', handleError);
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
+        setUseDirectBlobFallback(true);
+        setIsBuffering(true);
+        return;
+      }
       setVideoError("Error loading video");
-      onError?.();
+      onError?.({
+        reason: `media-element-${video.error?.code || 'unknown'}`,
+      });
     };
 
     video.addEventListener('timeupdate', handleTimeUpdate);
@@ -646,7 +962,7 @@ export function MobileVideoPlayer({
       video.removeEventListener('ended', handleEnded);
       video.removeEventListener('error', handleError);
     };
-  }, [onEpisodeEnd, onProgressUpdate, onError, settings.autoNextEpisode, settings.autoNextCountdownSeconds, settings.sleepTimer]);
+  }, [onEpisodeEnd, onProgressUpdate, onError, settings.autoNextEpisode, settings.autoNextCountdownSeconds, settings.sleepTimer, isProxyDirectFile, useDirectBlobFallback]);
 
   // Up-Next countdown driver.
   useEffect(() => {
@@ -892,13 +1208,14 @@ export function MobileVideoPlayer({
     setShowSubtitleMenu(false);
   };
 
-  // Playback speed change
-  const handleSpeedChange = (speed: number) => {
-    setPlaybackRate(speed);
-    if (videoRef.current) {
-      videoRef.current.playbackRate = speed;
+  // HLS alternate-audio switch (desktop Audio-tab parity).
+  const handleHlsAudioChange = (id: number) => {
+    try {
+      if (hlsRef.current) hlsRef.current.audioTrack = id;
+      setCurrentHlsAudioTrack(id);
+    } catch {
+      /* best effort */
     }
-    setShowSettingsMenu(false);
   };
 
   // Handle screenshot
@@ -1004,6 +1321,7 @@ export function MobileVideoPlayer({
         ref={videoRef}
         className="w-full h-full object-contain"
         poster={resolvedPoster}
+        preload="auto"
         playsInline
         crossOrigin="anonymous"
       >
@@ -1012,7 +1330,7 @@ export function MobileVideoPlayer({
           const subtitleKey = getSubtitleSelectionKey(sub, idx);
           const subtitleSourceUrl = String(sub.url || '').trim();
           if (!subtitleSourceUrl) return null;
-          const blobUrl = subtitleBlobs[subtitleSourceUrl];
+          const blobUrl = subtitleBlobs[subtitleSourceUrl] || subtitleBlobs[subtitleKey];
           const proxiedSubtitleUrl = !isOffline
             ? getProxiedSubtitleUrl(subtitleSourceUrl, playbackReferer)
             : subtitleSourceUrl;
@@ -1029,6 +1347,21 @@ export function MobileVideoPlayer({
           />
         )})}
       </video>
+
+      {/* Custom styled subtitles — desktop parity (size/font/color/BG/position). */}
+      {activeCueLines.length > 0 && currentSubtitle !== 'off' && (
+        <div
+          className="pointer-events-none absolute inset-x-0 z-20 flex flex-col items-center gap-1 px-4 text-center"
+          style={{ bottom: `${40 + settings.subtitlePosition * 6 + (showControls ? 64 : 0)}px` }}
+          aria-live="polite"
+        >
+          {activeCueLines.map((line, idx) => (
+            <span key={`${idx}-${line}`} style={customCueStyle}>
+              {line}
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Loading Overlay */}
       {(isLoading || isBuffering) && (
@@ -1203,25 +1536,25 @@ export function MobileVideoPlayer({
               </span>
 
               <div className="flex items-center gap-2">
-                {/* Subtitles */}
+                {/* Subtitles — quick switch; full styling lives in the settings sheet */}
                 <div className="relative">
                   <button
                     onClick={() => {
                       setShowSubtitleMenu(!showSubtitleMenu);
-                      setShowSettingsMenu(false);
                     }}
+                    aria-label="Subtitles"
                     className={cn(
                       "p-2.5 rounded-full backdrop-blur-md active:scale-95 transition-transform border",
-                      currentSubtitle !== 'off' 
-                        ? 'bg-primary border-white/20' 
+                      currentSubtitle !== 'off'
+                        ? 'bg-primary border-white/20'
                         : 'bg-white/10 border-white/10'
                     )}
                   >
                     <Subtitles className="w-5 h-5 text-white" />
                   </button>
-                  
+
                   {showSubtitleMenu && (
-                    <div className="absolute bottom-14 right-0 bg-black/95 backdrop-blur-xl rounded-2xl p-2 min-w-[180px] max-h-[250px] overflow-y-auto border border-white/10 shadow-2xl">
+                    <div className="absolute bottom-14 right-0 bg-black/95 backdrop-blur-xl rounded-2xl p-2 min-w-[180px] max-h-[250px] overflow-y-auto border border-white/10 shadow-2xl z-30">
                       <button
                         onClick={() => handleSubtitleChange('off')}
                         className={cn(
@@ -1249,36 +1582,17 @@ export function MobileVideoPlayer({
                   )}
                 </div>
 
-                {/* Settings */}
-                <div className="relative">
-                  <button
-                    onClick={() => {
-                      setShowSettingsMenu(!showSettingsMenu);
-                      setShowSubtitleMenu(false);
-                    }}
-                    className="p-2.5 rounded-full bg-white/10 backdrop-blur-md active:scale-95 transition-transform border border-white/10"
-                  >
-                    <Settings className="w-5 h-5 text-white" />
-                  </button>
-                  
-                  {showSettingsMenu && (
-                    <div className="absolute bottom-14 right-0 bg-black/95 backdrop-blur-xl rounded-2xl p-2 min-w-[160px] border border-white/10 shadow-2xl">
-                      <p className="px-4 py-2 text-white/50 text-xs font-semibold uppercase tracking-wide">Playback Speed</p>
-                      {[0.5, 0.75, 1, 1.25, 1.5, 2].map((speed) => (
-                        <button
-                          key={speed}
-                          onClick={() => handleSpeedChange(speed)}
-                          className={cn(
-                            "w-full px-4 py-3 text-left text-sm rounded-xl transition-colors",
-                            playbackRate === speed ? 'bg-primary text-white font-semibold' : 'text-white/80 hover:bg-white/5'
-                          )}
-                        >
-                          {speed}x {speed === 1 && '(Normal)'}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                {/* Settings — full desktop-parity sheet, bottom-sheet on mobile */}
+                <button
+                  onClick={() => {
+                    setShowSubtitleMenu(false);
+                    setShowFullSettings(true);
+                  }}
+                  aria-label="Player settings"
+                  className="p-2.5 rounded-full bg-white/10 backdrop-blur-md active:scale-95 transition-transform border border-white/10"
+                >
+                  <Settings className="w-5 h-5 text-white" />
+                </button>
 
                 {/* Fullscreen */}
                 <button
@@ -1312,6 +1626,16 @@ export function MobileVideoPlayer({
           <span className="text-white/80 text-xs font-medium">{serverName}</span>
         </div>
       )}
+
+      {/* Full settings — desktop parity (playback / video / subtitles / audio / keys) */}
+      <VideoSettingsPanel
+        isOpen={showFullSettings}
+        onClose={() => setShowFullSettings(false)}
+        availableSubtitles={settingsSubtitleOptions}
+        audioTracks={hlsAudioTracks}
+        currentAudioTrack={currentHlsAudioTrack}
+        onAudioTrackChange={handleHlsAudioChange}
+      />
     </div>
   );
 }

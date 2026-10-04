@@ -43,7 +43,7 @@ export function PillGroup<T extends string>({
       role="tablist"
       aria-label={label}
       className={cn(
-        'flex max-w-full items-center gap-1.5 overflow-x-auto rounded-full border border-white/10 bg-black/30 p-1.5 backdrop-blur-md scrollbar-none',
+        'flex max-w-full items-center gap-1.5 overflow-x-auto rounded-full border border-white/10 bg-black/30 p-1.5 backdrop-blur-md scrollbar-hide no-scrollbar [-webkit-overflow-scrolling:touch] [touch-action:pan-x_pan-y] overscroll-x-contain',
         className,
       )}
       style={{ WebkitMaskImage: SCROLL_FADE_MASK, maskImage: SCROLL_FADE_MASK }}

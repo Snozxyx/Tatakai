@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { triggerHaptic } from '@/lib/haptics';
 
 /**
  * Global download monitor — a single app-lifetime subscription to the Electron
@@ -108,6 +109,7 @@ function recordHistory(
       recordDownload({
         animeId: meta.animeId || 0,
         animeTitle: meta.animeTitle,
+        posterUrl: meta.posterUrl,
         episodeNumber: meta.episodeNumber,
         status,
         sourceType: meta.sourceType,
@@ -161,6 +163,7 @@ export function ensureDownloadMonitor() {
       fileSizeBytes: typeof data.size === 'number' ? data.size : undefined,
       localPath: typeof data.path === 'string' ? data.path : undefined,
     });
+    void triggerHaptic('download-complete');
   });
   bridge.onDownloadError((data: Record<string, unknown>) => {
     const id = String(data?.episodeId || '');
@@ -186,6 +189,24 @@ export function markFailedStart(id: string, error: string) {
 export function markCancelled(id: string) {
   upsert(id, { status: 'cancelled' });
   recordHistory(id, 'cancelled', {});
+}
+
+// ── Mobile-driven progress (Capacitor downloader) ──────────────────────────
+// On desktop the Electron IPC channels drive `upsert`. On mobile there is no
+// such bridge; the Capacitor downloader pushes progress/terminal states through
+// these so the SAME store (and every widget reading it) stays live and history
+// is recorded identically.
+export function markProgress(id: string, percent: number, extra?: { speed?: string; eta?: string }) {
+  upsert(id, { status: 'downloading', progress: Math.max(0, Math.min(100, percent)), ...extra });
+}
+export function markCompleted(id: string, opts?: { localUri?: string; fileSizeBytes?: number }) {
+  upsert(id, { status: 'completed', progress: 100, localUri: opts?.localUri });
+  recordHistory(id, 'completed', { localPath: opts?.localUri, fileSizeBytes: opts?.fileSizeBytes });
+  void triggerHaptic('download-complete');
+}
+export function markError(id: string, error: string) {
+  upsert(id, { status: 'failed', error });
+  recordHistory(id, 'failed', { errorMessage: error });
 }
 
 // ── React binding ──────────────────────────────────────────────────────────

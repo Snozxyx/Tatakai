@@ -31,6 +31,7 @@ import { useActiveCues } from "./hooks/useActiveCues";
 import { useStableVolume, useSleepTimer, useAmbientMode } from "./hooks/usePlayerEnhancements";
 import { SubtitleOverlay } from "./overlays/SubtitleOverlay";
 import { Anime4KRenderer, type Anime4KMode } from "@/lib/video/anime4k/Anime4KRenderer";
+import { isMobileNative } from "@/lib/platform/platform";
 import { ensureCustomSubtitleFontLoaded } from "@/lib/video/customSubtitleFont";
 
 // Controls
@@ -560,6 +561,8 @@ export function VideoPlayer({
     onProgressUpdate,
     animeName,
     episodeNumber,
+    animeImageUrl: animePoster,
+    animeUrl: animeId ? `https://tatakai.me/anime/${encodeURIComponent(animeId)}` : undefined,
   });
 
   // ---------------------------------------------------------------------------
@@ -656,11 +659,22 @@ export function VideoPlayer({
   // Anime4K GPU upscaling (desktop only, opt-in)
   // ---------------------------------------------------------------------------
 
-  const anime4kActive = !isMobile && settings.anime4kPreset !== "off";
+  // Anime4K on the Capacitor mobile app is opt-in and capability-gated: allowed
+  // only when the device supports WebGL2, and the preset is clamped to the
+  // cheapest ("light") mode so a phone GPU isn't asked to run the heavy CNN.
+  // A narrow desktop/web viewport (`isMobile` state, viewport-based) keeps the
+  // prior behavior of no Anime4K. On the mobile app we bypass that viewport gate.
+  const isMobileApp = isMobileNative();
+  const anime4kAllowed = isMobileApp ? Anime4KRenderer.isSupported() : !isMobile;
+  const effectiveAnime4kPreset: Anime4KMode =
+    isMobileApp && settings.anime4kPreset !== "off"
+      ? ("light" as Anime4KMode)
+      : (settings.anime4kPreset as Anime4KMode);
+  const anime4kActive = anime4kAllowed && settings.anime4kPreset !== "off";
 
   useEffect(() => {
-    // Off, unsupported, or mobile → tear down any live renderer and bail.
-    if (isMobile || settings.anime4kPreset === "off" || !Anime4KRenderer.isSupported()) {
+    // Off, unsupported, or disallowed on this surface → tear down and bail.
+    if (!anime4kActive || !Anime4KRenderer.isSupported()) {
       anime4kRendererRef.current?.destroy();
       anime4kRendererRef.current = null;
       return;
@@ -687,13 +701,13 @@ export function VideoPlayer({
     setAnime4kDisabled(false);
     renderer.setDisabledCallback(() => setAnime4kDisabled(true));
 
-    renderer.setMode(settings.anime4kPreset as Anime4KMode);
+    renderer.setMode(effectiveAnime4kPreset);
     renderer.start();
 
     return () => {
       anime4kRendererRef.current?.stop();
     };
-  }, [settings.anime4kPreset, isMobile, currentSource?.url]);
+  }, [anime4kActive, effectiveAnime4kPreset, currentSource?.url]);
 
   // Destroy the renderer on unmount.
   useEffect(() => {
@@ -702,6 +716,29 @@ export function VideoPlayer({
       anime4kRendererRef.current = null;
     };
   }, []);
+
+  // Mobile app: keep the screen awake while playing so the device doesn't dim /
+  // sleep mid-episode. Released on pause and unmount. No-ops off Capacitor.
+  useEffect(() => {
+    if (!isMobileApp) return;
+    let released = false;
+    void (async () => {
+      try {
+        const { KeepAwake } = await import("@capacitor-community/keep-awake");
+        if (isPlaying) await KeepAwake.keepAwake();
+        else await KeepAwake.allowSleep();
+      } catch {
+        /* plugin missing — ignore */
+      }
+    })();
+    return () => {
+      if (released) return;
+      released = true;
+      void import("@capacitor-community/keep-awake")
+        .then(({ KeepAwake }) => KeepAwake.allowSleep().catch(() => {}))
+        .catch(() => {});
+    };
+  }, [isMobileApp, isPlaying]);
 
   // ---------------------------------------------------------------------------
   // Subtitle change on settings change
@@ -1306,7 +1343,7 @@ export function VideoPlayer({
   return (
     <div
       ref={containerRef}
-      className="relative aspect-video bg-black rounded-xl md:rounded-2xl overflow-hidden group touch-manipulation video-player-container video-player-modern"
+      className="relative aspect-video min-h-[12rem] bg-black rounded-xl md:rounded-2xl overflow-hidden group touch-manipulation video-player-container video-player-modern"
       onMouseMove={!isMobile ? showControlsTemporarily : undefined}
       onMouseLeave={() => !isMobile && isPlaying && setControlsVisible(false)}
       onTouchStart={showControlsTemporarily}
@@ -1496,7 +1533,7 @@ export function VideoPlayer({
       {/* Controls Overlay */}
       <div
         ref={controlsOverlayRef}
-        className={`absolute inset-x-0 bottom-0 video-controls-gradient p-4 md:p-5 transition-all duration-300 ${
+        className={`absolute inset-x-0 bottom-0 video-controls-gradient px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-6 sm:p-4 md:p-5 transition-all duration-300 ${
           getShowControls()
             ? "opacity-100 translate-y-0"
             : "opacity-0 translate-y-4 pointer-events-none"

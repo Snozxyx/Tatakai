@@ -68,8 +68,8 @@ interface TorrentSwitchDialogProps {
   animeTitle?: string;
   /** e.g. "Episode 7". */
   episodeLabel?: string;
-  /** Torrent playback needs the desktop runtime; false disables confirmation. */
-  isDesktop: boolean;
+  /** Torrent playback needs a torrent-capable runtime (desktop or mobile app); false disables confirmation. */
+  canPlayTorrent: boolean;
   /** Reflects the "optimize torrent storage" setting so the note matches reality. */
   optimizeStorage?: boolean;
   /** Absolute path the torrent engine writes into, when the runtime reports one. */
@@ -112,7 +112,7 @@ export function TorrentSwitchDialog({
   source,
   animeTitle,
   episodeLabel,
-  isDesktop,
+  canPlayTorrent,
   optimizeStorage,
   downloadPath,
   onCancel,
@@ -184,7 +184,7 @@ export function TorrentSwitchDialog({
 
   const levelStyle = LEVEL_STYLES[policy.level];
   const zeroSeeders = seeders === 0;
-  const canConfirm = isDesktop && hasMagnet;
+  const canConfirm = canPlayTorrent && hasMagnet;
 
   return (
     <AlertDialog open={!!source} onOpenChange={(open) => { if (!open) onCancel(); }}>
@@ -303,8 +303,8 @@ export function TorrentSwitchDialog({
             <li>Playback starts only once metadata resolves and peers are found — usually seconds, sometimes never.</li>
             <li>Seeking is limited to what has downloaded, so the timeline stays locked until the file is complete and verified.</li>
             <li>Subtitles and audio tracks come from inside the release, so they may differ from the hosted stream.</li>
-            {!isDesktop && (
-              <li className="text-amber-400">Torrent playback needs the desktop app — this device cannot start a session.</li>
+            {!canPlayTorrent && (
+              <li className="text-amber-400">Torrent playback needs the Tatakai desktop or mobile app — a web browser cannot start a session.</li>
             )}
             {!hasMagnet && (
               <li className="text-amber-400">This source has no magnet link, so there is nothing to start.</li>

@@ -92,10 +92,18 @@ export function buildProxyBaseCandidates(): string[] {
 
   add(resolveSingleStreamProxyBase());
 
-  if (typeof window !== 'undefined') {
-    add(`${window.location.origin}${CONFIG.defaultPath}`);
+  // On Capacitor the WebView origin (tatakai.me/localhost) isn't the backend,
+  // so an origin-relative proxy path is a dead candidate — use the real backend.
+  const cap = (globalThis as any).Capacitor;
+  const isNative = !!cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform();
+  const proxyOrigin =
+    isNative
+      ? (String(import.meta.env.VITE_BACKEND_ORIGIN || '').replace(/\/+$/, '') || 'https://api.tatakai.me')
+      : (typeof window !== 'undefined' ? window.location.origin : '');
+  if (proxyOrigin) {
+    add(`${proxyOrigin}${CONFIG.defaultPath}`);
     CONFIG.legacyPaths.forEach((legacyPath) => {
-      add(`${window.location.origin}${legacyPath}`);
+      add(`${proxyOrigin}${legacyPath}`);
     });
   }
 

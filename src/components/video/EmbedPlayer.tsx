@@ -1,6 +1,47 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, AlertCircle, RefreshCw, Maximize, Minimize } from "lucide-react";
 import { probeUrlReachable } from "@/hooks/media/useExtensionSourceStream";
+import { isMobileNative } from "@/lib/platform/platform";
+
+/**
+ * Capacitor mobile fullscreen helpers. The native plugins are dynamically
+ * imported so they never land in the web/desktop chunk — this component renders
+ * on every platform, but only the in-WebView mobile shell has a device to rotate
+ * or a status bar to hide. Each call is best-effort: a WebView that blocks the
+ * lock still gets the CSS fixed-position fullscreen.
+ */
+async function lockLandscapeOrientation() {
+  try {
+    const { ScreenOrientation } = await import("@capacitor/screen-orientation");
+    await ScreenOrientation.lock({ orientation: "landscape" });
+  } catch {
+    /* orientation lock unavailable / blocked */
+  }
+}
+async function unlockOrientation() {
+  try {
+    const { ScreenOrientation } = await import("@capacitor/screen-orientation");
+    await ScreenOrientation.unlock();
+  } catch {
+    /* ignore */
+  }
+}
+async function hideStatusBar() {
+  try {
+    const { StatusBar } = await import("@capacitor/status-bar");
+    await StatusBar.hide();
+  } catch {
+    /* ignore */
+  }
+}
+async function showStatusBar() {
+  try {
+    const { StatusBar } = await import("@capacitor/status-bar");
+    await StatusBar.show();
+  } catch {
+    /* ignore */
+  }
+}
 
 interface EmbedPlayerProps {
   url: string;
@@ -55,6 +96,12 @@ export function EmbedPlayer({ url, poster, language, referer, onError }: EmbedPl
   const [reloadKey, setReloadKey] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // On touch (Capacitor) there is no hover, so a hover-revealed control needs a
+  // first tap just to appear and a second to activate — the "fullscreen needs
+  // two taps" bug. Render the control visible outright on mobile; keep the
+  // hover-reveal on desktop where a pointer exists.
+  const isMobile = isMobileNative();
 
   // One failure report per mounted URL. The probe, the watchdog and the iframe's
   // own onError can all fire for the same dead host, and each report pushes the
@@ -182,10 +229,19 @@ export function EmbedPlayer({ url, poster, language, referer, onError }: EmbedPl
     // VideoPlayer's approach so the embed behaves the same on desktop.
     const bridge = (window as unknown as { electron?: { setFullscreen?: (v: boolean) => Promise<void> } }).electron;
     const isElectron = !!bridge?.setFullscreen;
+    const isMobile = isMobileNative();
     const currentlyFull = node.classList.contains("is-player-fullscreen") || document.fullscreenElement === node;
 
     if (!currentlyFull) {
-      if (isElectron) {
+      if (isMobile) {
+        // Capacitor WebView: the element Fullscreen API is flaky inside the
+        // WebView, so use the CSS fixed-position fullscreen and rotate the
+        // device to landscape + hide the status bar (mirrors MobileVideoPlayer).
+        node.classList.add("is-player-fullscreen");
+        setIsFullscreen(true);
+        await hideStatusBar();
+        await lockLandscapeOrientation();
+      } else if (isElectron) {
         node.classList.add("is-player-fullscreen");
         setIsFullscreen(true);
         try {
@@ -205,7 +261,10 @@ export function EmbedPlayer({ url, poster, language, referer, onError }: EmbedPl
     } else {
       node.classList.remove("is-player-fullscreen");
       setIsFullscreen(false);
-      if (isElectron) {
+      if (isMobile) {
+        await showStatusBar();
+        await unlockOrientation();
+      } else if (isElectron) {
         document.documentElement.classList.remove("app-fullscreen");
         try {
           await bridge!.setFullscreen!(false);
@@ -216,6 +275,16 @@ export function EmbedPlayer({ url, poster, language, referer, onError }: EmbedPl
         void document.exitFullscreen().catch(() => undefined);
       }
     }
+  }, []);
+
+  // On unmount, restore the device if we left it rotated / status bar hidden.
+  useEffect(() => {
+    return () => {
+      if (isMobileNative()) {
+        void showStatusBar();
+        void unlockOrientation();
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -311,7 +380,7 @@ export function EmbedPlayer({ url, poster, language, referer, onError }: EmbedPl
         onClick={toggleFullscreen}
         title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
         aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-        className="absolute bottom-3 right-3 z-20 rounded-md bg-black/60 p-2 text-white opacity-0 transition-opacity hover:bg-black/80 focus:opacity-100 focus-visible:outline focus-visible:outline-2 group-hover:opacity-100 [div:hover>&]:opacity-100"
+        className={`absolute bottom-3 right-3 z-20 rounded-md bg-black/60 p-2 text-white transition-opacity hover:bg-black/80 focus:opacity-100 focus-visible:outline focus-visible:outline-2 group-hover:opacity-100 [div:hover>&]:opacity-100 ${isMobile ? "opacity-100" : "opacity-0"}`}
       >
         {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
       </button>

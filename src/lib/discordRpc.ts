@@ -151,6 +151,8 @@ export function setWatchingRpc(options: {
   isDub?: boolean;
   currentTime?: number;
   duration?: number;
+  /** External URL of the anime poster — shown as the large image in Discord. Falls back to the app logo. */
+  animeImageUrl?: string;
   imageKey?: string;
   animeUrl?: string;
 }): void {
@@ -181,9 +183,12 @@ export function setWatchingRpc(options: {
 
   const state = parts.length > 0 ? parts.join(' • ') : 'Watching';
 
+  // ── image — prefer external poster URL, fall back to registered asset key ──
+  const largeImageKey = options.animeImageUrl || options.imageKey || 'logo';
+
   // ── timestamps ────────────────────────────────────────────────────────────
   const extra: RpcExtra = {
-    largeImageKey: options.imageKey ?? 'logo',
+    largeImageKey,
     largeImageText: s.showAnimeTitle ? options.animeTitle : 'Tatakai',
     smallImageKey: 'play_icon',
     smallImageText: 'Playing',
@@ -198,10 +203,14 @@ export function setWatchingRpc(options: {
     }
   }
 
-  if (s.showButtons && options.animeUrl) {
-    extra.buttons = [
-      { label: 'View on Tatakai', url: options.animeUrl },
-    ];
+  if (s.showButtons) {
+    const buttons: Array<{ label: string; url: string }> = [];
+    if (options.animeUrl) {
+      buttons.push({ label: 'Show in Tatakai', url: options.animeUrl });
+    }
+    // Always offer a download button so Discord friends can get the app.
+    buttons.push({ label: 'Download Tatakai', url: 'https://tatakai.me/download' });
+    extra.buttons = buttons.slice(0, 2);
   }
 
   updateDiscordRpc(titlePart, state, extra);
@@ -216,6 +225,8 @@ export function setPausedRpc(options: {
   season?: number;
   language?: string;
   isDub?: boolean;
+  /** External URL of the anime poster — shown as the large image in Discord. Falls back to the app logo. */
+  animeImageUrl?: string;
   imageKey?: string;
   animeUrl?: string;
 }): void {
@@ -233,15 +244,23 @@ export function setPausedRpc(options: {
   }
   const state = parts.length > 0 ? parts.join(' • ') : 'Paused';
 
+  // ── image — prefer external poster URL, fall back to registered asset key ──
+  const largeImageKey = options.animeImageUrl || options.imageKey || 'logo';
+
   const extra: RpcExtra = {
-    largeImageKey: options.imageKey ?? 'logo',
+    largeImageKey,
     largeImageText: s.showAnimeTitle ? options.animeTitle : 'Tatakai',
     smallImageKey: 'pause_icon',
     smallImageText: 'Paused',
   };
 
-  if (s.showButtons && options.animeUrl) {
-    extra.buttons = [{ label: 'View on Tatakai', url: options.animeUrl }];
+  if (s.showButtons) {
+    const buttons: Array<{ label: string; url: string }> = [];
+    if (options.animeUrl) {
+      buttons.push({ label: 'Show in Tatakai', url: options.animeUrl });
+    }
+    buttons.push({ label: 'Download Tatakai', url: 'https://tatakai.me/download' });
+    extra.buttons = buttons.slice(0, 2);
   }
 
   updateDiscordRpc(titlePart, state, extra);
@@ -252,6 +271,8 @@ export function setPausedRpc(options: {
  */
 export function setViewingRpc(options: {
   animeTitle: string;
+  /** External URL of the anime poster — shown as the large image in Discord. Falls back to the app logo. */
+  animeImageUrl?: string;
   imageKey?: string;
   animeUrl?: string;
 }): void {
@@ -261,15 +282,23 @@ export function setViewingRpc(options: {
 
   const details = s.showAnimeTitle ? `Viewing ${options.animeTitle}` : 'Viewing Anime';
 
+  // ── image — prefer external poster URL, fall back to registered asset key ──
+  const largeImageKey = options.animeImageUrl || options.imageKey || 'logo';
+
   const extra: RpcExtra = {
-    largeImageKey: options.imageKey ?? 'logo',
+    largeImageKey,
     largeImageText: s.showAnimeTitle ? options.animeTitle : 'Tatakai',
     smallImageKey: 'logo',
     smallImageText: 'Tatakai',
   };
 
-  if (s.showButtons && options.animeUrl) {
-    extra.buttons = [{ label: 'View on Tatakai', url: options.animeUrl }];
+  if (s.showButtons) {
+    const buttons: Array<{ label: string; url: string }> = [];
+    if (options.animeUrl) {
+      buttons.push({ label: 'Show in Tatakai', url: options.animeUrl });
+    }
+    buttons.push({ label: 'Download Tatakai', url: 'https://tatakai.me/download' });
+    extra.buttons = buttons.slice(0, 2);
   }
 
   updateDiscordRpc(details, 'Browsing details', extra);
@@ -282,12 +311,23 @@ export function setViewingRpc(options: {
  */
 export function setBrowsingRpc(section: string = 'Anime'): void {
   if (!canShowDiscordRpc()) return;
-  updateDiscordRpc(`Browsing ${section}`, 'Exploring Tatakai', {
+
+  const s = getDiscordRpcSettings();
+
+  const extra: RpcExtra = {
     largeImageKey: 'logo',
     largeImageText: 'Tatakai',
     smallImageKey: 'logo',
     smallImageText: 'Tatakai',
-  });
+  };
+
+  if (s.showButtons) {
+    extra.buttons = [
+      { label: 'Download Tatakai', url: 'https://tatakai.me/download' },
+    ];
+  }
+
+  updateDiscordRpc(`Browsing ${section}`, 'Exploring Tatakai', extra);
 }
 
 /**
@@ -295,7 +335,10 @@ export function setBrowsingRpc(section: string = 'Anime'): void {
  */
 export function setSelectingRpc(options: {
   animeTitle: string;
+  /** External URL of the anime poster — shown as the large image in Discord. Falls back to the app logo. */
+  animeImageUrl?: string;
   imageKey?: string;
+  animeUrl?: string;
 }): void {
   if (!canShowDiscordRpc()) return;
 
@@ -304,10 +347,102 @@ export function setSelectingRpc(options: {
   const details = s.showAnimeTitle ? `Choosing an Episode` : 'Choosing an Episode';
   const state = s.showAnimeTitle ? options.animeTitle : 'On Tatakai';
 
-  updateDiscordRpc(details, state, {
-    largeImageKey: options.imageKey ?? 'logo',
+  // ── image — prefer external poster URL, fall back to registered asset key ──
+  const largeImageKey = options.animeImageUrl || options.imageKey || 'logo';
+
+  const extra: RpcExtra = {
+    largeImageKey,
     largeImageText: s.showAnimeTitle ? options.animeTitle : 'Tatakai',
     smallImageKey: 'logo',
     smallImageText: 'Tatakai',
-  });
+  };
+
+  if (s.showButtons) {
+    const buttons: Array<{ label: string; url: string }> = [];
+    if (options.animeUrl) {
+      buttons.push({ label: 'Show in Tatakai', url: options.animeUrl });
+    }
+    buttons.push({ label: 'Download Tatakai', url: 'https://tatakai.me/download' });
+    extra.buttons = buttons.slice(0, 2);
+  }
+
+  updateDiscordRpc(details, state, extra);
+}
+
+/**
+ * Set RPC when actively reading a manga chapter.
+ */
+export function setReadingMangaRpc(options: {
+  mangaTitle: string;
+  chapter?: number | null;
+  /** External URL of the manga cover — shown as the large image in Discord. Falls back to the app logo. */
+  mangaImageUrl?: string | null;
+  mangaUrl?: string;
+}): void {
+  if (!canShowDiscordRpc()) return;
+
+  const s = getDiscordRpcSettings();
+
+  const details = s.showAnimeTitle ? `Reading ${options.mangaTitle}` : 'Reading Manga';
+  const state =
+    s.showEpisode && options.chapter != null
+      ? `Chapter ${options.chapter}`
+      : 'Reading';
+
+  const largeImageKey = options.mangaImageUrl || 'logo';
+
+  const extra: RpcExtra = {
+    largeImageKey,
+    largeImageText: s.showAnimeTitle ? options.mangaTitle : 'Tatakai',
+    smallImageKey: 'logo',
+    smallImageText: 'Tatakai',
+    startTime: new Date(),
+  };
+
+  if (s.showButtons) {
+    const buttons: Array<{ label: string; url: string }> = [];
+    if (options.mangaUrl) {
+      buttons.push({ label: 'Show in Tatakai', url: options.mangaUrl });
+    }
+    buttons.push({ label: 'Download Tatakai', url: 'https://tatakai.me/download' });
+    extra.buttons = buttons.slice(0, 2);
+  }
+
+  updateDiscordRpc(details, state, extra);
+}
+
+/**
+ * Set RPC when viewing a manga detail / info page (not yet reading).
+ */
+export function setViewingMangaRpc(options: {
+  mangaTitle: string;
+  /** External URL of the manga cover — shown as the large image in Discord. Falls back to the app logo. */
+  mangaImageUrl?: string | null;
+  mangaUrl?: string;
+}): void {
+  if (!canShowDiscordRpc()) return;
+
+  const s = getDiscordRpcSettings();
+
+  const details = s.showAnimeTitle ? `Viewing ${options.mangaTitle}` : 'Viewing Manga';
+
+  const largeImageKey = options.mangaImageUrl || 'logo';
+
+  const extra: RpcExtra = {
+    largeImageKey,
+    largeImageText: s.showAnimeTitle ? options.mangaTitle : 'Tatakai',
+    smallImageKey: 'logo',
+    smallImageText: 'Tatakai',
+  };
+
+  if (s.showButtons) {
+    const buttons: Array<{ label: string; url: string }> = [];
+    if (options.mangaUrl) {
+      buttons.push({ label: 'Show in Tatakai', url: options.mangaUrl });
+    }
+    buttons.push({ label: 'Download Tatakai', url: 'https://tatakai.me/download' });
+    extra.buttons = buttons.slice(0, 2);
+  }
+
+  updateDiscordRpc(details, 'Browsing details', extra);
 }

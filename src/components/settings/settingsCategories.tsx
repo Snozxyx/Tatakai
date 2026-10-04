@@ -9,6 +9,7 @@ import {
   PlayCircle,
   BookOpen,
   SlidersHorizontal,
+  Smartphone,
   Puzzle,
   Info,
   ScrollText,
@@ -23,6 +24,7 @@ import { DisplayPanel } from './panels/DisplayPanel';
 import { VideoPlayerPanel } from './panels/VideoPlayerPanel';
 import { ReaderPanel } from './panels/ReaderPanel';
 import { AppSettingsPanel } from './panels/AppSettingsPanel';
+import { MobileAppSettingsPanel } from './panels/MobileAppSettingsPanel';
 import { ExtensionsPanel } from './panels/ExtensionsPanel';
 import { AboutPanel } from './panels/AboutPanel';
 import { ChangelogPanel } from './panels/ChangelogPanel';
@@ -37,6 +39,8 @@ export interface SettingsCategory {
   group: SettingsGroup;
   /** Desktop-only categories are hidden on web / mobile. */
   requiresNative?: boolean;
+  /** Mobile-only (Capacitor) categories are hidden on web / desktop. */
+  requiresMobile?: boolean;
   /** Extra search terms so the modal filter surfaces a category by the settings it holds, not just its label. */
   keywords?: string[];
   /** Panels accept an optional `section` prop for deep-link scrolling. */
@@ -53,6 +57,7 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   { id: 'player', label: 'Video Player', description: 'Playback and player behavior', icon: PlayCircle, group: 'App', keywords: ['playback', 'autoplay', 'auto play', 'skip intro', 'skip outro', 'quality', 'subtitles', 'captions', 'external player', 'mpv', 'vlc', 'volume', 'speed'], Component: VideoPlayerPanel },
   { id: 'reader', label: 'Reader', description: 'Manga reading layout and keybinds', icon: BookOpen, group: 'App', keywords: ['manga', 'reader', 'reading', 'reading direction', 'webtoon', 'vertical', 'paged', 'page fit', 'width', 'gap', 'background', 'preload', 'preloading', 'infinite scroll', 'auto scroll', 'keybinds', 'keyboard shortcuts', 'comments', 'zoom'], Component: ReaderPanel },
   { id: 'app', label: 'App Settings', description: 'Desktop and torrent preferences', icon: SlidersHorizontal, group: 'App', requiresNative: true, keywords: ['desktop', 'torrent', 'webtorrent', 'download location', 'storage path', 'startup', 'launch at startup', 'updates', 'auto update', 'logs', 'diagnostics', 'discord', 'rich presence', 'rpc', 'debrid', 'real-debrid', 'realdebrid', 'torbox', 'flaresolverr', 'cloudflare', 'proxy', 'home server', 'warp', 'country policy', 'region', 'developer mode', 'danger zone', 'reset app', 'bandwidth', 'connections', 'upnp'], Component: AppSettingsPanel },
+  { id: 'mobile', label: 'Mobile App Settings', description: 'Haptics, display, notifications, and device preferences', icon: Smartphone, group: 'App', requiresMobile: true, keywords: ['mobile', 'haptics', 'haptic feedback', 'vibration', 'vibrate', 'reduce motion', 'keep awake', 'keep screen awake', 'screen on', 'status bar', 'orientation', 'rotate', 'landscape', 'portrait', 'keyboard', 'playback', 'autoplay', 'quality', 'debrid', 'real-debrid', 'realdebrid', 'torbox', 'country policy', 'region', 'notifications', 'download notifications', 'storage', 'clear cache', 'developer mode', 'device info', 'app version'], Component: MobileAppSettingsPanel },
   { id: 'extensions', label: 'Extensions', description: 'Manage source extensions', icon: Puzzle, group: 'App', keywords: ['extensions', 'sources', 'plugins', 'extension hub', 'sideload', 'providers', 'repositories'], Component: ExtensionsPanel },
   { id: 'about', label: 'About', description: 'Version and legal information', icon: Info, group: 'Info', keywords: ['version', 'legal', 'license', 'terms', 'privacy policy', 'credits', 'build'], Component: AboutPanel },
   { id: 'changelog', label: 'Changelog', description: 'Recent releases and changes', icon: ScrollText, group: 'Info', keywords: ['changelog', 'releases', 'updates', "what's new", 'whats new', 'version history', 'patch notes'], Component: ChangelogPanel },

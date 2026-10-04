@@ -9,25 +9,13 @@ const config: CapacitorConfig = {
     cleartext: true,
     hostname: 'tatakai.me',
     allowNavigation: [
-      '*.tatakai.me',
-      'tatakaicore.vercel.app',
-      '*.tatakaicore.vercel.app',
-      '*.supabase.co',
-      '*.supabase.in',
-      '*.consumet.org',
-      '*.gogoanime.com.pe',
-      '*.ani-x.top',
-      '*.watchanimeworld.site',
-      '*.github.com',
-      '*.githubusercontent.com',
-      '*.megacloud.blog',
-      '*.rabbitstream.net'
+      '*'
     ]
   },
   android: {
     allowMixedContent: true,
     captureInput: true,
-    webContentsDebuggingEnabled: false, // Disable for production
+    webContentsDebuggingEnabled: true, // Enable for debugging
     backgroundColor: '#09090b',
     buildOptions: {
       releaseType: 'APK'
@@ -53,7 +41,10 @@ const config: CapacitorConfig = {
       androidScaleType: 'CENTER_CROP'
     },
     StatusBar: {
-      style: 'dark',
+      // `light` in Capacitor means light *icons*, which is what the dark
+      // Tatakai chrome needs. `dark` asks Android for a light status bar with
+      // dark icons, causing the white strip seen above the WebView.
+      style: 'light',
       backgroundColor: '#09090b',
       overlaysWebView: false
     },
@@ -63,12 +54,18 @@ const config: CapacitorConfig = {
       resizeOnFullScreen: true
     },
     CapacitorHttp: {
-      enabled: true,
+      // Keep the native client available for explicit high-value requests, but
+      // do not monkey-patch every fetch/XHR in the WebView. The global patch
+      // serializes ordinary API/Supabase traffic through an internal
+      // `*capacitor_http_interceptor*` route and made navigation feel stalled.
+      enabled: false,
     },
     LocalNotifications: {
-      smallIcon: 'ic_stat_icon',
-      iconColor: '#a855f7',
-      sound: 'notification.wav'
+      // Monochrome status-bar glyph (white kanji on transparent); Android tints it
+      // with iconColor. The full-colour rounded logo is used per-notification as
+      // `largeIcon: 'ic_notification_large'`. No custom `sound` → system default.
+      smallIcon: 'ic_notification',
+      iconColor: '#a855f7'
     }
   }
 };

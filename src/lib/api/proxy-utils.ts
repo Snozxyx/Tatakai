@@ -1,5 +1,6 @@
 import { getActiveStreamingProxySnapshot } from '@/hooks/user/useProxySettings';
 import { resolveBackendOrigin } from '@/lib/api/backendOrigin';
+import { isMobileProxyUrl } from '@/core/extensions/mobile/mobileProxy';
 
 const STREAM_PROXY_PASSWORD = String(
   import.meta.env.VITE_STREAM_PROXY_PASSWORD || import.meta.env.VITE_PROXY_PASSWORD || ''
@@ -92,6 +93,9 @@ export function getHighQualityPoster(rawUrl?: string, anilistId?: number): strin
 
 function buildProxyUrl(rawUrl: string, referer?: string, userAgent?: string, type: 'video' | 'subtitle' = 'video'): string {
   const url = unwrapProxyUrl(rawUrl);
+  // Already the in-app proxy (mobile token, desktop loopback): wrapping it in
+  // the remote proxy would strip the replay headers that make it work.
+  if (isMobileProxyUrl(url)) return url;
   if (!url || isLocalLike(url) || !/^https?:/i.test(url)) return url;
 
   const snapshot = getActiveStreamingProxySnapshot();
@@ -111,6 +115,9 @@ export function getProxiedVideoUrl(rawUrl: string, referer?: string, userAgent?:
 
 export function getProxiedSubtitleUrl(rawUrl: string, referer?: string, userAgent?: string): string {
   const url = unwrapProxyUrl(rawUrl);
+  // In-app proxy tracks resolve natively with header replay (see
+  // MobileVideoPlayer); routing them through the backend would lose the token.
+  if (isMobileProxyUrl(url)) return url;
   if (!url || isLocalLike(url) || !/^https?:/i.test(url)) return url;
 
   // Route subtitles through the local API (/api/proxy/subtitle) which sets

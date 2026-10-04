@@ -2,12 +2,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { ANILIST_GRAPHQL_ENDPOINT } from '@/lib/api/backendOrigin';
+import { getProxiedJsonUrl } from '@/lib/api/proxy-utils';
 import type { ProfileAppSettings } from '@/lib/profileSettings';
 
 // ── API Providers (all verified working) ────────────────────────────────────
+// Every request goes through the backend's /api/proxy/json passthrough: these
+// hosts are protected and answer browsers with a 403/CORS block (waifu.im in
+// particular refuses non-browser origins outright, so even the proxy comes back
+// 403 — the callers treat that as "empty", not an error).
 const WAIFU_IM_API  = 'https://api.waifu.im/search';
 const NEKOSIA_API   = 'https://api.nekosia.cat/api/v1';
-const NEKOSAPI_API  = 'https://api.nekosapi.com/v3';
+// nekos.best is not proxy-gated (it answers browsers directly), so it stays
+// direct — but it is also not on the /api/proxy/json allowlist, so never wrap it.
 const NEKOS_BEST_API = 'https://nekos.best/api/v2';
 
 // nekos.best animated (GIF) categories — anime reaction clips usable as avatars.
@@ -138,7 +144,7 @@ export async function fetchRandomAnimeImage(options?: {
   const waifuImFetch = async () => {
     const tag = waifuImTags[Math.floor(Math.random() * waifuImTags.length)];
     const url = `${WAIFU_IM_API}?included_tags=${tag}&is_nsfw=false&many=true&limit=${Math.min(limit, 30)}`;
-    const res = await fetch(url);
+    const res = await fetch(getProxiedJsonUrl(url));
     if (!res.ok) return;
     const data = await res.json();
     (data.images ?? []).forEach((img: any, i: number) => {
@@ -157,7 +163,7 @@ export async function fetchRandomAnimeImage(options?: {
   // ── 2. Nekosia ───────────────────────────────────────────────────────────────
   const nekosiaFetch = async () => {
     const category = gender === 'male' ? 'boy' : (isBanner ? 'catgirl' : 'catgirl');
-    const res = await fetch(`${NEKOSIA_API}/images/${category}?count=${Math.min(limit, 10)}&additionalTags=cute`);
+    const res = await fetch(getProxiedJsonUrl(`${NEKOSIA_API}/images/${category}?count=${Math.min(limit, 10)}&additionalTags=cute`));
     if (!res.ok) return;
     const data = await res.json();
     (data.images ?? (data.image ? [data] : [])).forEach((item: any, i: number) => {
@@ -175,24 +181,7 @@ export async function fetchRandomAnimeImage(options?: {
   };
 
   // ── 3. NekosAPI ──────────────────────────────────────────────────────────────
-  const nekosapiImgFetch = async () => {
-    const res = await fetch(`${NEKOSAPI_API}/images/random?rating=safe&limit=${Math.min(limit, 10)}`);
-    if (!res.ok) return;
-    const data = await res.json();
-    const items = Array.isArray(data) ? data : (data.items ?? []);
-    items.forEach((img: any, i: number) => {
-      if (!img.image_url && !img.url) return;
-      images.push({
-        id: `nekosapi-${Date.now()}-${i}`,
-        url: img.image_url ?? img.url,
-        rating: img.rating ?? 'safe',
-        gender: 'any',
-        provider: 'nekosapi',
-      });
-    });
-  };
-
-  await Promise.allSettled([waifuImFetch(), nekosiaFetch(), nekosapiImgFetch()]);
+  await Promise.allSettled([waifuImFetch(), nekosiaFetch()]);
 
   // Shuffle and return up to `limit`
   return images.sort(() => Math.random() - 0.5).slice(0, limit);
@@ -272,19 +261,110 @@ export async function searchAniListMedia(
 // ── waifu.im landscape banners ───────────────────────────────────────────────
 export async function fetchWaifuLandscape(limit = 8): Promise<NekosImage[]> {
   const url = `${WAIFU_IM_API}?orientation=LANDSCAPE&is_nsfw=false&many=true&limit=${Math.min(limit, 30)}`;
-  const res = await fetch(url);
-  if (!res.ok) return [];
-  const data = await res.json();
-  return (data?.images ?? [])
-    .filter((img: any) => !!img?.url)
-    .map((img: any, i: number): NekosImage => ({
-      id: `waifu-landscape-${Date.now()}-${i}`,
-      url: img.url,
-      palette: img.dominant_color ? [img.dominant_color] : undefined,
-      source: img.source,
-      rating: img.is_nsfw ? 'nsfw' : 'safe',
-      provider: 'waifu.im',
-    }));
+  // Proxied: a direct browser fetch is blocked with a 403 and a CORS error.
+  // waifu.im also refuses the backend proxy's origin, so `res.ok` is often
+  // false here — falling back to nekosia below instead of returning an empty
+  // gallery (which is the intended empty state only when both fail).
+  const res = await fetch(getProxiedJsonUrl(url));
+  if (res.ok) {
+    const data = await res.json();
+    const images = (data?.images ?? [])
+      .filter((img: any) => !!img?.url)
+      .map((img: any, i: number): NekosImage => ({
+        id: `waifu-landscape-${Date.now()}-${i}`,
+        url: img.url,
+        palette: img.dominant_color ? [img.dominant_color] : undefined,
+        source: img.source,
+        rating: img.is_nsfw ? 'nsfw' : 'safe',
+        provider: 'waifu.im',
+      }));
+    if (images.length) return images;
+  }
+
+  return fetchNekosiaLandscape(limit);
+}
+
+/**
+ * Landscape banner stand-in for waifu.im. nekosia mostly serves square and
+ * tall artwork, so candidates are sized (metadata when present, a real Image
+ * probe otherwise) and only genuinely wide ones (>= 1.3 aspect) are kept. The
+ * compressed variant is preferred so the picker stays light. Returns [] when
+ * nothing is wide enough — the picker then just shows no results for the tab.
+ */
+async function fetchNekosiaLandscape(limit = 8): Promise<NekosImage[]> {
+  const MIN_WIDTH = 720;
+  const MIN_ASPECT = 1.3;
+
+  const results = await Promise.allSettled(
+    ['catgirl', 'uniform', 'cosplay'].map(async (category) => {
+      const res = await fetch(getProxiedJsonUrl(`${NEKOSIA_API}/images/${category}?count=14`));
+      if (!res.ok) return [] as NekosImage[];
+      const data = await res.json();
+      const images = Array.isArray(data?.images) ? data.images : [];
+
+      const candidates = images.filter((item: any) => {
+        const meta = item?.metadata;
+        // nekosia nests dimensions under metadata.original / metadata.compressed
+        const dims =
+          meta && typeof meta.width === 'number' && typeof meta.height === 'number'
+            ? { w: meta.width, h: meta.height }
+            : meta?.compressed && typeof meta.compressed.width === 'number'
+              ? { w: meta.compressed.width, h: meta.compressed.height }
+              : meta?.original && typeof meta.original.width === 'number'
+                ? { w: meta.original.width, h: meta.original.height }
+                : null;
+        return dims !== null && dims.w >= MIN_WIDTH && dims.w / dims.h >= MIN_ASPECT;
+      });
+
+      return candidates
+        .map((item: any, i: number): NekosImage | null => {
+          const url =
+            item?.image?.compressed?.url ?? item?.image?.original?.url;
+          if (!url) return null;
+          return {
+            id: `nekosia-landscape-${category}-${item?.id ?? i}`,
+            url,
+            palette: Array.isArray(item?.colors?.palette) ? item.colors.palette : undefined,
+            source: typeof item?.source?.url === 'string' ? item.source.url : undefined,
+            rating: 'safe',
+            provider: 'nekosia',
+          };
+        })
+        .filter((img: NekosImage | null): img is NekosImage => !!img);
+    }),
+  );
+
+  const all = results
+    .filter((r): r is PromiseFulfilledResult<NekosImage[]> => r.status === 'fulfilled')
+    .flatMap((r) => r.value);
+
+  // One probe per URL keeps the picker snappy even for the largest result set.
+  const checked = await Promise.all(all.map(async (img) => {
+    const { w, h } = await probeImageSize(img.url);
+    return w >= MIN_WIDTH && w / h >= MIN_ASPECT ? img : null;
+  }));
+
+  return checked
+    .filter((img): img is NekosImage => img !== null)
+    .slice(0, limit);
+}
+
+/** Read a remote image's natural size (for aspect filtering); never throws. */
+function probeImageSize(url: string, timeoutMs = 4000): Promise<{ w: number; h: number }> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (w: number, h: number) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      resolve({ w, h });
+    };
+    const timer = window.setTimeout(() => finish(0, 0), timeoutMs);
+    const img = new Image();
+    img.onload = () => finish(img.naturalWidth, img.naturalHeight);
+    img.onerror = () => finish(0, 0);
+    img.src = url;
+  });
 }
 
 // Hook to fetch random animated GIF avatars

@@ -1,54 +1,22 @@
 import { useMemo } from 'react';
-import { Capacitor } from '@capacitor/core';
+import { isNative, isDesktop, isMobileNative } from '@/lib/platform/platform';
+
+/**
+ * Thin React bindings over `@/lib/platform/platform` (the single source of
+ * truth). Kept as hooks so existing call sites don't change; the detection
+ * logic lives in one place now.
+ */
 
 export function useIsNativeApp(): boolean {
-  return useMemo(() => {
-    if (typeof window === 'undefined') return false;
-
-    const forceNative =
-      String(import.meta.env.VITE_FORCE_NATIVE_APP || '').toLowerCase() === 'true' ||
-      String(import.meta.env.VITE_FORCE_NATIVE_APP || '') === '1';
-    if (forceNative) return true;
-
-    // Check for Electron
-    const isElectron = !!(window as any).electron;
-
-    // Check for Capacitor - use the official API
-    const isCapacitor = Capacitor.isNativePlatform();
-
-    // Check for Tauri (legacy check as per existing code)
-    const hasTauri = !!(window as any).__TAURI__ ||
-      !!(window as any).__TAURI_INTERNALS__ ||
-      !!(window as any).invoke ||
-      !!(window as any).tauri;
-
-    const isNative = isElectron || isCapacitor || hasTauri;
-
-    return isNative;
-  }, []);
+  return useMemo(() => isNative(), []);
 }
 
-// Separate hook for desktop apps only (Electron/Tauri)
+// Desktop apps only (Electron/Tauri)
 export function useIsDesktopApp(): boolean {
-  return useMemo(() => {
-    if (typeof window === 'undefined') return false;
-
-    // Check for Electron
-    const isElectron = !!(window as any).electron;
-
-    // Check for Tauri
-    const hasTauri = !!(window as any).__TAURI__ ||
-      !!(window as any).__TAURI_INTERNALS__ ||
-      !!(window as any).invoke ||
-      !!(window as any).tauri;
-
-    return isElectron || hasTauri;
-  }, []);
+  return useMemo(() => isDesktop(), []);
 }
 
-// Separate hook for mobile apps only (Capacitor)
+// Mobile apps only (Capacitor)
 export function useIsMobileApp(): boolean {
-  return useMemo(() => {
-    return Capacitor.isNativePlatform();
-  }, []);
+  return useMemo(() => isMobileNative(), []);
 }

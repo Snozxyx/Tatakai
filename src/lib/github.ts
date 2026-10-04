@@ -7,7 +7,7 @@ export const GITHUB_REPO = "tatakai";
 export const GITHUB_REPO_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`;
 export const GITHUB_RELEASES_URL = `${GITHUB_REPO_URL}/releases`;
 
-export type PlatformKey = "windows" | "macos" | "linux" | "android";
+export type PlatformKey = "windows" | "macos" | "linux" | "android" | "ios";
 
 export interface GitHubReleaseAsset {
   name: string;
@@ -82,6 +82,7 @@ export function platformForAsset(fileName: string): PlatformKey | null {
   if (/\.(dmg|pkg)$/.test(n) || /mac(os)?|darwin|osx|apple|universal/.test(n)) return "macos";
   if (/\.(appimage|deb|rpm|snap|flatpak)$/.test(n) || /linux/.test(n)) return "linux";
   if (/\.(apk|aab)$/.test(n) || /android/.test(n)) return "android";
+  if (/\.(ipa|xcarchive)$/.test(n) || /(^|[^a-z])(ios|iphone|ios-unsigned)/.test(n)) return "ios";
   return null;
 }
 
@@ -111,6 +112,8 @@ export function pickPrimaryAsset(
   }
   if (key === "macos") return matches.find((a) => /\.dmg$/i.test(a.name)) || matches[0];
   if (key === "linux") return matches.find((a) => /\.appimage$/i.test(a.name)) || matches[0];
+  if (key === "android") return matches.find((a) => /\.apk$/i.test(a.name)) || matches[0];
+  if (key === "ios") return matches.find((a) => /\.ipa$/i.test(a.name)) || matches[0];
   return matches[0];
 }
 
@@ -124,6 +127,8 @@ export function platformKeyForName(name: string): PlatformKey | null {
       return "linux";
     case "android":
       return "android";
+    case "ios":
+      return "ios";
     default:
       return null;
   }

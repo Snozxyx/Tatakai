@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Play, Download, Sparkles } from "lucide-react";
 import { Navigation } from "@/components/ui/navbar";
 import { useAuth } from "@/contexts/AuthContext";
-import { useGitHubRepo, useLatestRelease, useAllReleases, formatCompact, GITHUB_REPO_URL } from "@/lib/github";
+import { useGitHubRepo, useLatestRelease, useAllReleases, platformForAsset, formatCompact, GITHUB_REPO_URL } from "@/lib/github";
 import { supabase } from "@/integrations/supabase/client";
 import { FeatureShowcase } from "@/components/landing/FeatureShowcase";
 
@@ -147,13 +147,22 @@ export default function LandingPage() {
   const stars = repo ? formatCompact(repo.stargazers_count) : null;
   const forks = repo ? formatCompact(repo.forks_count) : null;
   const latestVersion = latest?.tag_name ? latest.tag_name.replace(/^v/i, "") : null;
-  // Total downloads across ALL releases (matches DownloadPage & admin analytics)
-  const latestDownloads = releases
+  // Download counts across ALL releases (matches DownloadPage & admin analytics).
+  // Split mobile out so the Android/iOS traction is visible on the hero, not just
+  // folded into the desktop installer total.
+  const { latestDownloads, mobileDownloads } = releases
     ? releases.reduce(
-        (sum, r) => sum + r.assets.reduce((s, a) => s + (a.download_count || 0), 0),
-        0,
+        (acc, r) => {
+          r.assets.forEach((a) => {
+            acc.latestDownloads += a.download_count || 0;
+            const k = platformForAsset(a.name);
+            if (k === "android" || k === "ios") acc.mobileDownloads += a.download_count || 0;
+          });
+          return acc;
+        },
+        { latestDownloads: 0, mobileDownloads: 0 },
       )
-    : 0;
+    : { latestDownloads: 0, mobileDownloads: 0 };
 
   const heroStats = [
     { value: stars ?? "—", label: "GitHub stars" },
@@ -161,7 +170,10 @@ export default function LandingPage() {
     latestDownloads > 0
       ? { value: formatCompact(latestDownloads), label: "app downloads" }
       : { value: forks ?? "—", label: "GitHub forks" },
-  ];
+    mobileDownloads > 0
+      ? { value: formatCompact(mobileDownloads), label: "mobile downloads" }
+      : null,
+  ].filter(Boolean) as { value: string; label: string }[];
 
   useEffect(() => {
     setMounted(true);

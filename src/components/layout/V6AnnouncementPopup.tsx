@@ -111,11 +111,11 @@ export function V6AnnouncementPopup() {
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
             <DialogContent
-                className="w-[95vw] max-w-[660px] p-0 overflow-hidden bg-background/70 border-white/10 shadow-2xl rounded-3xl animate-in fade-in zoom-in duration-500"
+                className="max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-1.5rem)] max-w-[660px] overflow-y-auto overscroll-contain p-0 bg-background/70 border-white/10 shadow-2xl rounded-3xl animate-in fade-in zoom-in duration-500 sm:max-h-[90vh]"
                 style={{ backdropFilter: 'blur(30px)' }}
             >
 
-                <div className="relative h-44 w-full overflow-hidden sm:h-52">
+                <div className="relative h-32 w-full overflow-hidden sm:h-52">
                     <img src={`${import.meta.env.BASE_URL}assets/logo/tatakaibanner.png`} alt="Tatakai V6" className="absolute inset-0 w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/40 to-transparent" />
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-4 sm:p-6">
@@ -123,11 +123,11 @@ export function V6AnnouncementPopup() {
                     </div>
                 </div>
 
-                <div className="p-5 sm:p-8 space-y-6 sm:space-y-8">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-5 p-4 sm:space-y-8 sm:p-8">
+                    <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 md:gap-6">
                         {features.map((feature, i) => (
                             <div key={i} className="flex gap-4 group">
-                                <div className="flex-shrink-0 w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-primary/10 group-hover:border-primary/20 transition-all duration-300 shadow-xl">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/5 border border-white/10 transition-all duration-300 shadow-xl group-hover:bg-primary/10 group-hover:border-primary/20 sm:h-12 sm:w-12 sm:rounded-2xl">
                                     {feature.icon}
                                 </div>
                                 <div className="space-y-1">
@@ -138,11 +138,11 @@ export function V6AnnouncementPopup() {
                         ))}
                     </div>
 
-                    <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-white/5 pb-4 sm:pb-0 px-4 sm:px-6">
+                    <div className="flex flex-col gap-2 border-t border-white/5 pt-4 pb-[max(0.25rem,env(safe-area-inset-bottom))] sm:flex-row sm:gap-3 sm:pb-0">
                         <Button
                             onClick={handleClose}
                             size="lg"
-                            className="flex-1 rounded-2xl font-black uppercase tracking-widest text-xs gap-2 group hover:scale-[1.02] transition-transform shadow-lg shadow-primary/20 px-4 sm:px-6 py-3"
+                            className="min-h-12 flex-1 rounded-2xl font-black uppercase tracking-widest text-xs gap-2 group hover:scale-[1.02] transition-transform shadow-lg shadow-primary/20 px-4 sm:px-6"
                         >
                             <Sparkles className="w-4 h-4 group-hover:animate-spin" /> Continue
                         </Button>
@@ -150,7 +150,7 @@ export function V6AnnouncementPopup() {
                             onClick={handleGoToSettings}
                             variant="outline"
                             size="lg"
-                            className="flex-1 rounded-2xl bg-white/5 border-white/10 font-bold uppercase tracking-widest text-[10px] gap-2 hover:bg-white/10 transition-all px-4 sm:px-6 py-3"
+                            className="min-h-12 flex-1 rounded-2xl bg-white/5 border-white/10 font-bold uppercase tracking-widest text-[10px] gap-2 hover:bg-white/10 transition-all px-4 sm:px-6"
                         >
                             <Settings className="w-4 h-4" /> View Changelog
                         </Button>

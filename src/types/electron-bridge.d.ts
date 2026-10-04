@@ -168,6 +168,8 @@ export interface TatakaiRuntimeBridge {
   sideloadManifest?: (manifest: unknown, bundleCode?: string) => Promise<unknown>;
   setExtensionKillSwitch?: (id: string, blocked: boolean) => Promise<unknown>;
   getExtensionAuditLog?: (limit?: number) => Promise<unknown>;
+  startTorrentSession?: (infoHashOrMagnet: string, options?: { magnet?: string; fileIndex?: number; autoSelectLargest?: boolean; optimizeStorage?: boolean }) => Promise<{ success?: boolean; sessionId?: string; infoHash?: string; error?: string }>;
+  onTorrentProgress?: (cb: (data: Record<string, unknown>) => void) => (() => void) | void;
   restoreTorrentSession?: (snapshot: { staging?: unknown[]; seeding?: unknown[]; completed?: unknown[]; current?: Record<string, unknown> | null }) => Promise<{ success?: boolean; restored?: { staging?: number; seeding?: number; completed?: number }; current?: unknown }>;
   stopTorrentSession?: (sessionId: string, options?: { destroyStore?: boolean }) => Promise<{ success?: boolean; error?: string }>;
   disconnectTorrentPeers?: (sessionId: string) => Promise<{ success?: boolean; error?: string; peersDisconnected?: number }>;
@@ -191,6 +193,16 @@ export interface TatakaiRuntimeBridge {
   extractAudioTrack?: (url: string, trackIndex: number) => Promise<{ success?: boolean; url?: string; error?: string }>;
   readLocalFile?: (filePath: string) => Promise<{ success?: boolean; url?: string; error?: string }>;
   onPlaybackEvent?: (cb: (data: Record<string, unknown>) => void) => (() => void) | void;
+  openNativePlayer?: (options: {
+    url: string;
+    title?: string;
+    startPositionMs?: number;
+    intro?: { start: number; end: number } | null;
+    outro?: { start: number; end: number } | null;
+    subtitles?: Array<{ url: string; lang?: string; label?: string; mime?: string }>;
+  }) => Promise<{ success?: boolean; error?: string }>;
+  closeNativePlayer?: () => Promise<{ success?: boolean; error?: string }>;
+  onNativePlayerEvent?: (cb: (data: Record<string, unknown>) => void) => (() => void) | void;
   [key: string]: unknown;
 }
 

@@ -47,8 +47,12 @@ interface TorrentSourcePanelProps {
   sources: any[];
   /** URL of the source backing the live session, so it can be marked. */
   activeUrl?: string;
-  /** Whether the runtime can start a session at all. */
-  isDesktop: boolean;
+  /**
+   * Whether the runtime can start a session at all — true on desktop (Electron)
+   * and on the mobile app (Capacitor native torrent plugin), false in a plain
+   * web browser where there is no torrent engine.
+   */
+  canPlayTorrent: boolean;
   onSelect: (source: any) => void;
 }
 
@@ -71,7 +75,7 @@ const HEALTH_TEXT: Record<ReturnType<typeof seederHealth>, string> = {
 export function TorrentSourcePanel({
   sources,
   activeUrl,
-  isDesktop,
+  canPlayTorrent,
   onSelect,
 }: TorrentSourcePanelProps) {
   const [sortKey, setSortKey] = useState<TorrentSortKey>("seeders");
@@ -284,13 +288,13 @@ export function TorrentSourcePanel({
                 key={`${source?.url || source?.magnetLink || "torrent"}-${index}`}
                 type="button"
                 onClick={() => onSelect(source)}
-                disabled={!isDesktop}
+                disabled={!canPlayTorrent}
                 className={`group flex w-full flex-col gap-1 rounded-xl border px-3 py-2 text-left transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
                   isActive
                     ? "border-emerald-400/60 bg-emerald-500/15"
                     : "border-white/5 bg-white/[0.02] hover:border-emerald-500/30 hover:bg-emerald-500/10"
                 }`}
-                title={isDesktop ? title : "Torrent playback needs the desktop app"}
+                title={canPlayTorrent ? title : "Torrent playback needs the Tatakai desktop or mobile app"}
               >
                 <div className="flex items-start gap-2">
                   <span className={`mt-[6px] h-1.5 w-1.5 shrink-0 rounded-full ${HEALTH_DOT[health]}`} />
@@ -332,9 +336,9 @@ export function TorrentSourcePanel({
         </div>
       )}
 
-      {!isDesktop && (
+      {!canPlayTorrent && (
         <p className="text-[10px] text-amber-400">
-          Torrent playback needs the desktop app — these releases cannot be started on this device.
+          Torrent playback needs the Tatakai desktop or mobile app — these releases can't be started in a web browser.
         </p>
       )}
     </div>

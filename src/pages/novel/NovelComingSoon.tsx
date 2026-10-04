@@ -5,11 +5,13 @@ import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
+import { useIsMobile } from "@/hooks/ui/use-mobile";
 import { cn } from "@/lib/utils";
 
 export default function NovelComingSoon() {
   const navigate = useNavigate();
   const isNative = useIsNativeApp();
+  const isMobile = useIsMobile();
 
   return (
     <div className="min-h-screen bg-black text-zinc-50 overflow-x-hidden selection:bg-primary/30 font-sans">
@@ -20,7 +22,7 @@ export default function NovelComingSoon() {
         <div className="absolute bottom-[20%] right-[20%] w-[400px] h-[400px] bg-purple-500/10 rounded-full blur-[100px] opacity-50 mix-blend-screen" />
       </div>
 
-      {!isNative && <Sidebar />}
+      {!isMobile && <Sidebar />}
 
       <main className={cn(
         "relative z-10 py-6 max-w-[1400px] mx-auto min-h-screen flex flex-col items-center justify-center px-6 pb-24 lg:pb-6",
@@ -86,7 +88,7 @@ export default function NovelComingSoon() {
         </div>
       </main>
 
-      <MobileNav />
+      {!isMobile && <MobileNav />}
     </div>
   );
 }

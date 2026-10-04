@@ -15,6 +15,8 @@
  * turnstile.ts.
  */
 
+import { isCapacitor } from "@/lib/platform/platform";
+
 /** Absolute backend origin with no trailing slash, or "" when none is known. */
 export function resolveBackendOrigin(): string {
   const explicit = String(import.meta.env.VITE_BACKEND_ORIGIN || "").trim();
@@ -27,6 +29,15 @@ export function resolveBackendOrigin(): string {
     /* fall through */
   }
 
+  // Capacitor runs from the WebView's own scheme (`capacitor://` /
+  // `https://localhost`), which is NOT the backend and can't proxy `/api/*`.
+  // A relative base there would hit the shell and return the SPA HTML, so an
+  // explicit origin is required. Use the production backend as the last resort.
+  if (isCapacitor()) return "https://api.tatakai.me";
+
+  // A real http(s) web origin proxies `/api/*` (Vite dev proxy or the deployed
+  // reverse proxy), so a relative base works — return "" so callers fall back
+  // to a relative `/api/v3`. Preserves the original web behavior exactly.
   if (typeof window !== "undefined" && window.location.protocol.startsWith("http")) {
     return window.location.origin;
   }

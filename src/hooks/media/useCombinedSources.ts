@@ -59,7 +59,21 @@ function toAppSubtitles(src: any): Subtitle[] {
       const label = String(t?.label || t?.language || t?.lang || "Subtitles").trim();
       const lang = String(t?.lang || t?.language || label).trim();
       const rank = t?.default ? 0 : SIGNS_ONLY_RE.test(label) ? 2 : 1;
-      return { rank, sub: { lang, url, label } as Subtitle };
+      const rawHeaders = t?.headers || src?.headers;
+      const headers = rawHeaders && typeof rawHeaders === "object"
+        ? Object.fromEntries(Object.entries(rawHeaders).map(([name, value]) => [name, String(value)]))
+        : undefined;
+      return {
+        rank,
+        sub: {
+          lang,
+          url,
+          label,
+          originalUrl: t?.originalUrl ? String(t.originalUrl) : undefined,
+          headers,
+          default: Boolean(t?.default),
+        } as Subtitle,
+      };
     })
     .filter((t): t is { rank: number; sub: Subtitle } => !!t);
 
@@ -153,8 +167,14 @@ function mapRawSourcesToStreamingData(rawSources: any[], ctx: MapContext): Strea
     return /dub/i.test(lang) || category === "dub";
   };
   const isEmbedSource = (src: any): boolean => {
+    const t = String(src.sourceType || src.type || "").toLowerCase();
+    // Toko uses `custom` for iframe/player-page sources. Older mobile cache
+    // rows were incorrectly stamped `isEmbed:false`, so honor the contract
+    // type before that stale derived flag. This also repairs those rows
+    // immediately after an app update, without waiting for every provider to
+    // resolve again.
+    if (t === "custom" || t === "embed") return true;
     if (typeof src.isEmbed === "boolean") return src.isEmbed;
-    const t = String(src.sourceType || "");
     if (t === "hls" || t === "mp4") return false;
     return !/\.m3u8($|[?#/])/i.test(String(src.url || ""));
   };
@@ -189,6 +209,12 @@ function mapRawSourcesToStreamingData(rawSources: any[], ctx: MapContext): Strea
       fileSize: src.fileSize,
       languageLabel: src.languageLabel,
       audioLanguage: src.audioLanguage ? String(src.audioLanguage) : undefined,
+      headers: src.headers && typeof src.headers === "object"
+        ? Object.fromEntries(Object.entries(src.headers).map(([name, value]) => [name, String(value)]))
+        : undefined,
+      refererCandidates: Array.isArray(src.refererCandidates)
+        ? src.refererCandidates.map((value: unknown) => String(value)).filter(Boolean)
+        : undefined,
       // Carried through so WatchPage can re-apply the extension's ranking after
       // it dedupes/merges servers — that pass loses the array order this sort
       // established.
@@ -227,6 +253,19 @@ function mapRawSourcesToStreamingData(rawSources: any[], ctx: MapContext): Strea
       fileSize: src.fileSize,
       languageLabel: src.languageLabel,
       audioLanguage: src.audioLanguage ? String(src.audioLanguage) : undefined,
+      // Keep provider replay metadata on the concrete source. The live proxy
+      // token carries it in memory, while these fields recover playback after
+      // a process restart/token expiry and let sidecar subtitles reuse the
+      // exact Referer/Origin/User-Agent expected by the CDN.
+      headers: src.headers && typeof src.headers === "object"
+        ? Object.fromEntries(Object.entries(src.headers).map(([name, value]) => [name, String(value)]))
+        : undefined,
+      refererCandidates: Array.isArray(src.refererCandidates)
+        ? src.refererCandidates.map((value: unknown) => String(value)).filter(Boolean)
+        : undefined,
+      providerPriority: Number.isFinite(src?.providerPriority)
+        ? Number(src.providerPriority)
+        : undefined,
       // Tracks belong to the source that resolved them — keep them attached so
       // switching server switches subtitles instead of reusing the union.
       subtitles: perSourceSubtitles[idx],

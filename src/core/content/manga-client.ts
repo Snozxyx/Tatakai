@@ -19,6 +19,7 @@ import {
   writeCachedItems,
   MANGA_CHAPTERS_TTL_MS,
 } from "@/lib/cache/extensionResultCache";
+import { isCapacitor } from "@/lib/platform/platform";
 
 /** Cache-key builder shared by the client + the query hook's placeholder. */
 export function mangaChaptersCacheKey(id: string, providers?: string, language?: string): string {
@@ -201,7 +202,13 @@ export async function getMangaFilterCounts(_query?: string): Promise<Record<stri
  * explicit absolute backend origin instead of `file:///api/v3/…`.
  */
 function resolveApiOrigin(): string {
-  if (typeof window !== 'undefined' && /^https?:$/i.test(window.location.protocol)) {
+  // Capacitor's origin is the WebView scheme (`https://localhost` /
+  // `capacitor://`), not the backend — skip straight to the explicit origin.
+  if (
+    typeof window !== 'undefined' &&
+    /^https?:$/i.test(window.location.protocol) &&
+    !isCapacitor()
+  ) {
     return window.location.origin;
   }
   const explicit = String(import.meta.env.VITE_BACKEND_ORIGIN || '').trim();
@@ -477,12 +484,75 @@ export async function getMangaReadByKey(
 ): Promise<MangaReadResponse> {
   const isNative =
     typeof window !== "undefined" &&
-    Boolean((window as any).electron || (window as any).tatakaiRuntime);
+    Boolean(
+      (window as any).electron ||
+        (window as any).tatakaiRuntime ||
+        (window as any).tatakaiMobileExtensions,
+    );
 
   // ── Offline-first: if this chapter (or any of its alternative source keys) has
   // been downloaded, serve the local pages via tatakai-media:// instead of the
   // extension host. This is also the ONLY working path when the app is offline.
   const anilistIdNum = Number(String(id).replace(/^anilist:/i, ""));
+
+  // ── Mobile offline-first: serve downloaded pages from app storage ──────────
+  // Capacitor has no `window.electron.manga`; downloaded chapters live in Dexie
+  // (offlineChapters) with page images on the filesystem, served via
+  // Capacitor.convertFileSrc. This is also the only working path offline.
+  if (isCapacitor() && Number.isFinite(anilistIdNum)) {
+    const candidateKeys = [
+      chapterKey,
+      ...(options?.alternatives || []).map((a) => a.chapterKey),
+    ].filter(Boolean);
+    try {
+      const { db } = await import("@/core/db/tatakai-db");
+      let matchedKey: string | null = null;
+      for (const key of candidateKeys) {
+        const row = await db.offlineChapters.get(`${anilistIdNum}:${key}`);
+        if (row) {
+          matchedKey = key;
+          break;
+        }
+      }
+      if (matchedKey) {
+        const { getOfflineMangaPagesMobile } = await import(
+          "@/core/download/mobile/mobileMangaDownloader"
+        );
+        const localPages = await getOfflineMangaPagesMobile(anilistIdNum, matchedKey);
+        if (localPages.length) {
+          return {
+            success: true,
+            data: {
+              pages: localPages.map((p) => ({
+                pageNumber: p.pageNumber,
+                imageUrl: p.imageUrl,
+                proxiedImageUrl: null,
+                width: null,
+                height: null,
+              })),
+              chapter: {
+                chapterKey: matchedKey,
+                anilistId: anilistIdNum,
+                provider: "tatakai_offline",
+                providerChapterId: matchedKey,
+                number: null,
+                title: null,
+                language: null,
+              },
+              readMeta: {
+                provider: "tatakai_offline",
+                fallbackUsed: false,
+                fetchedAt: new Date().toISOString(),
+              },
+            },
+          };
+        }
+      }
+    } catch {
+      /* offline lookup best-effort; fall through to the extension runtime */
+    }
+  }
+
   if (
     isNative &&
     Number.isFinite(anilistIdNum) &&

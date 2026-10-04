@@ -18,6 +18,7 @@ import type {
 } from "@/types/manga";
 import {
   resolveExtensionApiBase,
+  MOBILE_EXT_BASE,
   type NamespaceInfo,
 } from "@/hooks/media/useExtensionSourceStream";
 
@@ -121,7 +122,17 @@ interface HttpMangaEnv {
 /** Resolve the host base + manga-capable namespaces, or null when unavailable. */
 async function resolveMangaHttpEnv(): Promise<HttpMangaEnv | null> {
   try {
-    const base = await resolveExtensionApiBase();
+    // Mobile registers its downloaded extension bundles asynchronously during
+    // bootstrap. MangaPage requests chapters as soon as metadata arrives, which
+    // can beat that registration by a fraction of a second. Unlike the anime
+    // stream hook this path used to give up permanently, leaving a false empty
+    // chapter list until the user re-opened the page.
+    let base = await resolveExtensionApiBase();
+    const isMobileHost = typeof window !== "undefined" && !!(window as any).tatakaiMobileExtensions;
+    for (let attempt = 0; isMobileHost && mangaNamespaces(base.namespaces || []).length === 0 && attempt < 10; attempt += 1) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 400));
+      base = await resolveExtensionApiBase(true);
+    }
     dbg("resolveMangaHttpEnv: base=", base?.baseUrl, "namespaces=", (base?.namespaces || []).map((n) => ({ ns: n.namespace, caps: n.capabilities, routes: n.routes })));
     if (!base.baseUrl) {
       dbgWarn("resolveMangaHttpEnv: no baseUrl — host not up");
@@ -261,6 +272,15 @@ interface FlatChapterRow {
   language?: string;
   scanlator?: string;
   releaseDate?: string;
+  /** Mobile bundle results may already be aggregated by chapter. */
+  sources?: Array<{
+    provider?: string;
+    chapterKey?: string;
+    providerChapterId?: string;
+    language?: string | null;
+    scanlator?: string | null;
+    releaseDate?: string | null;
+  }>;
 }
 
 /** Merge flat rows from one source (namespace or extension) into the accumulator. */
@@ -281,6 +301,25 @@ function mergeFlatRows(
       volume: row.volume ?? null,
       sources: [],
     };
+    // `getMangaChapters` from the shared bundle already merges providers into
+    // `{ number, sources }`. Preserve those source records instead of reducing
+    // the whole chapter to a synthetic `toko:<number>` source.
+    if (Array.isArray(row.sources) && row.sources.length > 0) {
+      for (const source of row.sources) {
+        const sourceProvider = source.provider || fallbackProvider;
+        if (namespace && sourceProvider) subProviderToNamespace.set(sourceProvider, namespace);
+        existing.sources.push({
+          provider: sourceProvider,
+          chapterKey: source.chapterKey || String(number),
+          providerChapterId: source.providerChapterId || source.chapterKey || String(number),
+          language: source.language ?? null,
+          scanlator: source.scanlator ?? null,
+          releaseDate: source.releaseDate ?? null,
+        });
+      }
+      byNumber.set(number, existing);
+      continue;
+    }
     existing.sources.push({
       provider,
       chapterKey: row.chapterKey || String(number),
@@ -330,15 +369,39 @@ async function fetchChaptersViaHttp(
   const failedProviders: string[] = [];
 
   const targets = env.namespaces.slice(0, 8);
+  const isMobile = env.baseUrl === MOBILE_EXT_BASE;
+  const mobileHost = isMobile ? (window as any).tatakaiMobileExtensions : null;
   const results = await Promise.all(
     targets.map(async (ns) => {
-      const u = new URL(`${env.baseUrl}/api/v3/${ns.namespace}/manga/chapters`);
-      if (params.anilistId) u.searchParams.set("anilistId", String(params.anilistId));
-      if (params.malId) u.searchParams.set("malId", String(params.malId));
-      if (params.title) u.searchParams.set("title", params.title);
-      dbg("fetchChaptersViaHttp: GET", u.toString());
-      const { body } = await httpGetJson(u.toString());
-      const rows = Array.isArray(body?.chapters) ? (body.chapters as FlatChapterRow[]) : null;
+      let body: any = null;
+      if (isMobile && mobileHost) {
+        // In-WebView runtime: call the dispatch directly instead of HTTP.
+        try {
+          body = await mobileHost.mangaChapters(ns.namespace, {
+            anilistId: params.anilistId,
+            malId: params.malId,
+            title: params.title,
+          });
+        } catch {
+          body = null;
+        }
+      } else {
+        const u = new URL(`${env.baseUrl}/api/v3/${ns.namespace}/manga/chapters`);
+        if (params.anilistId) u.searchParams.set("anilistId", String(params.anilistId));
+        if (params.malId) u.searchParams.set("malId", String(params.malId));
+        if (params.title) u.searchParams.set("title", params.title);
+        dbg("fetchChaptersViaHttp: GET", u.toString());
+        ({ body } = await httpGetJson(u.toString()));
+      }
+      // The desktop HTTP host wraps rows as `{ chapters }`, while the mobile
+      // in-WebView dispatch returns the bundle's array directly. Accept both
+      // contracts; previously the valid mobile array was treated as a failure
+      // and MangaPage rendered an empty chapter list.
+      const rows = Array.isArray(body)
+        ? (body as FlatChapterRow[])
+        : Array.isArray(body?.chapters)
+          ? (body.chapters as FlatChapterRow[])
+          : null;
       const diag = Array.isArray(body?.providerStatus) ? (body.providerStatus as MangaProviderDiag[]) : [];
       dbg("fetchChaptersViaHttp:", ns.namespace, "→ rows=", rows == null ? "null(failed)" : rows.length);
       return { ns, rows, diag };
@@ -565,17 +628,38 @@ async function fetchPagesViaHttp(
   // `reached` becomes true once any candidate answers with a real HTTP status
   // (incl. 404) — i.e. the host is up and this source is authoritatively empty,
   // vs. a transport failure (status 0) that warrants the IPC fallback.
+  const isMobile = env.baseUrl === MOBILE_EXT_BASE;
+  const mobileHost = isMobile ? (window as any).tatakaiMobileExtensions : null;
+
   let reached = false;
   for (const ns of candidates) {
-    const u = new URL(`${env.baseUrl}/api/v3/${ns.namespace}/manga/pages`);
-    u.searchParams.set("chapterKey", params.chapterKey);
-    if (params.extensionId) u.searchParams.set("provider", params.extensionId);
-    if (params.providerChapterId) u.searchParams.set("providerChapterId", params.providerChapterId);
-    if (params.anilistId) u.searchParams.set("anilistId", String(params.anilistId));
-
-    const { status, body } = await httpGetJson(u.toString());
+    let status = 0;
+    let body: any = null;
+    if (isMobile && mobileHost) {
+      try {
+        body = await mobileHost.mangaPages(ns.namespace, {
+          chapterKey: params.chapterKey,
+          provider: params.extensionId,
+          providerChapterId: params.providerChapterId,
+          anilistId: params.anilistId,
+        });
+        status = body ? 200 : 404;
+      } catch {
+        status = 0;
+        body = null;
+      }
+    } else {
+      const u = new URL(`${env.baseUrl}/api/v3/${ns.namespace}/manga/pages`);
+      u.searchParams.set("chapterKey", params.chapterKey);
+      if (params.extensionId) u.searchParams.set("provider", params.extensionId);
+      if (params.providerChapterId) u.searchParams.set("providerChapterId", params.providerChapterId);
+      if (params.anilistId) u.searchParams.set("anilistId", String(params.anilistId));
+      ({ status, body } = await httpGetJson(u.toString()));
+    }
     if (status > 0) reached = true;
-    const rawPages = Array.isArray(body?.pages) ? body.pages : [];
+    // Same shape difference as chapters: mobile dispatch returns the page
+    // array directly while the desktop API wraps it in `{ pages }`.
+    const rawPages = Array.isArray(body) ? body : Array.isArray(body?.pages) ? body.pages : [];
     if (rawPages.length === 0) continue;
 
     // Remember the winner so the next chapter routes in one request.
@@ -638,17 +722,28 @@ async function fetchPagesViaIpc(params: {
 function buildReadResponse(
   params: { extensionId: string; chapterKey: string; providerChapterId?: string; anilistId?: number },
   provider: string,
-  rawPages: Array<{ pageNumber?: number; imageUrl?: string; proxiedImageUrl?: string | null; width?: number; height?: number }>,
+  rawPages: Array<{ pageNumber?: number; imageUrl?: string; proxiedImageUrl?: string | null; width?: number; height?: number; headers?: unknown }>,
   meta: { title?: string; number?: number; language?: string } | null,
 ): MangaReadResponse {
   const pages = rawPages
-    .map((page, idx) => ({
-      pageNumber: page.pageNumber ?? idx + 1,
-      imageUrl: String(page.imageUrl || ""),
-      proxiedImageUrl: page.proxiedImageUrl ?? null,
-      width: page.width ?? null,
-      height: page.height ?? null,
-    }))
+    .map((page, idx) => {
+      const headerEntries = page.headers && typeof page.headers === "object"
+        ? Object.entries(page.headers as Record<string, unknown>)
+          .filter(([, v]) => v != null)
+          .map(([k, v]): [string, string] => [k, String(v)])
+        : [];
+      return {
+        pageNumber: page.pageNumber ?? idx + 1,
+        imageUrl: String(page.imageUrl || ""),
+        proxiedImageUrl: page.proxiedImageUrl ?? null,
+        width: page.width ?? null,
+        height: page.height ?? null,
+        // Kept for the mobile in-app proxy's dead-token re-registration (the
+        // desktop loopback token needs no such fallback). Dropped when empty
+        // so desktop payloads stay byte-identical.
+        ...(headerEntries.length ? { headers: Object.fromEntries(headerEntries) } : {}),
+      };
+    })
     .filter((page) => page.imageUrl);
 
   // The extension pages endpoint returns pages only — `meta.number`/`meta.title`

@@ -22,7 +22,10 @@ const MAX_SECTIONS = 30;
 // ----------------------------------------------------------------------
 const MobileAnimeCard = memo(function MobileAnimeCard({ anime }: { anime: AnimeCard }) {
   return (
-    <div className="relative overflow-hidden rounded-xl border border-white/5 bg-neutral-900 active:scale-[0.98] transition-transform duration-200">
+    <div
+      className="relative overflow-hidden rounded-xl border border-white/5 bg-neutral-900 active:scale-[0.98] transition-transform duration-200"
+      style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 260px' }}
+    >
       <div className="relative aspect-[2/3] w-full">
         <img
           src={getHighQualityPoster(anime.poster, anime.anilistId)}
@@ -223,7 +226,7 @@ const HomeSectionBlock = memo(function HomeSectionBlock({ section }: { section: 
   if (section.animes.length === 0) return null;
 
   return (
-    <section className="home-section animate-fade-up mb-14 md:mb-20">
+    <section className="home-section mb-14 md:mb-20" style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 420px' }}>
       <HomeSectionHeading
         icon={<IconComponent className="w-5 h-5 text-primary" />}
         title={section.title}

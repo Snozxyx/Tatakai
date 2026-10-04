@@ -7,6 +7,7 @@ import {
   useCallback,
   type ReactNode,
 } from 'react';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 
 /**
  * BackendStatusContext
@@ -85,6 +86,28 @@ function readNavigatorOnline(): boolean {
 
 /** Resolve true if the origin answers at the network layer within the timeout. */
 async function probeOrigin(origin: string): Promise<boolean> {
+  // Avoid Capacitor's patched fetch interceptor for native health checks.
+  // Browser-only fetch options can reject even while the native network stack
+  // is healthy. Any HTTP status proves the origin was reached.
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const normalizedOrigin = origin.replace(/\/+$/, '');
+      const url = normalizedOrigin === API_ORIGIN.replace(/\/+$/, '')
+        ? `${normalizedOrigin}/health`
+        : normalizedOrigin;
+      const response = await CapacitorHttp.request({
+        url,
+        method: 'GET',
+        connectTimeout: PROBE_TIMEOUT_MS,
+        readTimeout: PROBE_TIMEOUT_MS,
+        responseType: 'text',
+      });
+      return Number(response.status) > 0;
+    } catch {
+      return false;
+    }
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
   try {

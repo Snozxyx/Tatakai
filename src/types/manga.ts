@@ -197,6 +197,13 @@ export interface MangaPage {
   proxiedImageUrl: string | null;
   width: number | null;
   height: number | null;
+  /**
+   * Upstream request headers for this page (Referer/User-Agent the image CDN
+   * demands). Carried so the mobile in-app proxy can re-register a dead token
+   * (15-minute expiry / app restart) from the page itself — desktop never
+   * needs it because its loopback server holds the headers.
+   */
+  headers?: Record<string, string> | null;
 }
 
 export interface MangaReadResponse {

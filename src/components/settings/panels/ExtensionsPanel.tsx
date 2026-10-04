@@ -10,6 +10,7 @@ import {
   SettingsEmptyState,
 } from '@/components/settings/SettingsPrimitives';
 import type { ExtensionManifest } from '@/pages/base/ExtensionHubPage';
+import { isIOS } from '@/lib/platform/platform';
 
 /** Install state lives per-device in localStorage — same keys the runtime and
  *  the store hooks read/write, so this is a view of that truth, not a new one. */
@@ -40,6 +41,7 @@ export function ExtensionsPanel() {
 
   const [installed, setInstalled] = useState<ExtensionManifest[]>(() => readInstalled());
   const [loadedIds, setLoadedIds] = useState<Set<string>>(() => new Set());
+  const visibleInstalled = isIOS() ? installed.filter((ext) => ext.type !== 'torrent') : installed;
 
   const refresh = useCallback(() => setInstalled(readInstalled()), []);
 
@@ -104,7 +106,7 @@ export function ExtensionsPanel() {
         title="Installed extensions"
         description="Extensions loaded on this device. Manage or add more from the Extension Hub."
       >
-        {installed.length === 0 ? (
+        {visibleInstalled.length === 0 ? (
           <SettingsEmptyState
             icon={PackageOpen}
             title="No extensions installed"
@@ -112,7 +114,7 @@ export function ExtensionsPanel() {
           />
         ) : (
           <div className="divide-y divide-white/5">
-            {installed.map((ext) => {
+            {visibleInstalled.map((ext) => {
               const isLoaded = loadedIds.size > 0 && loadedIds.has(ext.id.trim().toLowerCase());
               const showLoadState = loadedIds.size > 0;
               return (

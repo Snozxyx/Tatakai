@@ -4,6 +4,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 // import { Header } from "@/components/layout/Header";
 import { useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
+import { useIsMobile } from "@/hooks/ui/use-mobile";
 import { cn } from "@/lib/utils";
 import { CardSkeleton } from "@/components/ui/skeleton-custom";
 import { Input } from "@/components/ui/input";
@@ -67,6 +68,7 @@ export default function SearchPage() {
   const { producerName } = useParams<{ producerName?: string }>();
   const navigate = useNavigate();
   const isNative = useIsNativeApp();
+  const isMobile = useIsMobile();
   const decodedProducerName = useMemo(() => {
     if (!producerName) return "";
 
@@ -1109,7 +1111,7 @@ export default function SearchPage() {
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       {!isNative && <Background />}
-      {!isNative && <Sidebar />}
+      {!isMobile && <Sidebar />}
 
       <main className={cn(
         "relative z-10 pr-6 py-6 max-w-[1800px] mx-auto pb-24 md:pb-6",

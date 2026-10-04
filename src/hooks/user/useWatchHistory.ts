@@ -146,12 +146,22 @@ export function useContinueWatching() {
         }
       }
 
-      return Array.from(byEpisode.values())
+      const merged = Array.from(byEpisode.values())
         .filter((it) => !it.completed)
         .sort(
           (a, b) => new Date(b.watched_at).getTime() - new Date(a.watched_at).getTime(),
-        )
-        .slice(0, 10) as WatchHistoryItem[];
+        );
+
+      // One card per anime: show only the most recently watched episode. The list
+      // is already sorted newest-first, so the first row seen for an anime is the
+      // one the user last opened — keep it and drop the rest (e.g. Gintama EP
+      // 97/98/99 collapse to whichever episode was touched most recently).
+      const byAnime = new Map<string, WatchHistoryItem>();
+      for (const it of merged) {
+        if (!byAnime.has(it.anime_id)) byAnime.set(it.anime_id, it);
+      }
+
+      return Array.from(byAnime.values()).slice(0, 10) as WatchHistoryItem[];
     },
   });
 }

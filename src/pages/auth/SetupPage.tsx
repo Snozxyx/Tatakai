@@ -39,6 +39,7 @@ import { useCountryPolicy } from '@/core/country-policy/useCountryPolicy';
 import { FeatureFlag, setFlag } from '@/core/feature-flags';
 import { DebridSettingsPanel } from '@/components/settings/DebridSettingsPanel';
 import { useStoreCatalogue, useExtensionInstaller } from '@/hooks/api/useExtensionStore';
+import { isIOS, isMobileNative } from '@/lib/platform/platform';
 
 const VIDEO_SOURCES = [
   './assets/video/1.mp4',
@@ -186,7 +187,7 @@ const Toggle = ({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
       whileTap={{ scale: 0.9 }}
       onClick={() => onChange(!value)}
       className={cn(
-        'relative overflow-hidden w-11 h-6 rounded-full p-1 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-primary/30',
+        'relative overflow-hidden w-11 h-6 rounded-full p-1 transition-colors duration-300 focus-visible:ring-2 focus-visible:ring-primary/30',
         value ? 'bg-primary shadow-[0_0_12px_hsl(var(--primary)/0.4)]' : 'bg-muted-foreground/20'
       )}
     >
@@ -250,7 +251,12 @@ function ProgressBar({ step, total }: { step: number; total: number }) {
 }
 
 function StepHeader({ stepIndex }: { stepIndex: number }) {
-  const meta = STEP_META[stepIndex - 1];
+  const base = STEP_META[stepIndex - 1];
+  const meta = isMobileNative() && stepIndex === 2
+    ? { ...base, subtitle: 'Review mobile app permissions' }
+    : isIOS() && stepIndex === 3
+      ? { ...base, title: 'Region', subtitle: 'Regional content settings' }
+      : base;
   if (!meta) return null;
   const Icon = meta.icon;
 
@@ -471,8 +477,12 @@ export default function SetupPage() {
   const countryPolicy = useCountryPolicy();
 
   const isMobile = Capacitor.isNativePlatform() && !!(window as any).Capacitor;
+  const isIos = isIOS();
   const isDesktop = !!(window as any).electron;
-  const totalSteps = isDesktop ? 7 : 2;
+  // Keep the same guided setup on mobile and desktop. The storage step already
+  // adapts to Capacitor's managed app storage, while the remaining preferences
+  // are safe to configure on every platform.
+  const totalSteps = 7;
 
   const randomVideoSrc = useMemo(() => VIDEO_SOURCES[Math.floor(Math.random() * VIDEO_SOURCES.length)], []);
 
@@ -544,7 +554,7 @@ export default function SetupPage() {
   };
 
   return (
-    <div className="h-screen overflow-hidden bg-background flex flex-col lg:flex-row relative selection:bg-primary/30">
+    <div className="min-h-[100dvh] overflow-x-hidden bg-background flex flex-col lg:h-screen lg:flex-row lg:overflow-hidden relative selection:bg-primary/30">
       
       {/* Subtle background noise texture */}
       <div className="absolute inset-0 z-0 opacity-[0.03] pointer-events-none bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
@@ -557,11 +567,11 @@ export default function SetupPage() {
       />
 
       {/* LEFT COLUMN: Setup Interface */}
-      <div className="w-full lg:w-[45%] xl:w-[40%] h-screen flex flex-col justify-center items-center p-6 lg:p-12 relative z-20 bg-background/80 backdrop-blur-3xl lg:border-r border-border/30 shadow-2xl">
+      <div className="w-full lg:w-[45%] xl:w-[40%] h-[100dvh] flex flex-col justify-start lg:justify-center items-center overflow-y-auto p-5 pt-[max(1.25rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] lg:h-screen lg:p-12 relative z-20 bg-background/80 backdrop-blur-3xl lg:border-r border-border/30 shadow-2xl">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="w-full max-w-[420px]">
           
           {/* Logo & Header */}
-          <div className="mb-8">
+          <div className="mb-6 sm:mb-8">
             <div className="flex items-center gap-4 mb-8">
               <motion.div
                 whileHover={{ scale: 1.05, rotate: 2 }}
@@ -586,7 +596,7 @@ export default function SetupPage() {
           <ProgressBar step={step} total={totalSteps} />
 
           {/* Dynamic Content Area */}
-          <div className="min-h-[400px]">
+          <div className="min-h-[360px] sm:min-h-[400px]">
             <AnimatePresence mode="wait" custom={dir}>
               
               {/* STEP 1: Storage */}
@@ -632,7 +642,7 @@ export default function SetupPage() {
                       </motion.div>
                     )}
 
-                    <NavButtons onNext={() => isMobile ? handleComplete() : goTo(2)} nextLabel={isMobile ? 'Get Started' : 'Continue'} nextIcon={isMobile ? Sparkles : undefined} />
+                    <NavButtons onNext={() => goTo(2)} nextLabel="Continue" />
                   </motion.div>
                 </motion.div>
               )}
@@ -642,17 +652,40 @@ export default function SetupPage() {
                 <motion.div key="s2" custom={dir} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ type: 'spring', stiffness: 350, damping: 30 }}>
                   <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
                     <StepHeader stepIndex={2} />
-                    <ToggleRow icon={Disc} title="Discord Rich Presence" desc="Display the anime you're watching on your Discord profile" value={discordEnabled} onChange={setDiscordEnabled} />
-                    <NavButtons onBack={() => goTo(1)} onNext={() => isMobile ? handleComplete() : goTo(3)} />
+                    {isMobile ? (
+                      <motion.div variants={itemVariants} className="p-4 rounded-2xl bg-card border border-border/50 flex items-start gap-4">
+                        <div className="p-2 bg-primary/10 rounded-xl"><ShieldCheck className="w-4 h-4 text-primary" /></div>
+                        <div>
+                          <p className="font-semibold text-sm text-foreground">Mobile privacy</p>
+                          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                            Tatakai only requests device permissions when a feature needs them, such as download notifications.
+                          </p>
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <ToggleRow icon={Disc} title="Discord Rich Presence" desc="Display the anime you're watching on your Discord profile" value={discordEnabled} onChange={setDiscordEnabled} />
+                    )}
+                    <NavButtons onBack={() => goTo(1)} onNext={() => goTo(3)} />
                   </motion.div>
                 </motion.div>
               )}
 
               {/* STEP 3: Country Policy */}
-              {step === 3 && isDesktop && (
+              {step === 3 && (
                 <motion.div key="s3" custom={dir} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ type: 'spring', stiffness: 350, damping: 30 }}>
                   <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-5">
                     <StepHeader stepIndex={3} />
+                    {isIos ? (
+                      <motion.div variants={itemVariants} className="rounded-2xl bg-card border border-border/50 p-5 space-y-3 shadow-inner">
+                        <div className="flex items-center gap-3">
+                          <Globe className="w-5 h-5 text-primary" />
+                          <p className="text-sm font-medium text-foreground">Regional streaming settings</p>
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Region: <span className="font-semibold text-foreground">{countryPolicy.countryName || countryPolicy.countryCode}</span>. Tatakai will use sources available for this region.
+                        </p>
+                      </motion.div>
+                    ) : (
                     <motion.div variants={itemVariants} className="rounded-2xl bg-amber-500/10 border border-amber-500/20 p-5 space-y-4 shadow-inner">
                       <div className="flex items-center gap-3">
                         <Globe className="w-5 h-5 text-amber-500" />
@@ -674,13 +707,14 @@ export default function SetupPage() {
                         </span>
                       </CustomCheckbox>
                     </motion.div>
-                    <NavButtons onBack={() => goTo(2)} onNext={() => goTo(4)} nextDisabled={!countryAck} />
+                    )}
+                    <NavButtons onBack={() => goTo(2)} onNext={() => goTo(4)} nextDisabled={!isIos && !countryAck} />
                   </motion.div>
                 </motion.div>
               )}
 
               {/* STEP 4: Network */}
-              {step === 4 && isDesktop && (
+              {step === 4 && (
                 <motion.div key="s4" custom={dir} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ type: 'spring', stiffness: 350, damping: 30 }}>
                   <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
                     <StepHeader stepIndex={4} />
@@ -701,7 +735,7 @@ export default function SetupPage() {
               )}
 
               {/* STEP 5: Extensions */}
-              {step === 5 && isDesktop && (
+              {step === 5 && (
                 <motion.div key="s5" custom={dir} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ type: 'spring', stiffness: 350, damping: 30 }}>
                   <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
                     <StepHeader stepIndex={5} />
@@ -719,7 +753,7 @@ export default function SetupPage() {
               )}
 
               {/* STEP 6: Debrid Services */}
-              {step === 6 && isDesktop && (
+              {step === 6 && (
                 <motion.div key="s6" custom={dir} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ type: 'spring', stiffness: 350, damping: 30 }}>
                   <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
                     <StepHeader stepIndex={6} />
@@ -732,7 +766,7 @@ export default function SetupPage() {
               )}
 
               {/* STEP 7: Support & Terms */}
-              {step === 7 && isDesktop && (
+              {step === 7 && (
                 <motion.div key="s7" custom={dir} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ type: 'spring', stiffness: 350, damping: 30 }}>
                   <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-3">
                     <StepHeader stepIndex={7} />

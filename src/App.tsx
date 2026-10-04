@@ -9,7 +9,9 @@ import { queryClient } from "@/lib/queryClient";
 import MainLayout from "@/layouts/MainLayout";
 import AppRoutes from "@/routes/AppRoutes";
 import { DesktopDeepLinkBridge } from "@/components/desktop/DesktopDeepLinkBridge";
+import { MobileDeepLinkBridge } from "@/components/mobile/MobileDeepLinkBridge";
 import { LightboxProvider } from "@/components/media/ImageLightbox";
+import { ExtensionUpdateSheet } from "@/components/extensions/ExtensionUpdateSheet";
 import { toast } from "sonner";
 import { useEffect } from "react";
 
@@ -110,11 +112,13 @@ const App = () => {
             <TooltipProvider>
               <Router future={routerFutureFlags}>
                 <DesktopDeepLinkBridge />
+                <MobileDeepLinkBridge />
                 <SettingsModalProvider>
                   <LightboxProvider>
                     <MainLayout>
                       <AppRoutes />
                     </MainLayout>
+                    <ExtensionUpdateSheet />
                   </LightboxProvider>
                 </SettingsModalProvider>
               </Router>

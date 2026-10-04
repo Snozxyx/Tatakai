@@ -80,7 +80,7 @@ export default function WrappedPage() {
   const isMobileApp = useIsMobileApp();
   const isMobile = useIsMobile();
   const isDesktopApp = useIsDesktopApp();
-  const showSidebar = !isMobile && !isMobileApp;
+  const showSidebar = !isMobile;
 
   const currentYear = new Date().getFullYear();
 
@@ -396,7 +396,7 @@ export default function WrappedPage() {
         )}
       </main>
 
-      {!showSidebar && <MobileNav />}
+      {!isMobile && <MobileNav />}
     </div>
   );
 }

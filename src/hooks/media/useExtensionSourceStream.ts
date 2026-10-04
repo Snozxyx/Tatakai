@@ -98,6 +98,13 @@ export interface ResolvedBase {
 let cachedBase: ResolvedBase | null = null;
 let baseInFlight: Promise<ResolvedBase> | null = null;
 
+/**
+ * Sentinel base URL for the Capacitor in-WebView extension runtime. It is never
+ * fetched over the network — its presence signals consumers to route through the
+ * in-process dispatch (`window.tatakaiMobileExtensions`) instead of HTTP/SSE.
+ */
+export const MOBILE_EXT_BASE = "mobile://extensions";
+
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /**
@@ -176,6 +183,29 @@ export async function resolveExtensionApiBase(force = false): Promise<ResolvedBa
   if (baseInFlight) return baseInFlight;
 
   baseInFlight = (async () => {
+    // Capacitor mobile: extensions run in-WebView (no local HTTP host). Report a
+    // sentinel base + the mounted namespaces so consumers see the runtime as
+    // "up"; the in-process dispatch (window.tatakaiMobileExtensions) is used for
+    // the actual calls instead of EventSource/fetch. See mobileExtensionHost.ts.
+    const mobileHost =
+      typeof window !== "undefined" ? (window as any).tatakaiMobileExtensions : null;
+    if (mobileHost?.listNamespaces) {
+      try {
+        // Read the in-process registry live and DO NOT memoize it. At app boot
+        // the registry is still filling while bundles register, so the first
+        // read is frequently empty — and caching that empty list pinned every
+        // later call to "no namespaces mounted", which stranded the source
+        // stream on `unavailable` until the user hit refresh (reload() is the
+        // only thing that cleared the cache). The registry read is synchronous
+        // and instant, so there is nothing to gain from caching it; returning
+        // it live lets the stream pick up `toko` the moment it registers.
+        const namespaces = (mobileHost.listNamespaces() as NamespaceInfo[]) || [];
+        return { baseUrl: MOBILE_EXT_BASE, namespaces };
+      } catch {
+        /* fall through to the other resolvers */
+      }
+    }
+
     const rt = (typeof window !== "undefined" ? (window as any).tatakaiRuntime : null) as
       | { getExtensionApiBase?: () => Promise<ResolvedBase> }
       | null;
@@ -409,6 +439,23 @@ export function useExtensionSourceStream<T = any>(
     // that provider's entry rather than an accumulated duplicate.
     const refreshedProviders = new Set<string>();
     const groupOf = (s: any) => String(s?.providerKey || s?.url || "");
+    const canSeedSource = (s: any) => {
+      const isMobileRuntime = typeof window !== "undefined" && !!(window as any).tatakaiMobileExtensions;
+      if (!isMobileRuntime) return true;
+
+      const type = String(s?.sourceType || "").toLowerCase();
+      const remoteDirectMedia = /^https?:/i.test(String(s?.url || ""))
+        && s?.isEmbed !== true
+        && s?.isTorrent !== true
+        && (type === "hls" || type === "mp4" || s?.isM3U8 === true || /\.m3u8(?:$|[?#/])/i.test(String(s?.url || "")));
+      if (!remoteDirectMedia) return true;
+
+      // Old mobile cache rows predate per-source header preservation. Starting
+      // one immediately produces a CDN 403 and blocks its URL before the live
+      // provider result can replace it. Wait for the fresh row instead.
+      return !!(s?.headers && Object.keys(s.headers).length)
+        || (Array.isArray(s?.refererCandidates) && s.refererCandidates.length > 0);
+    };
 
     // ── Seed from cache for instant revisit (stale-while-revalidate) ──────────
     // Pre-fill the local accumulator + dedup set from the in-memory cache so the
@@ -419,6 +466,7 @@ export function useExtensionSourceStream<T = any>(
     // exactly as before.
     const seed = readCachedItemsSync<any>(streamCacheKey) || [];
     for (const s of seed) {
+      if (!canSeedSource(s)) continue;
       const k = `${s?.providerKey || ""}::${s?.url || ""}`;
       if (k !== "::" && seen.has(k)) continue;
       seen.add(k);
@@ -436,6 +484,7 @@ export function useExtensionSourceStream<T = any>(
           const hydrated = await hydrateCachedItems<any>(streamCacheKey);
           if (!cancelled && hydrated && hydrated.length) {
             for (const s of hydrated) {
+              if (!canSeedSource(s)) continue;
               const k = `${s?.providerKey || ""}::${s?.url || ""}`;
               if (k !== "::" && seen.has(k)) continue;
               seen.add(k);
@@ -451,23 +500,112 @@ export function useExtensionSourceStream<T = any>(
       const base = await resolveExtensionApiBase();
       if (cancelled) return;
 
-      const mounted = !!base.baseUrl && (base.namespaces || []).some((n) => n.namespace === namespace);
-      if (!base.baseUrl || !mounted) {
+      // Both the in-WebView mobile registry and a just-launched desktop host can
+      // finish registering their bundles a beat after the player mounts, so a
+      // single resolve that misses our namespace is not terminal: re-resolve a
+      // few times (forcing a fresh read) before declaring the runtime
+      // unavailable. Without this the very first watch-page load loses the race
+      // with bundle registration, reports `unavailable`, and only a manual
+      // refresh — which clears the base cache — ever recovers it.
+      let resolved = base;
+      let mounted =
+        !!resolved.baseUrl && (resolved.namespaces || []).some((n) => n.namespace === namespace);
+      for (let attempt = 0; attempt < 6 && !mounted; attempt++) {
+        await delay(400);
+        if (cancelled) return;
+        resolved = await resolveExtensionApiBase(true);
+        if (cancelled) return;
+        mounted =
+          !!resolved.baseUrl && (resolved.namespaces || []).some((n) => n.namespace === namespace);
+      }
+
+      if (!resolved.baseUrl || !mounted) {
         setState((s) => ({
           ...s,
           phase: "unavailable",
-          baseUrl: base.baseUrl,
+          baseUrl: resolved.baseUrl,
           baseResolved: true,
           namespaceMounted: mounted,
         }));
         return;
       }
 
-      setState((s) => ({ ...s, baseUrl: base.baseUrl, baseResolved: true, namespaceMounted: true }));
+      setState((s) => ({ ...s, baseUrl: resolved.baseUrl, baseResolved: true, namespaceMounted: true }));
+
+      // ── Mobile in-WebView runtime: progressive, SSE-equivalent ───────────────
+      // Pass an `onChunk` callback so each provider's servers render the instant
+      // that provider finishes — mirroring the SSE `source`/`provider_status`
+      // handlers below — instead of awaiting the whole ~100-provider batch.
+      if (resolved.baseUrl === MOBILE_EXT_BASE) {
+        const host = (window as any).tatakaiMobileExtensions;
+        try {
+          const onChunk = (chunk: { results?: any[]; diagnostic?: ProviderDiagnostic }) => {
+            if (cancelled || done) return;
+            const results = Array.isArray(chunk?.results) ? chunk.results : [];
+            for (const src of results) {
+              // First live chunk from this provider: evict its stale seeded/
+              // cached rows so a rotated URL replaces the dead entry (same
+              // replacement rule the SSE `source` handler applies).
+              const g = groupOf(src);
+              if (g && !refreshedProviders.has(g)) {
+                refreshedProviders.add(g);
+                for (let i = sources.length - 1; i >= 0; i--) {
+                  if (groupOf(sources[i]) === g) {
+                    const ek = `${sources[i]?.providerKey || ""}::${sources[i]?.url || ""}`;
+                    seen.delete(ek);
+                    sources.splice(i, 1);
+                  }
+                }
+              }
+              // Check duplicates only after the provider's cached rows have
+              // been evicted. Doing this first caused an identical live URL to
+              // be skipped, preserving an older cache record that lacked the
+              // source's required playback headers.
+              const key = `${src?.providerKey || ""}::${src?.url || ""}`;
+              if (key !== "::" && seen.has(key)) continue;
+              seen.add(key);
+              sources.push(src);
+              received++;
+              const owner = String(src?.providerName || src?.source || src?.providerKey || "unknown").toLowerCase();
+              perProvider.set(owner, (perProvider.get(owner) || 0) + 1);
+            }
+            if (chunk?.diagnostic) {
+              providerStatus.push(chunk.diagnostic);
+              logProviderStatus(namespace, route, chunk.diagnostic, countReceived(perProvider, chunk.diagnostic.provider));
+            }
+            setState((s) => ({ ...s, sources: [...sources], providerStatus: [...providerStatus], phase: "streaming" }));
+            // Write-through so a revisit seeds from the latest union (debounced).
+            writeCachedItems(streamCacheKey, sources, STREAM_TTL_MS);
+          };
+
+          setState((s) => ({ ...s, phase: "streaming" }));
+          await host.resolveSources(
+            namespace,
+            route,
+            { anilistId, titles, episode, resolution, preferredLanguage },
+            onChunk,
+          );
+          if (cancelled) return;
+          done = true;
+          logStreamSummary(namespace, route, providerStatus, perProvider, received);
+          writeCachedItems(streamCacheKey, sources, STREAM_TTL_MS);
+          setState((s) => ({ ...s, sources: [...sources], phase: "done" }));
+        } catch (err) {
+          if (!cancelled) {
+            const have = sources.length > 0;
+            setState((s) => ({
+              ...s,
+              phase: have ? "done" : "error",
+              error: have ? s.error : (err as Error),
+            }));
+          }
+        }
+        return;
+      }
 
       let url: string;
       try {
-        url = buildStreamUrl(base.baseUrl, namespace, route, {
+        url = buildStreamUrl(resolved.baseUrl, namespace, route, {
           anilistId,
           titles,
           episode,
@@ -848,12 +986,14 @@ export function streamExtensionSources<T = any>(
     let settled = false;
     let es: EventSource | null = null;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let quietTimer: ReturnType<typeof setTimeout> | null = null;
     const seen = new Set<string>();
     const sources: T[] = [];
     const finish = () => {
       if (settled) return;
       settled = true;
       if (timer) clearTimeout(timer);
+      if (quietTimer) clearTimeout(quietTimer);
       try { es?.close(); } catch { /* noop */ }
       resolve(sources);
     };
@@ -868,6 +1008,46 @@ export function streamExtensionSources<T = any>(
       const mounted =
         !!base.baseUrl && (base.namespaces || []).some((n) => n.namespace === namespace);
       if (!base.baseUrl || !mounted) return finish();
+
+      // Mobile in-WebView runtime: resolve in-process, no SSE.
+      if (base.baseUrl === MOBILE_EXT_BASE) {
+        // A mobile provider batch can contain a few unreachable hosts. Waiting
+        // for every 15-second provider timeout made the download sheet report
+        // "No sources" long after playable servers had already resolved. Use
+        // the bundle's progressive callback and return after a short quiet
+        // window once at least one source arrives, while the underlying batch
+        // is free to finish for the live player/cache.
+        timer = setTimeout(finish, Math.min(timeoutMs, 8000));
+        try {
+          const host = (window as any).tatakaiMobileExtensions;
+          const accept = (src: T) => {
+            if (settled) return;
+            const s = src as any;
+            const key = `${s?.providerKey || ""}::${s?.url || ""}`;
+            if (key !== "::" && seen.has(key)) return;
+            seen.add(key);
+            sources.push(src);
+          };
+          const onChunk = (chunk: { results?: T[] }) => {
+            if (settled) return;
+            for (const src of chunk?.results || []) accept(src);
+            if (sources.length > 0) {
+              if (quietTimer) clearTimeout(quietTimer);
+              quietTimer = setTimeout(finish, 900);
+            }
+          };
+          const resolved = (await host.resolveSources(
+            namespace,
+            (params.route as "sources" | "stream" | "torrent") || "sources",
+            params,
+            onChunk,
+          )) as T[];
+          for (const src of resolved || []) accept(src);
+        } catch {
+          /* fall through to finish with whatever resolved */
+        }
+        return finish();
+      }
 
       let url: string;
       try {

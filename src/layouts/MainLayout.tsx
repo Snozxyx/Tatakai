@@ -7,9 +7,9 @@ import { useTheme } from "@/hooks/ui/useTheme";
 import { usePageTracking } from "@/hooks/api/useAnalytics";
 import { useActiveSession } from "@/hooks/auth/useActiveSession";
 import { useClientId, setCachedClientId } from "@/hooks/ui/useClientId";
-import { useIsNativeApp, useIsDesktopApp } from "@/hooks/ui/useIsNativeApp";
+import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from "@/hooks/ui/useIsNativeApp";
 import { useTitlebarHidden } from "@/hooks/ui/useTitlebarHidden";
-import { useIsMobile } from "@/hooks/ui/use-mobile";
+import { useIsPhone } from "@/hooks/ui/use-mobile";
 import { useSmartTV } from "@/hooks/ui/useSmartTV";
 import { useOnline } from "@/hooks/ui/useOnline";
 
@@ -24,10 +24,9 @@ import { OfflineBanner } from '@/components/layout/OfflineBanner';
 import { OfflineGate } from '@/components/layout/OfflineGate';
 import { V6AnnouncementPopup } from '@/components/layout/V6AnnouncementPopup';
 import { PopupDisplay } from "@/components/layout/PopupDisplay";
-import { ReduceMotionPrompt } from '@/components/layout/ReduceMotionPrompt';
 import { LogViewer } from "@/components/debug/LogViewer";
 import { DevConsole } from "@/components/debug/DevConsole";
-import { GlobalListeners, DeepLinkHandler, AntiDevToolsGuard } from "@/routes/AppRoutes";
+import { GlobalListeners, DeepLinkHandler } from "@/routes/AppRoutes";
 import { EasterEggs } from "@/components/layout/EasterEggs";
 import { CelebrationHost } from "@/components/effects/Celebrate";
 import { MagnetAlignmentModal } from "@/components/modals/MagnetAlignmentModal";
@@ -37,6 +36,8 @@ import { CommunityRulesGateProvider } from "@/components/community/CommunityRule
 import { IdleReclaimProvider } from "@/contexts/IdleReclaimProvider";
 import { toast } from 'sonner';
 import { getLocalTorrentSessionHistory, getLocalTorrentSessionHistoryEnabled } from '@/lib/localStorage';
+import { triggerHaptic } from '@/lib/haptics';
+import { useMobileUpdateOrchestrator } from '@/core/update/mobile-update';
 
 const getDevModeEnabled = (): boolean => {
   try {
@@ -52,6 +53,7 @@ const getDevModeEnabled = (): boolean => {
 
 const MainLayout = ({ children }: { children: React.ReactNode }) => {
   useTheme();
+  useMobileUpdateOrchestrator();
   const [deferredStartupReady, setDeferredStartupReady] = useState(false);
   usePageTracking(deferredStartupReady);
   useActiveSession(deferredStartupReady);
@@ -68,9 +70,23 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
   const isNative = useIsNativeApp();
   const isDesktopApp = useIsDesktopApp();
   const [titlebarHidden] = useTitlebarHidden();
-  const isMobile = useIsMobile();
-  const isMobileApp = Capacitor.isNativePlatform();
-  const isDevtoolsBlockedPage = location.pathname.startsWith('/devtools-blocked');
+  const isMobile = useIsPhone();
+  const isMobileApp = useIsMobileApp();
+
+  // Light haptic tick on every page change (mobile web + native). Skips the
+  // first mount so opening the app doesn't buzz. Gated by the user's setting.
+  const lastHapticPathRef = useRef<string | null>(null);
+  useEffect(() => {
+    const path = location.pathname;
+    if (lastHapticPathRef.current === null) {
+      lastHapticPathRef.current = path;
+      return;
+    }
+    if (lastHapticPathRef.current !== path) {
+      lastHapticPathRef.current = path;
+      void triggerHaptic('navigate');
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -136,7 +152,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
   }, [deferredStartupReady, isDesktopApp]);
 
   const online = useOnline();
-  const hideSidebarPages = ['/', '/welcome', '/download', '/downloads', '/auth', '/onboarding', '/setup', '/maintenance', '/banned', '/error', '/devtools-blocked', '/smarttv', '/manga/read'];
+  const hideSidebarPages = ['/', '/welcome', '/download', '/downloads', '/auth', '/onboarding', '/setup', '/maintenance', '/banned', '/error', '/smarttv', '/manga/read'];
   const isHiddenPage = hideSidebarPages.some(page => page === '/' ? location.pathname === '/' : location.pathname.startsWith(page));
   // The community feed ships its own X-style CommunitySidebar, so suppress the
   // global Sidebar there. The single-post /community/forum/:id view and the
@@ -145,8 +161,10 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
   const isCommunityFeed = location.pathname === '/community'
     || location.pathname.startsWith('/community/forum/')
     || /^\/community\/c\/[^/]+/.test(location.pathname);
-  // Also hide sidebar when offline (OfflineGate shows full-screen offline page)
-  const showSidebar = !isMobile && !isMobileApp && !isHiddenPage && !isCommunityFeed && online;
+  // Phone widths get the bottom nav instead (Sidebar is `hidden md:flex`, MobileNav is `md:hidden`).
+  // The native-shell check is intentionally absent: a Capacitor tablet should still get the
+  // floating sidebar rather than a stretched bottom bar.
+  const showSidebar = !isMobile && !isHiddenPage && !isCommunityFeed && online;
 
   useEffect(() => {
     if (isNative) document.body.classList.add('native-app');
@@ -215,7 +233,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
     <IdleReclaimProvider />
     <div
       className={cn(
-        "min-h-screen relative flex flex-col transition-all duration-300",
+        "min-h-screen relative flex flex-col transition-[padding] duration-300",
         isDesktopApp && showSidebar && online && "lg:pl-[var(--sidebar-width)]",
         isDesktopApp && !titlebarHidden && "pt-8"
       )}
@@ -228,11 +246,6 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
           viewport, otherwise the desktop window can't be moved or closed. */}
       {isDesktopApp && <TitleBar />}
       <OfflineGate>
-        {isDevtoolsBlockedPage ? (
-          <main className="flex-1 w-full relative z-[1000]">
-            {children}
-          </main>
-        ) : (
           <>
             {getDevModeEnabled() && <DevConsole />}
             {showSidebar && <Background />}
@@ -242,12 +255,10 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
             <EasterEggs />
             <CelebrationHost />
             {deferredStartupReady && <PopupDisplay />}
-            <ReduceMotionPrompt />
             <LogViewer />
             <DeepLinkHandler />
-            <AntiDevToolsGuard />
-            
-            <MagnetAlignmentModal 
+
+            <MagnetAlignmentModal
               isOpen={magnetModalOpen} 
               onClose={() => {
                 setMagnetModalOpen(false);
@@ -266,7 +277,6 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
 
             <ConditionalFooter />
           </>
-        )}
       </OfflineGate>
     </div>
     </CommunityRulesGateProvider>
@@ -278,7 +288,7 @@ function ConditionalFooter() {
   const location = useLocation();
   const isNative = useIsNativeApp();
   if (isNative) return null;
-  const hideFooter = ['/welcome', '/download', '/watch/', '/novel/comingsoon', '/dmca', '/suggestions','/privacy', '/terms', '/community-guidelines', '/community-rules', '/char/', '/genre/', '/manga/', '/manga', '/isshoni/', '/search', '/image-search', '/status', '/banned', '/maintenance', '/service-unavailable', '/503', '/error', '/devtools-blocked', '/auth', '/reset-password', '/update-password', '/onboarding', '/setup', '/mal-redirect', '/anilist-redirect', '/favorites', '/', '/trending', '/settings' , '/recommendations' , '/admin', '/mobile-app'].some(path => location.pathname === '/' ? path === '/' : location.pathname.startsWith(path));
+  const hideFooter = ['/welcome', '/download', '/watch/', '/novel/comingsoon', '/dmca', '/suggestions','/privacy', '/terms', '/community-guidelines', '/community-rules', '/char/', '/genre/', '/manga/', '/manga', '/isshoni/', '/search', '/image-search', '/status', '/banned', '/maintenance', '/service-unavailable', '/503', '/error', '/auth', '/reset-password', '/update-password', '/onboarding', '/setup', '/mal-redirect', '/anilist-redirect', '/favorites', '/', '/trending', '/settings' , '/recommendations' , '/admin', '/mobile-app'].some(path => location.pathname === '/' ? path === '/' : location.pathname.startsWith(path));
   if (hideFooter) return null;
   return <Footer />;
 }

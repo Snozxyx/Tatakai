@@ -1,8 +1,8 @@
 import { Star, Play } from "lucide-react";
+import { memo, useRef, useState, useEffect } from "react";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import { SpotlightAnime, getProxiedImageUrl, getHighQualityImage } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
 import { AddToPlaylistButton } from '@/components/playlist/AddToPlaylistButton';
 import { buildPreferredAnimeRouteId } from "@/lib/animeIdMapping";
 
@@ -11,10 +11,11 @@ interface HeroSectionProps {
   spotlights?: SpotlightAnime[];
 }
 
-export function HeroSection({ spotlight, spotlights = [] }: HeroSectionProps) {
+export const HeroSection = memo(function HeroSection({ spotlight, spotlights = [] }: HeroSectionProps) {
   const navigate = useNavigate();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const touchXRef = useRef<number | null>(null);
   
   const allSpotlights = spotlights.length > 0 ? spotlights.slice(0, 5) : [spotlight];
   const activeSpotlight = allSpotlights[currentIndex] || spotlight;
@@ -45,77 +46,105 @@ export function HeroSection({ spotlight, spotlights = [] }: HeroSectionProps) {
     navigate(`/anime/${routeAnimeId || activeSpotlight.id}`);
   };
 
+  const goTo = (idx: number) => {
+    if (idx === currentIndex) return;
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setCurrentIndex(idx);
+      setIsTransitioning(false);
+    }, 250);
+  };
+
+  // Swipe between spotlights on touch.
+  const onTouchStart = (e: React.TouchEvent) => {
+    touchXRef.current = e.touches[0].clientX;
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (touchXRef.current == null) return;
+    const dx = e.changedTouches[0].clientX - touchXRef.current;
+    touchXRef.current = null;
+    if (Math.abs(dx) < 48 || allSpotlights.length <= 1) return;
+    const next = (currentIndex + (dx < 0 ? 1 : -1) + allSpotlights.length) % allSpotlights.length;
+    goTo(next);
+  };
+
   return (
-    <section className="relative mb-16 md:mb-24">
-      {/* Mobile Layout - Stacked with poster background */}
-      <div className="lg:hidden relative">
+    <section className="relative mb-12 md:mb-24" style={{ contentVisibility: 'auto' }}>
+      {/* Mobile Layout — immersive banner, swipeable */}
+      <div
+        className="lg:hidden relative overflow-hidden rounded-3xl border border-white/[0.08]"
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+      >
         {/* Background poster with gradient overlay */}
-        <div className="absolute inset-0 h-[400px] overflow-hidden">
-          <img 
-            src={getHighQualityImage(activeSpotlight.banner || activeSpotlight.poster)} 
+        <div className="absolute inset-0 overflow-hidden">
+          <img
+            key={activeSpotlight.id}
+            src={getHighQualityImage(activeSpotlight.banner || activeSpotlight.poster)}
             alt=""
-            fetchpriority="high"
+            fetchPriority="high"
             decoding="async"
-            className="w-full h-full object-cover scale-105 brightness-50"
+            className="w-full h-full object-cover scale-105 brightness-[0.55]"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-background/50 via-background/85 to-background" />
+          <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/80 to-background" />
+          <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-background to-transparent" />
         </div>
 
         {/* Mobile content */}
-        <div className={`relative z-10 pt-8 px-2 transition-all duration-500 ${
-          isTransitioning ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'
+        <div className={`relative z-10 px-4 pb-5 pt-10 transition-opacity duration-300 ${
+          isTransitioning ? 'opacity-0' : 'opacity-100'
         }`}>
           {/* Small poster + info */}
-          <div className="flex gap-4 mb-6">
-            <div className="w-32 flex-shrink-0">
-              <GlassPanel className="overflow-hidden rounded-xl">
-                <img 
-                  src={getHighQualityImage(activeSpotlight.poster)} 
-                  alt={activeSpotlight.name}
-                  className="w-full aspect-[3/4] object-cover"
-                />
-              </GlassPanel>
+          <div className="flex gap-3.5 mb-4">
+            <div className="w-28 flex-shrink-0 overflow-hidden rounded-2xl border border-white/15 shadow-2xl">
+              <img
+                src={getHighQualityImage(activeSpotlight.poster)}
+                alt={activeSpotlight.name}
+                loading="eager"
+                decoding="async"
+                className="w-full aspect-[3/4] object-cover"
+              />
             </div>
-            
-            <div className="flex-1 min-w-0 py-2">
-              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-amber/30 bg-amber/10 text-amber text-[10px] font-bold tracking-wider uppercase mb-2">
+
+            <div className="flex-1 min-w-0 py-1">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-amber/30 bg-black/50 backdrop-blur-sm text-amber text-[10px] font-bold tracking-wider uppercase mb-2">
                 <Star className="w-2.5 h-2.5 fill-amber" />
                 #{activeSpotlight.rank} Spotlight
               </div>
-              
-              <h1 className="font-display text-xl font-black tracking-tight leading-tight gradient-text mb-2 line-clamp-2">
+
+              <h1 className="font-display text-2xl font-black tracking-tight leading-[1.05] text-white drop-shadow-lg mb-2 line-clamp-3">
                 {activeSpotlight.name}
               </h1>
-              
-              <div className="flex flex-wrap gap-1.5 mb-3">
-                {activeSpotlight.otherInfo.slice(0, 3).map((info, idx) => (
-                  <span 
-                    key={idx} 
-                    className="px-2 py-0.5 rounded-md border border-border bg-muted/50 text-[10px] font-medium"
+
+              <div className="flex gap-1.5 mb-2.5 overflow-x-auto no-scrollbar scrollbar-hide [-webkit-overflow-scrolling:touch]">
+                {activeSpotlight.otherInfo.slice(0, 4).map((info, idx) => (
+                  <span
+                    key={idx}
+                    className="shrink-0 px-2 py-0.5 rounded-md border border-white/15 bg-black/50 backdrop-blur-sm text-[10px] font-semibold text-white/80"
                   >
                     {info}
                   </span>
                 ))}
               </div>
-              
-              <div className="text-xs text-muted-foreground">
-                SUB: {activeSpotlight.episodes.sub} | DUB: {activeSpotlight.episodes.dub || 'N/A'}
+
+              <div className="text-[11px] font-semibold tabular-nums text-white/60">
+                SUB {activeSpotlight.episodes.sub} {activeSpotlight.episodes.dub ? `· DUB ${activeSpotlight.episodes.dub}` : ''}
               </div>
             </div>
           </div>
 
           {/* Description */}
-          <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3 mb-4 px-1">
+          <p className="text-[13px] text-white/65 leading-relaxed line-clamp-2 mb-4">
             {activeSpotlight.description}
           </p>
 
           {/* Action buttons - full width on mobile */}
-          <div className="flex gap-3">
-            <button 
+          <div className="flex gap-2.5">
+            <button
               onClick={handleWatch}
-              className="flex-1 h-12 rounded-full bg-foreground text-background font-bold text-sm hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg"
+              className="flex-1 h-[52px] rounded-2xl bg-white text-black font-bold text-[15px] active:scale-[0.98] transition-transform flex items-center justify-center gap-2 shadow-xl"
             >
-              <Play className="w-4 h-4 fill-background" />
+              <Play className="w-4 h-4 fill-black" />
               Watch Now
             </button>
             <AddToPlaylistButton
@@ -123,29 +152,28 @@ export function HeroSection({ spotlight, spotlights = [] }: HeroSectionProps) {
               animeName={activeSpotlight.name}
               animePoster={activeSpotlight.poster}
               variant="icon"
-              className="h-12 w-12 rounded-full border border-border bg-muted/50 flex items-center justify-center hover:bg-muted transition-all shadow-lg"
+              className="h-[52px] w-[52px] shrink-0 rounded-2xl border border-white/15 bg-black/50 backdrop-blur-sm flex items-center justify-center active:scale-95 transition-transform"
             />
           </div>
 
-          {/* Navigation dots */}
+          {/* Navigation dots — 28px hit targets */}
           {allSpotlights.length > 1 && (
-            <div className="flex items-center justify-center gap-2 pt-6">
+            <div className="flex items-center justify-center gap-1 pt-4">
               {allSpotlights.map((_, idx) => (
                 <button
                   key={idx}
-                  onClick={() => {
-                    setIsTransitioning(true);
-                    setTimeout(() => {
-                      setCurrentIndex(idx);
-                      setIsTransitioning(false);
-                    }, 300);
-                  }}
-                  className={`transition-all duration-300 rounded-full ${
-                    idx === currentIndex 
-                      ? 'w-6 h-1.5 bg-foreground' 
-                      : 'w-1.5 h-1.5 bg-muted-foreground/50'
-                  }`}
-                />
+                  onClick={() => goTo(idx)}
+                  aria-label={`Show spotlight ${idx + 1}`}
+                  className="flex h-7 w-7 items-center justify-center"
+                >
+                  <span
+                    className={`transition-all duration-300 rounded-full ${
+                      idx === currentIndex
+                        ? 'w-6 h-1.5 bg-white'
+                        : 'w-1.5 h-1.5 bg-white/35'
+                    }`}
+                  />
+                </button>
               ))}
             </div>
           )}
@@ -273,4 +301,4 @@ export function HeroSection({ spotlight, spotlights = [] }: HeroSectionProps) {
       </div>
     </section>
   );
-}
+})

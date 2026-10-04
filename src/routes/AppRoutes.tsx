@@ -5,14 +5,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useMaintenanceMode } from "@/hooks/admin/useAdminMessages";
 import { useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
 import { WebWatchGate } from '@/components/layout/WebWatchGate';
-import { useAntiDevTools } from '@/hooks/ui/useAntiDevTools';
-import {
-  clearDevtoolsTrapState,
-  isDevtoolsGuardBypassedHost,
-  isDevtoolsLockActive,
-  isLikelyDevtoolsOpenByViewport,
-  persistDevtoolsTrapState,
-} from '@/lib/devtoolsTrap';
 import { Capacitor } from '@capacitor/core';
 import { initializePlayerAdapters } from '@/core/player/adapters-init';
 
@@ -104,7 +96,6 @@ const ServiceUnavailablePage = lazy(() => import("../pages/error/ServiceUnavaila
 const NoInternetPage = lazy(() => import("../pages/error/NoInternetPage"));
 const StatusPage = lazy(() => import("../pages/error/StatusPage"));
 const MobileOfflinePage = lazy(() => import("../pages/error/MobileOfflinePage"));
-const DevtoolsBlockedPage = lazy(() => import("../pages/error/DevtoolsBlockedPage"));
 
 const PageLoader = () => (
   <div className="min-h-screen bg-background flex items-center justify-center">
@@ -236,42 +227,6 @@ export function DeepLinkHandler() {
   return null;
 }
 
-export function AntiDevToolsGuard() {
-  useAntiDevTools();
-  return null;
-}
-
-function DevtoolsRouteEnforcer() {
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (location.pathname.startsWith('/devtools-blocked')) return;
-
-    if (isDevtoolsGuardBypassedHost()) {
-      clearDevtoolsTrapState();
-      return;
-    }
-
-    if (isDevtoolsLockActive()) {
-      navigate(`/devtools-blocked?locked=${Date.now()}`, { replace: true });
-      return;
-    }
-
-    // Fast viewport-based probe on route changes for immediate enforcement.
-    if (isLikelyDevtoolsOpenByViewport(180)) {
-      const payload = persistDevtoolsTrapState('route-viewport-detection');
-      navigate(`/devtools-blocked?locked=${Date.now()}`, {
-        replace: true,
-        state: { trapPayload: payload },
-      });
-    }
-  }, [location.pathname, navigate]);
-
-  return null;
-}
-
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isBanned, isAdmin, isLoading } = useAuth();
   const { isMaintenanceMode } = useMaintenanceMode();
@@ -375,14 +330,12 @@ const AppRoutes = () => {
 
   return (
     <Suspense fallback={<PageLoader />}>
-      <DevtoolsRouteEnforcer />
       <div key={routeSection} className="route-enter">
       <Routes>
         <Route path="/maintenance" element={<StatusPageGuard allowedWhen={isMaintenanceMode}><MaintenancePage /></StatusPageGuard>} />
         <Route path="/banned" element={<StatusPageGuard allowedWhen={isBanned}><BannedPage /></StatusPageGuard>} />
         <Route path="/503" element={<StatusPageGuard allowedWhen={false}><ServiceUnavailablePage /></StatusPageGuard>} />
         <Route path="/error" element={<StatusPageGuard allowedWhen={false}><ErrorPage /></StatusPageGuard>} />
-        <Route path="/devtools-blocked" element={<DevtoolsBlockedPage />} />
         <Route path="/char/:charname" element={<CharacterPage />} />
         <Route path="/character/:charname" element={<CharacterPage />} />
         <Route path="/extensions" element={<ProtectedRoute><ExtensionHubPage /></ProtectedRoute>} />

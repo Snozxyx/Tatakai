@@ -44,7 +44,7 @@ import { getDiscordRpcSettings, saveDiscordRpcSettings, type DiscordRpcSettings 
 
 import { useIsNativeApp } from '@/hooks/ui/useIsNativeApp';
 import { useUpdateState, resetUpdateState } from '@/core/update/update-monitor';
-import { installUpdateNow } from '@/core/update/useUpdateOrchestrator';
+import { installUpdateNow, openManualUpdateDownload } from '@/core/update/useUpdateOrchestrator';
 
 export function DesktopSettings() {
     const isNative = useIsNativeApp();
@@ -490,8 +490,8 @@ export function DesktopSettings() {
                                     Restart to Install
                                 </Button>
                             ) : updateAvailable && !isDownloading ? (
-                                <Button onClick={handleDownloadUpdate}>
-                                    Download v{updateAvailable.version}
+                                <Button onClick={update.manual ? openManualUpdateDownload : handleDownloadUpdate}>
+                                    {update.manual ? 'Download manually' : `Download v${updateAvailable.version}`}
                                 </Button>
                             ) : (
                                 <Button onClick={handleCheckUpdate} disabled={isCheckingUpdate || isDownloading}>
@@ -511,6 +511,7 @@ export function DesktopSettings() {
                         <p className="text-xs text-success flex items-center gap-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
                             Update available: v{updateAvailable.version}
+                            {update.manual && ' - install the latest DMG manually on macOS.'}
                         </p>
                     )}
                     {downloadProgress > 0 && isDownloading && (

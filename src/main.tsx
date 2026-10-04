@@ -26,6 +26,12 @@ initConsoleProtection();
 import { analytics } from '@/core/analytics/AnalyticsService';
 analytics.init();
 
+// One-time native setup for the Capacitor mobile shell (status bar, keyboard,
+// splash, platform CSS classes). `renderApp` awaits it below so extensions are
+// present before the first route/nav query.
+import { bootstrapMobile } from '@/lib/mobile/bootstrap';
+import { isCapacitor } from '@/lib/platform/platform';
+
 // Initialize Discord Activity SDK when running inside Discord embedded mode.
 void initDiscordActivity();
 
@@ -52,8 +58,18 @@ if (typeof window !== 'undefined') {
     } catch { }
   });
 
+  // Capacitor already packages every web asset locally. A service worker in the
+  // native WebView can intercept the virtual tatakai.me host (including the
+  // Capacitor HTTP bridge), retain stale bundles after an APK update, and delay
+  // normal navigation. Remove registrations left by older mobile builds.
+  if ('serviceWorker' in navigator && isCapacitor()) {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      registrations.forEach((registration) => {
+        void registration.unregister();
+      });
+    });
   // Keep development builds free of stale cached bundles.
-  if ('serviceWorker' in navigator && !import.meta.env.PROD) {
+  } else if ('serviceWorker' in navigator && !import.meta.env.PROD) {
     navigator.serviceWorker.getRegistrations().then((registrations) => {
       registrations.forEach((registration) => {
         void registration.unregister();
@@ -62,7 +78,7 @@ if (typeof window !== 'undefined') {
   }
 
   // Register service worker for PWA only in production (non-webapp mode).
-  if ('serviceWorker' in navigator && import.meta.env.PROD && import.meta.env.MODE !== 'web') {
+  if ('serviceWorker' in navigator && !isCapacitor() && import.meta.env.PROD && import.meta.env.MODE !== 'web') {
     window.addEventListener('load', () => {
       navigator.serviceWorker
         .register('/sw.js')
@@ -76,12 +92,20 @@ if (typeof window !== 'undefined') {
   }
 }
 
-createRoot(document.getElementById("root")!).render(
-  <HelmetProvider>
-    <ErrorBoundary>
-      <WebappWrapper>
-        <App />
-      </WebappWrapper>
-    </ErrorBoundary>
-  </HelmetProvider>
-);
+async function renderApp() {
+  // Native source discovery must be ready before routes/nav mount. Otherwise
+  // their first React Query request caches an empty extension/custom-source
+  // catalogue for five minutes.
+  await bootstrapMobile();
+  createRoot(document.getElementById("root")!).render(
+    <HelmetProvider>
+      <ErrorBoundary>
+        <WebappWrapper>
+          <App />
+        </WebappWrapper>
+      </ErrorBoundary>
+    </HelmetProvider>
+  );
+}
+
+void renderApp();

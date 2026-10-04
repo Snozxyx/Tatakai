@@ -1,78 +1,31 @@
-import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
+/**
+ * React hook wrapper around the centralized haptics module (`@/lib/haptics`).
+ *
+ * Kept for backwards compatibility with existing call sites (MobileNav etc.).
+ * Unlike the old implementation, every method now:
+ *   - respects the `tatakai_mobile_config.hapticFeedback` toggle, and
+ *   - falls back to `navigator.vibrate` on mobile web (not just Capacitor native).
+ *
+ * For new code prefer `triggerHaptic('event')` from `@/lib/haptics` directly.
+ */
 import { Capacitor } from '@capacitor/core';
+import { triggerHaptic } from '@/lib/haptics';
 
 export function useHaptics() {
-  const isNative = Capacitor.isNativePlatform();
-
-  const impact = async (style: 'light' | 'medium' | 'heavy' = 'medium') => {
-    if (!isNative) return;
-    
+  const isNative = (() => {
     try {
-      const styleMap: Record<string, ImpactStyle> = {
-        light: ImpactStyle.Light,
-        medium: ImpactStyle.Medium,
-        heavy: ImpactStyle.Heavy,
-      };
-      await Haptics.impact({ style: styleMap[style] });
-    } catch (e) {
-      console.warn('Haptics not available:', e);
+      return Capacitor.isNativePlatform();
+    } catch {
+      return false;
     }
-  };
+  })();
 
-  const notification = async (type: 'success' | 'warning' | 'error' = 'success') => {
-    if (!isNative) return;
-    
-    try {
-      const typeMap: Record<string, NotificationType> = {
-        success: NotificationType.Success,
-        warning: NotificationType.Warning,
-        error: NotificationType.Error,
-      };
-      await Haptics.notification({ type: typeMap[type] });
-    } catch (e) {
-      console.warn('Haptics not available:', e);
-    }
-  };
-
-  const vibrate = async (duration: number = 300) => {
-    if (!isNative) return;
-    
-    try {
-      await Haptics.vibrate({ duration });
-    } catch (e) {
-      console.warn('Haptics not available:', e);
-    }
-  };
-
-  const selectionStart = async () => {
-    if (!isNative) return;
-    
-    try {
-      await Haptics.selectionStart();
-    } catch (e) {
-      console.warn('Haptics not available:', e);
-    }
-  };
-
-  const selectionChanged = async () => {
-    if (!isNative) return;
-    
-    try {
-      await Haptics.selectionChanged();
-    } catch (e) {
-      console.warn('Haptics not available:', e);
-    }
-  };
-
-  const selectionEnd = async () => {
-    if (!isNative) return;
-    
-    try {
-      await Haptics.selectionEnd();
-    } catch (e) {
-      console.warn('Haptics not available:', e);
-    }
-  };
+  const impact = (style: 'light' | 'medium' | 'heavy' = 'medium') => triggerHaptic(style);
+  const notification = (type: 'success' | 'warning' | 'error' = 'success') => triggerHaptic(type);
+  const vibrate = (_duration = 300) => triggerHaptic('medium');
+  const selectionStart = () => triggerHaptic('select');
+  const selectionChanged = () => triggerHaptic('select');
+  const selectionEnd = () => triggerHaptic('select');
 
   return {
     impact,

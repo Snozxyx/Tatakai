@@ -34,6 +34,10 @@ export function AnimeAtlas({ layout, colorBy, controls }: { layout: AtlasLayout;
   const viewRef = useRef<View>({ scale: 1, tx: 0, ty: 0 });
   const sizeRef = useRef({ w: 0, h: 0, dpr: 1 });
   const dragRef = useRef<{ active: boolean; x: number; y: number; moved: boolean }>({ active: false, x: 0, y: 0, moved: false });
+  const touchRef = useRef({
+    pan: { active: false, x: 0, y: 0, moved: false },
+    pinch: { active: false, dist: 0, mid: { x: 0, y: 0 } },
+  });
 
   const [hovered, setHovered] = useState<AtlasNode | null>(null);
   const [selected, setSelected] = useState<AtlasNode | null>(null);
@@ -242,17 +246,18 @@ export function AnimeAtlas({ layout, colorBy, controls }: { layout: AtlasLayout;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const localXY = (e: MouseEvent) => {
+    const localXY = (clientX: number, clientY: number) => {
       const rect = canvas.getBoundingClientRect();
-      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      return { x: clientX - rect.left, y: clientY - rect.top };
     };
+    const localMouse = (e: MouseEvent) => localXY(e.clientX, e.clientY);
 
     const onDown = (e: MouseEvent) => {
-      const { x, y } = localXY(e);
+      const { x, y } = localMouse(e);
       dragRef.current = { active: true, x, y, moved: false };
     };
     const onMove = (e: MouseEvent) => {
-      const { x, y } = localXY(e);
+      const { x, y } = localMouse(e);
       if (dragRef.current.active) {
         const dx = x - dragRef.current.x;
         const dy = y - dragRef.current.y;
@@ -270,7 +275,7 @@ export function AnimeAtlas({ layout, colorBy, controls }: { layout: AtlasLayout;
     };
     const onUp = (e: MouseEvent) => {
       if (dragRef.current.active && !dragRef.current.moved) {
-        const { x, y } = localXY(e);
+        const { x, y } = localMouse(e);
         const hit = hitTest(x, y);
         if (hit) setSelected(hit);
       }
@@ -279,7 +284,7 @@ export function AnimeAtlas({ layout, colorBy, controls }: { layout: AtlasLayout;
     const onLeave = () => { setHovered(null); dragRef.current.active = false; };
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const { x, y } = localXY(e);
+      const { x, y } = localMouse(e);
       const f = Math.exp(-e.deltaY * 0.0015);
       const v = viewRef.current;
       v.tx = x - (x - v.tx) * f;
@@ -288,17 +293,101 @@ export function AnimeAtlas({ layout, colorBy, controls }: { layout: AtlasLayout;
       draw();
     };
 
+    // ── Touch: 1-finger pan, 2-finger pinch-zoom, tap to select ──
+    const touchState = touchRef.current;
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        const t = e.touches[0];
+        const { x, y } = localXY(t.clientX, t.clientY);
+        touchState.pan = { active: true, x, y, moved: false };
+      } else if (e.touches.length === 2) {
+        const a = e.touches[0];
+        const b = e.touches[1];
+        touchState.pan.active = false;
+        touchState.pinch = {
+          active: true,
+          dist: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
+          mid: { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 },
+        };
+        e.preventDefault();
+      }
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && touchState.pinch.active) {
+        const a = e.touches[0];
+        const b = e.touches[1];
+        const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+        const rect = canvas.getBoundingClientRect();
+        const mx = (a.clientX + b.clientX) / 2 - rect.left;
+        const my = (a.clientY + b.clientY) / 2 - rect.top;
+        if (touchState.pinch.dist > 0 && dist > 0) {
+          const f = dist / touchState.pinch.dist;
+          const v = viewRef.current;
+          v.tx = mx - (mx - v.tx) * f;
+          v.ty = my - (my - v.ty) * f;
+          v.scale = Math.max(4, Math.min(4000, v.scale * f));
+          draw();
+        }
+        touchState.pinch.dist = dist;
+        e.preventDefault();
+        return;
+      }
+      if (e.touches.length === 1 && touchState.pan.active) {
+        const t = e.touches[0];
+        const { x, y } = localXY(t.clientX, t.clientY);
+        const dx = x - touchState.pan.x;
+        const dy = y - touchState.pan.y;
+        if (Math.abs(dx) + Math.abs(dy) > 4) touchState.pan.moved = true;
+        // Only hijack the gesture once it's clearly horizontal — otherwise let
+        // the page scroll vertically (canvas uses touch-action: pan-y).
+        if (touchState.pan.moved && Math.abs(dx) > Math.abs(dy)) {
+          viewRef.current.tx += dx;
+          viewRef.current.ty += dy;
+          draw();
+          e.preventDefault();
+        }
+        touchState.pan.x = x;
+        touchState.pan.y = y;
+      }
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      if (touchState.pinch.active) {
+        if (e.touches.length < 2) touchState.pinch.active = false;
+        if (e.touches.length === 1) {
+          const t = e.touches[0];
+          const { x, y } = localXY(t.clientX, t.clientY);
+          touchState.pan = { active: true, x, y, moved: false };
+        }
+        return;
+      }
+      if (touchState.pan.active && !touchState.pan.moved && e.changedTouches.length > 0) {
+        const t = e.changedTouches[0];
+        const { x, y } = localXY(t.clientX, t.clientY);
+        const hit = hitTest(x, y);
+        if (hit) setSelected(hit);
+      }
+      touchState.pan.active = false;
+    };
+
     canvas.addEventListener('mousedown', onDown);
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
     canvas.addEventListener('mouseleave', onLeave);
     canvas.addEventListener('wheel', onWheel, { passive: false });
+    canvas.addEventListener('touchstart', onTouchStart, { passive: true });
+    canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+    canvas.addEventListener('touchend', onTouchEnd);
+    canvas.addEventListener('touchcancel', onTouchEnd);
     return () => {
       canvas.removeEventListener('mousedown', onDown);
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
       canvas.removeEventListener('mouseleave', onLeave);
       canvas.removeEventListener('wheel', onWheel);
+      canvas.removeEventListener('touchstart', onTouchStart);
+      canvas.removeEventListener('touchmove', onTouchMove);
+      canvas.removeEventListener('touchend', onTouchEnd);
+      canvas.removeEventListener('touchcancel', onTouchEnd);
     };
   }, [draw, hitTest]);
 
@@ -306,31 +395,31 @@ export function AnimeAtlas({ layout, colorBy, controls }: { layout: AtlasLayout;
   const infoHref = info ? info.href ?? `/anime/${info.id}` : '#';
 
   return (
-    <div ref={containerRef} className="relative h-[560px] w-full overflow-hidden rounded-2xl border border-white/10">
-      <canvas ref={canvasRef} className="block h-full w-full" style={{ cursor: 'grab' }} />
+    <div ref={containerRef} className="relative h-[420px] md:h-[560px] w-full overflow-hidden rounded-2xl border border-white/10">
+      <canvas ref={canvasRef} className="block h-full w-full [touch-action:pan-y]" style={{ cursor: 'grab' }} />
 
       {/* Control overlay (top-left), styled like the reference galaxy. */}
       {controls && (
-        <div className="absolute left-3 top-3 flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-black/55 px-2.5 py-2 backdrop-blur-md">
+        <div className="absolute left-3 top-3 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-black/55 px-2.5 py-2 backdrop-blur-md">
           {controls}
         </div>
       )}
 
-      {/* Zoom controls (bottom-right). */}
+      {/* Zoom controls (bottom-right) — larger targets on touch. */}
       <div className="absolute bottom-3 right-3 flex flex-col gap-1.5">
-        <button onClick={() => zoomBy(1.3)} aria-label="Zoom in" className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-black/55 text-white/80 backdrop-blur-md transition-colors hover:bg-white/10">
+        <button onClick={() => zoomBy(1.3)} aria-label="Zoom in" className="flex h-10 w-10 md:h-8 md:w-8 items-center justify-center rounded-lg border border-white/10 bg-black/55 text-white/80 backdrop-blur-md transition-colors hover:bg-white/10 active:scale-95">
           <Plus className="h-4 w-4" />
         </button>
-        <button onClick={() => zoomBy(1 / 1.3)} aria-label="Zoom out" className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-black/55 text-white/80 backdrop-blur-md transition-colors hover:bg-white/10">
+        <button onClick={() => zoomBy(1 / 1.3)} aria-label="Zoom out" className="flex h-10 w-10 md:h-8 md:w-8 items-center justify-center rounded-lg border border-white/10 bg-black/55 text-white/80 backdrop-blur-md transition-colors hover:bg-white/10 active:scale-95">
           <Minus className="h-4 w-4" />
         </button>
-        <button onClick={resetView} aria-label="Reset view" className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-black/55 text-white/80 backdrop-blur-md transition-colors hover:bg-white/10">
+        <button onClick={resetView} aria-label="Reset view" className="flex h-10 w-10 md:h-8 md:w-8 items-center justify-center rounded-lg border border-white/10 bg-black/55 text-white/80 backdrop-blur-md transition-colors hover:bg-white/10 active:scale-95">
           <Maximize2 className="h-4 w-4" />
         </button>
       </div>
 
       {info && (
-        <div className="absolute bottom-3 left-3 w-64 rounded-xl border border-white/10 bg-black/80 p-3 backdrop-blur-md flex gap-3">
+        <div className="absolute bottom-3 left-3 w-[min(16rem,calc(100%-1.5rem))] rounded-xl border border-white/10 bg-black/80 p-3 backdrop-blur-md flex gap-3">
           {info.poster && (
             <img src={getProxiedImageUrl(info.poster)} alt={info.title} className="h-24 w-16 flex-shrink-0 rounded-md object-cover" loading="lazy" />
           )}

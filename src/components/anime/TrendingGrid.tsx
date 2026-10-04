@@ -1,4 +1,5 @@
 import { Play, Flame } from "lucide-react";
+import { memo } from "react";
 import { TrendingAnime } from "@/lib/api";
 import { Link, useNavigate } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
@@ -44,7 +45,7 @@ const getTrendingPoster = (poster: string) => {
     .replace(/\/banner\/(small|medium)\//, '/banner/large/');
 };
 
-function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: string }) {
+const TrendingCard = memo(function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: string }) {
   const navigate = useNavigate();
   const routeAnimeId = buildPreferredAnimeRouteId({
     id: anime.id,
@@ -189,7 +190,7 @@ function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: s
   }, [isHovering, loading, previewUrl]);
 
   return (
-    <div 
+    <div
       onClick={() => {
         if (routeAnimeId) {
           navigate(`/anime/${routeAnimeId}`);
@@ -198,6 +199,8 @@ function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: s
         navigate(`/search?q=${encodeURIComponent(anime.name)}`);
       }}
       onMouseEnter={() => {
+        // Hover previews are desktop-only — touch devices never hover.
+        if (typeof window !== 'undefined' && window.matchMedia?.('(hover: none)').matches) return;
         setIsHovering(true);
         if (previewError && !previewUrl) {
           setPreviewError(false);
@@ -207,66 +210,68 @@ function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: s
         setIsHovering(false);
         cancelHover();
       }}
-      className={`relative group rounded-3xl overflow-hidden cursor-pointer ${spanClass} border border-border/30 min-h-[200px] md:min-h-0`}
+      className={`relative group rounded-3xl overflow-hidden cursor-pointer ${spanClass} border border-border/30 min-h-[200px] md:min-h-0 active:scale-[0.99]`}
+      style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 300px' }}
     >
-      <img 
-        src={getTrendingPoster(anime.poster)} 
-        alt={anime.name} 
+      <img
+        src={getTrendingPoster(anime.poster)}
+        alt={anime.name}
         loading="lazy"
         decoding="async"
-        className={`w-full h-full object-cover transition-all duration-700 ${
-          isHovering && previewUrl ? 'opacity-0' : 'group-hover:scale-110'
+        fetchPriority="low"
+        className={`w-full h-full object-cover md:transition-all md:duration-700 ${
+          isHovering && previewUrl ? 'opacity-0' : 'md:group-hover:scale-110'
         }`}
       />
-      
-      {/* Video Preview */}
+
+      {/* Video Preview — desktop hover only */}
       <video
         ref={videoRef}
-        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
+        className={`absolute inset-0 hidden w-full h-full object-cover transition-opacity duration-300 md:block ${
           isHovering && previewUrl ? 'opacity-100' : 'opacity-0'
         }`}
         muted
         loop
         playsInline
-        preload="metadata"
+        preload="none"
         crossOrigin="anonymous"
       />
 
       {/* Loading indicator */}
       {isHovering && isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/30 z-10">
+        <div className="absolute inset-0 hidden items-center justify-center bg-black/30 z-10 md:flex">
           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       )}
 
-      <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent opacity-80 transition-opacity duration-300 group-hover:opacity-60" />
-      
-      <div className="absolute top-4 left-4 z-10">
-        <span className="px-3 py-1 rounded-full bg-foreground/20 backdrop-blur-md border border-foreground/10 text-xs font-bold uppercase tracking-wider">
+      <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent opacity-80 md:transition-opacity md:duration-300 md:group-hover:opacity-60" />
+
+      <div className="absolute top-3 left-3 md:top-4 md:left-4 z-10">
+        <span className="px-2.5 py-1 md:px-3 rounded-full bg-black/50 border border-white/10 text-[11px] md:text-xs font-bold uppercase tracking-wider">
           #{anime.rank} Trending
         </span>
       </div>
 
-      <div className="absolute bottom-0 left-0 right-0 p-6 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300 z-10">
-        <h4 className="font-display text-xl md:text-2xl font-bold mb-1 leading-tight line-clamp-2">{anime.name}</h4>
+      <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 z-10">
+        <h4 className="font-display text-lg md:text-2xl font-bold mb-1 leading-tight line-clamp-2">{anime.name}</h4>
         <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-primary">Rank #{anime.rank}</p>
-          <button className="w-10 h-10 rounded-full bg-foreground text-background flex items-center justify-center opacity-0 group-hover:opacity-100 transform translate-y-4 group-hover:translate-y-0 transition-all duration-300 delay-75">
+          <p className="text-xs md:text-sm font-medium text-primary">Rank #{anime.rank}</p>
+          <span className="hidden w-10 h-10 rounded-full bg-foreground text-background md:flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
             <Play className="w-4 h-4 fill-background" />
-          </button>
+          </span>
         </div>
       </div>
     </div>
   );
-}
+})
 
-export function TrendingGrid({ animes }: TrendingGridProps) {
+export const TrendingGrid = memo(function TrendingGrid({ animes }: TrendingGridProps) {
   const displayAnimes = animes.slice(0, 4);
 
   return (
-    <section className="mb-24">
-      <div className="flex items-center justify-between mb-8 px-2">
-        <h3 className="font-display text-2xl font-semibold tracking-tight flex items-center gap-2">
+    <section className="mb-14 md:mb-24" style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 500px' }}>
+      <div className="flex items-center justify-between mb-5 md:mb-8 px-1 md:px-2">
+        <h3 className="font-display text-xl md:text-2xl font-semibold tracking-tight flex items-center gap-2">
           <Flame className="w-5 h-5 text-orange" />
           Trending Now
         </h3>
@@ -275,11 +280,11 @@ export function TrendingGrid({ animes }: TrendingGridProps) {
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 grid-rows-2 gap-4 h-auto md:h-[600px]">
+      <div className="grid grid-cols-2 md:grid-cols-4 md:grid-rows-2 gap-3 md:gap-4 h-auto md:h-[600px]">
         {displayAnimes.map((anime, idx) => (
           <TrendingCard key={anime.id} anime={anime} spanClass={SPAN_CLASSES[idx]} />
         ))}
       </div>
     </section>
   );
-}
+})

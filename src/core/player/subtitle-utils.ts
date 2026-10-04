@@ -248,13 +248,41 @@ export function sanitizeCueText(raw: string): string {
  * TextTrack into ERROR with `cues === null`, and from then on `mode = 'showing'`
  * silently renders nothing. The player therefore has to know which of its
  * subtitle URLs still need normalizing before they reach the element.
+ *
+ * A `.vtt` suffix is NOT sufficient: a *cross-origin* `.vtt` cannot be fetched
+ * by the renderer (CORS) and `<track>` has no way to send a Referer, so direct
+ * use is a guaranteed silent failure for the many CDNs that gate on it. Those
+ * must go through the fetch→proxy→blob path instead. Only URLs we can reach
+ * without a cross-origin barrier are "ready": blob/data, app assets, the local
+ * proxy (loopback / `/api/proxy/subtitle`, which replays Referer and sends
+ * `Access-Control-Allow-Origin: *`), and same-origin files.
  */
+function isSameOriginUrl(value: string): boolean {
+  try {
+    if (typeof window === 'undefined' || !window.location) return false;
+    const origin = window.location.origin;
+    if (!origin || origin === 'null') return false;
+    return new URL(value, origin).origin === origin;
+  } catch {
+    return false;
+  }
+}
+
 export function isBrowserReadyVttUrl(url: string): boolean {
   const value = String(url || '').trim();
   if (!value) return false;
+  // Inline / app-local payloads are always safe.
   if (/^(blob|data):/i.test(value)) return true;
   if (/^asset:/i.test(value) || value.includes('asset.localhost')) return true;
-  return /\.vtt(?:[?#]|$)/i.test(value);
+  // The local proxy (loopback stream tokens or the subtitle endpoint) replays
+  // Referer and sends ACAO:*, so it loads directly regardless of .vtt suffix.
+  if (/\/api\/proxy\/subtitle\b/i.test(value)) return true;
+  if (/^https?:\/\/(?:127\.0\.0\.1|localhost|\[::1\])(?::\d+)?\//i.test(value)) return true;
+  // Same-origin (incl. relative) files have no CORS barrier.
+  if (isSameOriginUrl(value)) return true;
+  // A cross-origin raw URL — even a .vtt — must be fetched+proxied, never
+  // handed to <track> directly.
+  return false;
 }
 
 export function buildSubtitleFetchCandidates(

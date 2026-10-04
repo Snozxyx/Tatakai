@@ -65,20 +65,18 @@ const DEFAULT_DOWNLOADS: DownloadItem[] = [
     name: "Android",
     category: "Mobile App",
     icon: Smartphone,
-    description: "Native Android app — currently in development",
-    requirements: "Android 8.0 or later",
-    link: "#",
-    inProgress: true,
+    description: "Signed developer APK — install directly, no App Store needed",
+    requirements: "Android 8.0 or later (64-bit)",
+    link: "https://github.com/snozxyx/tatakai/releases",
     versions: []
   },
   {
     name: "iOS",
     category: "Mobile App",
     icon: Smartphone,
-    description: "iPhone & iPad app — currently in development",
+    description: "Unsigned IPA for iPhone & iPad — sideload with your own Apple account (no App Store)",
     requirements: "iOS 14.0 or later",
-    link: "#",
-    inProgress: true,
+    link: "https://github.com/snozxyx/tatakai/releases",
     versions: []
   },
 ];
@@ -115,7 +113,7 @@ export function DownloadSection() {
     setDownloadsList((prev) =>
       prev.map((item) => {
         const key = platformKeyForName(item.name);
-        if (!key || item.inProgress) return item; // iOS / in-progress mobile builds — no GitHub download
+        if (!key) return item;
         const versions = releases
           .map((rel) => {
             const asset = pickPrimaryAsset(rel.assets, key);
@@ -430,6 +428,20 @@ export function DownloadSection() {
                 <p className="text-xs font-semibold text-white">{selectedDownload?.versions[0]?.version ? `v${selectedDownload.versions[0].version}` : "—"}</p>
               </div>
             </div>
+
+            {/* Mobile install instructions */}
+            {selectedDownload?.category === "Mobile App" && (
+              <div className="space-y-2 py-3 px-4 bg-amber-500/10 rounded-xl border border-amber-500/30">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-amber-300 font-mono">
+                  {selectedDownload?.name === "Android" ? "Direct install" : "Unsigned build"}
+                </p>
+                <p className="text-xs text-white/70 leading-relaxed">
+                  {selectedDownload?.name === "Android"
+                    ? "Download the APK and open it on your device. Android asks to allow “Install unknown apps” for your browser — the Play Protect warning is expected since this build is not published through Google Play."
+                    : "No App Store listing — sign and sideload the .ipa with your own Apple account (AltStore / SideStore / TrollStore) to install it on your device."}
+                </p>
+              </div>
+            )}
 
             {/* Features */}
             <div className="space-y-3">

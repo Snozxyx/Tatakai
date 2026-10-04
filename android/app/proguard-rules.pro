@@ -19,3 +19,7 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# libtorrent4j reaches its JNI bindings through generated SWIG classes. Keep
+# those names stable if release minification is enabled in a future build.
+-keep class org.libtorrent4j.swig.** { *; }

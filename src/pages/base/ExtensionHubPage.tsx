@@ -19,7 +19,9 @@
  * tracks real install counts is worse than an emptier page.
  */
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
+  ArrowLeft,
   ExternalLink,
   FolderUp,
   Puzzle,
@@ -34,6 +36,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Background } from '@/components/layout/Background';
 import { useIsDesktopApp, useIsNativeApp } from '@/hooks/ui/useIsNativeApp';
+import { isIOS } from '@/lib/platform/platform';
 import { SideloadExtensionModal } from '@/components/extensions/SideloadExtensionModal';
 import { PillGroup, type PillOption } from '@/components/anime/discover/PillGroup';
 import { SectionHeading } from '@/components/anime/discover/SectionHeading';
@@ -158,6 +161,7 @@ function TileSkeleton() {
 export default function ExtensionHubPage() {
   const isNative = useIsNativeApp();
   const isDesktopApp = useIsDesktopApp();
+  const isIos = isIOS();
 
   const [search, setSearch] = useState('');
   const [type, setType] = useState<TypeFilter>('all');
@@ -165,14 +169,23 @@ export default function ExtensionHubPage() {
 
   const catalogue = useStoreCatalogue({ search, type });
   const installer = useExtensionInstaller();
+  const typeFilters = isIos ? TYPE_FILTERS.filter((option) => option.id !== 'torrent') : TYPE_FILTERS;
+  const visibleItems = useMemo(
+    () => (isIos ? catalogue.items.filter((item) => item.type !== 'torrent') : catalogue.items),
+    [catalogue.items, isIos],
+  );
+  const visibleFeatured = useMemo(
+    () => (isIos ? catalogue.featured.filter((item) => item.type !== 'torrent') : catalogue.featured),
+    [catalogue.featured, isIos],
+  );
 
   const isSearching = search.trim().length > 0;
 
   const handleInstall = (extension: StoreExtension) => installer.toggle(extension);
 
   const { spotlight, promos, streaming, torrent, utilities, installed } = useMemo(() => {
-    const items = catalogue.items;
-    const featured = catalogue.featured;
+    const items = visibleItems;
+    const featured = visibleFeatured;
     return {
       spotlight: featured[0],
       promos: featured.slice(1, 3),
@@ -181,7 +194,7 @@ export default function ExtensionHubPage() {
       utilities: items.filter((item) => item.type === 'custom'),
       installed: items.filter((item) => installer.isInstalled(item)),
     };
-  }, [catalogue.items, catalogue.featured, installer]);
+  }, [visibleItems, visibleFeatured, installer]);
 
   return (
     <div className="relative min-h-screen">
@@ -193,6 +206,13 @@ export default function ExtensionHubPage() {
           isDesktopApp ? 'md:pl-6' : 'md:pl-32',
         )}
       >
+        <Link
+          to="/"
+          aria-label="Back to home"
+          className="mb-4 inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-white/15 px-3 py-2 text-sm font-semibold active:scale-95 hover:bg-white/10"
+        >
+          <ArrowLeft className="h-4 w-4" /> Home
+        </Link>
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-primary">
@@ -202,9 +222,11 @@ export default function ExtensionHubPage() {
               Extensions
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-white/50">
-              Streaming sources, torrent providers and utilities that plug into the player.
-              {catalogue.items.length > 0
-                ? ` ${catalogue.items.length} available.`
+              {isIos
+                ? 'Streaming sources and utilities that plug into the player.'
+                : 'Streaming sources, torrent providers and utilities that plug into the player.'}
+              {visibleItems.length > 0
+                ? ` ${visibleItems.length} available.`
                 : ''}
             </p>
           </div>
@@ -295,7 +317,7 @@ export default function ExtensionHubPage() {
 
         <div className="mt-6">
           <PillGroup
-            options={TYPE_FILTERS}
+            options={typeFilters}
             value={type}
             onChange={(next) => setType(next)}
             label="Extension type"
@@ -308,7 +330,7 @@ export default function ExtensionHubPage() {
               <TileSkeleton key={index} />
             ))}
           </div>
-        ) : catalogue.items.length === 0 ? (
+        ) : visibleItems.length === 0 ? (
           <div className="mt-8 rounded-3xl border border-white/[0.07] bg-white/[0.02] py-24 text-center">
             <Puzzle className="mx-auto h-10 w-10 text-white/20" />
             <p className="mt-4 font-bold text-white/80">
@@ -324,10 +346,10 @@ export default function ExtensionHubPage() {
           <section className="mt-8 space-y-4">
             <SectionHeading
               title="Search results"
-              meta={`${catalogue.items.length} ${catalogue.items.length === 1 ? 'match' : 'matches'}`}
+              meta={`${visibleItems.length} ${visibleItems.length === 1 ? 'match' : 'matches'}`}
             />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {catalogue.items.map((extension) => (
+              {visibleItems.map((extension) => (
                 <ExtensionTile
                   key={extension.id}
                   extension={extension}
@@ -380,14 +402,16 @@ export default function ExtensionHubPage() {
               onInstall={handleInstall}
             />
 
-            <RowShelf
-              title="Torrent providers"
-              eyebrow="Discovery"
-              items={torrent}
-              ranked
-              installer={installer}
-              onInstall={handleInstall}
-            />
+            {!isIos ? (
+              <RowShelf
+                title="Torrent providers"
+                eyebrow="Discovery"
+                items={torrent}
+                ranked
+                installer={installer}
+                onInstall={handleInstall}
+              />
+            ) : null}
 
             <RowShelf
               title="Utilities"
@@ -401,12 +425,12 @@ export default function ExtensionHubPage() {
               <SectionHeading
                 eyebrow="Catalogue"
                 title="All extensions"
-                meta={`${catalogue.items.length} total · ${formatCompact(
-                  catalogue.items.reduce((sum, item) => sum + item.installs + item.downloads, 0),
+                meta={`${visibleItems.length} total · ${formatCompact(
+                  visibleItems.reduce((sum, item) => sum + item.installs + item.downloads, 0),
                 )} installs`}
               />
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {catalogue.items.map((extension) => (
+                {visibleItems.map((extension) => (
                   <ExtensionTile
                     key={extension.id}
                     extension={extension}

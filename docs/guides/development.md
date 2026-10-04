@@ -6,8 +6,7 @@ How to set up, run, build, and verify Tatakai locally. Read the
 ## Prerequisites
 
 - **Node.js** — note the Electron caveat below re: very new Node majors.
-- **npm** (lockfile is `package-lock.json`; a `bun.lockb` also exists and `bun`
-  is used for tests).
+- **npm** — lockfile is `package-lock.json`.
 - A Supabase project + env vars for anything that touches the backend.
 
 ## Environment files

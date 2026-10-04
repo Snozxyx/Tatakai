@@ -91,7 +91,7 @@ export default function ProfilePage() {
   const isDesktopApp = useIsDesktopApp();
   const isMobileApp = useIsMobileApp();
   const isMobile = useIsMobile();
-  const showSidebar = !isMobile && !isMobileApp;
+  const showSidebar = !isMobile;
   const { data: notifications = [], unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
 
   const viewingUsername = usernameParam ||
@@ -524,7 +524,17 @@ export default function ProfilePage() {
                     );
                   })()}
                   
-                  <UserBadges badges={profileBadges} size={22} />
+                  <UserBadges
+                    badges={profileBadges}
+                    size={22}
+                    userStats={{
+                      episodes: effectiveEpisodeCount,
+                      manga_chapters: mangaCounts.totalChapters,
+                      comments: commentsCount,
+                      ratings: userRatings.length,
+                      reputation: reputationRate,
+                    }}
+                  />
                 </div>
 
                 {/* Username & Rank Row */}
@@ -656,10 +666,10 @@ export default function ProfilePage() {
                       p-2
                       border border-white/[0.08]
                       rounded-full
-                      w-full
-                      md:w-auto
+                      w-full max-w-full
+                      md:w-auto md:max-w-none
                       mx-auto
-                      flex items-center justify-center
+                      flex items-center justify-start md:justify-center
                       gap-1.5
                       overflow-x-auto
                       overflow-y-hidden
@@ -670,35 +680,35 @@ export default function ProfilePage() {
                   >
                 <TabsTrigger
                   value="overview"
-                  className="shrink-0 gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-5 py-2.5 text-sm font-bold whitespace-nowrap transition-all"
+                  className="shrink-0 gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-4 py-2.5 text-sm font-bold whitespace-nowrap transition-all sm:px-5"
                 >
                   <LayoutGrid className="w-4 h-4" />
                   Overview
                 </TabsTrigger>
                 {showWatchlistTab && (
-                  <TabsTrigger value="watchlist" className="flex-1 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-6 py-2.5 text-sm font-bold transition-all">
+                  <TabsTrigger value="watchlist" className="shrink-0 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-4 py-2.5 text-sm font-bold transition-all sm:px-6">
                     <List className="w-4 h-4" />
                     Watchlist
                   </TabsTrigger>
                 )}
                 {showWatchlistTab && (
-                  <TabsTrigger value="manga-readlist" className="flex-1 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-6 py-2.5 text-sm font-bold transition-all">
+                  <TabsTrigger value="manga-readlist" className="shrink-0 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-4 py-2.5 text-sm font-bold transition-all sm:px-6">
                     <BookOpen className="w-4 h-4" />
                     Manga Readlist
                   </TabsTrigger>
                 )}
                 {showHistoryTab && (
-                  <TabsTrigger value="history" className="flex-1 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-6 py-2.5 text-sm font-bold transition-all">
+                  <TabsTrigger value="history" className="shrink-0 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-4 py-2.5 text-sm font-bold transition-all sm:px-6">
                     <History className="w-4 h-4" />
                     History
                   </TabsTrigger>
                 )}
-                <TabsTrigger value="vault" className="flex-1 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-6 py-2.5 text-sm font-bold transition-all">
+                <TabsTrigger value="vault" className="shrink-0 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-4 py-2.5 text-sm font-bold transition-all sm:px-6">
                   <Library className="w-4 h-4" />
                   Vault
                 </TabsTrigger>
                 {(!isViewingOther || showHistoryTab) && (
-                  <TabsTrigger value="streaks" className="flex-1 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-6 py-2.5 text-sm font-bold transition-all">
+                  <TabsTrigger value="streaks" className="shrink-0 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-4 py-2.5 text-sm font-bold transition-all sm:px-6">
                     <Flame className="w-4 h-4" />
                     Streaks
                   </TabsTrigger>

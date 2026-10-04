@@ -29,6 +29,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getGlobalVideo, getLastSavedTime } from '@/core/player/global-video-ref';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { triggerHaptic } from '@/lib/haptics';
 import { EmojiPicker, EmojiIcon } from './EmojiPicker';
 import { GifPicker } from './GifPicker';
 import { uploadCommentMedia, type CommentAttachment } from '@/lib/commentMedia';
@@ -346,6 +347,7 @@ export function RichCommentComposer({
     };
     const result = await onSubmit(payload);
     if (result === false) return; // caller signalled failure — keep the draft
+    void triggerHaptic('comment');
     setContent('');
     setAttachments([]);
     setIsSpoiler(false);
@@ -373,7 +375,7 @@ export function RichCommentComposer({
     <div
       className={cn(
         'relative space-y-2',
-        compact ? '' : 'rounded-xl border border-border/30 bg-card/50 p-3',
+        compact ? 'max-md:space-y-3' : 'rounded-xl border border-border/30 bg-card/50 p-3 max-md:p-4',
         dropActive && 'ring-2 ring-primary/60',
       )}
       onDragOver={(e) => {
@@ -529,7 +531,7 @@ export function RichCommentComposer({
             const file = imageFileFromTransfer(e.clipboardData);
             if (file) { e.preventDefault(); intakeImageFile(file); }
           }}
-          className={cn('bg-muted/50 text-sm', compact ? 'min-h-[60px]' : 'min-h-[80px]')}
+          className={cn('bg-muted/50 text-sm leading-relaxed', compact ? 'min-h-[76px] max-md:px-3 max-md:py-2.5' : 'min-h-[112px] max-md:px-3 max-md:py-3')}
         />
         {mentionQuery !== null && mentionQuery.length > 0 && (mentions.data?.length ?? 0) > 0 && (
           <div className="absolute left-0 top-full z-20 mt-1 w-64 overflow-hidden rounded-lg border border-border/60 bg-popover shadow-lg">

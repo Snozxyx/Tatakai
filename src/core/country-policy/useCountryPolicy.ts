@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { getCountryTorrentPolicy, type CountryTorrentPolicy } from './torrent-legality';
 
 type GeoState = {
@@ -27,15 +28,9 @@ type GeoResult = { countryCode: string | null; countryName: string | null; ip: s
  */
 const GEO_PROVIDERS: Array<{ url: string; parse: (j: any) => GeoResult }> = [
   {
-    url: 'https://ipapi.co/json/',
-    parse: (j) => ({
-      countryCode: String(j?.country_code || '').toUpperCase() || null,
-      countryName: String(j?.country_name || '').trim() || null,
-      ip: String(j?.ip || '').trim() || null,
-    }),
-  },
-  {
-    // ipwho.is wraps failures in `{ success: false }` rather than an HTTP error.
+    // This currently answers mobile clients reliably; ipapi.co commonly rate
+    // limits packaged apps, so keep it as the fallback rather than making setup
+    // wait for its failure first.
     url: 'https://ipwho.is/',
     parse: (j) =>
       j && j.success !== false
@@ -45,6 +40,14 @@ const GEO_PROVIDERS: Array<{ url: string; parse: (j: any) => GeoResult }> = [
             ip: String(j?.ip || '').trim() || null,
           }
         : { countryCode: null, countryName: null, ip: null },
+  },
+  {
+    url: 'https://ipapi.co/json/',
+    parse: (j) => ({
+      countryCode: String(j?.country_code || '').toUpperCase() || null,
+      countryName: String(j?.country_name || '').trim() || null,
+      ip: String(j?.ip || '').trim() || null,
+    }),
   },
   {
     url: 'https://get.geojs.io/v1/ip/geo.json',
@@ -66,12 +69,26 @@ async function lookupGeo(
     setActiveController(controller);
     const timer = setTimeout(() => controller.abort(), 4000);
     try {
-      const res = await fetch(provider.url, {
-        signal: controller.signal,
-        headers: { Accept: 'application/json' },
-      });
-      if (!res.ok) continue;
-      const parsed = provider.parse(await res.json());
+      let payload: unknown;
+      if (Capacitor.isNativePlatform()) {
+        const response = await CapacitorHttp.get({
+          url: provider.url,
+          headers: { Accept: 'application/json' },
+          connectTimeout: 4000,
+          readTimeout: 4000,
+          responseType: 'json',
+        });
+        if (response.status < 200 || response.status >= 300) continue;
+        payload = response.data;
+      } else {
+        const res = await fetch(provider.url, {
+          signal: controller.signal,
+          headers: { Accept: 'application/json' },
+        });
+        if (!res.ok) continue;
+        payload = await res.json();
+      }
+      const parsed = provider.parse(payload);
       if (parsed.countryCode) return parsed;
     } catch {
       /* timed out or refused — fall through to the next provider */

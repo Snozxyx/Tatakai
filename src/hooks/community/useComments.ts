@@ -321,6 +321,53 @@ export function useAddComment() {
 
       return data;
     },
+    // Optimistic insert: show the comment/reply the instant the user submits, so
+    // posting feels instant instead of waiting for the round-trip + refetch. The
+    // temp row is reconciled by the onSuccess invalidation (or rolled back on error).
+    onMutate: async (variables) => {
+      const listKey = ['comments', variables.entityType, variables.entityId, variables.episodeId] as const;
+      const replyKey = variables.parentId ? (['replies', variables.parentId] as const) : null;
+      const targetKey = replyKey ?? listKey;
+
+      await queryClient.cancelQueries({ queryKey: targetKey });
+      const previous = queryClient.getQueryData<Comment[]>(targetKey as any);
+
+      const optimistic = {
+        id: `optimistic-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        user_id: user?.id ?? 'me',
+        entity_type: variables.entityType,
+        entity_id: variables.entityId,
+        episode_id: variables.episodeId ?? null,
+        content: variables.content,
+        parent_id: variables.parentId ?? null,
+        is_spoiler: variables.isSpoiler ?? false,
+        is_pinned: false,
+        is_deleted: false,
+        attachments: sanitizeAttachments(variables.attachments ?? []),
+        embeds: sanitizeEmbeds(variables.embeds ?? []),
+        mentions: [],
+        poll: null,
+        likes_count: 0,
+        user_liked: false,
+        created_at: new Date().toISOString(),
+        profile: {
+          user_id: user?.id,
+          display_name: user?.user_metadata?.display_name ?? null,
+          avatar_url: user?.user_metadata?.avatar_url ?? null,
+          username: user?.user_metadata?.username ?? null,
+          total_episodes: 0,
+        },
+        _optimistic: true,
+      } as unknown as Comment;
+
+      queryClient.setQueryData<Comment[]>(targetKey as any, (old) => {
+        const list = old ? [...old] : [];
+        // Replies render oldest-first; top-level render newest-first.
+        return replyKey ? [...list, optimistic] : [optimistic, ...list];
+      });
+
+      return { previous, targetKey };
+    },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['comments', variables.entityType, variables.entityId] });
       if (variables.parentId) {
@@ -337,7 +384,11 @@ export function useAddComment() {
         isSpoiler: variables.isSpoiler,
       });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _variables, context: any) => {
+      // Roll back the optimistic insert.
+      if (context?.previous !== undefined && context?.targetKey) {
+        queryClient.setQueryData(context.targetKey, context.previous);
+      }
       toast.error(ugcErrorMessage(error) || error.message || 'Failed to post comment');
     },
   });

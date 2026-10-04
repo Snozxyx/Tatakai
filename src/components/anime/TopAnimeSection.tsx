@@ -1,8 +1,8 @@
+import { memo, useState } from "react";
 import { Trophy } from "lucide-react";
-import { GlassPanel } from "@/components/ui/GlassPanel";
 import { TopAnime, getHighQualityPoster } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { cn } from "@/lib/utils";
 
 interface TopAnimeSectionProps {
   today: TopAnime[];
@@ -12,7 +12,7 @@ interface TopAnimeSectionProps {
 
 type Period = "today" | "week" | "month";
 
-export function TopAnimeSection({ today, week, month }: TopAnimeSectionProps) {
+export const TopAnimeSection = memo(function TopAnimeSection({ today, week, month }: TopAnimeSectionProps) {
   const navigate = useNavigate();
   const [activePeriod, setActivePeriod] = useState<Period>("today");
 
@@ -38,26 +38,27 @@ export function TopAnimeSection({ today, week, month }: TopAnimeSectionProps) {
   };
 
   return (
-    <section className="mb-24">
+    <section className="mb-14 md:mb-24" style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 600px' }}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-8 px-2">
-        <h3 className="font-display text-2xl font-semibold tracking-tight flex items-center gap-2.5">
-          <div className="p-1.5 rounded-lg bg-amber/10 text-amber">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-5 md:mb-8 px-1 md:px-2">
+        <h3 className="font-display text-xl md:text-2xl font-semibold tracking-tight flex items-center gap-2.5">
+          <div className="p-1.5 rounded-xl bg-amber/10 text-amber border border-amber/20">
             <Trophy className="w-5 h-5" />
           </div>
           <span>Top <span className="text-amber">10</span> Anime</span>
         </h3>
-        
-        <div className="flex gap-1 p-1 rounded-full bg-white/5 border border-white/10">
+
+        <div className="flex w-full sm:w-auto gap-1 p-1 rounded-full bg-white/5 border border-white/10 max-w-full overflow-x-auto no-scrollbar scrollbar-hide [-webkit-overflow-scrolling:touch] [touch-action:pan-x_pan-y] overscroll-x-contain">
           {periods.map((period) => (
             <button
               key={period.key}
               onClick={() => setActivePeriod(period.key)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-300 ${
+              className={cn(
+                'shrink-0 min-h-[36px] px-3 md:px-4 py-1.5 rounded-full text-xs md:text-sm font-semibold transition-colors active:scale-95',
                 activePeriod === period.key
-                  ? "bg-white/15 backdrop-blur-md text-white shadow-sm"
+                  ? "bg-white/15 text-white shadow-sm"
                   : "text-muted-foreground hover:text-white hover:bg-white/5"
-              }`}
+              )}
             >
               {period.label}
             </button>
@@ -65,47 +66,49 @@ export function TopAnimeSection({ today, week, month }: TopAnimeSectionProps) {
         </div>
       </div>
 
-      {/* Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 md:gap-5">
+      {/* Grid — plain cards on mobile (no backdrop-blur / hover scale) for 60fps scroll */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-5">
         {getAnimes().slice(0, 10).map((anime, idx) => (
-          <GlassPanel
+          <button
             key={anime.id}
-            hoverEffect
-            className="group cursor-pointer overflow-hidden"
+            type="button"
             onClick={() => navigate(`/anime/${anime.id}`)}
+            className="group overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03] text-left transition-transform duration-200 active:scale-[0.98] md:hover:border-white/[0.14]"
+            style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 280px' }}
           >
             <div className="relative aspect-[2/3]">
               <img
                 src={getHighQualityPoster(anime.poster, anime.anilistId)}
                 alt={anime.name}
-                className="w-full h-full object-cover transition-all duration-700 ease-out group-hover:scale-105 group-hover:brightness-110"
+                className="w-full h-full object-cover md:transition-transform md:duration-500 md:group-hover:scale-105"
                 loading="lazy"
+                decoding="async"
+                fetchPriority="low"
               />
-              
+
               {/* Overlays */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
-              <div className="absolute inset-0 bg-black/0 transition-colors duration-300 group-hover:bg-black/10" />
-              
+
               {/* Rank Badge */}
-              <div className={`absolute top-3 left-3 rounded-md flex items-center justify-center font-black shadow-black/50 ${getRankStyles(idx)}`}>
+              <div className={`absolute top-2.5 left-2.5 md:top-3 md:left-3 rounded-lg flex items-center justify-center font-black ${getRankStyles(idx)}`}>
                 {anime.rank ?? idx + 1}
               </div>
 
               {/* Content */}
-              <div className="absolute bottom-0 left-0 right-0 p-4 pt-10">
-                <h4 className="font-bold text-sm leading-tight line-clamp-2 drop-shadow-md group-hover:text-amber transition-colors duration-300">
+              <div className="absolute bottom-0 left-0 right-0 p-3 md:p-4 pt-10">
+                <h4 className="font-bold text-[13px] md:text-sm leading-tight line-clamp-2 drop-shadow-md md:group-hover:text-amber md:transition-colors">
                   {anime.name}
                 </h4>
-                <div className="mt-2 flex items-center gap-2">
-                  <span className="inline-flex items-center bg-white/10 backdrop-blur-sm border border-white/5 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold uppercase tracking-wider text-white/80">
+                <div className="mt-1.5 md:mt-2 flex items-center gap-2">
+                  <span className="inline-flex items-center bg-black/50 border border-white/10 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold uppercase tracking-wider text-white/80">
                     EP {anime.episodes.sub}
                   </span>
                 </div>
               </div>
             </div>
-          </GlassPanel>
+          </button>
         ))}
       </div>
     </section>
   );
-}
+});

@@ -9,6 +9,7 @@
 
 import { queryCache, TTL } from '../cache/query-cache';
 import { trackEvent } from '@/core/analytics/AnalyticsService';
+import { isCapacitor } from '@/lib/platform/platform';
 import { db, type CachedMedia } from '../db';
 import type {
   TatakaiMedia,
@@ -56,7 +57,16 @@ const CONTENT_BASE = '/api/v3/content';
  * explicit absolute backend origin (same one playback already uses).
  */
 function resolveApiOrigin(): string {
-  if (typeof window !== 'undefined' && /^https?:$/i.test(window.location.protocol)) {
+  // Capacitor serves the app from a virtual host (`https://tatakai.me` /
+  // `https://localhost`) that is the WebView's LOCAL asset origin, NOT the
+  // backend — a relative `/api/v3/content/…` there resolves to the shell and
+  // returns the SPA HTML (or 404), which is the "Failed to load" home screen.
+  // Skip window.location on Capacitor and use the explicit backend origin.
+  if (
+    typeof window !== 'undefined' &&
+    /^https?:$/i.test(window.location.protocol) &&
+    !isCapacitor()
+  ) {
     return window.location.origin;
   }
   const explicit = String(import.meta.env.VITE_BACKEND_ORIGIN || '').trim();

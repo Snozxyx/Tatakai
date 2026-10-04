@@ -246,8 +246,85 @@ export function useCreateForumPost() {
       if (error) throw error;
       return data;
     },
+    // Optimistic feed insert for text posts (which auto-approve), so a new post
+    // appears at the top of the feed instantly. Image posts may need approval,
+    // so they're left to the onSuccess refetch. The community feed is keyed
+    // ['feed', ...] (see useFeed) — NOT ['forum_posts'] — so we must touch both.
+    onMutate: async (post) => {
+      if (post.image_url) return { snapshots: [] as Array<[readonly unknown[], unknown]> };
+      await queryClient.cancelQueries({ queryKey: ['feed'] });
+
+      const nowIso = new Date().toISOString();
+      const optimisticPost = {
+        id: `optimistic-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        user_id: user?.id ?? 'me',
+        title: post.title,
+        content: post.content,
+        content_type: post.content_type ?? 'text',
+        image_url: post.image_url,
+        external_url: post.external_url,
+        magnet_link: post.magnet_link,
+        anime_id: post.anime_id,
+        anime_name: post.anime_name,
+        anime_poster: post.anime_poster,
+        playlist_id: post.playlist_id,
+        tierlist_id: post.tierlist_id,
+        character_id: post.character_id,
+        character_name: post.character_name,
+        flair: post.flair,
+        metadata: post.metadata ?? {},
+        is_pinned: false,
+        is_locked: false,
+        is_spoiler: post.is_spoiler ?? false,
+        is_nsfw: false,
+        is_approved: true,
+        community_id: (post.metadata as any)?.community_id ?? null,
+        created_at: nowIso,
+        updated_at: nowIso,
+        upvotes: 0,
+        downvotes: 0,
+        comment_count: 0,
+        user_vote: null,
+        poll: null,
+        images: null,
+        repost_count: 0,
+        reposted: false,
+        bookmarked: false,
+        badges: [],
+        author_rank_score: 0,
+        author_is_official: false,
+        profiles: {
+          user_id: user?.id,
+          display_name: user?.user_metadata?.display_name ?? null,
+          avatar_url: user?.user_metadata?.avatar_url ?? null,
+          username: user?.user_metadata?.username ?? null,
+        },
+        _optimistic: true,
+      };
+      const optimisticItem = { kind: 'post', sortAt: Date.now(), post: optimisticPost };
+
+      // Insert into the first page of every matching feed query.
+      const snapshots: Array<[readonly unknown[], unknown]> = [];
+      const queries = queryClient.getQueryCache().findAll({ queryKey: ['feed'] });
+      for (const q of queries) {
+        const data = q.state.data as any;
+        snapshots.push([q.queryKey, data]);
+        if (data?.pages?.length) {
+          const pages = [...data.pages];
+          pages[0] = [optimisticItem, ...pages[0]];
+          queryClient.setQueryData(q.queryKey, { ...data, pages });
+        }
+      }
+      return { snapshots };
+    },
+    onError: (_err, _post, context: any) => {
+      for (const [key, data] of context?.snapshots ?? []) {
+        queryClient.setQueryData(key, data);
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['forum_posts'] });
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
     },
   });
 }

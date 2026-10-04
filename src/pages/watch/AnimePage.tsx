@@ -33,6 +33,7 @@ import { AnimeCommunityPosts } from "@/components/anime/AnimeCommunityPosts";
 import { WatchlistButton } from "@/components/anime/WatchlistButton";
 import { ShareButton } from "@/components/anime/ShareButton";
 import { AddToPlaylistButton } from "@/components/playlist/AddToPlaylistButton";
+import { OpenInAppButton } from "@/components/common/OpenInAppButton";
 import { NextEpisodeSchedule } from "@/components/anime/NextEpisodeSchedule";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { getProxiedImageUrl, fetchJikanCover, fetchProducerAnimes } from "@/lib/api";
@@ -460,15 +461,16 @@ export default function AnimePage() {
     if (!title) return;
     setViewingRpc({
       animeTitle: title,
+      animeImageUrl: animeData?.info?.poster,
       animeUrl: `https://tatakai.me/anime/${contentAnimeId}`,
     });
     return () => {
       clearDiscordRpc();
     };
-  }, [animeData?.info?.name, contentAnimeId]);
+  }, [animeData?.info?.name, animeData?.info?.poster, contentAnimeId]);
   
   // Show sidebar on desktop (web or app), but not on mobile (web or app)
-  const showSidebar = !isMobile && !isMobileNative;
+  const showSidebar = !isMobile;
   
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
@@ -576,10 +578,10 @@ export default function AnimePage() {
   const { recommendations: anilistRecs } = useAniListRecommendations(parsedAniListId, {
     mediaType: "ANIME",
     includeAdult: includeAdultRecs,
-    limit: 24,
+    limit: isMobile ? 12 : 24,
   });
   // The app's own personalized engine (same source as the Recommendations page).
-  const { recommendations: engineRecs } = useRecommendationEngine({ limit: 24 });
+  const { recommendations: engineRecs } = useRecommendationEngine({ limit: isMobile ? 12 : 24 });
 
   // Merge AniList (primary) + engine (personalized) + genre-search (fallback),
   // deduped by id and with the current title removed.
@@ -632,8 +634,8 @@ export default function AnimePage() {
       push({ ...(row as AnimeCard), mediaType: "anime" } as AnimeCard);
     }
 
-    return out.slice(0, 14);
-  }, [anilistRecs, engineRecs, recommendationRows, contentAnimeId]);
+    return out.slice(0, isMobile ? 10 : 14);
+  }, [anilistRecs, engineRecs, recommendationRows, contentAnimeId, isMobile]);
 
   useEffect(() => {
     setSelectedEpisodeGroup(0);
@@ -1113,6 +1115,7 @@ export default function AnimePage() {
                     animePoster={info.poster}
                     description={info.description}
                   />
+                  <OpenInAppButton size="lg" className="h-12 sm:h-14 rounded-full" label="Open in app" />
                   <button
                     onClick={() => navigate(`/isshoni?anime=${encodeURIComponent(contentAnimeId!)}&title=${encodeURIComponent(info.name)}&poster=${encodeURIComponent(info.poster)}`)}
                     className="group flex h-14 w-14 items-center justify-center rounded-full bg-[hsl(var(--isshoni-accent))] text-black ring-1 ring-inset ring-white/25 shadow-[0_10px_30px_-8px_hsl(var(--isshoni-accent)/0.6)] transition-all hover:scale-105 hover:bg-[hsl(var(--isshoni-accent)/0.9)] hover:shadow-[0_0_28px_hsl(var(--isshoni-accent)/0.5)] active:scale-95"

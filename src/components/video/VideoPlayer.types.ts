@@ -9,6 +9,9 @@ export interface PlaybackSource {
   isM3U8: boolean;
   quality?: string;
   sourceType?: string;
+  /** Upstream URL + request headers retained by the mobile in-app proxy. */
+  originalUrl?: string;
+  headers?: Record<string, string>;
 }
 
 export interface PlaybackHeaders {
@@ -24,6 +27,8 @@ export interface ExternalSubtitle {
   lang: string;
   url: string;
   label?: string;
+  originalUrl?: string;
+  headers?: Record<string, string>;
 }
 
 export interface CustomSubtitle extends ExternalSubtitle {
@@ -277,6 +282,10 @@ export interface UseVideoProgressParams {
   onProgressUpdate?: (progressSeconds: number, durationSeconds?: number, completed?: boolean, flush?: boolean) => void;
   animeName?: string;
   episodeNumber?: number;
+  /** External URL of the anime poster — passed to Discord RPC as the large image. */
+  animeImageUrl?: string;
+  /** Deep link to the anime page on Tatakai — used for the "Show in Tatakai" RPC button. */
+  animeUrl?: string;
 }
 
 export interface UseVideoKeyboardParams {

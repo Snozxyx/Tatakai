@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react-swc";
 import { visualizer } from "rollup-plugin-visualizer";
 import path from "path";
 import packageJson from "./package.json";
+import { seoPreviewPlugin } from "./scripts/seo/vite-seo-preview.mjs";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -21,7 +22,7 @@ export default defineConfig(({ mode }) => {
   const apiV3Origin = env.VITE_API_V3_ORIGIN || "https://api.tatakai.me";
 
   return {
-    plugins: [react()],
+    plugins: [react(), seoPreviewPlugin()],
     base: isElectronBuild ? './' : '/',
     resolve: {
       alias: {

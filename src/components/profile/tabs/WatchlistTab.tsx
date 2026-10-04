@@ -31,7 +31,8 @@ export function WatchlistTab({ watchlist, loading, isViewingOther, onNavigate }:
   );
 
   const renderCard = (item: any) => {
-    const statusInfo = STATUS_LABELS[item.status || 'plan_to_watch'];
+    const statusKey = String(item?.status || 'plan_to_watch').trim().toLowerCase();
+    const statusInfo = STATUS_LABELS[statusKey] ?? STATUS_LABELS.plan_to_watch;
     return (
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}

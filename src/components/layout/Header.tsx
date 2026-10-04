@@ -1,6 +1,6 @@
-import { Search, User, LogOut, Shield, Download, Camera, Loader2, X, Film, Play, ChevronRight } from "lucide-react";
+import { Search, User, LogOut, Shield, Download, Camera, Loader2, X, Film, Play, ChevronRight, BookOpen } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
 
@@ -89,6 +89,7 @@ export function Header() {
   const [systemStatus, setSystemStatus] = useState<"operational" | "degraded" | "checking">("checking");
   const searchWrapperRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, profile, isAdmin, isModerator, isBanned, signOut, isLoading } = useAuth();
   const isNative = useIsNativeApp();
 
@@ -187,33 +188,75 @@ export function Header() {
     systemStatus === "degraded" ? "bg-amber-500" : "bg-gray-500";
 
   return (
-    <header className="hidden md:flex items-center mb-4 px-6 sticky top-0 z-50 backdrop-blur-md py-2">
-      <div className="flex items-center justify-between w-full gap-8">
+    <>
+      <header className="md:hidden sticky top-0 z-50 bg-transparent">
+        <div className="relative flex h-14 items-center justify-between bg-transparent px-3 pt-[env(safe-area-inset-top)]">
+          <div className="relative z-10 flex h-10 w-10 items-center justify-center rounded-full">
+            <NotificationBell />
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate(location.pathname.startsWith('/manga') ? '/' : '/manga')}
+            className="absolute left-1/2 top-1/2 z-10 inline-flex h-9 -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3.5 text-xs font-bold tracking-wide text-foreground shadow-sm transition-all hover:bg-white/[0.1] hover:border-white/20 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+            aria-label={location.pathname.startsWith('/manga') ? 'Switch to Anime' : 'Switch to Manga'}
+          >
+            {location.pathname.startsWith('/manga') ? <BookOpen className="h-3.5 w-3.5 text-primary" /> : <Play className="h-3.5 w-3.5 fill-primary text-primary" />}
+            {location.pathname.startsWith('/manga') ? 'Manga' : 'Anime'}
+          </button>
+          <div className="relative z-10">
+            {isLoading ? (
+              <div className="h-9 w-9 rounded-full bg-muted animate-pulse ring-1 ring-white/10" />
+            ) : user && !isBanned ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button aria-label="Open profile menu" className="rounded-full outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary/60">
+                    <Avatar className="h-9 w-9 ring-1 ring-white/20 transition-shadow hover:ring-primary/40">
+                      <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || 'User'} />
+                      <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-xs font-bold text-primary-foreground">{profile?.display_name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
+                    </Avatar>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52 rounded-2xl border-white/10 bg-background/90 p-1.5 shadow-2xl backdrop-blur-xl">
+                  <DropdownMenuItem onClick={() => navigate(profile?.username ? `/@${profile.username}` : '/profile')} className="gap-2 rounded-xl px-3 py-2.5 font-medium"><User className="mr-1 h-4 w-4 text-muted-foreground" />Profile</DropdownMenuItem>
+                  {(isAdmin || isModerator) && <DropdownMenuItem onClick={() => navigate('/admin')} className="gap-2 rounded-xl px-3 py-2.5 font-medium"><Shield className="mr-1 h-4 w-4 text-muted-foreground" />Admin navigation</DropdownMenuItem>}
+                  <DropdownMenuSeparator className="bg-white/[0.06]" />
+                  <DropdownMenuItem onClick={handleSignOut} className="gap-2 rounded-xl px-3 py-2.5 font-medium text-destructive focus:text-destructive"><LogOut className="mr-1 h-4 w-4" />Sign out</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Link to="/auth" className="inline-flex h-9 items-center rounded-full bg-primary px-4 text-xs font-bold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:brightness-110 active:scale-95">Sign in</Link>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <header className="hidden md:flex items-center mb-4 px-1 sticky top-0 z-50 py-2">
+        <div className="flex w-full items-center justify-between gap-8 rounded-2xl border border-white/[0.08] bg-background/70 px-5 py-2.5 shadow-[0_8px_32px_-12px_rgba(0,0,0,0.5)] backdrop-blur-xl">
         {/* Left: welcome + status */}
-        <div className="flex items-center gap-3">
-          <h2 className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
-            Welcome back, <span className="text-foreground">{profile?.display_name || "Traveler"}</span>
+        <div className="flex items-center gap-3 min-w-0">
+          <h2 className="truncate text-muted-foreground text-[13px] font-medium tracking-wide">
+            Welcome back, <span className="font-semibold text-foreground">{profile?.display_name || "Traveler"}</span>
           </h2>
           {isBanned && (
-            <span className="px-2 py-0.5 rounded-full bg-destructive/20 text-destructive text-xs font-medium animate-pulse">BANNED</span>
+            <span className="shrink-0 px-2 py-0.5 rounded-full bg-destructive/20 text-destructive text-xs font-medium animate-pulse">BANNED</span>
           )}
           <Link
             to="/status"
-            className="flex items-center gap-2 px-3 py-1 rounded-full bg-muted/30 hover:bg-muted/50 transition-all group"
+            className="flex shrink-0 items-center gap-2 rounded-full border border-white/[0.06] bg-muted/30 px-3 py-1 hover:bg-muted/50 transition-all"
             title={systemStatus === "operational" ? "All systems operational" : "Some services degraded"}
           >
-            <span className={cn("w-2 h-2 rounded-full", statusColor, systemStatus === "operational" && "animate-pulse")} />
+            <span className={cn("h-2 w-2 rounded-full", statusColor, systemStatus === "operational" && "animate-pulse")} />
             <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">Status</span>
           </Link>
         </div>
 
         {/* Right: search + user */}
-        <div className="flex items-center gap-4 md:gap-6">
+        <div className="flex items-center gap-3 md:gap-4">
           {/* Search form with live suggestions */}
           <div ref={searchWrapperRef} className="relative">
             <form
               onSubmit={handleSearch}
-              className="flex items-center gap-3 bg-muted/50 border border-border/30 rounded-full px-4 py-2 hover:bg-muted transition-colors cursor-pointer group"
+              className="flex items-center gap-2.5 rounded-full border border-white/[0.08] bg-muted/40 px-4 py-2 transition-all hover:bg-muted/60 hover:border-white/[0.12] focus-within:border-primary/40 focus-within:bg-muted/60 cursor-text group"
             >
               <Search className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
               <input
@@ -229,7 +272,7 @@ export function Header() {
                   if (e.key === "Escape") setShowSuggestions(false);
                 }}
                 placeholder="Search anime..."
-                className="bg-transparent text-sm text-muted-foreground placeholder:text-muted-foreground focus:outline-none focus:text-foreground w-24 sm:w-32 lg:w-48"
+                className="w-24 bg-transparent text-sm text-muted-foreground placeholder:text-muted-foreground/70 focus:text-foreground focus:outline-none sm:w-32 lg:w-48"
                 aria-label="Search anime"
                 autoComplete="off"
               />
@@ -237,7 +280,8 @@ export function Header() {
                 <button
                   type="button"
                   onClick={() => { setSearchQuery(""); setShowSuggestions(false); }}
-                  className="p-0.5 hover:bg-muted/50 rounded-full"
+                  className="rounded-full p-0.5 hover:bg-white/10"
+                  aria-label="Clear search"
                 >
                   <X className="w-3.5 h-3.5 text-muted-foreground" />
                 </button>
@@ -245,14 +289,14 @@ export function Header() {
               <button
                 type="button"
                 onClick={(e) => { e.preventDefault(); setShowImageSearch(true); }}
-                className="p-1 hover:bg-muted/50 rounded-lg transition-colors"
+                className="rounded-lg p-1 transition-colors hover:bg-white/10"
                 title="Search by image"
               >
                 <Camera className="w-4 h-4 text-muted-foreground hover:text-foreground transition-colors" />
               </button>
-              <div className="hidden lg:flex gap-1 ml-2">
-                <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">⌘</span>
-                <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">K</span>
+              <div className="hidden lg:flex gap-1 ml-1">
+                <span className="rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] text-muted-foreground">⌘</span>
+                <span className="rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] text-muted-foreground">K</span>
               </div>
             </form>
 
@@ -269,12 +313,12 @@ export function Header() {
           </div>
 
           {isLoading ? (
-            <div className="w-10 h-10 rounded-full bg-muted animate-pulse" />
+            <div className="w-10 h-10 rounded-full bg-muted animate-pulse ring-1 ring-white/10" />
           ) : user && !isBanned ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background rounded-full active:scale-95 transition-transform">
-                  <Avatar className="w-10 h-10 cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all">
+                <button className="rounded-full outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+                  <Avatar className="w-10 h-10 cursor-pointer ring-1 ring-white/20 transition-all hover:ring-2 hover:ring-primary/50">
                     <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || "User"} />
                     <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-primary-foreground font-bold">
                       {profile?.display_name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || "U"}
@@ -282,25 +326,25 @@ export function Header() {
                   </Avatar>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={() => navigate(profile?.username ? `/@${profile.username}` : "/profile")}>
-                  <User className="w-4 h-4 mr-2" /> Profile
+              <DropdownMenuContent align="end" className="w-52 rounded-2xl border-white/10 bg-background/90 p-1.5 shadow-2xl backdrop-blur-xl">
+                <DropdownMenuItem onClick={() => navigate(profile?.username ? `/@${profile.username}` : "/profile")} className="gap-2 rounded-xl px-3 py-2.5 font-medium">
+                  <User className="w-4 h-4 mr-1 text-muted-foreground" /> Profile
                 </DropdownMenuItem>
                 {(isAdmin || isModerator) && (
-                  <DropdownMenuItem onClick={() => navigate("/admin")}>
-                    <Shield className="w-4 h-4 mr-2" /> Admin Panel
+                  <DropdownMenuItem onClick={() => navigate("/admin")} className="gap-2 rounded-xl px-3 py-2.5 font-medium">
+                    <Shield className="w-4 h-4 mr-1 text-muted-foreground" /> Admin Panel
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
-                  <LogOut className="w-4 h-4 mr-2" /> Sign Out
+                <DropdownMenuSeparator className="bg-white/[0.06]" />
+                <DropdownMenuItem onClick={handleSignOut} className="gap-2 rounded-xl px-3 py-2.5 font-medium text-destructive focus:text-destructive">
+                  <LogOut className="w-4 h-4 mr-1" /> Sign Out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
             <Link
               to="/auth"
-              className="h-10 px-4 rounded-full bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 transition-colors flex items-center gap-2"
+              className="h-10 px-4 rounded-full bg-primary text-primary-foreground font-semibold text-sm shadow-lg shadow-primary/25 hover:brightness-110 active:scale-95 transition-all flex items-center gap-2"
             >
               <User className="w-4 h-4" />
               <span className="hidden sm:inline">Sign In</span>
@@ -488,6 +532,7 @@ export function Header() {
           </div>
         </DialogContent>
       </Dialog>
-    </header>
+      </header>
+    </>
   );
 }

@@ -13,8 +13,8 @@ android {
         applicationId = "app.tatakai.me"
         minSdk = rootProject.ext.minSdkVersion
         targetSdk = rootProject.ext.targetSdkVersion
-        versionCode = 45
-        versionName = "4.1.16"
+        versionCode = 604
+        versionName = "6.0.4"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -25,16 +25,28 @@ android {
     
     signingConfigs {
         debug {
-            storeFile = file(System.properties['user.home'] + '/.android/debug.keystore')
-            storePassword = 'android'
-            keyAlias = 'androiddebugkey'
-            keyPassword = 'android'
+            def debugKeystore = file(System.properties['user.home'] + '/.android/debug.keystore')
+            if (debugKeystore.exists()) {
+                storeFile = debugKeystore
+                storePassword = 'android'
+                keyAlias = 'androiddebugkey'
+                keyPassword = 'android'
+            }
         }
+        // Self-sign the release build with the local keystore so the APK installs
+        // straight from GitHub Releases. "Unsigned" in the release copy means *not
+        // distribution signed* — an APK with no signature at all is rejected by the
+        // OS at install time. Put a release.keystore (gitignored) next to this file
+        // to switch from the debug key; keep the alias/password the same.
         release {
-            storeFile = file('../tatakai-release.keystore')
-            storePassword = 'tatakai123'
-            keyAlias = 'tatakai'
-            keyPassword = 'tatakai123'
+            def releaseKeystore = file("${rootProject.projectDir}/app/release.keystore")
+            def storeKeystore = releaseKeystore.exists() ? releaseKeystore : file(System.properties['user.home'] + '/.android/debug.keystore')
+            if (storeKeystore.exists()) {
+                storeFile = storeKeystore
+                storePassword = 'android'
+                keyAlias = 'androiddebugkey'
+                keyPassword = 'android'
+            }
         }
     }
     
@@ -66,6 +78,31 @@ dependencies {
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
+
+    // Native Android torrent engine. libtorrent4j 2.1.x supports Android API
+    // 28+, so the plugin itself reports unsupported below that level while the
+    // rest of Tatakai keeps its existing minSdk 24 compatibility.
+    // All four ABIs are bundled: without armeabi-v7a/x86 the native library
+    // fails to load on 32-bit phones and older emulators, which made torrent
+    // playback a whole-app native crash on those devices.
+    // NOTE: stock libtorrent4j .so files are 4 KB page-aligned. On Android 15+
+    // devices with 16 KB page-size kernels (and Play submissions targeting API
+    // 35+ after Nov 2025) loading can fail — if that surfaces, migrate to a
+    // 16 KB-aligned build (e.g. FrostWire jlibtorrent, NDK r28c+).
+    def libtorrentVersion = '2.1.0-39'
+    implementation "org.libtorrent4j:libtorrent4j:$libtorrentVersion"
+    implementation "org.libtorrent4j:libtorrent4j-android-arm64:$libtorrentVersion"
+    implementation "org.libtorrent4j:libtorrent4j-android-arm:$libtorrentVersion"
+    implementation "org.libtorrent4j:libtorrent4j-android-x86_64:$libtorrentVersion"
+    implementation "org.libtorrent4j:libtorrent4j-android-x86:$libtorrentVersion"
+
+    // Torrent files are commonly MKV/HEVC. Android's WebView video element
+    // cannot reliably demux or decode those formats, so torrent playback uses
+    // Media3 directly against the private loopback range server.
+    def media3Version = '1.5.1'
+    implementation "androidx.media3:media3-exoplayer:$media3Version"
+    implementation "androidx.media3:media3-exoplayer-hls:$media3Version"
+    implementation "androidx.media3:media3-ui:$media3Version"
 }
 
 apply from: 'capacitor.build.gradle'

@@ -151,4 +151,7 @@ export async function bootstrapExtensions(navigate: (path: string) => void): Pro
   }
 
   console.log(`[bootstrapExtensions] booted ${rows.length} extension(s)`);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('tatakai-extensions-changed'));
+  }
 }

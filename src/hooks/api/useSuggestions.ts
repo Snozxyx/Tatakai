@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { notifySuggestion } from '@/core/network/discord-webhook';
 
 export interface Suggestion {
   id: string;
@@ -107,6 +108,19 @@ export function useCreateSuggestion() {
         .single();
 
       if (error) throw error;
+
+      // Best-effort Discord notification (server-side forwarded; never blocks).
+      try {
+        notifySuggestion({
+          title: suggestion.title,
+          description: suggestion.description,
+          category: suggestion.category,
+          userId: user.id,
+          userName: user.user_metadata?.display_name || user.email || undefined,
+          imageUrl: suggestion.image_url,
+        });
+      } catch { /* ignore */ }
+
       return data;
     },
     onSuccess: () => {

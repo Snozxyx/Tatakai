@@ -96,6 +96,14 @@ export interface SourceResult {
    * 'torrent' = magnet/torrent, 'hls' = HLS stream (will be transcoded to MP4).
    */
   sourceType?: 'torrent' | 'hls' | 'mp4' | 'custom';
+
+  /**
+   * Optional server/group label. When an extension exposes the same episode on
+   * several servers (each possibly with its own quality ladder), it sets a
+   * stable `server` on every result so the player's source panel can group them
+   * — all results sharing a `server` are the quality rungs of that one server.
+   */
+  server?: string;
 }
 
 /**
@@ -424,9 +432,49 @@ export interface CustomHomeSection {
 /** Result of `customHome(sourceId)`. */
 export interface CustomHomeResult {
   sections: CustomHomeSection[];
+  /**
+   * Optional filter schema for this source's search surface. The app renders it
+   * generically: `tags` become toggle chips, each `group` becomes a dropdown.
+   * The selected values are sent back verbatim as the `filters` arg of
+   * `customSearch` (see {@link CustomSearchFilters}).
+   */
+  filters?: CustomFilterSchema;
 }
 
-/** Result of `customSearch(sourceId, query, page?)`. */
+/** One selectable value within a filter group. */
+export interface CustomFilterOption {
+  value: string;
+  label: string;
+}
+
+/** A single-select filter dimension (e.g. Type, Status, Quality, Sort). */
+export interface CustomFilterGroup {
+  /** Stable key sent back in {@link CustomSearchFilters} (e.g. "type"). */
+  key: string;
+  /** Human-readable label shown above the control. */
+  label: string;
+  options: CustomFilterOption[];
+}
+
+/** Declarative filter schema an extension advertises via `customHome`. */
+export interface CustomFilterSchema {
+  /** Taggable values rendered as multi-select chips. */
+  tags?: string[];
+  /** Single-select dropdown dimensions. */
+  groups?: CustomFilterGroup[];
+}
+
+/**
+ * Filters chosen by the user, passed as the 4th arg of `customSearch`.
+ * `tags` holds the selected chip values; every other key is a group key mapped
+ * to the selected option value.
+ */
+export interface CustomSearchFilters {
+  tags?: string[];
+  [groupKey: string]: string | string[] | undefined;
+}
+
+/** Result of `customSearch(sourceId, query, page?, filters?)`. */
 export interface CustomSearchResult {
   results: CustomMediaCard[];
   hasNextPage?: boolean;

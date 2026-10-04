@@ -1,0 +1,112 @@
+name: macOS 6.0.3 manual rebuild
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-v6.0.3-rebuild
+  cancel-in-progress: false
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+            macho: arm64
+          - runner: macos-15-intel
+            arch: x64
+            macho: x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Verify version and native runner
+        env:
+          TARGET_ARCH: ${{ matrix.arch }}
+        run: |
+          node -e "const p=require('./package.json'); if(p.version!=='6.0.3'||process.arch!==process.env.TARGET_ARCH) process.exit(1)"
+      - run: npm ci
+      - name: Test macOS manual-update behavior
+        run: node --test tests/services/mac-manual-update.test.cjs
+      - name: Write renderer configuration
+        env:
+          DESKTOP_DOTENV: ${{ secrets.DESKTOP_DOTENV }}
+        run: |
+          test -n "$DESKTOP_DOTENV" || { echo "::error::DESKTOP_DOTENV is required"; exit 1; }
+          printf '%s\n' "$DESKTOP_DOTENV" > .env
+      - name: Build renderer
+        run: npx cross-env NODE_ENV=production ELECTRON_BUILD=true vite build
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+      - name: Fetch native tunnel helper
+        run: npm run assets:cloudflared
+      - name: Configure isolated DMG rebuild
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const config = JSON.parse(JSON.stringify(require('./package.json').build));
+          config.mac.target = [{target: 'dmg', arch: [process.arch]}];
+          config.mac.artifactName = '${productName}-${version}-${os}-${arch}-r1.${ext}';
+          config.mac.identity = '-';
+          config.mac.hardenedRuntime = false;
+          config.mac.notarize = false;
+          config.extraResources.push({from: 'resources/bin', to: 'bin'});
+          fs.writeFileSync('macos-rebuild.json', JSON.stringify(config, null, 2));
+          NODE
+      - name: Package certificate-less DMG
+        run: npx electron-builder --config macos-rebuild.json --mac --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Verify bundle and stage manual downloads
+        env:
+          TARGET_ARCH: ${{ matrix.arch }}
+          MACHO_ARCH: ${{ matrix.macho }}
+        run: |
+          set -euo pipefail
+          APP=$(find dist_electron -maxdepth 2 -name Tatakai.app -type d -print -quit)
+          test -n "$APP"
+          test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$APP/Contents/Info.plist")" = 6.0.3
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          lipo "$APP/Contents/MacOS/Tatakai" -verify_arch "$MACHO_ARCH"
+          lipo "$APP/Contents/Resources/bin/cloudflared" -verify_arch "$MACHO_ARCH"
+          "$APP/Contents/Resources/bin/cloudflared" --version
+          mkdir -p manual-downloads
+          cp "dist_electron/Tatakai-6.0.3-mac-$TARGET_ARCH-r1.dmg" manual-downloads/
+          cd manual-downloads
+          shasum -a 256 *.dmg > "Tatakai-6.0.3-mac-$TARGET_ARCH-r1.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-6.0.3-${{ matrix.arch }}-r1
+          path: manual-downloads/*
+          if-no-files-found: error
+
+  attach:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: macos-6.0.3-*-r1
+          merge-multiple: true
+          path: manual-downloads
+      - name: Attach manual downloads to existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh release view v6.0.3 --json tagName --jq '.tagName' | grep -Fx v6.0.3
+          test "$(find manual-downloads -name '*.dmg' | wc -l)" -eq 2
+          # No --clobber: existing downloads and update manifests are never replaced.
+          gh release upload v6.0.3 manual-downloads/*.dmg manual-downloads/*.sha256

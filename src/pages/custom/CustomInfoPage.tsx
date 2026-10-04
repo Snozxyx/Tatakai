@@ -12,6 +12,7 @@ import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
+import { useIsMobile } from "@/hooks/ui/use-mobile";
 import { cn } from "@/lib/utils";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import { getProxiedImageUrl } from "@/lib/api";
@@ -21,6 +22,7 @@ import { ExtensionSlot } from "@/core/extensions/ExtensionSlot";
 export default function CustomInfoPage() {
   const navigate = useNavigate();
   const isNative = useIsNativeApp();
+  const isMobile = useIsMobile();
   const { namespace, sourceId, id } = useParams<{ namespace: string; sourceId: string; id: string }>();
   const { source } = useCustomSource(namespace, sourceId);
   const { data: info, isLoading, isError } = useCustomInfo(namespace, sourceId, id);
@@ -36,7 +38,7 @@ export default function CustomInfoPage() {
   return (
     <div className="min-h-screen overflow-x-hidden bg-background text-foreground">
       {!isNative && <Background />}
-      {!isNative && <Sidebar />}
+      {!isMobile && <Sidebar />}
 
       <main
         className={cn(
@@ -46,7 +48,7 @@ export default function CustomInfoPage() {
       >
         <button
           onClick={() => navigate(base)}
-          className="mb-4 inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-3 py-1.5 text-sm font-semibold hover:bg-white/10"
+          className="mb-4 inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-white/15 px-3 py-2 text-sm font-semibold hover:bg-white/10 active:scale-95"
         >
           <ArrowLeft className="h-4 w-4" /> {source?.name || "Back"}
         </button>
@@ -153,7 +155,7 @@ export default function CustomInfoPage() {
         )}
       </main>
 
-      {!isNative && <MobileNav />}
+      {!isMobile && <MobileNav />}
     </div>
   );
 }

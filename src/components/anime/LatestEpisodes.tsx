@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { memo, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Play, Zap } from "lucide-react";
 
@@ -15,6 +15,7 @@ function LatestEpisodeCard({ anime }: { anime: AnimeCard }) {
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
   const { startHover, cancelHover, source } = usePreviewSource();
+  const canHover = typeof window !== 'undefined' && window.matchMedia?.('(hover: hover)').matches;
 
   // Attach video src when source resolves (req 9.2)
   useEffect(() => {
@@ -32,14 +33,15 @@ function LatestEpisodeCard({ anime }: { anime: AnimeCard }) {
   const titles = [anime.name].filter(Boolean);
 
   return (
-    <GlassPanel 
-      hoverEffect 
-      className="group relative flex w-[300px] shrink-0 snap-start cursor-pointer items-stretch gap-4 rounded-2xl border border-white/[0.05] bg-white/[0.02] p-3 transition-all duration-300 hover:-translate-y-1 hover:bg-white/[0.04] hover:shadow-xl hover:shadow-black/20"
+    <GlassPanel
+      hoverEffect={false}
+      className="group relative flex w-[260px] md:w-[300px] shrink-0 snap-start cursor-pointer items-stretch gap-3 md:gap-4 rounded-2xl border border-white/[0.05] bg-white/[0.02] p-3 active:scale-[0.98]"
+      style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 144px' }}
       onClick={() => navigate(`/anime/${anime.id}`)}
-      onMouseEnter={() => startHover(anilistId, titles)}
-      onMouseLeave={() => cancelHover()}
+      onMouseEnter={() => { if (canHover) startHover(anilistId, titles); }}
+      onMouseLeave={() => { if (canHover) cancelHover(); }}
     >
-      <div className="relative h-[120px] w-[88px] shrink-0 overflow-hidden rounded-xl bg-white/[0.05]">
+      <div className="relative h-[110px] md:h-[120px] w-[80px] md:w-[88px] shrink-0 overflow-hidden rounded-xl bg-white/[0.05]">
         {/* Static poster */}
         <img
           src={
@@ -50,24 +52,27 @@ function LatestEpisodeCard({ anime }: { anime: AnimeCard }) {
           }
           alt={anime.name}
           loading="lazy"
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+          decoding="async"
+          fetchPriority="low"
+          className="h-full w-full object-cover"
           {...(!source?.streamUrl ? { 'data-preview-unavailable': 'true' } : {})}
         />
-        
-        {/* Video Preview — only rendered when source available and not HLS */}
-        {source?.streamUrl && !source.isHls && (
+
+        {/* Video Preview — hover-capable desktop only */}
+        {canHover && source?.streamUrl && !source.isHls && (
           <video
             ref={videoRef}
             className="absolute inset-0 h-full w-full object-cover opacity-100 transition-opacity duration-300"
             muted
             loop
             playsInline
+            preload="none"
           />
         )}
 
-        {/* Play overlay when no preview */}
+        {/* Play overlay when no preview — desktop hover only */}
         {!source?.streamUrl && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 backdrop-blur-[2px] transition-all duration-300 group-hover:opacity-100">
+          <div className="absolute inset-0 hidden items-center justify-center bg-black/40 opacity-0 transition-all duration-300 group-hover:opacity-100 md:flex">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm ring-1 ring-white/20">
               <Play className="ml-1 h-4 w-4 fill-current" />
             </div>
@@ -100,7 +105,7 @@ function LatestEpisodeCard({ anime }: { anime: AnimeCard }) {
   );
 }
 
-export function LatestEpisodes({ animes }: LatestEpisodesProps) {
+export const LatestEpisodes = memo(function LatestEpisodes({ animes }: LatestEpisodesProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const scroll = (direction: "left" | "right") => {
@@ -116,20 +121,20 @@ export function LatestEpisodes({ animes }: LatestEpisodesProps) {
   if (!animes || animes.length === 0) return null;
 
   return (
-    <section className="mb-12 space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <section className="mb-10 md:mb-12 space-y-4 md:space-y-5" style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 260px' }}>
       <HomeSectionHeading
         icon={<Zap className="w-5 h-5 text-amber" />}
         title="Latest Episodes"
         action={
-          <div className="flex items-center gap-2">
-            <button 
+          <div className="hidden md:flex items-center gap-2">
+            <button
               onClick={() => scroll("left")}
               aria-label="Scroll left"
               className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.02] text-white/60 transition-colors hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <button 
+            <button
               onClick={() => scroll("right")}
               aria-label="Scroll right"
               className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.02] text-white/60 transition-colors hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
@@ -141,9 +146,9 @@ export function LatestEpisodes({ animes }: LatestEpisodesProps) {
       />
 
       {/* Snap container for smooth, tactile scrolling */}
-      <div 
+      <div
         ref={scrollRef}
-        className="flex gap-4 overflow-x-auto pb-4 pt-1 snap-x snap-mandatory scroll-smooth scrollbar-hide"
+        className="flex gap-3 md:gap-4 overflow-x-auto pb-4 pt-1 snap-x snap-proximity scroll-smooth scrollbar-hide [-webkit-overflow-scrolling:touch] [touch-action:pan-x_pan-y] -mx-1 px-1"
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
         {animes.slice(0, 10).map((anime) => (
@@ -152,4 +157,4 @@ export function LatestEpisodes({ animes }: LatestEpisodesProps) {
       </div>
     </section>
   );
-}
+})

@@ -17,10 +17,11 @@
  * has two different sets of loaded extensions. The keys are the ones the runtime
  * and `useExtensions` already read, so nothing here is a second source of truth.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
-import { downloadExtensionKai } from '@/core/extensions/marketplace-client';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { downloadExtensionKai } from "@/core/extensions/marketplace-client";
+import { isCapacitor } from "@/lib/platform/platform";
 import {
   extensionAliases,
   fetchStoreExtension,
@@ -32,11 +33,11 @@ import {
   type StoreExtension,
   type StoreExtensionType,
   type StoreVersion,
-} from '@/core/extensions/store-api';
-import type { ExtensionManifest } from '@/pages/base/ExtensionHubPage';
+} from "@/core/extensions/store-api";
+import type { ExtensionManifest } from "@/pages/base/ExtensionHubPage";
 
-const INSTALLED_KEY = 'tatakai_installed_extensions';
-const SIDELOADED_KEY = 'tatakai_sideloaded_extensions';
+const INSTALLED_KEY = "tatakai_installed_extensions";
+const SIDELOADED_KEY = "tatakai_sideloaded_extensions";
 
 /**
  * Alias groups: `[[serviceUuid, publisherId, manifestId], ...]`, lowercased.
@@ -48,13 +49,13 @@ const SIDELOADED_KEY = 'tatakai_sideloaded_extensions';
  * next load, instead of rendering the same extension twice with one of the two
  * rows stuck on "Get".
  */
-const ALIASES_KEY = 'tatakai_extension_aliases';
+const ALIASES_KEY = "tatakai_extension_aliases";
 
 /** Fired by the sideload modal and by `install` below; `useExtensions` listens. */
-const SIDELOAD_EVENT = 'tatakai:extension-sideloaded';
+const SIDELOAD_EVENT = "tatakai:extension-sideloaded";
 
 function readJson<T>(key: string, fallback: T): T {
-  if (typeof window === 'undefined') return fallback;
+  if (typeof window === "undefined") return fallback;
   try {
     const raw = window.localStorage.getItem(key);
     return raw ? (JSON.parse(raw) as T) : fallback;
@@ -62,9 +63,8 @@ function readJson<T>(key: string, fallback: T): T {
     return fallback;
   }
 }
-
 function writeJson(key: string, value: unknown) {
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
   } catch {
@@ -77,16 +77,18 @@ function writeJson(key: string, value: unknown) {
  * exist locally, so they stay at zero rather than being invented; `downloads` is
  * the one figure a manifest does carry.
  */
-export function manifestToStoreExtension(manifest: ExtensionManifest): StoreExtension {
-  const version = manifest.version || '1.0.0';
+export function manifestToStoreExtension(
+  manifest: ExtensionManifest
+): StoreExtension {
+  const version = manifest.version || "1.0.0";
   return {
     id: manifest.id,
     slug: manifest.id,
     name: manifest.name,
-    description: manifest.description ?? '',
-    author: manifest.author || 'Unknown',
-    type: (manifest.type ?? 'custom') as StoreExtensionType,
-    status: manifest.status ?? (manifest.isApproved ? 'approved' : 'pending'),
+    description: manifest.description ?? "",
+    author: manifest.author || "Unknown",
+    type: (manifest.type ?? "custom") as StoreExtensionType,
+    status: manifest.status ?? (manifest.isApproved ? "approved" : "pending"),
     icon: manifest.icon,
     banner: manifest.banner,
     categories: manifest.categories ?? [],
@@ -95,18 +97,17 @@ export function manifestToStoreExtension(manifest: ExtensionManifest): StoreExte
     tags: [],
     githubRepoUrl: undefined,
     healthScore: undefined,
-    isFeatured: Boolean(manifest.categories?.includes('official')),
+    isFeatured: Boolean(manifest.categories?.includes("official")),
     views: 0,
     downloads: manifest.downloads ?? 0,
     installs: 0,
     updatedAt: manifest.updatedAt,
-    readme: '',
+    readme: "",
     versions: [],
     latestVersion: undefined,
     version,
   };
 }
-
 /** The inverse, for the sideload list the runtime and `useExtensions` read. */
 function storeToManifest(extension: StoreExtension): ExtensionManifest {
   return {
@@ -119,11 +120,11 @@ function storeToManifest(extension: StoreExtension): ExtensionManifest {
     banner: extension.banner,
     categories: extension.categories,
     permissions: extension.permissions,
-    isApproved: extension.status === 'approved',
+    isApproved: extension.status === "approved",
     downloads: extension.downloads,
     updatedAt: extension.updatedAt,
     type: extension.type,
-    status: extension.status as ExtensionManifest['status'],
+    status: extension.status as ExtensionManifest["status"],
   };
 }
 
@@ -142,8 +143,16 @@ function readAliasGroups(): string[][] {
     .filter(Array.isArray)
     .map((group) =>
       Array.from(
-        new Set(group.map((id) => String(id ?? '').trim().toLowerCase()).filter(Boolean)),
-      ),
+        new Set(
+          group
+            .map((id) =>
+              String(id ?? "")
+                .trim()
+                .toLowerCase()
+            )
+            .filter(Boolean)
+        )
+      )
     )
     .filter((group) => group.length > 1);
 }
@@ -154,7 +163,15 @@ function readAliasGroups(): string[][] {
  */
 function rememberAliases(ids: string[]): string[] {
   const incoming = Array.from(
-    new Set(ids.map((id) => String(id ?? '').trim().toLowerCase()).filter(Boolean)),
+    new Set(
+      ids
+        .map((id) =>
+          String(id ?? "")
+            .trim()
+            .toLowerCase()
+        )
+        .filter(Boolean)
+    )
   );
   if (incoming.length < 2) return incoming;
 
@@ -163,7 +180,8 @@ function rememberAliases(ids: string[]): string[] {
   const rest: string[][] = [];
 
   groups.forEach((group) => {
-    if (group.some((id) => merged.has(id))) group.forEach((id) => merged.add(id));
+    if (group.some((id) => merged.has(id)))
+      group.forEach((id) => merged.add(id));
     else rest.push(group);
   });
 
@@ -173,10 +191,18 @@ function rememberAliases(ids: string[]): string[] {
 
 /** Drop every group that mentions any of `ids` — used when uninstalling. */
 function forgetAliases(ids: string[]) {
-  const lowered = new Set(ids.map((id) => String(id ?? '').trim().toLowerCase()).filter(Boolean));
+  const lowered = new Set(
+    ids
+      .map((id) =>
+        String(id ?? "")
+          .trim()
+          .toLowerCase()
+      )
+      .filter(Boolean)
+  );
   writeJson(
     ALIASES_KEY,
-    readAliasGroups().filter((group) => !group.some((id) => lowered.has(id))),
+    readAliasGroups().filter((group) => !group.some((id) => lowered.has(id)))
   );
 }
 
@@ -208,7 +234,7 @@ function makeAliasResolver() {
 export interface StoreCatalogueOptions {
   /** Free text; routed to `/extension/search/:search` when non-empty. */
   search?: string;
-  type?: StoreExtensionType | 'all';
+  type?: StoreExtensionType | "all";
   limit?: number;
 }
 
@@ -234,14 +260,14 @@ export interface StoreCatalogue {
  * published row side by side — the duplicate the store was rendering.
  */
 export function useStoreCatalogue({
-  search = '',
-  type = 'all',
+  search = "",
+  type = "all",
   limit = 48,
 }: StoreCatalogueOptions = {}): StoreCatalogue {
   const needle = search.trim();
 
   const query = useQuery({
-    queryKey: ['extension-store', 'catalogue', needle, type, limit],
+    queryKey: ["extension-store", "catalogue", needle, type, limit],
     queryFn: ({ signal }) =>
       needle
         ? searchStoreExtensions(needle, signal)
@@ -260,26 +286,33 @@ export function useStoreCatalogue({
 
     let list = Array.from(merged.values());
 
-    if (type !== 'all') list = list.filter((item) => item.type === type);
+    if (type !== "all") list = list.filter((item) => item.type === type);
     if (needle) {
       const lowered = needle.toLowerCase();
       list = list.filter((item) =>
-        `${item.name} ${item.description} ${item.author} ${item.categories.join(' ')} ${item.tags.join(' ')}`
+        `${item.name} ${item.description} ${item.author} ${item.categories.join(
+          " "
+        )} ${item.tags.join(" ")}`
           .toLowerCase()
-          .includes(lowered),
+          .includes(lowered)
       );
     }
 
     // Featured first, then the most-installed — the store's own ordering.
     return list.sort((left, right) => {
       if (left.isFeatured !== right.isFeatured) return left.isFeatured ? -1 : 1;
-      return right.installs + right.downloads - (left.installs + left.downloads);
+      return (
+        right.installs + right.downloads - (left.installs + left.downloads)
+      );
     });
   }, [query.data, needle, type]);
 
   const featured = useMemo(
-    () => items.filter((item) => item.isFeatured || item.categories.includes('official')),
-    [items],
+    () =>
+      items.filter(
+        (item) => item.isFeatured || item.categories.includes("official")
+      ),
+    [items]
   );
 
   return {
@@ -295,7 +328,7 @@ export function useStoreCatalogue({
 /** `GET /api/extension/tags`, for the store's tag rail. */
 export function useStoreTags() {
   return useQuery({
-    queryKey: ['extension-store', 'tags'],
+    queryKey: ["extension-store", "tags"],
     queryFn: ({ signal }) => fetchStoreTags(signal),
     enabled: isExtensionStoreConfigured,
     staleTime: 30 * 60 * 1000,
@@ -309,7 +342,7 @@ export function useStoreTags() {
  */
 export function useStoreExtensionDetail(idOrSlug?: string) {
   const query = useQuery({
-    queryKey: ['extension-store', 'detail', idOrSlug],
+    queryKey: ["extension-store", "detail", idOrSlug],
     queryFn: ({ signal }) => fetchStoreExtension(idOrSlug!, signal),
     enabled: Boolean(idOrSlug) && isExtensionStoreConfigured,
     staleTime: 10 * 60 * 1000,
@@ -323,9 +356,11 @@ export function useStoreExtensionDetail(idOrSlug?: string) {
     const lowered = idOrSlug.trim().toLowerCase();
     // The route carries the slug, the sideload list is keyed by the manifest id,
     // so the alias group is what connects the two.
-    const group = readAliasGroups().find((ids) => ids.includes(lowered)) ?? [lowered];
+    const group = readAliasGroups().find((ids) => ids.includes(lowered)) ?? [
+      lowered,
+    ];
     return localExtensions().find((item) =>
-      extensionAliases(item).some((alias) => group.includes(alias)),
+      extensionAliases(item).some((alias) => group.includes(alias))
     );
   }, [idOrSlug]);
 
@@ -333,12 +368,12 @@ export function useStoreExtensionDetail(idOrSlug?: string) {
     extension: query.data ?? local ?? null,
     /** True while the service is the only place the id could resolve. */
     isLoading: query.isLoading && !local,
-    error: local ? null : ((query.error as Error) ?? null),
+    error: local ? null : (query.error as Error) ?? null,
     isFromService: Boolean(query.data),
   };
 }
 
-export type InstallState = 'idle' | 'installing' | 'installed' | 'not_loaded';
+export type InstallState = "idle" | "installing" | "installed" | "not_loaded";
 
 /**
  * Install / uninstall, shared by the store grid and the detail page so both
@@ -352,7 +387,7 @@ export type InstallState = 'idle' | 'installing' | 'installed' | 'not_loaded';
 export function useExtensionInstaller() {
   const queryClient = useQueryClient();
   const [installedIds, setInstalledIds] = useState<string[]>(() =>
-    readJson<string[]>(INSTALLED_KEY, []),
+    readJson<string[]>(INSTALLED_KEY, [])
   );
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [notLoadedIds, setNotLoadedIds] = useState<string[]>([]);
@@ -364,10 +399,10 @@ export function useExtensionInstaller() {
       setInstalledIds(readJson<string[]>(INSTALLED_KEY, []));
       setAliasEpoch((value) => value + 1);
     };
-    window.addEventListener('storage', sync);
+    window.addEventListener("storage", sync);
     window.addEventListener(SIDELOAD_EVENT, sync);
     return () => {
-      window.removeEventListener('storage', sync);
+      window.removeEventListener("storage", sync);
       window.removeEventListener(SIDELOAD_EVENT, sync);
     };
   }, []);
@@ -379,36 +414,44 @@ export function useExtensionInstaller() {
    * a freshly installed extension kept reading "Get".
    */
   const aliasesOf = useCallback(
-    (extension: Pick<StoreExtension, 'id' | 'slug'>): string[] => {
+    (extension: Pick<StoreExtension, "id" | "slug">): string[] => {
       void aliasEpoch;
       const own = extensionAliases(extension);
       const expanded = new Set(own);
       readAliasGroups().forEach((group) => {
-        if (group.some((id) => expanded.has(id))) group.forEach((id) => expanded.add(id));
+        if (group.some((id) => expanded.has(id)))
+          group.forEach((id) => expanded.add(id));
       });
       return Array.from(expanded);
     },
-    [aliasEpoch],
+    [aliasEpoch]
   );
 
   const isInstalled = useCallback(
-    (extension: Pick<StoreExtension, 'id' | 'slug'>) => {
+    (extension: Pick<StoreExtension, "id" | "slug">) => {
       const aliases = aliasesOf(extension);
-      return installedIds.some((id) => aliases.includes(String(id ?? '').toLowerCase()));
+      return installedIds.some((id) =>
+        aliases.includes(String(id ?? "").toLowerCase())
+      );
     },
-    [aliasesOf, installedIds],
+    [aliasesOf, installedIds]
   );
 
   const stateFor = useCallback(
-    (extension: Pick<StoreExtension, 'id' | 'slug'>): InstallState => {
+    (extension: Pick<StoreExtension, "id" | "slug">): InstallState => {
       const aliases = aliasesOf(extension);
-      if (pendingId && aliases.includes(pendingId.toLowerCase())) return 'installing';
-      if (notLoadedIds.some((id) => aliases.includes(String(id ?? '').toLowerCase()))) {
-        return 'not_loaded';
+      if (pendingId && aliases.includes(pendingId.toLowerCase()))
+        return "installing";
+      if (
+        notLoadedIds.some((id) =>
+          aliases.includes(String(id ?? "").toLowerCase())
+        )
+      ) {
+        return "not_loaded";
       }
-      return isInstalled(extension) ? 'installed' : 'idle';
+      return isInstalled(extension) ? "installed" : "idle";
     },
-    [aliasesOf, isInstalled, notLoadedIds, pendingId],
+    [aliasesOf, isInstalled, notLoadedIds, pendingId]
   );
 
   /**
@@ -424,7 +467,13 @@ export function useExtensionInstaller() {
     const runtime = (window as any).tatakaiRuntime;
     if (!runtime?.health) return false;
 
-    const needles = ids.map((id) => String(id ?? '').trim().toLowerCase()).filter(Boolean);
+    const needles = ids
+      .map((id) =>
+        String(id ?? "")
+          .trim()
+          .toLowerCase()
+      )
+      .filter(Boolean);
     if (needles.length === 0) return false;
 
     for (let attempt = 0; attempt < 10; attempt += 1) {
@@ -434,7 +483,15 @@ export function useExtensionInstaller() {
         const loaded: string[] = Array.isArray(health?.loadedExtensions)
           ? health.loadedExtensions
           : [];
-        if (loaded.some((id) => needles.includes(String(id ?? '').trim().toLowerCase()))) {
+        if (
+          loaded.some((id) =>
+            needles.includes(
+              String(id ?? "")
+                .trim()
+                .toLowerCase()
+            )
+          )
+        ) {
           return true;
         }
       } catch {
@@ -456,7 +513,7 @@ export function useExtensionInstaller() {
       setPendingId(targetId);
       const known = aliasesOf(extension);
       setNotLoadedIds((prev) =>
-        prev.filter((id) => !known.includes(String(id ?? '').toLowerCase())),
+        prev.filter((id) => !known.includes(String(id ?? "").toLowerCase()))
       );
 
       const url = resolveInstallUrl(extension, version);
@@ -467,18 +524,43 @@ export function useExtensionInstaller() {
       // under the manifest's own id, and that is the only id `runtime:health`
       // and `unloadExtension` recognise.
       let canonicalId = targetId;
-      if (runtime?.loadKaiExtension) {
+      let loadedOnMobile = false;
+      if (isCapacitor()) {
+        // Bootstrap runs asynchronously so the store can be usable one render
+        // before `window.tatakaiRuntime` is attached. Do not treat that tiny
+        // window as a failed install: the mobile installer owns the same
+        // registry and persists the bundle for the next launch.
+        const { installMobileKaiExtension } = await import(
+          "@/core/extensions/mobile/mobileExtensionInstaller"
+        );
+        const result = await installMobileKaiExtension(buffer);
+        if (!result.success) {
+          throw new Error(
+            "error" in result ? result.error : "Runtime rejected the bundle"
+          );
+        }
+        canonicalId = result.extensionId;
+        loadedOnMobile = true;
+      } else if (runtime?.loadKaiExtension) {
         const result = await runtime.loadKaiExtension(buffer, true);
-        if (!result?.success) throw new Error(result?.error ?? 'Runtime rejected the bundle');
-        canonicalId = String(result.extensionId ?? '').trim() || targetId;
+        if (!result?.success)
+          throw new Error(result?.error ?? "Runtime rejected the bundle");
+        canonicalId = String(result.extensionId ?? "").trim() || targetId;
       }
 
       // Tie all three ids together before anything reads them back, so the
       // catalogue merge and `isInstalled` can see past whichever one they hold.
-      const aliases = rememberAliases([extension.id, extension.slug, canonicalId]);
+      const aliases = rememberAliases([
+        extension.id,
+        extension.slug,
+        canonicalId,
+      ]);
 
-      const sideloaded = readJson<ExtensionManifest[]>(SIDELOADED_KEY, []).filter(
-        (item) => !aliases.includes(String(item?.id ?? '').toLowerCase()),
+      const sideloaded = readJson<ExtensionManifest[]>(
+        SIDELOADED_KEY,
+        []
+      ).filter(
+        (item) => !aliases.includes(String(item?.id ?? "").toLowerCase())
       );
       writeJson(SIDELOADED_KEY, [
         storeToManifest({ ...extension, id: canonicalId, slug: canonicalId }),
@@ -486,27 +568,36 @@ export function useExtensionInstaller() {
       ]);
 
       const installed = readJson<string[]>(INSTALLED_KEY, []).filter(
-        (id) => !aliases.includes(String(id ?? '').toLowerCase()),
+        (id) => !aliases.includes(String(id ?? "").toLowerCase())
       );
       const nextInstalled = [...installed, canonicalId];
       writeJson(INSTALLED_KEY, nextInstalled);
       setInstalledIds(nextInstalled);
       setAliasEpoch((value) => value + 1);
 
-      const loaded = await waitForRuntime(aliases.length > 0 ? aliases : [canonicalId]);
+      const loaded =
+        loadedOnMobile ||
+        (await waitForRuntime(aliases.length > 0 ? aliases : [canonicalId]));
       return { targetId: canonicalId, loaded };
     },
     onSuccess: ({ targetId, loaded }) => {
-      if (!loaded) setNotLoadedIds((prev) => Array.from(new Set([...prev, targetId])));
-      window.dispatchEvent(new CustomEvent(SIDELOAD_EVENT, { detail: targetId }));
-      queryClient.invalidateQueries({ queryKey: ['extensions'] });
+      if (!loaded)
+        setNotLoadedIds((prev) => Array.from(new Set([...prev, targetId])));
+      window.dispatchEvent(
+        new CustomEvent(SIDELOAD_EVENT, { detail: targetId })
+      );
+      queryClient.invalidateQueries({ queryKey: ["extensions"] });
       // The catalogue merges on alias groups that only just gained the manifest
       // id, so it has to be rebuilt or the duplicate row stays on screen.
-      queryClient.invalidateQueries({ queryKey: ['extension-store'] });
-      toast.success(loaded ? 'Extension installed' : 'Installed — waiting for the runtime to load it');
+      queryClient.invalidateQueries({ queryKey: ["extension-store"] });
+      toast.success(
+        loaded
+          ? "Extension installed"
+          : "Installed — waiting for the runtime to load it"
+      );
     },
     onError: (error: unknown) => {
-      const message = error instanceof Error ? error.message : 'Install failed';
+      const message = error instanceof Error ? error.message : "Install failed";
       toast.error(message);
     },
     onSettled: () => setPendingId(null),
@@ -520,15 +611,19 @@ export function useExtensionInstaller() {
       // Remove by alias, not by one field: the installed id is the manifest id,
       // which the store row does not carry.
       const aliases = aliasesOf(extension);
-      const matches = (value: unknown) => aliases.includes(String(value ?? '').toLowerCase());
+      const matches = (value: unknown) =>
+        aliases.includes(String(value ?? "").toLowerCase());
 
-      const installed = readJson<string[]>(INSTALLED_KEY, []).filter((id) => !matches(id));
+      const installed = readJson<string[]>(INSTALLED_KEY, []).filter(
+        (id) => !matches(id)
+      );
       writeJson(INSTALLED_KEY, installed);
       setInstalledIds(installed);
 
-      const sideloaded = readJson<ExtensionManifest[]>(SIDELOADED_KEY, []).filter(
-        (item) => !matches(item?.id),
-      );
+      const sideloaded = readJson<ExtensionManifest[]>(
+        SIDELOADED_KEY,
+        []
+      ).filter((item) => !matches(item?.id));
       writeJson(SIDELOADED_KEY, sideloaded);
 
       setNotLoadedIds((prev) => prev.filter((id) => !matches(id)));
@@ -536,9 +631,16 @@ export function useExtensionInstaller() {
       // Unload every id the runtime might have registered it under, then drop
       // the grouping so a reinstall re-derives it from the runtime.
       const unload = (window as any).tatakaiRuntime?.unloadExtension;
-      if (unload) {
+      if (isCapacitor()) {
+        const { uninstallMobileExtension } = await import(
+          "@/core/extensions/mobile/mobileExtensionInstaller"
+        );
+        await Promise.all(aliases.map((id) => uninstallMobileExtension(id)));
+      } else if (unload) {
         await Promise.all(
-          aliases.map((id) => Promise.resolve(unload(id)).catch(() => undefined)),
+          aliases.map((id) =>
+            Promise.resolve(unload(id)).catch(() => undefined)
+          )
         );
       }
       forgetAliases(aliases);
@@ -547,12 +649,15 @@ export function useExtensionInstaller() {
     },
     onSuccess: () => {
       window.dispatchEvent(new CustomEvent(SIDELOAD_EVENT));
-      queryClient.invalidateQueries({ queryKey: ['extensions'] });
-      queryClient.invalidateQueries({ queryKey: ['extension-store'] });
-      toast.success('Extension removed');
+      queryClient.invalidateQueries({ queryKey: ["extensions"] });
+      queryClient.invalidateQueries({ queryKey: ["extension-store"] });
+      toast.success("Extension removed");
     },
     onError: (error: unknown) => {
-      const message = error instanceof Error ? error.message : 'Could not remove the extension';
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Could not remove the extension";
       toast.error(message);
     },
     onSettled: () => setPendingId(null),
@@ -563,8 +668,183 @@ export function useExtensionInstaller() {
       if (isInstalled(extension)) uninstall.mutate(extension);
       else install.mutate({ extension, version });
     },
-    [install, isInstalled, uninstall],
+    [install, isInstalled, uninstall]
   );
 
   return { installedIds, isInstalled, stateFor, install, uninstall, toggle };
+}
+
+// ── Update detection ───────────────────────────────────────────────────────────
+
+const DISMISSED_UPDATES_KEY = "tatakai_dismissed_ext_updates";
+
+/**
+ * Semver-ish comparison that sorts `1.10.0` above `1.2.0` (a plain string
+ * compare does not). Numeric segments compare numerically, anything else
+ * lexically; a leading `v` and `-pre`/`.pre` suffixes are tolerated. Returns
+ * >0 when `a` is newer than `b`.
+ */
+function compareVersions(a: string, b: string): number {
+  const parts = (v: string) =>
+    String(v).trim().replace(/^v/i, "").split(/[.+-]/);
+  const pa = parts(a);
+  const pb = parts(b);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i += 1) {
+    const sa = pa[i] ?? "0";
+    const sb = pb[i] ?? "0";
+    const na = Number(sa);
+    const nb = Number(sb);
+    if (!Number.isNaN(na) && !Number.isNaN(nb)) {
+      if (na !== nb) return na > nb ? 1 : -1;
+    } else if (sa !== sb) {
+      return sa > sb ? 1 : -1;
+    }
+  }
+  return 0;
+}
+
+export interface ExtensionUpdate {
+  /** The published catalogue row carrying the latest version + changelog. */
+  extension: StoreExtension;
+  installedVersion: string;
+  latestVersion: string;
+  /** The latest build, when the service sent one — used for the changelog. */
+  latestStoreVersion?: StoreVersion;
+}
+
+/**
+ * Which installed extensions have a newer version published.
+ *
+ * Installed versions come from wherever this shell records them: the
+ * `localStorage` sideload list on desktop/web (and Hub installs on mobile), plus
+ * the Dexie bundle cache on mobile (which also holds auto-refreshed curated
+ * extensions). The latest version is the service catalogue's, matched to the
+ * installed id through the same alias groups the catalogue merge uses — so a Hub
+ * install, whose `.kai` manifest id differs from the service uuid/slug, still
+ * lines up with its published row.
+ *
+ * Dismissals are remembered per id+version: once the user defers `1.3.0` it stays
+ * quiet until an even newer build appears.
+ */
+export function useExtensionUpdates() {
+  const [dismissed, setDismissed] = useState<Record<string, string>>(() =>
+    readJson<Record<string, string>>(DISMISSED_UPDATES_KEY, {})
+  );
+
+  const installedQuery = useQuery({
+    queryKey: ["extension-store", "installed-versions"],
+    queryFn: async (): Promise<Record<string, string>> => {
+      const map: Record<string, string> = {};
+      for (const manifest of readJson<ExtensionManifest[]>(
+        SIDELOADED_KEY,
+        []
+      )) {
+        const id = String(manifest?.id ?? "")
+          .trim()
+          .toLowerCase();
+        if (id && manifest?.version) map[id] = String(manifest.version);
+      }
+      if (isCapacitor()) {
+        try {
+          const { db } = await import("@/core/db/tatakai-db");
+          const rows = await db.mobileExtensionBundles.toArray();
+          for (const row of rows) {
+            const id = String(row?.id ?? "")
+              .trim()
+              .toLowerCase();
+            if (id && row?.version) map[id] = String(row.version);
+          }
+        } catch {
+          /* durable cache unreadable — fall back to the sideload list */
+        }
+      }
+      return map;
+    },
+    staleTime: 60 * 1000,
+  });
+
+  const catalogueQuery = useQuery({
+    queryKey: ["extension-store", "updates-catalogue"],
+    queryFn: ({ signal }) =>
+      fetchStoreExtensions({ type: "all", limit: 200 }, signal),
+    enabled: isExtensionStoreConfigured,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+
+  const updates = useMemo<ExtensionUpdate[]>(() => {
+    const installed = installedQuery.data ?? {};
+    const items = catalogueQuery.data?.items ?? [];
+    if (Object.keys(installed).length === 0 || items.length === 0) return [];
+
+    const groups = readAliasGroups();
+    const out: ExtensionUpdate[] = [];
+    const matched = new Set<string>();
+
+    for (const extension of items) {
+      const aliases = new Set(extensionAliases(extension));
+      groups.forEach((group) => {
+        if (group.some((id) => aliases.has(id)))
+          group.forEach((id) => aliases.add(id));
+      });
+
+      let installedId: string | undefined;
+      for (const id of Object.keys(installed)) {
+        if (aliases.has(id)) {
+          installedId = id;
+          break;
+        }
+      }
+      if (!installedId || matched.has(installedId)) continue;
+
+      const installedVersion = installed[installedId];
+      const latestVersion =
+        extension.latestVersion?.version || extension.version;
+      if (!installedVersion || !latestVersion) continue;
+      if (compareVersions(latestVersion, installedVersion) <= 0) continue;
+
+      matched.add(installedId);
+      out.push({
+        extension,
+        installedVersion,
+        latestVersion,
+        latestStoreVersion: extension.latestVersion,
+      });
+    }
+    return out;
+  }, [installedQuery.data, catalogueQuery.data]);
+
+  /** Updates the user has not already deferred at this exact version. */
+  const pendingUpdates = useMemo(
+    () =>
+      updates.filter((update) => {
+        const key = String(
+          update.extension.slug || update.extension.id
+        ).toLowerCase();
+        return dismissed[key] !== update.latestVersion;
+      }),
+    [updates, dismissed]
+  );
+
+  const dismiss = useCallback((targets: ExtensionUpdate[]) => {
+    setDismissed((prev) => {
+      const next = { ...prev };
+      for (const update of targets) {
+        const key = String(
+          update.extension.slug || update.extension.id
+        ).toLowerCase();
+        next[key] = update.latestVersion;
+      }
+      writeJson(DISMISSED_UPDATES_KEY, next);
+      return next;
+    });
+  }, []);
+
+  return {
+    updates,
+    pendingUpdates,
+    dismiss,
+    isLoading: catalogueQuery.isLoading || installedQuery.isLoading,
+  };
 }

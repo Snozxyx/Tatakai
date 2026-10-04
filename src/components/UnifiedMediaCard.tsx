@@ -9,6 +9,7 @@
  * with `AnimeCardWithPreview` so the two agree.
  */
 import { Play, BookOpen, Star, Film } from "lucide-react";
+import { memo } from "react";
 
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import { Link } from "react-router-dom";
@@ -16,6 +17,7 @@ import { getProxiedImageUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { splitRating } from "@/lib/mediaRating";
 import { AdultBadge, MetaBadge, ScoreBadge } from "@/components/MediaCardBadges";
+import { useIsMobile } from "@/hooks/ui/use-mobile";
 
 export interface UnifiedMediaCardProps {
   item: {
@@ -39,13 +41,16 @@ export interface UnifiedMediaCardProps {
   className?: string;
 }
 
-export function UnifiedMediaCard({ item, variant = 'overlay', className = "" }: UnifiedMediaCardProps) {
+export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant = 'overlay', className = "" }: UnifiedMediaCardProps) {
+  const isMobile = useIsMobile();
   const isAnime = item.mediaType === 'anime';
   const isManga = item.mediaType === 'manga';
   const isCharacter = item.mediaType === 'character';
   const isAdultItem = Boolean(item.isAdult);
   const shouldBlurAdult = Boolean(isAdultItem && item.blurAdult);
   const { score, label } = splitRating(item.rating);
+  // Phones: no hover states exist, so drop the GPU-heavy hover overlays,
+  // backdrop-blurs and transitions entirely (big scroll win on long grids).
 
   const getMangaFormatLabel = () => {
     if (!isManga) return item.mediaType;
@@ -108,21 +113,23 @@ export function UnifiedMediaCard({ item, variant = 'overlay', className = "" }: 
     return (
       <div
         className={cn(
-          'group relative flex flex-col transition-all duration-300',
+          'group relative flex flex-col md:transition-all md:duration-300',
           routeTo && 'cursor-pointer',
           className
         )}
+        style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 300px' }}
       >
-        <div className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.04] transition-all duration-300 group-hover:border-white/20 group-hover:shadow-xl group-hover:shadow-black/60 group-hover:-translate-y-1">
+        <div className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.04] md:transition-all md:duration-300 md:group-hover:border-white/20 md:group-hover:shadow-xl md:group-hover:shadow-black/60 md:group-hover:-translate-y-1">
           <img
             src={getProxiedImageUrl(item.poster || '')}
             alt={item.name}
             className={cn(
-              "w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105",
+              "w-full h-full object-cover object-top md:transition-transform md:duration-500 md:group-hover:scale-105",
               shouldBlurAdult && "blur-md scale-105"
             )}
             loading="lazy"
             decoding="async"
+            fetchPriority="low"
             onError={(event) => {
               const image = event.currentTarget;
               const directPoster = item.poster || '';
@@ -153,26 +160,28 @@ export function UnifiedMediaCard({ item, variant = 'overlay', className = "" }: 
 
           {item.status && !isCharacter && !isAdultItem && (
             <div className="absolute top-2 right-2 z-10">
-              <div className="px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+              <div className="px-2 py-0.5 rounded-full bg-black/60 border border-white/10 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
                 {item.status}
               </div>
             </div>
           )}
 
           {score && (
-            <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
+            <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-bold text-white">
               <Star className="h-2.5 w-2.5 fill-amber text-amber" />
               {score}
             </div>
           )}
 
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          {!isMobile && <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />}
 
+          {!isMobile && (
           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
-            <div className="w-11 h-11 rounded-full bg-primary/90 text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/30 backdrop-blur-sm transform scale-75 group-hover:scale-100 transition-transform duration-300 ease-out">
+            <div className="w-11 h-11 rounded-full bg-primary/90 text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/30 transform scale-75 group-hover:scale-100 transition-transform duration-300 ease-out">
               {isManga ? <BookOpen className="w-5 h-5 ml-0.5" /> : (isCharacter ? <Star className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />)}
             </div>
           </div>
+          )}
 
           {routeTo &&
             (isExternal ? (
@@ -207,24 +216,20 @@ export function UnifiedMediaCard({ item, variant = 'overlay', className = "" }: 
     );
   }
 
-  return (
-    <GlassPanel
-      className={cn(
-        'group relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary/20 focus-within:ring-2 focus-within:ring-ring',
-        routeTo && 'cursor-pointer',
-        className,
-      )}
-    >
-      <div className="relative aspect-[2/3] overflow-hidden">
+  // Overlay variant — GlassPanel (backdrop-blur) is desktop-only; phones get
+  // a plain card with solid overlays so long recommendation grids stay fluid.
+  const overlayInner = (
+      <div className="relative aspect-[2/3] overflow-hidden" style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 300px' }}>
         <img
           src={getProxiedImageUrl(item.poster || '')}
           alt={item.name}
           className={cn(
-            "w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-110",
+            "w-full h-full object-cover object-top md:transition-transform md:duration-500 md:group-hover:scale-110",
             shouldBlurAdult && "blur-md scale-110"
           )}
           loading="lazy"
           decoding="async"
+          fetchPriority="low"
           onError={(event) => {
             const image = event.currentTarget;
             const directPoster = item.poster || '';
@@ -256,7 +261,7 @@ export function UnifiedMediaCard({ item, variant = 'overlay', className = "" }: 
         {/* Media Type Badge */}
         {item.mediaType && (
           <div className="absolute top-2 left-2 z-10">
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-background/80 backdrop-blur-md border border-white/10 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm">
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-black/60 border border-white/10 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm">
               {getBadgeIcon()}
               {mediaBadgeLabel}
             </div>
@@ -266,23 +271,25 @@ export function UnifiedMediaCard({ item, variant = 'overlay', className = "" }: 
         {/* Status Badge */}
         {item.status && !isCharacter && !isAdultItem && (
           <div className="absolute top-2 right-2 z-10">
-            <div className="px-2 py-1 rounded-full bg-background/80 backdrop-blur-md border border-white/10 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            <div className="px-2 py-1 rounded-full bg-black/60 border border-white/10 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
               {item.status}
             </div>
           </div>
         )}
 
-        <div className="absolute inset-0 bg-gradient-to-t from-background/95 via-background/20 to-transparent opacity-80 group-hover:opacity-90 transition-opacity" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background/95 via-background/20 to-transparent opacity-80 md:group-hover:opacity-90 md:transition-opacity" />
 
-        {/* Hover Action Overlay */}
+        {/* Hover Action Overlay — desktop only */}
+        {!isMobile && (
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
-          <div className="w-12 h-12 rounded-full bg-primary/90 text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/30 backdrop-blur-sm transform scale-50 group-hover:scale-100 transition-transform duration-300 ease-out">
+          <div className="w-12 h-12 rounded-full bg-primary/90 text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/30 transform scale-50 group-hover:scale-100 transition-transform duration-300 ease-out">
             {isManga ? <BookOpen className="w-6 h-6 ml-0.5" /> : (isCharacter ? <Star className="w-6 h-6" /> : <Play className="w-6 h-6 ml-1" />)}
           </div>
         </div>
+        )}
 
         <div className="absolute bottom-0 w-full p-4 min-h-[80px] flex flex-col justify-end">
-          <h3 className="font-display font-bold text-base md:text-lg leading-tight line-clamp-2 text-white group-hover:text-primary transition-colors">
+          <h3 className="font-display font-bold text-base md:text-lg leading-tight line-clamp-2 text-white">
             {item.name}
           </h3>
           {renderMetadata()}
@@ -309,6 +316,31 @@ export function UnifiedMediaCard({ item, variant = 'overlay', className = "" }: 
             />
           ))}
       </div>
+  );
+
+  if (isMobile) {
+    return (
+      <div
+        className={cn(
+          'group relative overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03] active:scale-[0.99]',
+          routeTo && 'cursor-pointer',
+          className,
+        )}
+      >
+        {overlayInner}
+      </div>
+    );
+  }
+
+  return (
+    <GlassPanel
+      className={cn(
+        'group relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary/20 focus-within:ring-2 focus-within:ring-ring',
+        routeTo && 'cursor-pointer',
+        className,
+      )}
+    >
+      {overlayInner}
     </GlassPanel>
   );
-}
+})

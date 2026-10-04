@@ -156,6 +156,8 @@ export interface DownloadHistoryEntry {
   id: string;
   animeId: number;
   animeTitle: string;
+  /** Poster captured when the download started (used by grouped offline rows). */
+  posterUrl?: string;
   episodeNumber: number;
   episodeName?: string;
   /** Final outcome of this attempt. */
@@ -193,6 +195,8 @@ export interface OfflineChapter {
   id: string;
   anilistId: number;
   title: string;
+  /** Series poster captured at enqueue time. */
+  posterUrl?: string | null;
   chapterKey: string;
   chapterNumber?: number | null;
   volume?: number | string | null;
@@ -204,6 +208,29 @@ export interface OfflineChapter {
   provider?: string | null;
   /** ISO timestamp of download completion. */
   downloadedAt: string;
+}
+
+/**
+ * A downloaded extension bundle cached for the in-WebView mobile runtime.
+ * On desktop, bundles ship as extraResources and run in a Node worker; on
+ * mobile there is no such host, so the marketplace `.kai` is unzipped and its
+ * `manifest.json` + `dist/bundle.js` cached here, then registered into the
+ * in-WebView runtime on launch (network-first refresh, cache for offline).
+ */
+export interface MobileExtensionBundle {
+  /** Extension manifest id (also the primary key). */
+  id: string;
+  /** Namespace the bundle mounts under (manifest.apiServer.namespace or id). */
+  namespace: string;
+  version: string;
+  /** Full manifest JSON (parsed object stored verbatim). */
+  manifest: unknown;
+  /** The extension bundle source (dist/bundle.js contents). */
+  bundleCode: string;
+  /** Whether the user has this extension enabled. */
+  enabled: boolean;
+  /** ISO timestamp of last download/refresh. */
+  updatedAt: string;
 }
 
 // ── Database ──────────────────────────────────────────────────────────────────
@@ -219,6 +246,8 @@ class TatakaiDB extends Dexie {
   downloadHistory!: EntityTable<DownloadHistoryEntry, 'id'>;
   /** v5: Downloaded manga chapters for offline reading. */
   offlineChapters!: EntityTable<OfflineChapter, 'id'>;
+  /** v6: Cached extension bundles for the in-WebView mobile runtime. */
+  mobileExtensionBundles!: EntityTable<MobileExtensionBundle, 'id'>;
 
   constructor() {
     super('tatakai');
@@ -276,6 +305,20 @@ class TatakaiDB extends Dexie {
       downloadRules: 'id, animeId, enabled',
       downloadHistory: 'id, animeId, status, startedAt',
       offlineChapters: 'id, anilistId, downloadedAt',
+    });
+
+    // Version 6 adds mobileExtensionBundles for the in-WebView extension
+    // runtime. Append-only: every prior table is carried forward unchanged.
+    this.version(6).stores({
+      cachedMedia: 'id, anilistId, malId, *genres, cachedAt',
+      watchProgress: 'id, mediaId, updatedAt',
+      offlineEpisodes: 'id, mediaId, downloadedAt',
+      extensions: 'id, name',
+      kv: 'key',
+      downloadRules: 'id, animeId, enabled',
+      downloadHistory: 'id, animeId, status, startedAt',
+      offlineChapters: 'id, anilistId, downloadedAt',
+      mobileExtensionBundles: 'id, namespace, enabled, updatedAt',
     });
   }
 }

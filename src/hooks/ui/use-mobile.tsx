@@ -17,3 +17,13 @@ export function useIsMobile() {
 
   return !!isMobile;
 }
+
+/**
+ * True on phone-width viewports only (< 768px) — the phone bottom navigation bar
+ * lives below this line; at the tablet breakpoint and above the app uses the web
+ * floating sidebar instead, so tablets get the desktop layout rather than a
+ * stretched bottom bar.
+ */
+export function useIsPhone() {
+  return useIsMobile();
+}

@@ -14,30 +14,18 @@ import { TATAKAI_API_URL } from '@/lib/api/api-client';
  *  3. Comments      — fires when a new comment is posted
  */
 
-const RAW_TATAKAI_API_URL = TATAKAI_API_URL;
-
-function normalizeWebhookBase(url: string): string {
+// The backend exposes the forwarder at `${API}/api/v3/webhooks/discord`.
+// TATAKAI_API_URL is already the resolved `/api/v3` base (a relative `/api/v3`
+// in dev, which the Vite proxy forwards; the absolute origin in prod), so the
+// webhook base is simply that. (Older builds mangled this into a legacy
+// `/api/v2/anime` path that no route ever served — hence webhooks silently 404'd.)
+function resolveWebhookBase(url: string): string {
   const trimmed = (url || '').replace(/\/+$/, '');
-  if (!trimmed) return '/api/v2/anime';
-  if (/^https?:\/\/[^/]+$/i.test(trimmed)) return `${trimmed}/api/v2/anime`;
-  if (/\/api\/v2\/anime$/i.test(trimmed)) return trimmed;
-  if (/\/api\/v1$/i.test(trimmed)) return `${trimmed.replace(/\/api\/v1$/i, '')}/api/v2/anime`;
-  if (/\/api\/v2$/i.test(trimmed)) return `${trimmed}/anime`;
-  if (/\/api$/i.test(trimmed)) return `${trimmed}/v2/anime`;
+  if (!trimmed) return '/api/v3';
   return trimmed;
 }
 
-function resolveWebhookBase(url: string): string {
-  // In dev, always use same-origin so Vite proxy handles CORS.
-  if (import.meta.env.DEV) {
-    return '/api/v2/anime';
-  }
-
-  const normalized = normalizeWebhookBase(url);
-  return normalized;
-}
-
-const TATAKAI_WEBHOOK_BASE = resolveWebhookBase(RAW_TATAKAI_API_URL);
+const TATAKAI_WEBHOOK_BASE = resolveWebhookBase(TATAKAI_API_URL);
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -226,6 +214,46 @@ export function notifyReviewPopup(review: {
     channel: 'review_popup',
     embeds: [embed],
     username: 'Tatakai Reviews',
+  });
+}
+
+/**
+ * Notify when a user submits a suggestion / bug report from the Suggestions
+ * page. Routed to the same feedback channel as the review popup.
+ */
+export function notifySuggestion(suggestion: {
+  title: string;
+  description: string;
+  category: string;
+  userId?: string;
+  userName?: string;
+  imageUrl?: string;
+}) {
+  const categoryEmoji: Record<string, string> = {
+    feature: '✨',
+    bug: '🐛',
+    improvement: '⚡',
+    content: '📚',
+    other: '💡',
+  };
+  const embed: DiscordEmbed = {
+    title: `${categoryEmoji[suggestion.category] || '💡'} New ${suggestion.category} suggestion`,
+    description: `**${suggestion.title.slice(0, 240)}**\n${suggestion.description.slice(0, 1500)}`,
+    color: COLORS.info,
+    fields: [
+      { name: 'Category', value: suggestion.category, inline: true },
+      ...(suggestion.userName ? [{ name: 'User', value: suggestion.userName, inline: true }] : []),
+      ...(suggestion.userId ? [{ name: 'User ID', value: suggestion.userId, inline: true }] : []),
+    ],
+    ...(suggestion.imageUrl ? { thumbnail: { url: suggestion.imageUrl } } : {}),
+    timestamp: new Date().toISOString(),
+    footer: { text: 'Tatakai Suggestions' },
+  };
+
+  void sendToDiscord({
+    channel: 'review_popup',
+    embeds: [embed],
+    username: 'Tatakai Suggestions',
   });
 }
 

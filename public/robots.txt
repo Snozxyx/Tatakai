@@ -1,19 +1,41 @@
+# Tatakai — otaku community. Index public content (anime/manga info pages,
+# profiles, tier lists, playlists, community); keep utility, auth, streaming,
+# and admin routes out of the index.
+
 User-agent: *
 Allow: /
 Disallow: /api/
 Disallow: /admin
 Disallow: /auth
+Disallow: /settings
+Disallow: /watch
+Disallow: /manga/read
+Disallow: /downloads
+Disallow: /offline-library
+Disallow: /offline
+Disallow: /reset-password
+Disallow: /update-password
+Disallow: /onboarding
+Disallow: /setup
+Disallow: /integration/
 
-# Allow search engine crawlers
+# Search engine crawlers — allow content, block utility routes
 User-agent: Googlebot
 Allow: /
 Disallow: /api/
 Disallow: /admin
+Disallow: /auth
+Disallow: /watch
+Disallow: /manga/read
+Disallow: /settings
 
 User-agent: Bingbot
 Allow: /
 Disallow: /api/
 Disallow: /admin
+Disallow: /auth
+Disallow: /watch
+Disallow: /settings
 
 User-agent: Slurp
 Allow: /
@@ -24,15 +46,19 @@ Allow: /
 User-agent: Baiduspider
 Allow: /
 
-# Social media bots
+# Social media preview bots — must reach content for link cards
 User-agent: Twitterbot
 Allow: /
 
 User-agent: facebookexternalhit
 Allow: /
 
+User-agent: Discordbot
+Allow: /
+
 # Crawl-delay
 Crawl-delay: 1
 
-# Sitemap location
+# Sitemap index (served from the web origin, proxied to the live backend
+# generator that enumerates the full catalogue + public profiles).
 Sitemap: https://tatakai.me/sitemap.xml

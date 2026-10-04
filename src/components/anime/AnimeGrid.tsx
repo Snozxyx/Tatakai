@@ -1,9 +1,11 @@
 import { Play, Star, Tv, BookOpen, Film } from "lucide-react";
+import { memo } from "react";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import { AnimeCard, getHighQualityPoster } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 import { AnimeCardWithPreview } from "./AnimeCardWithPreview";
 import { useTheme } from "@/hooks/ui/useTheme";
+import { useIsMobile } from "@/hooks/ui/use-mobile";
 import { buildPreferredAnimeRouteId } from "@/lib/animeIdMapping";
 import { BlurhashImage } from "@/components/ui/blurhash-image";
 import { FeatureFlag, useFeatureFlag } from '@/core/feature-flags';
@@ -16,7 +18,7 @@ interface AnimeGridProps {
   gridSize?: "compact" | "normal" | "large";
 }
 
-export function AnimeGrid({
+export const AnimeGrid = memo(function AnimeGrid({
   animes,
   title,
   icon,
@@ -25,7 +27,10 @@ export function AnimeGrid({
 }: AnimeGridProps) {
   const navigate = useNavigate();
   const { isUltraLite } = useTheme();
-  const blurhashEnabled = useFeatureFlag(FeatureFlag.BLURHASH_IMAGES);
+  const isMobile = useIsMobile();
+  // BlurHash canvas decode per card is main-thread CPU — skip it on phones.
+  const blurhashEnabled = useFeatureFlag(FeatureFlag.BLURHASH_IMAGES) && !isMobile;
+  // Mobile + ultra-lite: skip hover transforms entirely (compositor jank).
 
   // Grid size classes
   const gridClasses = {
@@ -68,12 +73,12 @@ export function AnimeGrid({
   };
 
   return (
-    <section className="mb-24">
+    <section className="mb-14 md:mb-24" style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 500px' }}>
       {title && (
-        <div className="flex items-center justify-between mb-8 px-2">
-          <h3 className="font-display text-2xl font-semibold tracking-tight flex items-center gap-2.5">
+        <div className="flex items-center justify-between mb-5 md:mb-8 px-1 md:px-2">
+          <h3 className="font-display text-xl md:text-2xl font-semibold tracking-tight flex items-center gap-2.5">
             {icon || <Tv className="w-5 h-5 text-primary" />}
-            {title}
+            <span className="line-clamp-1">{title}</span>
           </h3>
         </div>
       )}
@@ -92,26 +97,51 @@ export function AnimeGrid({
           });
 
           const cardKey = `${String((anime as any).mediaType || "anime")}:${String(anime.id || "unknown")}:${index}`;
+          const animateCard = !isUltraLite && !isMobile;
 
-          return enablePreview ? (
-            <AnimeCardWithPreview key={cardKey} anime={anime} showPreview={true} />
-          ) : (
-            <GlassPanel
-              key={cardKey}
-              hoverEffect={!isUltraLite}
-              className="group cursor-pointer overflow-hidden transition-all duration-300 hover:z-10 hover:scale-[1.02]"
-              onClick={() => {
-                const mediaType = (anime as any).mediaType || 'anime';
-                const baseRoute = mediaType === 'manga' ? '/manga' : '/anime';
+          if (enablePreview && !isMobile) {
+            return <AnimeCardWithPreview key={cardKey} anime={anime} showPreview={true} />;
+          }
 
-                if (routeAnimeId) {
-                  navigate(`${baseRoute}/${routeAnimeId}`);
-                  return;
-                }
-                navigate(`/search?q=${encodeURIComponent(anime.name)}`);
-              }}
-            >
-              <div className={`relative ${cardSizeClasses[gridSize]}`}>
+          const goToCard = () => {
+            const mediaType = (anime as any).mediaType || 'anime';
+            const baseRoute = mediaType === 'manga' ? '/manga' : '/anime';
+
+            if (routeAnimeId) {
+              navigate(`${baseRoute}/${routeAnimeId}`);
+              return;
+            }
+            navigate(`/search?q=${encodeURIComponent(anime.name)}`);
+          };
+
+          // Phones: a plain card instead of GlassPanel. GlassPanel applies
+          // `backdrop-blur-2xl`, so a grid of these forces one invisible (the
+          // opaque poster covers it) backdrop-filter blur per card every scroll
+          // frame — the main source of mobile jank. Mirrors the plain-card path
+          // the rest of the home grids already use.
+          const CardWrapper = isMobile ? 'div' : GlassPanel;
+          const wrapperProps = isMobile
+            ? {
+                role: 'button' as const,
+                tabIndex: 0,
+                onKeyDown: (e: React.KeyboardEvent) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    goToCard();
+                  }
+                },
+                className:
+                  'group relative cursor-pointer overflow-hidden rounded-[var(--radius)] border border-white/5 bg-white/[0.03] active:scale-[0.98]',
+              }
+            : {
+                hoverEffect: animateCard,
+                className:
+                  'group cursor-pointer overflow-hidden active:scale-[0.98] md:transition-all md:duration-300 md:hover:z-10 md:hover:scale-[1.02]',
+              };
+
+          return (
+            <CardWrapper key={cardKey} onClick={goToCard} {...(wrapperProps as any)}>
+              <div className={`relative ${cardSizeClasses[gridSize]}`} style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 260px' }}>
                 {blurhashEnabled ? (
                   <BlurhashImage
                     src={getHighQualityPoster(anime.poster, anime.anilistId)}
@@ -120,8 +150,7 @@ export function AnimeGrid({
                     decoding="async"
                     onError={handlePosterError}
                     blurhash={(anime as any).blurhash ?? undefined}
-                    imgClassName={`w-full h-full object-cover ${!isUltraLite ? 'transition-all duration-700 group-hover:scale-105 group-hover:brightness-110' : ''}`}
-                    style={{ imageRendering: 'high-quality' }}
+                    imgClassName={`w-full h-full object-cover ${animateCard ? 'transition-all duration-700 group-hover:scale-105 group-hover:brightness-110' : ''}`}
                   />
                 ) : (
                   <img
@@ -129,62 +158,64 @@ export function AnimeGrid({
                     alt={anime.name}
                     loading="lazy"
                     decoding="async"
+                    fetchPriority="low"
                     onError={handlePosterError}
-                    className={`w-full h-full object-cover ${!isUltraLite ? 'transition-all duration-700 group-hover:scale-105 group-hover:brightness-110' : ''}`}
-                    style={{ imageRendering: 'high-quality' }}
+                    className={`w-full h-full object-cover ${animateCard ? 'transition-all duration-700 group-hover:scale-105 group-hover:brightness-110' : ''}`}
                   />
                 )}
 
                 {/* Overlay gradients */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
-                <div className="absolute inset-0 bg-black/0 transition-colors duration-300 group-hover:bg-black/10" />
+                {animateCard && <div className="absolute inset-0 bg-black/0 transition-colors duration-300 group-hover:bg-black/10" />}
 
                 {/* Badges */}
                 {anime.type && (
-                  <div className="absolute top-3 left-3 px-2 py-1 rounded-md bg-primary/90 text-primary-foreground text-xs font-bold flex items-center gap-1 shadow-lg">
+                  <div className="absolute top-2.5 left-2.5 md:top-3 md:left-3 px-2 py-1 rounded-md bg-primary/90 text-primary-foreground text-xs font-bold flex items-center gap-1 shadow-lg">
                     {getMediaIcon(anime.type)}
                     <span className="uppercase tracking-wider">{anime.type}</span>
                   </div>
                 )}
 
                 {anime.rating && (
-                  <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-md bg-black/50 backdrop-blur-md border border-white/10 text-xs font-bold text-white">
+                  <div className="absolute top-2.5 right-2.5 md:top-3 md:right-3 flex items-center gap-1 px-2 py-1 rounded-md bg-black/50 border border-white/10 text-xs font-bold text-white">
                     <Star className="w-3 h-3 fill-amber text-amber" />
                     {anime.rating}
                   </div>
                 )}
 
-                {/* Play button */}
-                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                  <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center transform scale-75 group-hover:scale-100 transition-transform duration-300">
+                {/* Play button — desktop hover only (no backdrop-blur on touch) */}
+                {animateCard && (
+                <div className="absolute inset-0 hidden items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 md:flex">
+                  <div className="w-14 h-14 rounded-full bg-white/20 border border-white/20 flex items-center justify-center transform scale-75 group-hover:scale-100 transition-transform duration-300">
                     <Play className="w-6 h-6 fill-white text-white ml-0.5" />
                   </div>
                 </div>
+                )}
 
                 {/* Content */}
                 <div className="absolute bottom-0 left-0 right-0 p-3 pt-8">
-                  <h4 className="font-bold text-sm leading-tight line-clamp-2 drop-shadow-md group-hover:text-primary transition-colors duration-300">
+                  <h4 className="font-bold text-sm leading-tight line-clamp-2 drop-shadow-md md:group-hover:text-primary md:transition-colors md:duration-300">
                     {anime.name}
                   </h4>
 
                   <div className="flex gap-2 mt-2 text-xs text-muted-foreground">
                     {(anime.episodes?.sub ?? 0) > 0 && (
-                      <span className="flex items-center gap-1 bg-white/10 backdrop-blur-sm px-1.5 py-0.5 rounded-md border border-white/10">
+                      <span className="flex items-center gap-1 bg-black/50 px-1.5 py-0.5 rounded-md border border-white/10">
                         SUB {anime.episodes.sub}
                       </span>
                     )}
                     {(anime.episodes?.dub ?? 0) > 0 && (
-                      <span className="flex items-center gap-1 bg-white/10 backdrop-blur-sm px-1.5 py-0.5 rounded-md border border-white/10">
+                      <span className="flex items-center gap-1 bg-black/50 px-1.5 py-0.5 rounded-md border border-white/10">
                         DUB {anime.episodes.dub}
                       </span>
                     )}
                   </div>
                 </div>
               </div>
-            </GlassPanel>
+            </CardWrapper>
           );
         })}
       </div>
     </section>
   );
-}
+})

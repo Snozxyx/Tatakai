@@ -6,7 +6,7 @@ import {
   useAnimeInfo,
 } from "@/hooks/api/useAnimeData";
 import { useCombinedSourcesWithRefetch } from "@/hooks/media/useCombinedSources";
-import type { EpisodeServer } from "@/types/anime";
+import type { EpisodeServer, Subtitle } from "@/types/anime";
 import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
@@ -14,6 +14,7 @@ import { GlassPanel } from "@/components/ui/GlassPanel";
 import { Skeleton } from "@/components/ui/skeleton-custom";
 import { VideoPlayer } from "@/components/video/VideoPlayer";
 import { MobileVideoPlayer } from "@/components/video/MobileVideoPlayer";
+import { NativeTorrentPlayer } from "@/components/video/NativeTorrentPlayer";
 import { EmbedPlayer } from "@/components/video/EmbedPlayer";
 import {
   ArrowLeft,
@@ -43,6 +44,7 @@ import {
 import { useVideoSettings } from "@/hooks/media/useVideoSettings";
 import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from "@/hooks/ui/useIsNativeApp";
 import { useIsMobile } from "@/hooks/ui/use-mobile";
+import { hasTorrentService } from "@/lib/platform/platform";
 import { buildUniqueSimpleNameMap, getFriendlyServerName, getSimpleServerDisplayName } from "@/lib/serverNames";
 import { updateLocalContinueWatching, getLocalContinueWatching } from "@/lib/localStorage";
 import { getLocalTorrentSessionHistory, updateLocalTorrentSessionHistory, upsertLocalTorrentSessionHistory } from "@/lib/localStorage";
@@ -51,6 +53,7 @@ import { useUpdateWatchHistory } from '@/hooks/user/useWatchHistory';
 import { useViewTracker, useAnimeViewCount, formatViewCount } from '@/hooks/user/useViews';
 import { useWatchTracking } from '@/hooks/api/useAnalytics';
 import { getProxiedVideoUrl } from "@/lib/api";
+import { isMobileProxyUrl } from "@/core/extensions/mobile/mobileProxy";
 import { cn } from "@/lib/utils";
 import { clearDiscordRpc } from "@/lib/discordRpc";
 import { ReportModal } from "@/components/ui/ReportModal";
@@ -60,6 +63,7 @@ import { TorrentSwitchDialog } from "@/components/watch/TorrentSwitchDialog";
 import { TorrentSourcePanel } from "@/components/watch/TorrentSourcePanel";
 import { TorrentSessionPanel } from "@/components/watch/TorrentSessionPanel";
 import { ReviewPopup } from "@/components/ui/ReviewPopup";
+import { OpenInAppButton } from "@/components/common/OpenInAppButton";
 import { Button } from "@/components/ui/button";
 import { MarketplaceSubmitModal } from "@/components/ui/MarketplaceSubmitModal";
 import { MarketplaceModal } from "@/components/ui/MarketplaceModal";
@@ -166,6 +170,7 @@ export default function WatchPage() {
   const isDesktop = useIsDesktopApp(); // Only Electron/Tauri
   const isMobileApp = useIsMobileApp(); // Only Capacitor
   const isMobileViewport = useIsMobile();
+  const torrentServiceAvailable = hasTorrentService();
   const queryClient = useQueryClient();
   const isDeveloperMode = useMemo(() => {
     if (import.meta.env.DEV) return true;
@@ -188,6 +193,21 @@ export default function WatchPage() {
   const offlinePath = useMemo(() => {
     const params = new URLSearchParams(location.search);
     return params.get('path') || '';
+  }, [location.search]);
+
+  const mobileOfflinePath = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('mobilePath') || '';
+  }, [location.search]);
+
+  const mobileOfflineMetadata = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return {
+      title: params.get('title') || 'Downloaded anime',
+      episodeTitle: params.get('episodeTitle') || '',
+      episodeNumber: Number(params.get('episode') || 0),
+      poster: params.get('poster') || '',
+    };
   }, [location.search]);
 
   const initialSeekSeconds = useMemo(() => {
@@ -348,8 +368,8 @@ export default function WatchPage() {
     }
 
     const runtime = (window as any).tatakaiRuntime;
-    if (!isDesktop || typeof runtime?.startTorrentSession !== 'function') {
-      setTorrentPlaybackError('Torrent playback is only available in the desktop app.');
+    if (!torrentServiceAvailable || typeof runtime?.startTorrentSession !== 'function') {
+      setTorrentPlaybackError('Torrent playback is unavailable in this app build.');
       return;
     }
 
@@ -405,7 +425,7 @@ export default function WatchPage() {
       setTorrentPlaybackLoading(false);
       setTorrentPlaybackError(err?.message || 'Could not start this torrent.');
     }
-  }, [isDesktop, optimizeTorrentStorage, location.search, location.pathname, navigate]);
+  }, [torrentServiceAvailable, optimizeTorrentStorage, location.search, location.pathname, navigate]);
 
   const torrentVerified = Boolean(torrentSessionId && torrentLiveStats?.done === true && torrentLiveStats?.verified !== false);
   const torrentTimelineLocked = Boolean(torrentSessionId && !torrentVerified);
@@ -428,7 +448,7 @@ export default function WatchPage() {
     let cancelled = false;
 
     const run = async () => {
-      if (!isDesktop || !torrentSessionId || !(window as any).tatakaiRuntime?.getTorrentStreamUrl) {
+      if (!torrentServiceAvailable || !torrentSessionId || !(window as any).tatakaiRuntime?.getTorrentStreamUrl) {
         setTorrentPlaybackSource(null);
         setTorrentPlaybackLoading(false);
         setTorrentPlaybackError(null);
@@ -447,6 +467,9 @@ export default function WatchPage() {
           // If metadata is still resolving, we don't set a hard error yet
           if (stream?.error === 'metadata_not_ready') {
             setTorrentPlaybackError('Resolving torrent metadata...');
+            setTimeout(() => {
+              if (!cancelled) setTorrentRetryTrigger(prev => prev + 1);
+            }, 2000);
           } else if (stream?.error === 'session_not_found') {
             // Session might be lost (app restart), try to recover from history
             const history = getLocalTorrentSessionHistory();
@@ -588,10 +611,10 @@ export default function WatchPage() {
     return () => {
       cancelled = true;
     };
-  }, [isDesktop, torrentSessionId, torrentRetryTrigger]);
+  }, [torrentServiceAvailable, torrentSessionId, torrentRetryTrigger]);
 
   useEffect(() => {
-    if (!isDesktop || !torrentSessionId || !(window as any).tatakaiRuntime) {
+    if (!torrentServiceAvailable || !torrentSessionId || !(window as any).tatakaiRuntime) {
       return;
     }
 
@@ -657,7 +680,7 @@ export default function WatchPage() {
       stopProgress?.();
       stopMetadataReady?.();
     };
-  }, [isDesktop, torrentSessionId]);
+  }, [torrentServiceAvailable, torrentSessionId]);
 
   useEffect(() => {
     if (!torrentSessionId) return;
@@ -683,7 +706,7 @@ export default function WatchPage() {
   // alive so the local HTTP stream server can continue serving the file,
   // which avoids Electron webSecurity blocking direct file:// protocol URLs.
   useEffect(() => {
-    if (!isDesktop || !torrentSessionId) return;
+    if (!torrentServiceAvailable || !torrentSessionId) return;
     if (!torrentLiveStats?.done) {
       // Reset the completion flag when torrent is not done (e.g. new session)
       torrentCompletionHandledRef.current = false;
@@ -738,7 +761,7 @@ export default function WatchPage() {
     };
 
     void handleTorrentCompleted();
-  }, [isDesktop, torrentSessionId, torrentLiveStats?.done]);
+  }, [torrentServiceAvailable, torrentSessionId, torrentLiveStats?.done]);
 
   // Parse the episode ID properly - extract the actual episode ID
   const decodedEpisodeId = useMemo(() => {
@@ -889,12 +912,44 @@ export default function WatchPage() {
       setOfflineManifest(null);
       setOfflineSubtitles([]);
     }
-  }, [isOfflineMode, offlinePath, decodedEpisodeId]);
+  }, [isOfflineMode, offlinePath, mobileOfflinePath, decodedEpisodeId]);
 
   useEffect(() => {
-    if (isOfflineMode && offlinePath) {
+    if (isOfflineMode && (offlinePath || mobileOfflinePath)) {
       const loadOfflineContent = async () => {
         try {
+          if (mobileOfflinePath) {
+            const manifest = {
+              animeName: mobileOfflineMetadata.title,
+              poster: mobileOfflineMetadata.poster || undefined,
+              episodes: [{
+                id: decodedEpisodeId,
+                number: mobileOfflineMetadata.episodeNumber || undefined,
+                title: mobileOfflineMetadata.episodeTitle || `Episode ${mobileOfflineMetadata.episodeNumber}`,
+                file: mobileOfflinePath,
+              }],
+            };
+            setOfflineManifest(manifest);
+            setOfflineSubtitles([]);
+
+            // Torrent downloads are reattached by the existing session effect.
+            // Direct files and downloaded HLS playlists can go straight to the
+            // native player. Convert raw paths saved by older app versions.
+            if (/^torrent-session:\/\//i.test(mobileOfflinePath)) {
+              setOfflineSources([]);
+              return;
+            }
+            const sourceUrl = /^(https?:|blob:|data:)/i.test(mobileOfflinePath)
+              ? mobileOfflinePath
+              : Capacitor.convertFileSrc(mobileOfflinePath);
+            setOfflineSources([{
+              url: sourceUrl,
+              isM3U8: /\.m3u8(?:$|[?#])/i.test(sourceUrl),
+              quality: 'Downloaded',
+            }]);
+            return;
+          }
+
           let manifest: any = null;
           const electronBridge = (window as any).electron;
           if (electronBridge?.getOfflineLibrary) {
@@ -1009,7 +1064,7 @@ export default function WatchPage() {
       };
       loadOfflineContent();
     }
-  }, [isOfflineMode, offlinePath, decodedEpisodeId]);
+  }, [isOfflineMode, offlinePath, mobileOfflinePath, mobileOfflineMetadata, decodedEpisodeId]);
 
   useEffect(() => {
     try {
@@ -1547,6 +1602,43 @@ export default function WatchPage() {
     });
   }, [sourceDataForPlayback?.sources, isPlaybackSourceBlocked]);
 
+  // Mobile can receive concrete provider sources before (or without) the
+  // central dispatcher's abstract server rows. Select the first playable live
+  // result immediately so entering a watch page behaves like desktop and does
+  // not require tapping a language-group source first.
+  useEffect(() => {
+    if (selectedServerIndex !== -1 || availableServers.length > 0 || torrentTakeoverActive) return;
+
+    const playable = visibleSources.filter((source: any) => (
+      !!source?.url && source.isTorrent !== true && source.sourceType !== "torrent"
+    ));
+    if (!playable.length) return;
+
+    const candidate = playable.find((source: any) => (
+      source.isEmbed !== true && source.sourceType !== "embed"
+    )) || playable[0];
+    const langCode = String(candidate.langCode || candidate.language || "unknown");
+
+    pendingPlaybackCommitRef.current = true;
+    selectRegularServer(-4);
+    setSelectedLangCode(langCode);
+    setPreferredServerName(candidate.providerName || null);
+    setPreferredSourceUrl(candidate.url || null);
+    // Auto-playing the best source must not also narrow the visible source
+    // list. `langCode` is commonly an ISO code (`ja`) while the display groups
+    // are keyed from labels (`Japanese`); using it as the tab filter hid every
+    // embed provider even though those sources were still resolved. Keep the
+    // picker on "All" until the user explicitly chooses a language tab.
+    setActiveSourceLanguage("all");
+    setFailedServers(new Set());
+  }, [
+    availableServers.length,
+    selectedServerIndex,
+    selectRegularServer,
+    torrentTakeoverActive,
+    visibleSources,
+  ]);
+
   const hasWatchAnimeWorldAvailable = useMemo(() => {
     return visibleSources.some((s: any) =>
       s.langCode?.startsWith('watchanimeworld') ||
@@ -1685,7 +1777,7 @@ export default function WatchPage() {
 
   // Normalize subtitles - in dub mode, ALWAYS prefer sub source subs since dub rarely has them
   const normalizedSubtitles = useMemo(() => {
-    let subs: Array<{ lang: string; url: string; label?: string; sourceOrigin?: string }> = [];
+    let subs: Subtitle[] = [];
 
     if (category === "dub") {
       const subTracks = [
@@ -1795,7 +1887,16 @@ export default function WatchPage() {
           const providerName = String(source.providerName || "").trim().toLowerCase();
           return !isNebulaServer(source.providerKey) && !providerName.includes("koro");
         });
-      return selectSourceForServer(candidatePool, serverName, category);
+      const exact = selectSourceForServer(candidatePool, serverName, category);
+      if (exact) return exact;
+
+      // Dispatch identifies the extension (`toko`), while progressive results
+      // identify concrete providers (`nebula`, `animepahe`, ...). When those
+      // keys differ, immediately play the extension-ranked first result just as
+      // the desktop host does instead of leaving the player without a source.
+      return visibleSources.find((source: any) => !source.isTorrent && !source.isEmbed)
+        || visibleSources.find((source: any) => !source.isTorrent)
+        || null;
     }
 
     return null;
@@ -1837,11 +1938,15 @@ export default function WatchPage() {
       return {};
     }
 
-    const baseHeaders: { Referer?: string; "User-Agent"?: string } = (sourceDataForPlayback?.headers || {}) as { Referer?: string; "User-Agent"?: string };
+    const sourceHeaders = ((selectedSource as any)?.headers || {}) as Record<string, string | undefined>;
+    const baseHeaders: Record<string, string | undefined> = {
+      ...(sourceDataForPlayback?.headers || {}),
+      ...sourceHeaders,
+    };
     // The extension ships an ordered, per-CDN referer list on the source itself;
     // prefer it over the neutral origin-only guess so the right site is tried first.
     const candidateReferers = (selectedSource as any)?.refererCandidates as string[] | undefined;
-    const variants = candidateReferers?.length ? candidateReferers : getRefererVariants(baseHeaders?.Referer);
+    const variants = candidateReferers?.length ? candidateReferers : getRefererVariants(baseHeaders?.Referer || "");
     const chosenReferer = variants[Math.min(refererRetryIndex, Math.max(0, variants.length - 1))];
 
     return {
@@ -1849,7 +1954,7 @@ export default function WatchPage() {
       Referer: chosenReferer || baseHeaders?.Referer,
       "User-Agent": baseHeaders?.["User-Agent"],
     };
-  }, [sourceDataForPlayback?.headers?.Referer, sourceDataForPlayback?.headers?.["User-Agent"], (selectedSource as any)?.refererCandidates, refererRetryIndex, torrentPlaybackSource]);
+  }, [sourceDataForPlayback?.headers?.Referer, sourceDataForPlayback?.headers?.["User-Agent"], (selectedSource as any)?.headers, (selectedSource as any)?.refererCandidates, refererRetryIndex, torrentPlaybackSource]);
 
   const playbackCandidateSource = useMemo(() => {
     if (torrentPlaybackSource) return torrentPlaybackSource;
@@ -1879,6 +1984,16 @@ export default function WatchPage() {
       setCommittedPlaybackSource(playbackCandidateSource);
       setCommittedPlaybackHeaders(playbackHeaders);
       pendingPlaybackCommitRef.current = false;
+    } else if (
+      committedPlaybackSource.url === playbackCandidateSource.url
+      && committedPlaybackSource !== playbackCandidateSource
+    ) {
+      // Progressive resolution can replace a cache-seeded row with the fresh
+      // provider result at the same URL (notably adding Referer/Origin/UA).
+      // Refresh the committed object too; otherwise the mounted player keeps
+      // the headerless cache snapshot and receives a CDN 403 forever.
+      setCommittedPlaybackSource(playbackCandidateSource);
+      setCommittedPlaybackHeaders(playbackHeaders);
     }
   }, [playbackCandidateSource, playbackHeaders, committedPlaybackSource, torrentTakeoverActive]);
 
@@ -1912,7 +2027,7 @@ export default function WatchPage() {
       if (source.isTorrent === true) return false;
       const type = String(source.sourceType || "");
       if (type === "embed" || type === "torrent") return false;
-      return /^(https?:|blob:|file:|\/)/i.test(String(source.url));
+      return /^(https?:|blob:|file:|mobile-proxy:|\/)/i.test(String(source.url));
     });
 
     const activeUrl = activePlaybackSource?.url;
@@ -1928,6 +2043,15 @@ export default function WatchPage() {
 
     const runPreflight = async () => {
       if (!activePlaybackSource || isOfflineMode || activePlaybackSource.isEmbed || activePlaybackSource.sourceType === 'torrent') {
+        setSourceReady(true);
+        setSourcePreflightError(null);
+        return;
+      }
+
+      // This is an in-process token, not a network URL. The native loader
+      // resolves and validates it; browser preflight can only fail and delay
+      // first playback by the timeout window.
+      if (isMobileApp && isMobileProxyUrl(activePlaybackSource.url)) {
         setSourceReady(true);
         setSourcePreflightError(null);
         return;
@@ -1982,7 +2106,7 @@ export default function WatchPage() {
     return () => {
       cancelled = true;
     };
-  }, [activePlaybackSource?.url, activePlaybackSource?.providerName, activePlaybackSource?.server, activePlaybackSource?.isEmbed, isOfflineMode, activePlaybackHeaders?.Referer, activePlaybackHeaders?.["User-Agent"], category, currentServer?.serverName, animeId, decodedEpisodeId, user?.id]);
+  }, [activePlaybackSource?.url, activePlaybackSource?.providerName, activePlaybackSource?.server, activePlaybackSource?.isEmbed, isOfflineMode, isMobileApp, activePlaybackHeaders?.Referer, activePlaybackHeaders?.["User-Agent"], category, currentServer?.serverName, animeId, decodedEpisodeId, user?.id]);
 
   // Separate Marketplace sources
   const marketplaceSources = useMemo(() => {
@@ -2677,7 +2801,7 @@ export default function WatchPage() {
 
   // Background session management
   useEffect(() => {
-    if (!torrentSessionId || !isDesktop) return;
+    if (!torrentSessionId || !torrentServiceAvailable) return;
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       // If there's an active torrent, prompt the user
@@ -2699,11 +2823,11 @@ export default function WatchPage() {
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [torrentSessionId, isDesktop]);
+  }, [torrentSessionId, torrentServiceAvailable]);
 
   // Handle navigation within the app
   useEffect(() => {
-    if (!torrentSessionId || !isDesktop) return;
+    if (!torrentSessionId || !torrentServiceAvailable) return;
 
     return () => {
       // This runs when the component unmounts (navigation away)
@@ -2723,7 +2847,7 @@ export default function WatchPage() {
       // For now, we'll default to 'keep' but notify the user
       toast.info('Torrent session is running in the background. You can stop it from the Home page or Settings.');
     };
-  }, [torrentSessionId, isDesktop]);
+  }, [torrentSessionId, torrentServiceAvailable]);
 
   useEffect(() => {
     setRefererRetryIndex(0);
@@ -2735,13 +2859,39 @@ export default function WatchPage() {
     clearSourceFailure(comboKey);
   }, [sourceReady, currentServer?.serverName, animeId, decodedEpisodeId, category]);
 
+  /**
+   * Native torrent player errors must NOT run the hosted-stream failover.
+   *
+   * `handleVideoError` blocks the failing URL and commits the next hosted
+   * source — for a loopback torrent URL that would silently kill the torrent
+   * session the user just started and yank them onto a hosted stream. A
+   * native decode failure is surfaced by NativeTorrentPlayer itself (message
+   * + retry); this only records telemetry and keeps the session alive.
+   */
+  const handleTorrentNativeError = useCallback((message?: string) => {
+    try {
+      logPlaybackTelemetry({
+        type: "source_failure",
+        animeId,
+        episodeId: decodedEpisodeId,
+        category,
+        serverName: currentServer?.serverName || "torrent-session",
+        ok: false,
+        userId: user?.id,
+        metadata: { reason: message || "native-player-error", torrent: true },
+      });
+    } catch {
+      // Telemetry is best-effort; the on-screen retry matters.
+    }
+  }, [animeId, decodedEpisodeId, category, currentServer?.serverName, user?.id]);
+
   const handleEpisodeEnd = () => {
     if (settings.autoNextEpisode && nextEpisode?.episodeId) {
       handleEpisodeChange(nextEpisode.episodeId);
       return;
     }
 
-    if (isDesktop && torrentSessionId && (window as any).tatakaiRuntime?.stopTorrentSession) {
+    if (torrentServiceAvailable && torrentSessionId && (window as any).tatakaiRuntime?.stopTorrentSession) {
       const keepCompletedFile = Boolean(torrentLiveStats?.done || torrentProgressPercent >= 100);
       const destroyStore = Boolean(optimizeTorrentStorage && !keepCompletedFile);
       void (window as any).tatakaiRuntime.stopTorrentSession(torrentSessionId, { destroyStore }).catch(() => { });
@@ -2770,13 +2920,17 @@ export default function WatchPage() {
       )}>
         {/* Header */}
         <div className="flex items-center justify-between gap-2 mb-4 md:mb-6">
-          <button
-            onClick={() => isOfflineMode ? navigate('/offline') : navigate(`/anime/${animeId}`)}
-            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors group"
-          >
-            <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-            <span className="hidden sm:inline">Back</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => isOfflineMode ? navigate('/offline') : navigate(`/anime/${animeId}`)}
+              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors group"
+            >
+              <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+              <span className="hidden sm:inline">Back</span>
+            </button>
+            {/* Web-only: bounce this exact route into the desktop app via tatakai:// */}
+            <OpenInAppButton className="hidden sm:inline-flex" />
+          </div>
 
           {animeData && (
             <div className="flex-1 min-w-0 text-right flex flex-col items-end gap-2">
@@ -2818,12 +2972,28 @@ export default function WatchPage() {
                   referer={activePlaybackHeaders?.Referer}
                   onError={handleVideoError}
                 />
+              ) : isMobileApp && activePlaybackSource?.sourceType === 'torrent' ? (
+                <NativeTorrentPlayer
+                  url={activePlaybackSource.url}
+                  title={animeData?.info.name}
+                  poster={animeData?.info.poster}
+                  subtitles={normalizedSubtitles}
+                  preferredAudioLanguage={category === 'dub' ? 'en' : 'ja'}
+                  initialSeekSeconds={initialSeekSeconds}
+                  introWindow={sourceDataForPlayback?.intro || null}
+                  outroWindow={sourceDataForPlayback?.outro || null}
+                  torrentStats={torrentLiveStats}
+                  onProgressUpdate={handleProgressUpdate}
+                  onEpisodeEnd={handleEpisodeEnd}
+                  onBack={() => navigate(-1)}
+                  onError={handleTorrentNativeError}
+                />
               ) : isMobileApp ? (
                 <MobileVideoPlayer
                   sources={isOfflineMode ? offlineSources : playbackSources}
                   subtitles={isOfflineMode ? offlineSubtitles : normalizedSubtitles}
                   headers={activePlaybackHeaders}
-                  poster={animeData?.info.poster || (isOfflineMode ? toLocalFileUrl(joinLocalPath(offlinePath, 'poster.jpg')) : undefined)}
+                  poster={animeData?.info.poster || (isOfflineMode ? (offlineManifest?.poster || (offlinePath ? toLocalFileUrl(joinLocalPath(offlinePath, 'poster.jpg')) : undefined)) : undefined)}
                   onError={handleVideoError}
                   onServerSwitch={handleServerSwitch}
                   onRetryCurrentServer={handleRetryCurrentServer}
@@ -2837,7 +3007,7 @@ export default function WatchPage() {
                   onProgressUpdate={handleProgressUpdate}
                   animeId={animeId}
                   animeName={animeData?.info.name || (isOfflineMode ? offlineManifest?.animeName : '')}
-                  animePoster={animeData?.info.poster || (isOfflineMode ? toLocalFileUrl(joinLocalPath(offlinePath, 'poster.jpg')) : undefined)}
+                  animePoster={animeData?.info.poster || (isOfflineMode ? (offlineManifest?.poster || (offlinePath ? toLocalFileUrl(joinLocalPath(offlinePath, 'poster.jpg')) : undefined)) : undefined)}
                   episodeTitle={currentEpisode?.title || (isOfflineMode ? offlineManifest?.episodes.find((e: any) => e.id === decodedEpisodeId)?.title : undefined)}
                   episodeId={decodedEpisodeId}
                   onEpisodeEnd={handleEpisodeEnd}
@@ -2850,7 +3020,7 @@ export default function WatchPage() {
                   sources={isOfflineMode ? offlineSources : playbackSources}
                   subtitles={isOfflineMode ? offlineSubtitles : normalizedSubtitles}
                   headers={activePlaybackHeaders}
-                  poster={animeData?.info.poster || (isOfflineMode ? toLocalFileUrl(joinLocalPath(offlinePath, 'poster.jpg')) : undefined)}
+                  poster={animeData?.info.poster || (isOfflineMode ? (offlineManifest?.poster || (offlinePath ? toLocalFileUrl(joinLocalPath(offlinePath, 'poster.jpg')) : undefined)) : undefined)}
                   onError={handleVideoError}
                   onServerSwitch={handleServerSwitch}
                   onRetryCurrentServer={handleRetryCurrentServer}
@@ -2865,7 +3035,7 @@ export default function WatchPage() {
                   onProgressUpdate={handleProgressUpdate}
                   animeId={animeId}
                   animeName={animeData?.info.name || (isOfflineMode ? offlineManifest?.animeName : '')}
-                  animePoster={animeData?.info.poster || (isOfflineMode ? toLocalFileUrl(joinLocalPath(offlinePath, 'poster.jpg')) : undefined)}
+                  animePoster={animeData?.info.poster || (isOfflineMode ? (offlineManifest?.poster || (offlinePath ? toLocalFileUrl(joinLocalPath(offlinePath, 'poster.jpg')) : undefined)) : undefined)}
                   episodeTitle={currentEpisode?.title || (isOfflineMode ? offlineManifest?.episodes.find((e: any) => e.id === decodedEpisodeId)?.title : undefined)}
                   episodeId={decodedEpisodeId}
                   onEpisodeEnd={handleEpisodeEnd}
@@ -3186,7 +3356,7 @@ export default function WatchPage() {
                         <TorrentSourcePanel
                           sources={torrentSources}
                           activeUrl={torrentPlaybackSource?.url}
-                          isDesktop={isDesktop}
+                          canPlayTorrent={torrentServiceAvailable}
                           onSelect={setPendingTorrentSource}
                         />
 
@@ -3486,8 +3656,7 @@ export default function WatchPage() {
 
       </main >
 
-      {!isDesktop && isMobileViewport && <MobileNav />
-      }
+      {!isDesktop && <MobileNav />}
 
       {
         animeData && (
@@ -3527,7 +3696,7 @@ export default function WatchPage() {
         source={pendingTorrentSource}
         animeTitle={animeData?.info.name || (isOfflineMode ? offlineManifest?.animeName : '') || undefined}
         episodeLabel={currentEpisode?.number ? `Episode ${currentEpisode.number}` : undefined}
-        isDesktop={isDesktop}
+        canPlayTorrent={torrentServiceAvailable}
         optimizeStorage={optimizeTorrentStorage}
         downloadPath={torrentDownloadPath || undefined}
         onCancel={() => setPendingTorrentSource(null)}

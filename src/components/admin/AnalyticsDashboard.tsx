@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import {
   TrendingUp, Users, Eye, Play, Clock, Globe, MapPin,
   BarChart3, PieChart, Activity, ArrowUpRight,
-  Download, Star, GitFork, Github
+  Download, Star, GitFork, Github, Smartphone, Monitor
 } from 'lucide-react';
 import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -356,11 +356,21 @@ export function AnalyticsDashboard() {
       }));
       const totalDownloads = perRelease.reduce((s, r) => s + r.downloads, 0);
 
+      // Mobile = the Android APK + iOS IPA artifacts (Capacitor builds, not the
+      // desktop installers), so the mobile traction is visible on its own rather
+      // than buried inside the desktop installer total.
+      let mobileDownloads = 0;
+      let mobileDownloadsDesktop = 0;
+
       const platform = new Map<string, number>();
       releases.forEach((r) =>
         r.assets.forEach((a) => {
           const k = platformForAsset(a.name);
-          if (k) platform.set(k, (platform.get(k) || 0) + (a.download_count || 0));
+          if (k) {
+            platform.set(k, (platform.get(k) || 0) + (a.download_count || 0));
+            if (k === 'android' || k === 'ios') mobileDownloads += a.download_count || 0;
+            else mobileDownloadsDesktop += a.download_count || 0;
+          }
         })
       );
       const colors = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b'];
@@ -370,6 +380,8 @@ export function AnalyticsDashboard() {
 
       return {
         totalDownloads,
+        mobileDownloads,
+        desktopDownloads: mobileDownloadsDesktop,
         stars: repo?.stargazers_count || 0,
         forks: repo?.forks_count || 0,
         latestVersion: perRelease[0]?.version || 'N/A',
@@ -768,11 +780,12 @@ export function AnalyticsDashboard() {
             </a>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             {[
               { icon: Download, label: 'Total Downloads', value: formatCompact(githubData.totalDownloads), color: 'text-violet-400' },
+              { icon: Smartphone, label: 'Mobile Downloads', value: formatCompact(githubData.mobileDownloads), color: 'text-emerald-400' },
+              { icon: Monitor, label: 'Desktop Downloads', value: formatCompact(githubData.desktopDownloads), color: 'text-blue-400' },
               { icon: Star, label: 'GitHub Stars', value: formatCompact(githubData.stars), color: 'text-amber-400' },
-              { icon: GitFork, label: 'Forks', value: formatCompact(githubData.forks), color: 'text-cyan-400' },
               { icon: TrendingUp, label: 'Latest Version', value: `v${githubData.latestVersion}`, color: 'text-emerald-400' },
             ].map((s) => (
               <GlassPanel key={s.label} className="p-5">

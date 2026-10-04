@@ -15,11 +15,17 @@ import { getMangaByGenre, getMangaDetail, getTrendingManga, getTrendingManhwa, g
 import { buildTasteProfile } from '@/core/recommendations/tasteProfile';
 import { rankCandidates, clamp } from '@/core/recommendations/scoring';
 import { mangaCardToMeta, mangaDetailToMeta, mangaStatusToWatchlist } from '@/core/recommendations/mangaMeta';
+import { isCapacitor } from '@/lib/platform/platform';
 import type { AnimeMeta, TasteProfile, UserAnimeSignal } from '@/core/recommendations/types';
 import type { EngineRecommendation } from './useRecommendationEngine';
 
 const MAX_SEEDS = 40;
 const MAX_STORED = 60;
+
+function mangaRecommendationBudget() {
+  if (!isCapacitor()) return { seeds: MAX_SEEDS, concurrency: 5, genres: 5, primary: 30, secondary: 24 };
+  return { seeds: 24, concurrency: 3, genres: 3, primary: 18, secondary: 16 };
+}
 
 async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const results: R[] = new Array(items.length);
@@ -44,14 +50,17 @@ function signalsFromReadlist(rows: MangaReadlistItem[]): UserAnimeSignal[] {
   }));
 }
 
-async function gatherMangaCandidates(topGenres: string[]): Promise<MangaCard[]> {
+async function gatherMangaCandidates(
+  topGenres: string[],
+  budget: ReturnType<typeof mangaRecommendationBudget>,
+): Promise<MangaCard[]> {
   // Pull genre-targeted picks plus all three formats (manga / manhwa / manhua)
   // so the pool covers what the reader actually reads, not just Japanese manga.
   const [byGenre, trending, manhwa, manhua] = await Promise.all([
-    Promise.all(topGenres.slice(0, 5).map((g) => getMangaByGenre(g, 30).catch(() => [] as MangaCard[]))),
-    getTrendingManga(30).catch(() => [] as MangaCard[]),
-    getTrendingManhwa(24).catch(() => [] as MangaCard[]),
-    getTrendingManhua(24).catch(() => [] as MangaCard[]),
+    Promise.all(topGenres.slice(0, budget.genres).map((g) => getMangaByGenre(g, budget.primary).catch(() => [] as MangaCard[]))),
+    getTrendingManga(budget.primary).catch(() => [] as MangaCard[]),
+    getTrendingManhwa(budget.secondary).catch(() => [] as MangaCard[]),
+    getTrendingManhua(budget.secondary).catch(() => [] as MangaCard[]),
   ]);
   return [...byGenre.flat(), ...trending, ...manhwa, ...manhua];
 }
@@ -63,16 +72,17 @@ interface MangaEngineData {
 }
 
 async function computeMangaEngine(userId: string, readlist: MangaReadlistItem[]): Promise<MangaEngineData> {
+  const budget = mangaRecommendationBudget();
   const signals = signalsFromReadlist(readlist);
 
   const seedIds = signals
     .filter((s) => !s.disliked)
     .sort((a, b) => new Date(b.lastActivity ?? 0).getTime() - new Date(a.lastActivity ?? 0).getTime())
-    .slice(0, MAX_SEEDS)
+    .slice(0, budget.seeds)
     .map((s) => s.animeId);
 
   const seedMeta = new Map<string, AnimeMeta>();
-  await mapLimit(seedIds, 5, async (id) => {
+  await mapLimit(seedIds, budget.concurrency, async (id) => {
     try {
       const detail = await getMangaDetail(id);
       seedMeta.set(id, mangaDetailToMeta(id, detail));
@@ -81,7 +91,7 @@ async function computeMangaEngine(userId: string, readlist: MangaReadlistItem[])
 
   const profile = buildTasteProfile(signals, seedMeta);
 
-  const cards = await gatherMangaCandidates(profile.topGenres.map((g) => g.genre));
+  const cards = await gatherMangaCandidates(profile.topGenres.map((g) => g.genre), budget);
   const candidateMap = new Map<string, AnimeMeta>();
   for (const card of cards) {
     if (!card.id) continue;

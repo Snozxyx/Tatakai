@@ -19,6 +19,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { triggerHaptic } from '@/lib/haptics';
 import { validateImageFile, imageFileFromTransfer, dragHasFiles } from '@/lib/imageIntake';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -253,6 +254,7 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
       toast.success(imageUrls.length ? 'Post submitted for approval' : 'Posted', {
         description: imageUrls.length ? 'Posts with images require admin approval before they appear.' : undefined,
       });
+      void triggerHaptic('post');
       reset();
       onPosted?.();
     } catch (err) {
@@ -271,7 +273,7 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
       aria-label={label}
       title={label}
       onClick={onClick}
-      className={cn('flex h-9 w-9 items-center justify-center rounded-full transition-colors', active ? 'bg-primary/20 text-primary' : 'text-primary/70 hover:bg-primary/10 hover:text-primary')}
+      className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all active:scale-95', active ? 'bg-primary/20 text-primary shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.25)]' : 'text-primary/70 hover:bg-primary/10 hover:text-primary')}
     >
       <Icon className="h-[18px] w-[18px]" />
     </button>
@@ -279,7 +281,7 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
 
   return (
     <GlassPanel
-      className={cn('relative overflow-hidden p-4 transition-shadow', dropActive && 'ring-2 ring-primary/60')}
+      className={cn('relative overflow-hidden rounded-3xl border-white/10 p-3 transition-shadow sm:p-4', dropActive && 'ring-2 ring-primary/60')}
       onDragOver={(e) => {
         if (!dragHasFiles(e.dataTransfer)) return;
         e.preventDefault();
@@ -305,19 +307,19 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
         </div>
       )}
       <div className="pointer-events-none absolute -top-12 -right-12 h-48 w-48 rounded-full bg-primary/10 blur-[70px]" />
-      <div className="relative flex gap-3">
-        <Avatar className="h-10 w-10">
+      <div className="relative flex gap-2.5 sm:gap-3">
+        <Avatar className="h-9 w-9 shrink-0 sm:h-10 sm:w-10">
           <AvatarImage src={profile?.avatar_url || undefined} />
           <AvatarFallback>{(profile?.display_name || profile?.username || 'U')[0]?.toUpperCase()}</AvatarFallback>
         </Avatar>
 
         <div className="min-w-0 flex-1">
-          <div className="mb-1 flex items-center gap-2">
+          <div className="mb-1 flex flex-wrap items-center gap-2">
             {profile?.username && <p className="text-sm font-display font-bold tracking-tight text-muted-foreground">@{profile.username}</p>}
             {communityId && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-                in {communities.find((c) => c.id === communityId)?.name}
-                <button type="button" aria-label="Clear community" onClick={() => setCommunityId(null)}><X className="h-3 w-3" /></button>
+              <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                <span className="truncate">in {communities.find((c) => c.id === communityId)?.name}</span>
+                <button type="button" aria-label="Clear community" onClick={() => setCommunityId(null)} className="shrink-0 rounded-full p-0.5 hover:bg-primary/20"><X className="h-3 w-3" /></button>
               </span>
             )}
           </div>
@@ -328,7 +330,7 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
             maxLength={120}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Add a title (optional)"
-            className="mb-1.5 w-full bg-transparent text-[17px] font-display font-bold tracking-tight text-white placeholder:text-muted-foreground/40 focus:outline-none"
+            className="mb-1.5 w-full bg-transparent text-base sm:text-[17px] font-display font-bold tracking-tight text-white placeholder:text-muted-foreground/40 focus:outline-none"
           />
 
           <RichEditor
@@ -417,14 +419,14 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
             <div className={cn('mt-2 gap-1.5', gifUrl ? '' : 'grid', !gifUrl && imageUrls.length > 1 ? 'grid-cols-2' : 'grid-cols-1')}>
               {gifUrl ? (
                 <div className="relative overflow-hidden rounded-2xl border border-white/[0.06]">
-                  <img src={getProxiedImageUrl(gifUrl)} alt="gif" className="max-h-80 w-full object-contain bg-black/20" />
-                  <button type="button" aria-label="Remove" onClick={() => setGifUrl(null)} className="absolute right-2 top-2 rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80"><X className="h-4 w-4" /></button>
+                  <img src={getProxiedImageUrl(gifUrl)} alt="gif" className="max-h-64 sm:max-h-80 w-full object-contain bg-black/20" />
+                  <button type="button" aria-label="Remove" onClick={() => setGifUrl(null)} className="absolute right-2 top-2 rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80 active:scale-95"><X className="h-4 w-4" /></button>
                 </div>
               ) : (
                 imageUrls.map((src, i) => (
                   <div key={i} className="relative overflow-hidden rounded-2xl border border-white/[0.06]">
-                    <img src={getProxiedImageUrl(src)} alt="preview" className="h-44 w-full object-cover" />
-                    <button type="button" aria-label="Remove image" onClick={() => setImageUrls((p) => p.filter((_, idx) => idx !== i))} className="absolute right-2 top-2 rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80"><X className="h-4 w-4" /></button>
+                    <img src={getProxiedImageUrl(src)} alt="preview" className="h-32 sm:h-44 w-full object-cover" />
+                    <button type="button" aria-label="Remove image" onClick={() => setImageUrls((p) => p.filter((_, idx) => idx !== i))} className="absolute right-2 top-2 rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80 active:scale-95"><X className="h-4 w-4" /></button>
                   </div>
                 ))
               )}
@@ -441,24 +443,26 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
             </div>
           )}
 
-          {/* Toolbar */}
-          <div className="mt-3 flex items-center gap-0.5 border-t border-white/[0.05] pt-3">
-            <ImagePicker
-              userId={user.id}
-              uploadFile={async (f) => ({ url: await uploadImage(f) })}
-              onSelect={(img) => handleImagePick(img.url)}
-              trigger={<span><ToolbarIcon icon={ImageIcon} label="Image" active={imageUrls.length > 0} onClick={() => {}} /></span>}
-            />
-            <GifPicker onSelect={(att) => { setImageUrls([]); setGifUrl(att.url); }} trigger={<span><ToolbarIcon icon={Film} label="GIF" active={!!gifUrl} onClick={() => {}} /></span>} />
-            <ToolbarIcon icon={ListChecks} label="Poll" active={!!poll} onClick={togglePoll} />
-            <PickerPopover icon={Music2} label="Playlist" active={!!playlistId} items={playlists.map((p) => ({ id: p.id, label: p.name }))} empty="You have no playlists yet." onPick={setPlaylistId} />
-            <PickerPopover icon={Layers} label="Tier list" active={!!tierlistId} items={tierlists.map((t) => ({ id: t.id, label: t.title }))} empty="You have no tier lists yet." onPick={setTierlistId} />
-            <PickerPopover icon={Radio} label="Watch Together lobby" active={!!watchRoomId} items={rooms.map((r) => ({ id: r.id, label: r.name }))} empty="You have no active lobbies." onPick={setWatchRoomId} />
-            <PickerPopover icon={Users} label="Post to community" active={!!communityId} items={communities.map((c) => ({ id: c.id, label: c.name }))} empty="No communities yet." onPick={setCommunityId} />
-            <MediaPicker onSelect={setMedia} trigger={<span><ToolbarIcon icon={Tv} label="Share anime / manga" active={!!media} onClick={() => {}} /></span>} />
-            <ToolbarIcon icon={AlertTriangle} label="Mark spoiler" active={isSpoiler} onClick={() => setIsSpoiler((v) => !v)} />
+          {/* Toolbar — scrollable icon rail on mobile, Post pinned below */}
+          <div className="mt-3 border-t border-white/[0.05] pt-3 sm:flex sm:items-center sm:gap-2">
+            <div className="flex flex-1 items-center gap-0.5 overflow-x-auto no-scrollbar -mx-1 px-1 pb-0.5">
+              <ImagePicker
+                userId={user.id}
+                uploadFile={async (f) => ({ url: await uploadImage(f) })}
+                onSelect={(img) => handleImagePick(img.url)}
+                trigger={<span><ToolbarIcon icon={ImageIcon} label="Image" active={imageUrls.length > 0} onClick={() => {}} /></span>}
+              />
+              <GifPicker onSelect={(att) => { setImageUrls([]); setGifUrl(att.url); }} trigger={<span><ToolbarIcon icon={Film} label="GIF" active={!!gifUrl} onClick={() => {}} /></span>} />
+              <ToolbarIcon icon={ListChecks} label="Poll" active={!!poll} onClick={togglePoll} />
+              <PickerPopover icon={Music2} label="Playlist" active={!!playlistId} items={playlists.map((p) => ({ id: p.id, label: p.name }))} empty="You have no playlists yet." onPick={setPlaylistId} />
+              <PickerPopover icon={Layers} label="Tier list" active={!!tierlistId} items={tierlists.map((t) => ({ id: t.id, label: t.title }))} empty="You have no tier lists yet." onPick={setTierlistId} />
+              <PickerPopover icon={Radio} label="Watch Together lobby" active={!!watchRoomId} items={rooms.map((r) => ({ id: r.id, label: r.name }))} empty="You have no active lobbies." onPick={setWatchRoomId} />
+              <PickerPopover icon={Users} label="Post to community" active={!!communityId} items={communities.map((c) => ({ id: c.id, label: c.name }))} empty="No communities yet." onPick={setCommunityId} />
+              <MediaPicker onSelect={setMedia} trigger={<span><ToolbarIcon icon={Tv} label="Share anime / manga" active={!!media} onClick={() => {}} /></span>} />
+              <ToolbarIcon icon={AlertTriangle} label="Mark spoiler" active={isSpoiler} onClick={() => setIsSpoiler((v) => !v)} />
+            </div>
 
-            <Button onClick={handleSubmit} disabled={!canPost} className="ml-auto h-9 rounded-full px-5 text-sm font-bold">
+            <Button onClick={handleSubmit} disabled={!canPost} className="mt-2.5 h-10 w-full rounded-2xl px-5 text-sm font-bold shadow-lg shadow-primary/20 sm:mt-0 sm:h-9 sm:w-auto sm:rounded-full sm:ml-auto">
               {submitting ? 'Posting…' : 'Post'}
             </Button>
           </div>

@@ -53,6 +53,10 @@ function resolveApiV3Base(): string {
   } catch {
     /* fall through */
   }
+  // Capacitor's origin is the WebView host, not the backend — use production.
+  const cap = (globalThis as any).Capacitor;
+  const isNative = !!cap && typeof cap.isNativePlatform === "function" && cap.isNativePlatform();
+  if (isNative) return "https://api.tatakai.me/api/v3";
   if (typeof window !== "undefined") return window.location.origin + "/api/v3";
   return "/api/v3";
 }

@@ -14,6 +14,20 @@ export interface ChangelogRelease {
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '6.0.4',
+    date: '2026-10-04',
+    changes: [
+      'Mobile App: Tatakai can now be downloaded for Android — a signed APK is published with the desktop installers on GitHub Releases and installs straight from the release page, and the download page has its own Android button',
+      'iOS App: iOS builds are now produced in CI as well, uploaded as an artifact — it ships unsigned, since there is no Apple signing identity',
+      'Tablet Layout: On tablet-sized screens the app now uses the same floating sidebar as the web version instead of the bottom navigation bar — phones keep the bottom nav',
+      'macOS Fix: The macOS desktop build is now ad-hoc signed in CI, so macOS no longer reports the download as damaged or from an unverified developer',
+      'Mobile Download Stats: Admin analytics now splits downloads into mobile and desktop, and the landing page shows mobile downloads separately',
+      'Repository Cleanup: Removed the vendored hentai database fork and other unreferenced scaffolding, including dead scratch scripts, leftover build output, and a duplicate lockfile',
+      'Profile Banner Fix: The landscape banner feed no longer calls the external image API directly from the browser, which was failing with a 403 and a CORS error — those requests now go through the app backend instead',
+      'Mobile Builds in CI: The release workflow now builds and uploads the Android APK and the iOS archive alongside the desktop app',
+    ],
+  },
+  {
     version: '6.0.3',
     date: '2026-09-29',
     changes: [
