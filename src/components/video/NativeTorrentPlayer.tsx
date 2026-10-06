@@ -22,6 +22,7 @@ export type NativeTorrentStats = {
 
 type Props = {
   url: string;
+  streamKind?: 'torrent' | 'debrid';
   title?: string;
   poster?: string;
   subtitles?: Subtitle[];
@@ -75,6 +76,7 @@ function formatRate(bytesPerSecond?: number): string {
  */
 export function NativeTorrentPlayer({
   url,
+  streamKind = 'torrent',
   title,
   poster,
   subtitles = [],
@@ -172,6 +174,8 @@ export function NativeTorrentPlayer({
     setStatus('opening');
     setMessage('Opening native torrent player…');
 
+    if (streamKind === 'debrid') setMessage('Opening debrid stream...');
+
     unsubscribe = onNativePlayerEvent((event: any) => {
       if (cancelled) return;
       const position = Number(event?.positionMs || 0) / 1000;
@@ -237,7 +241,7 @@ export function NativeTorrentPlayer({
         void closeNativePlayer().catch(() => { /* best effort */ });
       }
     };
-  }, [url]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [url, streamKind]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const retry = () => {
     openedUrlRef.current = null;
@@ -245,6 +249,7 @@ export function NativeTorrentPlayer({
     setStatus('opening');
     setMessage('Opening native torrent player…');
     const windows = windowsRef.current;
+    if (streamKind === 'debrid') setMessage('Opening debrid stream...');
     void openNativePlayer({
       url,
       title,
@@ -302,14 +307,14 @@ export function NativeTorrentPlayer({
             Subtitles &amp; alternate audio (incl. embedded MKV tracks) are in the player&apos;s subtitle / settings menu.
           </p>
         )}
-        {status !== 'error' && (
+        {status !== 'error' && torrentStats && (
           <p className="mt-1 text-xs text-white/60">
             {progressPercent.toFixed(0)}%{Number(torrentStats?.seeders) > 0 ? ` • ${torrentStats?.seeders} seeders` : ''}
             {Number(torrentStats?.numPeers) > 0 ? ` • ${torrentStats?.numPeers} peers` : ''}
             {Number(torrentStats?.downloadSpeed) > 0 ? ` • ${formatRate(torrentStats?.downloadSpeed)}` : ''}
           </p>
         )}
-        {status !== 'error' && progressPercent > 0 && (
+        {status !== 'error' && torrentStats && progressPercent > 0 && (
           <div className="mt-3 h-1 w-48 overflow-hidden rounded-full bg-white/15">
             <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${progressPercent}%` }} />
           </div>

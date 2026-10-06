@@ -13,8 +13,8 @@ android {
         applicationId = "app.tatakai.me"
         minSdk = rootProject.ext.minSdkVersion
         targetSdk = rootProject.ext.targetSdkVersion
-        versionCode = 605
-        versionName = "6.0.5"
+        versionCode = 606
+        versionName = "6.0.6"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -103,6 +103,14 @@ dependencies {
     implementation "androidx.media3:media3-exoplayer:$media3Version"
     implementation "androidx.media3:media3-exoplayer-hls:$media3Version"
     implementation "androidx.media3:media3-ui:$media3Version"
+
+    // HLS → MP4 remux for offline downloads (mobile parity with desktop's
+    // ffmpeg `-c copy` path). The `https` package (TLS-backed) is required
+    // because stream URLs are https. Uses the community-maintained fork:
+    // arthenica's artifacts were removed from Maven Central (Apr 2025); this
+    // is the drop-in replacement (same com.arthenica.ffmpegkit API), and the
+    // 8.x line is 16 KB page-aligned for Android 15+.
+    implementation "dev.ffmpegkit-maintained:ffmpeg-kit-https:8.1.9"
 }
 
 apply from: 'capacitor.build.gradle'

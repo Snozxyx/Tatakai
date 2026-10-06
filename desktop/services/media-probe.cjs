@@ -258,7 +258,10 @@ class MediaProbeService {
             // not to exist in this input, letting the empty-output path report a
             // clearer error than a raw ffmpeg exit.
             const command = ffmpeg(url)
-                .inputOptions(inputOptions)
+                // Spread, not an array: fluent-ffmpeg space-splits single-array
+                // elements that form exactly 2 parts (see ipc-download-manager
+                // `-headers` bug). All elements here are already single tokens.
+                .inputOptions(...inputOptions)
                 .outputOptions([
                     `-map 0:${trackIndex}?`,
                     '-f webvtt',
@@ -342,12 +345,12 @@ class MediaProbeService {
             const isLocalFile = fs.existsSync(url);
 
             const command = ffmpeg(url)
-                .inputOptions([
+                .inputOptions(
                     '-analyzeduration',
                     '750000',
                     '-probesize',
                     '750000'
-                ])
+                )
                 .outputOptions([
                     `-map 0:${trackIndex}`,
                     '-vn',
@@ -359,7 +362,7 @@ class MediaProbeService {
                 ]);
 
             if (!isLocalFile) {
-                command.inputOptions(['-timeout 10000000']);
+                command.inputOptions('-timeout', '10000000');
             }
 
             command

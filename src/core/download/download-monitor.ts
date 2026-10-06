@@ -111,6 +111,7 @@ function recordHistory(
         animeTitle: meta.animeTitle,
         posterUrl: meta.posterUrl,
         episodeNumber: meta.episodeNumber,
+        episodeId: id,
         status,
         sourceType: meta.sourceType,
         resolvedLanguage: meta.resolvedLanguage || 'unknown',
@@ -203,6 +204,28 @@ export function markCompleted(id: string, opts?: { localUri?: string; fileSizeBy
   upsert(id, { status: 'completed', progress: 100, localUri: opts?.localUri });
   recordHistory(id, 'completed', { localPath: opts?.localUri, fileSizeBytes: opts?.fileSizeBytes });
   void triggerHaptic('download-complete');
+  // Auto-download-next: finishing episode N arms a one-shot intent for N+1
+  // (consumed by the player download button when the next episode resolves).
+  // The arm itself checks the per-device toggle + WiFi-only guard; dynamic
+  // import keeps this singleton free of downloader dependencies.
+  try {
+    const raw = localStorage.getItem(`tatakai:dl:meta:${id}`);
+    const meta = raw ? JSON.parse(raw) : null;
+    const animeId = Number(meta?.animeId);
+    const episodeNumber = Number(meta?.episodeNumber);
+    if (Number.isFinite(animeId) && animeId > 0 && Number.isFinite(episodeNumber)) {
+      void import('@/core/download/mobile/autoDownloadNext').then((m) => {
+        m.armAutoDownloadNext({
+          animeId,
+          animeTitle: String(meta?.animeTitle || 'Anime'),
+          nextEpisode: episodeNumber + 1,
+          posterUrl: meta?.posterUrl,
+        });
+      }).catch(() => {});
+    }
+  } catch {
+    /* meta unreadable — no auto-next */
+  }
 }
 export function markError(id: string, error: string) {
   upsert(id, { status: 'failed', error });

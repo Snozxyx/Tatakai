@@ -5,6 +5,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { getLocalContinueWatching, removeFromLocalContinueWatching, LocalContinueWatchingItem } from '@/lib/localStorage';
 import { getProxiedImageUrl } from '@/lib/api';
+import { Peekable } from '@/components/media/MediaQuickPeek';
+import { peekFromAnime } from '@/components/media/quickPeekStore';
 
 function formatTimeLeft(remainingSeconds: number) {
   if (remainingSeconds <= 0) return 'Almost finished';
@@ -86,8 +88,14 @@ export function LocalContinueWatching() {
             : '/placeholder.svg';
 
           return (
-            <div
+            <Peekable
               key={item.episodeId}
+              media={peekFromAnime(
+                { id: item.animeId, name: item.animeName, poster: item.animePoster },
+                `/anime/${item.animeId}`,
+              )}
+            >
+            <div
               className="group relative flex min-h-[176px] overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:transition-none motion-reduce:hover:translate-y-0"
             >
               {/* Remove button */}
@@ -160,6 +168,7 @@ export function LocalContinueWatching() {
                 </div>
               </div>
             </div>
+            </Peekable>
           );
         })}
       </div>

@@ -28,6 +28,22 @@ export async function bootstrapMobile(): Promise<void> {
   // Install the in-WebView extension dispatch surface early so the first
   // source/manga resolution can find it. Bundles register into it separately.
   try {
+    // Start the native loopback media proxy first (anime HLS/MP4 + subtitles +
+    // manga images + download assets, desktop LocalProxyServer parity). When
+    // running, `registerMobileSource` returns `http://127.0.0.1:<port>/stream/`
+    // URLs for plain `<video>` / `<img>` loads; otherwise the in-memory
+    // `mobile-proxy://` + CapacitorHttp path is used. Never blocks render.
+    try {
+      const [{ ensureNativeProxy }, { setNativeProxyBaseUrl }] = await Promise.all([
+        import('@/core/mobile/localProxyNative'),
+        import('@/core/extensions/mobile/mobileProxy'),
+      ]);
+      const base = await ensureNativeProxy();
+      if (base) setNativeProxyBaseUrl(base);
+    } catch {
+      /* JS fallback stays */
+    }
+
     // The torrent runtime must be present before React's first interaction
     // frame, otherwise capability-gated Android torrent controls can race it.
     const { installMobileTorrentBridge } = await import(
@@ -53,6 +69,21 @@ export async function bootstrapMobile(): Promise<void> {
     );
   } catch {
     /* non-fatal */
+  }
+
+  // If the native loopback service died while the app was backgrounded
+  // (OS process recycle), re-establish it on return so playback keeps the
+  // desktop-parity fast path instead of silently dropping to the JS bridge.
+  // Never blocks render; failures keep the existing fallback.
+  try {
+    const { App } = await import('@capacitor/app');
+    await App.addListener('resume', () => {
+      void import('@/core/mobile/localProxyNative').then(({ reensureNativeProxy }) =>
+        reensureNativeProxy(),
+      ).catch(() => {});
+    });
+  } catch {
+    /* App plugin missing / web — ignore */
   }
 
   await Promise.allSettled([

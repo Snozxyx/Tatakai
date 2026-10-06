@@ -267,6 +267,7 @@ const torrentRuntimeApi = require('./ipc/ipc-torrent.cjs')(ipcMain, app, fs, pat
 require('./ipc/ipc-system.cjs')(ipcMain, app, dialog, autoUpdater, fs, path, logger, getMainWindow, appCID, isDev);
 require('./ipc/ipc-theme.cjs')(ipcMain, app, fs, path);
 require('./ipc/ipc-media.cjs')(ipcMain, app, logger);
+require('./ipc/ipc-debrid.cjs')(ipcMain);
 require('./ipc/ipc-home-server.cjs')(ipcMain, app, fs, path, logger, getMainWindow, {
     getExtensionRuntime: () => extensionRuntimeRef.current,
     getTorrentFacade: () => torrentRuntimeApi?.facade,

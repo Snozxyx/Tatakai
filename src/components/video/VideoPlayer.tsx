@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import Hls from "hls.js";
 import { toast } from "sonner";
-import { Lock, SlidersHorizontal } from "lucide-react";
+import { Lock, Maximize, SlidersHorizontal } from "lucide-react";
 
 import { useVideoSettings } from "@/hooks/media/useVideoSettings";
 import { useKeybinds } from "@/hooks/media/useKeybinds";
@@ -31,7 +31,7 @@ import { useActiveCues } from "./hooks/useActiveCues";
 import { useStableVolume, useSleepTimer, useAmbientMode } from "./hooks/usePlayerEnhancements";
 import { SubtitleOverlay } from "./overlays/SubtitleOverlay";
 import { Anime4KRenderer, type Anime4KMode } from "@/lib/video/anime4k/Anime4KRenderer";
-import { isMobileNative } from "@/lib/platform/platform";
+import { isDesktop, isMobileNative } from "@/lib/platform/platform";
 import { ensureCustomSubtitleFontLoaded } from "@/lib/video/customSubtitleFont";
 
 // Controls
@@ -132,6 +132,13 @@ function isTransientTorrentStartupError(message: string): boolean {
   );
 }
 
+// One-time discovery hint: shown after a single click until the user has
+// used double-click fullscreen once (desktop only).
+const FS_HINT_SEEN_KEY = "tatakai:player:fs-hint-seen";
+
+// Click vs double-click disambiguation window (ms).
+const DBL_CLICK_DELAY_MS = 260;
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -203,6 +210,14 @@ export function VideoPlayer({
     }
   }, [externalRef]);
 
+  // Clear pending click/hint timers on unmount.
+  useEffect(() => {
+    return () => {
+      if (clickTimerRef.current) window.clearTimeout(clickTimerRef.current);
+      if (hintTimeoutRef.current) window.clearTimeout(hintTimeoutRef.current);
+    };
+  }, []);
+
   // Register global video for PiP/Miniplayer
   useEffect(() => {
     registerGlobalVideo(videoRef.current, window.location.pathname, {
@@ -260,6 +275,10 @@ export function VideoPlayer({
   const [externalPlayerPath, setExternalPlayerPath] = useState<string | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [originalSpeed, setOriginalSpeed] = useState(1);
+  // "Double-click for fullscreen" discovery pill (desktop only).
+  const [showFsHint, setShowFsHint] = useState(false);
+  const clickTimerRef = useRef<number | null>(null);
+  const hintTimeoutRef = useRef<number | null>(null);
 
   // ---------------------------------------------------------------------------
   // AniSkip
@@ -354,6 +373,50 @@ export function VideoPlayer({
     isMobile,
     isPlaying,
   });
+
+  // ---------------------------------------------------------------------------
+  // Single click = play/pause (+ "double-click for fullscreen" hint on
+  // desktop), double click = fullscreen. A short delay disambiguates the two
+  // so a double-click doesn't toggle play twice.
+  // ---------------------------------------------------------------------------
+
+  const hideFsHintSoon = useCallback(() => {
+    if (hintTimeoutRef.current) window.clearTimeout(hintTimeoutRef.current);
+    hintTimeoutRef.current = window.setTimeout(() => setShowFsHint(false), 3500);
+  }, []);
+
+  const handleVideoClick = useCallback(() => {
+    if (isMobile) {
+      togglePlay();
+      return;
+    }
+    if (clickTimerRef.current) {
+      // Second click within the window → double-click: fullscreen instead.
+      window.clearTimeout(clickTimerRef.current);
+      clickTimerRef.current = null;
+      setShowFsHint(false);
+      try {
+        localStorage.setItem(FS_HINT_SEEN_KEY, "1");
+      } catch { /* storage unavailable — hint may show again */ }
+      void toggleFullscreen();
+      return;
+    }
+    clickTimerRef.current = window.setTimeout(() => {
+      clickTimerRef.current = null;
+      togglePlay();
+      // One-time discovery hint for desktop users.
+      if (isDesktop()) {
+        let seen = false;
+        try {
+          seen = localStorage.getItem(FS_HINT_SEEN_KEY) === "1";
+        } catch { /* ignore */ }
+        if (!seen) {
+          setShowFsHint(true);
+          hideFsHintSoon();
+        }
+      }
+    }, DBL_CLICK_DELAY_MS);
+  }, [isMobile, togglePlay, toggleFullscreen, hideFsHintSoon]);
 
   const {
     showControls,
@@ -593,6 +656,13 @@ export function VideoPlayer({
   const subtitleTrackSignatureRef = useRef<string>("");
   const autoSkippedWindowRef = useRef<string | null>(null);
   const manualRetryLockUntilRef = useRef(0);
+  // Timestamp until which code-4 errors are ignored. Set whenever we
+  // programmatically empty the element (unload effect / adapter switch), because
+  // Chromium fires MEDIA_ERR_SRC_NOT_SUPPORTED ("Empty src attribute") for that
+  // load() and the event can arrive after the next source has already mounted —
+  // at which point neither the current source nor the element looks empty, so
+  // only a time window reliably identifies it as ours.
+  const suppressEmptySrcUntilRef = useRef(0);
   const initialSeekDoneRef = useRef(false);
   const initialSeekRef = useRef(initialSeekSeconds);
   const retryCountRef = useRef(0);
@@ -861,6 +931,8 @@ export function VideoPlayer({
           id: currentSource.url,
           url: currentSource.url,
           mode: mode,
+          episodeNumber: currentSource.episodeNumber ?? episodeNumber,
+          filenameHint: currentSource.filenameHint,
         },
         videoElement: videoRef.current,
         startTime: seekTime,
@@ -876,6 +948,9 @@ export function VideoPlayer({
     currentSource?.url,
     currentSource?.isM3U8,
     currentSource?.sourceType,
+    currentSource?.episodeNumber,
+    currentSource?.filenameHint,
+    episodeNumber,
     isOffline,
     settings.autoplay,
   ]);
@@ -893,6 +968,18 @@ export function VideoPlayer({
     }
     const video = videoRef.current;
     if (video) {
+      // Calling load() on an already-empty element fires a MEDIA_ERR_SRC_NOT_SUPPORTED
+      // (code 4, "Empty src attribute") error event. That spurious event used to
+      // set videoError and trigger a server failover even though there was simply
+      // no source selected yet (loading / torrent handover) — and the stale error
+      // then sat on top of the video after the real source mounted and started
+      // playing. Skip the reset entirely when there is nothing to unload.
+      const hasSrc =
+        Boolean(video.currentSrc) ||
+        Boolean(video.getAttribute("src")) ||
+        video.querySelectorAll("source").length > 0;
+      if (!hasSrc) return;
+      suppressEmptySrcUntilRef.current = Date.now() + 1500;
       video.removeAttribute("src");
       video.querySelectorAll("source").forEach((node) => node.remove());
       video.load();
@@ -927,6 +1014,14 @@ export function VideoPlayer({
       }
     };
     const handleDurationChange = () => setDuration(video.duration);
+    const handleLoadedMetadata = () => {
+      // Metadata means the mounted source is genuinely readable — any earlier
+      // transient error (empty-src from a switch, a first-segment stall that
+      // later resolved) is stale. Clear it so the overlay never covers a
+      // playable video, including when autoplay is off and `playing` hasn't
+      // fired yet.
+      setVideoError((prev) => (prev ? null : prev));
+    };
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => {
       setIsPlaying(false);
@@ -944,6 +1039,11 @@ export function VideoPlayer({
     };
     const handlePlaying = () => {
       setIsBuffering(false);
+      // Playback recovered (or started) — drop any stale error overlay. Without
+      // this a transient failure (e.g. the empty-src event fired by a
+      // programmatic unload during a source switch) stayed visible on top of a
+      // now-playing video.
+      setVideoError((prev) => (prev ? null : prev));
       lastProgressAtRef.current = Date.now();
       if (audioTracks.length === 0 && internalSubtitles.length === 0) {
         triggerMediaProbe();
@@ -972,12 +1072,25 @@ export function VideoPlayer({
     };
     const handleError = (e: any) => {
       console.error("Video Error:", e);
-      const err = videoRef.current?.error;
+      const videoEl = videoRef.current;
+      const err = videoEl?.error;
+      // No source selected (initial load, torrent handover, episode switch):
+      // the element legitimately has nothing to play, so any error event here
+      // — typically code 4 "Empty src attribute" from a programmatic unload —
+      // is not a playback failure. Ignore it instead of raising the overlay
+      // (and triggering a server failover) while the real source mounts.
+      if (!currentSource?.url) return;
+      const code = Number(err?.code || 0);
+      const rawMessage = String(err?.message || "Unknown error");
+      // Our own programmatic unload fires code 4 ("Empty src attribute") and the
+      // event can land after the next source has mounted, when nothing looks
+      // empty anymore — the timestamp is the only reliable identifier.
+      if (Date.now() < suppressEmptySrcUntilRef.current && (code === 4 || code === 0)) return;
+      const elementSrc = String(videoEl?.currentSrc || videoEl?.src || videoEl?.getAttribute?.("src") || "").trim();
+      if (!elementSrc || /empty[^a-z]*src/i.test(rawMessage)) return;
       let failureReason = "native-video-error";
       let friendlyMessage: string | null = null;
       const eventMessage = String(e?.message || e?.target?.error?.message || "").trim().toLowerCase();
-      const code = Number(err?.code || 0);
-      const rawMessage = String(err?.message || "Unknown error");
       const normalizedMessage = rawMessage.toLowerCase();
       const compositeMessage = `${normalizedMessage} ${eventMessage}`;
 
@@ -1020,6 +1133,7 @@ export function VideoPlayer({
 
     video.addEventListener("timeupdate", handleTimeUpdate);
     video.addEventListener("durationchange", handleDurationChange);
+    video.addEventListener("loadedmetadata", handleLoadedMetadata);
     video.addEventListener("play", handlePlay);
     video.addEventListener("pause", handlePause);
     video.addEventListener("waiting", handleWaiting);
@@ -1031,6 +1145,7 @@ export function VideoPlayer({
     return () => {
       video.removeEventListener("timeupdate", handleTimeUpdate);
       video.removeEventListener("durationchange", handleDurationChange);
+      video.removeEventListener("loadedmetadata", handleLoadedMetadata);
       video.removeEventListener("play", handlePlay);
       video.removeEventListener("pause", handlePause);
       video.removeEventListener("waiting", handleWaiting);
@@ -1348,6 +1463,17 @@ export function VideoPlayer({
       onMouseLeave={() => !isMobile && isPlaying && setControlsVisible(false)}
       onTouchStart={showControlsTemporarily}
     >
+      {/* Double-click fullscreen discovery hint (desktop only, one-time).
+          Non-interactive so it never swallows clicks. */}
+      {showFsHint && !isMobile && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
+          <div className="flex items-center gap-2 rounded-full bg-black/70 px-3 py-1.5 text-xs font-medium text-white border border-white/10 shadow-lg backdrop-blur-md whitespace-nowrap">
+            <Maximize className="w-3.5 h-3.5 shrink-0" />
+            <span>Double-click for fullscreen</span>
+          </div>
+        </div>
+      )}
+
       {/* Media stack — ambient glow, video, and Anime4K canvas share one
           stacking context (z-0) so their internal z-index:1/2 (video below the
           upscaled canvas) never lifts above the controls overlay, which paints
@@ -1385,7 +1511,7 @@ export function VideoPlayer({
             poster={resolvedPoster}
             playsInline
             {...(!isOffline ? { crossOrigin: "anonymous" } : {})}
-            onClick={togglePlay}
+            onClick={handleVideoClick}
           >
             {(() => {
               // Dedup by selection key (URL-based) before rendering tracks. The same
@@ -1707,9 +1833,19 @@ export function VideoPlayer({
                 posterUrl={animePoster ?? poster}
                 sourceUrl={currentSource?.url}
                 sourceType={currentSource?.sourceType}
-                torrentUrl={torrentStats?.rawUrl}
+                // Only hand the torrent magnet/bridge URL over when the playing
+                // source is actually a torrent — otherwise a stale session
+                // hijacks stream downloads into the slow torrent path.
+                torrentUrl={
+                  String((currentSource as any)?.sourceType || '').toLowerCase() === 'torrent' ||
+                  String((currentSource as any)?.sourceType || '').toLowerCase() === 'debrid' ||
+                  String(currentSource?.url || '').startsWith('magnet:')
+                    ? torrentStats?.rawUrl
+                    : undefined
+                }
                 headers={headers as Record<string, string> | undefined}
                 animeId={animeId ?? malId}
+                subtitles={subtitles}
               />
             )}
 

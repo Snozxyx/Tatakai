@@ -34,8 +34,56 @@
  */
 
 import { CapacitorHttp } from '@capacitor/core';
+import { mirrorTokenToNative } from '@/core/mobile/localProxyNative';
+import {
+  UPSTREAM_TIMEOUT_MS,
+  UPSTREAM_RETRY_DELAY_MS,
+  buildProxyOutboundHeaders,
+  headerCacheKey,
+  isHlsPlaylist,
+  proxyDelay,
+  rewriteProxyPlaylist,
+  shouldRetryUpstream,
+} from '@/core/proxy/proxyShared';
 
 export const MOBILE_PROXY_SCHEME = 'mobile-proxy://stream/';
+
+/**
+ * Native loopback base (e.g. `http://127.0.0.1:43127`), set once
+ * `ensureNativeProxy()` resolves in `bootstrapMobile()`. When present,
+ * `registerMobileSource` returns native `/stream/<token>` URLs — the exact
+ * desktop `LocalProxyServer` shape — so `<video>` / `<img>` / HLS / subtitles /
+ * downloads load with a plain HTTP request (headers replayed natively, Range +
+ * playlist rewrite on the server). Falls back to `mobile-proxy://` otherwise.
+ */
+let nativeProxyBaseUrl: string | null = null;
+
+export function setNativeProxyBaseUrl(baseUrl: string | null): void {
+  const clean = String(baseUrl || '').replace(/\/$/, '');
+  nativeProxyBaseUrl = /^http:\/\/127\.0\.0\.1:\d+$/i.test(clean) ? clean : null;
+}
+
+export function getNativeProxyBaseUrl(): string | null {
+  return nativeProxyBaseUrl;
+}
+
+/** True for native loopback stream URLs (`http://127.0.0.1:<port>/stream/<token>`). */
+export function isNativeProxyUrl(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  if (nativeProxyBaseUrl && value.startsWith(`${nativeProxyBaseUrl}/stream/`)) return true;
+  return /^http:\/\/127\.0\.0\.1:\d+\/stream\/[a-f0-9]{32}/i.test(value);
+}
+
+/** True for any proxied URL (native loopback OR in-memory token). */
+export function isAnyProxyUrl(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  return value.startsWith(MOBILE_PROXY_SCHEME) || isNativeProxyUrl(value);
+}
+
+function tokenOfNativeProxyUrl(proxyUrl: string): string {
+  const tail = proxyUrl.split('/stream/', 2)[1] || '';
+  return tail.split(/[?#]/, 1)[0].toLowerCase();
+}
 
 /** Same default UA the desktop proxy sends when a source has none. */
 const DEFAULT_USER_AGENT =
@@ -52,14 +100,22 @@ interface MobileProxyEntry {
 
 const tokenMap = new Map<string, MobileProxyEntry>();
 
-/** Blob URLs minted from proxy payloads (dedupe + bounded cache). */
+/** Blob URLs minted from proxy payloads (dedupe + bounded cache).
+ *
+ * Two independent LRU buckets: image pages and full-file media share one
+ * budget, so a single large MP4 blob (a `media:` entry is 100–800 MB) evicted
+ * every reader page the user had already viewed — that's exactly the "images
+ * only reappear after closing the app" symptom. Reader pages stay resident in
+ * their own 250-slot bucket, so back-scrolling stays instant; media blobs
+ * have a much smaller slot count because a given session almost never has
+ * more than a handful of direct files open.
+ */
 const blobCache = new Map<string, string>();
 const blobInflight = new Map<string, Promise<string | null>>();
-// Manga chapters are commonly 30-150 pages — an 80-entry cap evicted the
-// first pages while the user was still reading (re-fetch + black flashes).
-// 250 covers even long chapters without meaningful RAM growth (blob URLs
-// themselves are cheap; the decoded bitmaps live in the image cache anyway).
 const MAX_BLOB_ENTRIES = 250;
+const MAX_MEDIA_BLOB_ENTRIES = 16;
+
+const isMediaKey = (key: string): boolean => key.startsWith('media:');
 
 function mintToken(): string {
   try {
@@ -78,19 +134,28 @@ function sweepTokens(): void {
   for (const [token, entry] of tokenMap) {
     if (entry.createdAt < cutoff) tokenMap.delete(token);
   }
-  while (blobCache.size > MAX_BLOB_ENTRIES) {
-    const oldest = blobCache.keys().next();
-    if (oldest.done) break;
-    const url = blobCache.get(oldest.value);
-    blobCache.delete(oldest.value);
-    if (url) {
-      try {
-        URL.revokeObjectURL(url);
-      } catch {
-        /* ignore */
+  // Two independent LRU budgets so a large media blob cannot evict reader
+  // pages the user has already scrolled through — the "images only reappear
+  // after closing the app" symptom. Map iteration order is insertion order,
+  // so the oldest entries of a bucket are evicted first.
+  const evictBucket = (limit: number, matches: (key: string) => boolean): void => {
+    let count = 0;
+    for (const key of blobCache.keys()) if (matches(key)) count += 1;
+    let toDrop = count - limit;
+    if (toDrop <= 0) return;
+    for (const key of Array.from(blobCache.keys())) {
+      if (toDrop <= 0) break;
+      if (!matches(key)) continue;
+      const url = blobCache.get(key);
+      blobCache.delete(key);
+      if (url) {
+        try { URL.revokeObjectURL(url); } catch { /* ignore */ }
       }
+      toDrop -= 1;
     }
-  }
+  };
+  evictBucket(MAX_BLOB_ENTRIES, (key) => !isMediaKey(key));
+  evictBucket(MAX_MEDIA_BLOB_ENTRIES, isMediaKey);
 }
 
 export function isMobileProxyUrl(value: unknown): boolean {
@@ -104,13 +169,20 @@ function tokenOf(proxyUrl: string): string {
 /**
  * Resolve a proxy URL to its stored `{ url, headers }`, or null when the
  * token is unknown/expired (mirrors the desktop 410 "stream token expired").
+ * Handles both `mobile-proxy://` tokens and native loopback
+ * `http://127.0.0.1:<port>/stream/<token>` URLs (same token space).
  */
 export function resolveMobileProxy(proxyUrl: string): MobileProxyEntry | null {
-  if (!isMobileProxyUrl(proxyUrl)) return null;
-  const entry = tokenMap.get(tokenOf(proxyUrl));
+  const token = isMobileProxyUrl(proxyUrl)
+    ? tokenOf(proxyUrl)
+    : isNativeProxyUrl(proxyUrl)
+      ? tokenOfNativeProxyUrl(proxyUrl)
+      : null;
+  if (!token) return null;
+  const entry = tokenMap.get(token);
   if (!entry) return null;
   if (Date.now() - entry.createdAt > TOKEN_TTL_MS) {
-    tokenMap.delete(tokenOf(proxyUrl));
+    tokenMap.delete(token);
     return null;
   }
   return entry;
@@ -126,7 +198,7 @@ export function unwrapMobileProxyUrl(
   proxyUrl: string,
   fallback?: { originalUrl?: string },
 ): string {
-  if (!isMobileProxyUrl(proxyUrl)) return proxyUrl;
+  if (!isMobileProxyUrl(proxyUrl) && !isNativeProxyUrl(proxyUrl)) return proxyUrl;
   const live = resolveMobileProxy(proxyUrl);
   if (live) return live.url;
   const original = String(fallback?.originalUrl || '').trim();
@@ -172,8 +244,13 @@ function withDefaultHeaders(headers: Record<string, string>): Record<string, str
 }
 
 /**
- * Register an upstream URL + its required headers, returning the opaque
- * `mobile-proxy://stream/<token>` URL consumers resolve through this module.
+ * Register an upstream URL + its required headers.
+ *
+ * When the native loopback proxy is running, returns a desktop-shaped
+ * `http://127.0.0.1:<port>/stream/<token>` URL (plain HTTP load, headers
+ * replayed natively — anime HLS/MP4, subtitles, manga images, download assets
+ * all share this path). Otherwise returns the opaque
+ * `mobile-proxy://stream/<token>` URL resolved via CapacitorHttp.
  * Mirrors `LocalProxyServer.registerSource` (random token, header capture,
  * 15-minute sweep). Never throws — falls back to the raw URL.
  */
@@ -186,8 +263,22 @@ export function registerMobileSource(input: {
   const headers = withDefaultHeaders(normalizeMobileHeaders(input?.headers));
   try {
     sweepTokens();
-    const token = mintToken();
+    const token = mintToken().toLowerCase();
     tokenMap.set(token, { url, headers, createdAt: Date.now() });
+    if (nativeProxyBaseUrl) {
+      // Dispatch the native registration immediately. This used to sit behind
+      // a dynamic import, so the WebView could start fetching the returned
+      // loopback URL before the import chunk/Capacitor call had even run. On
+      // slower phones that produced an initial 410 and sent hls.js into its
+      // multi-second retry ladder. localProxyNative has no dependency on this
+      // module, so a direct import is safe and removes that race window.
+      try {
+        mirrorTokenToNative(token, url, headers);
+      } catch {
+        /* JS fallback below still works */
+      }
+      return `${nativeProxyBaseUrl}/stream/${token}`;
+    }
     return `${MOBILE_PROXY_SCHEME}${token}`;
   } catch {
     return url;
@@ -213,7 +304,13 @@ export function reregisterMobileSource(input: {
 function resolveTarget(
   proxyOrUrl: string,
   fallback?: { originalUrl?: string; headers?: unknown },
-): { url: string; headers: Record<string, string> } {
+): { url: string; headers: Record<string, string>; nativeDirect?: boolean } {
+  // Native loopback URLs already carry their headers server-side: fetch them
+  // directly (plain HTTP load, desktop parity) instead of unwrapping to the
+  // upstream and replaying headers from JS.
+  if (isNativeProxyUrl(proxyOrUrl)) {
+    return { url: proxyOrUrl, headers: {}, nativeDirect: true };
+  }
   if (isMobileProxyUrl(proxyOrUrl)) {
     const live = resolveMobileProxy(proxyOrUrl);
     if (live) return { url: live.url, headers: live.headers };
@@ -241,16 +338,9 @@ function mergeHeaders(
   extra?: Record<string, string>,
   range?: string,
 ): Record<string, string> {
-  const out = { ...base };
-  if (extra) {
-    for (const [k, v] of Object.entries(extra)) out[k] = v;
-  }
-  if (range) out.Range = range;
-  // Media is already compressed; asking for it raw keeps content-length/range
-  // truthful through the relay (same reason the desktop proxy pins identity).
-  const hasEncoding = Object.keys(out).some((k) => k.toLowerCase() === 'accept-encoding');
-  if (!hasEncoding) out['Accept-Encoding'] = 'identity';
-  return out;
+  // Desktop `_handleRequest` outbound block — kept identical via the shared
+  // module (default UA, identity encoding, Range passthrough).
+  return buildProxyOutboundHeaders(base, extra, range);
 }
 
 /** Chunked base64 → ArrayBuffer (a single `atob` on a multi-MB segment blows
@@ -357,7 +447,9 @@ export async function fetchViaMobileProxy(
     originalUrl?: string;
   } = {},
 ): Promise<MobileProxyFetchResult> {
-  const timeoutMs = options.timeoutMs ?? 30000;
+  // Desktop parity: the loopback server aborts upstream at 18s. The old 30s
+  // default just delayed failover on a dead origin.
+  const timeoutMs = options.timeoutMs ?? UPSTREAM_TIMEOUT_MS;
   const target = resolveTarget(proxyOrUrl, {
     originalUrl: options.originalUrl,
     headers: options.headers,
@@ -373,14 +465,67 @@ export async function fetchViaMobileProxy(
       text: null,
     };
   }
+  // Native loopback: plain fetch, no header replay needed (server owns the
+  // headers, answers CORS `*` — desktop `/stream/<token>` parity). Keeps
+  // manga images, subtitles and HLS playlists on the fast path.
+  if (target.nativeDirect) {
+    const wantTextEarly = (options.responseType ?? 'arraybuffer') === 'text';
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+      try {
+        const init: RequestInit = { signal: ctrl.signal };
+        if (options.range) init.headers = { Range: options.range };
+        const r = await fetch(target.url, init);
+        const contentType = r.headers.get('content-type') || '';
+        if (!r.ok) {
+          return {
+            ok: false, status: r.status, url: target.url, contentType,
+            headers: {}, data: null, text: null,
+          };
+        }
+        if (wantTextEarly) {
+          const text = await r.text();
+          return {
+            ok: true, status: r.status, url: target.url, contentType,
+            headers: {}, data: null, text,
+          };
+        }
+        const data = await r.arrayBuffer();
+        return {
+          ok: true, status: r.status, url: target.url, contentType,
+          headers: {}, data, text: null,
+        };
+      } finally {
+        clearTimeout(timer);
+      }
+    } catch {
+      return {
+        ok: false, status: 0, url: target.url, contentType: '',
+        headers: {}, data: null, text: null,
+      };
+    }
+  }
   const headers = mergeHeaders(
     target.headers,
     normalizeMobileHeaders(options.headers),
     options.range,
   );
   const wantText = (options.responseType ?? 'arraybuffer') === 'text';
+  // Desktop `_fetchStreamUpstream` parity: one retry on network failure (250ms
+  // later), never on HTTP errors (a 403/404 is a real answer and relays as-is)
+  // and never after an abort.
+  const requestWithRetry = async (): Promise<Awaited<ReturnType<typeof capacitorRequest>>> => {
+    try {
+      return await capacitorRequest(target.url, headers, wantText ? 'text' : 'arraybuffer', timeoutMs);
+    } catch (err) {
+      if (!shouldRetryUpstream(err, 0)) throw err;
+      await proxyDelay(UPSTREAM_RETRY_DELAY_MS);
+      return capacitorRequest(target.url, headers, wantText ? 'text' : 'arraybuffer', timeoutMs);
+    }
+  };
   try {
-    const res = await capacitorRequest(target.url, headers, wantText ? 'text' : 'arraybuffer', timeoutMs);
+    const res = await requestWithRetry();
     const contentType = headerValue(res.headers, 'content-type') || '';
     const ok = res.status >= 200 && res.status < 300;
     if (wantText) {
@@ -489,6 +634,9 @@ export function getMobileProxyImageBlobUrl(
   proxyOrUrl: string,
   options: { headers?: unknown; originalUrl?: string; retries?: number } = {},
 ): Promise<string | null> {
+  // Native loopback URLs load directly in `<img>` (desktop parity) — no blob
+  // relay, no full download. Only in-memory tokens need the blob bridge.
+  if (isNativeProxyUrl(proxyOrUrl)) return Promise.resolve(null);
   if (!isMobileProxyUrl(proxyOrUrl)) return Promise.resolve(null);
   const entry = resolveMobileProxy(proxyOrUrl);
   const upstream = entry?.url || String(options.originalUrl || '').trim();
@@ -538,7 +686,9 @@ export function getMobileHeaderedImageBlobUrl(
   if (!url || !/^https?:\/\//i.test(url)) return Promise.resolve(null);
   const flat = normalizeMobileHeaders(headers);
   if (!Object.keys(flat).length) return Promise.resolve(null);
-  const cacheKey = `hdr-img:${url}`;
+  // Key includes the header values: the same image URL gated by different
+  // Referers is a different payload (desktop parity — tokens are per headers).
+  const cacheKey = `hdr-img:${headerCacheKey(url, flat)}`;
   const attempts = Math.max(1, Math.min(4, options.retries ?? 2));
   return blobUrlFor(cacheKey, '', async () => {
     let last = { ok: false, data: null as ArrayBuffer | null, contentType: '', url };
@@ -611,11 +761,16 @@ export function prefetchMobileReaderImages(
  * Resolve a (possibly proxied) direct media file (MP4/WebM) to a `blob:` URL
  * for `<video>`. Full-file fetch — the tradeoff for header replay without a
  * local HTTP server. HLS should prefer the native loader path instead.
+ *
+ * With the native loopback proxy running, MP4s never reach here: the
+ * `http://127.0.0.1:<port>/stream/<token>` URL plays directly in `<video>`
+ * with Range seeks (desktop parity), so this returns null for native URLs.
  */
 export function getMobileProxyMediaBlobUrl(
   proxyOrUrl: string,
   options: { headers?: unknown; originalUrl?: string; timeoutMs?: number } = {},
 ): Promise<string | null> {
+  if (isNativeProxyUrl(proxyOrUrl)) return Promise.resolve(null);
   if (!isMobileProxyUrl(proxyOrUrl)) return Promise.resolve(null);
   const entry = resolveMobileProxy(proxyOrUrl);
   const upstream = entry?.url || String(options.originalUrl || '').trim();
@@ -638,42 +793,28 @@ export function getMobileProxyMediaBlobUrl(
 /**
  * Rewrite an HLS playlist so every child reference (segments, keys, maps,
  * variant playlists) becomes a fresh in-app proxy token carrying the same
- * headers — a direct port of `LocalProxyServer._rewritePlaylistUrls`, except
+ * headers — desktop `_rewritePlaylistUrls` via the shared module, except
  * tokens are `mobile-proxy://` URLs the native loader resolves instead of
- * origin-relative `/stream/<token>` paths.
+ * origin-relative `/stream/<token>` paths. Kept as the public name so
+ * `nativeHlsLoader` and other callers don't change.
  */
 export function rewriteMobilePlaylist(
   playlistText: string,
   playlistUrl: string,
   headers: Record<string, string>,
 ): string {
-  const rewriteOne = (target: string): string => {
-    const raw = String(target || '').trim();
-    if (!raw) return target;
-    try {
-      const resolved = new URL(raw, playlistUrl).href;
-      return registerMobileSource({ url: resolved, headers });
-    } catch {
-      return target;
-    }
-  };
-  return String(playlistText || '')
-    .split('\n')
-    .map((line) => {
-      const trimmed = line.trim();
-      if (!trimmed) return line;
-      if (trimmed.startsWith('#')) {
-        return line.replace(/URI="([^"]+)"/g, (_m, p1) => `URI="${rewriteOne(p1)}"`);
-      }
-      return rewriteOne(trimmed);
-    })
-    .join('\n');
+  return rewriteProxyPlaylist(playlistText, playlistUrl, (resolved) =>
+    registerMobileSource({ url: resolved, headers }),
+  );
 }
 
+/**
+ * Desktop-exact playlist detection (URL `\.m3u8($|\?)` or an HLS
+ * content-type). Previously matched any content-type containing `mpegurl`,
+ * which is broader than desktop — now shared so all three proxies agree.
+ */
 export function isHlsProxyPayload(url: string, contentType: string): boolean {
-  if (/\.m3u8($|[?#])/i.test(url)) return true;
-  const ct = String(contentType || '').toLowerCase();
-  return ct.includes('mpegurl') || ct.includes('application/x-mpegurl');
+  return isHlsPlaylist(url, contentType);
 }
 
 // ── applyProxy (desktop host-server parity) ──────────────────────────────────
@@ -683,57 +824,76 @@ export function isHlsProxyPayload(url: string, contentType: string): boolean {
 // engine), plus every subtitle track (their CDNs validate Referer exactly
 // like the video CDNs do).
 
+/**
+ * Canonical playback-kind resolver — the mobile mirror of desktop
+ * `resolveSourceType` (`host-server.cjs`) and the contract behind
+ * `isEmbedSource`/`isM3U8Source` in `useCombinedSources.ts`.
+ *
+ * Precedence (all layers agree on this order):
+ *   torrent (explicit type, isTorrent flag, or magnet: URL) >
+ *   embed (`custom`/`embed` contract type, or an explicit isEmbed flag) >
+ *   hls (explicit type, isM3U8 flag, or .m3u8 URL) >
+ *   mp4 (explicit type or video-extension URL) >
+ *   embed fallback.
+ *
+ * Reading `type` (not just `sourceType`) and the explicit booleans is what
+ * keeps HLS rows with extractor-style URLs from collapsing into the embed
+ * bucket — the "server list shows only embeds" bug.
+ */
 export function resolveStreamKind(source: Record<string, unknown>): 'hls' | 'mp4' | 'embed' | 'torrent' {
-  const explicit = String((source as any)?.sourceType || '').toLowerCase();
-  if (explicit === 'torrent') return 'torrent';
-  if (explicit === 'hls') return 'hls';
-  if (explicit === 'mp4') return 'mp4';
+  const t = String((source as any)?.sourceType || (source as any)?.type || '').toLowerCase();
   const url = String((source as any)?.url || '');
-  if (/\.m3u8($|[?#/])/i.test(url)) return 'hls';
-  if (/\.(mp4|m4v|webm|mkv)($|[?#])/i.test(url)) return 'mp4';
+  if (t === 'torrent' || (source as any)?.isTorrent === true || /^magnet:/i.test(url)) return 'torrent';
+  if (t === 'custom' || t === 'embed' || (source as any)?.isEmbed === true) return 'embed';
+  if (t === 'hls' || (source as any)?.isM3U8 === true || /\.m3u8($|[?#/])/i.test(url)) return 'hls';
+  if (t === 'mp4' || /\.(mp4|m4v|webm|mkv)($|[?#])/i.test(url)) return 'mp4';
   return 'embed';
 }
 
-/** Fill the desktop-normalized type flags when the bundle omitted them (never
- *  overwrites values the bundle already set — selection/sort logic downstream
- *  depends on them). */
+/**
+ * Stamp the desktop-normalized type flags, DERIVED from the resolved kind
+ * (desktop `normalizeSource` parity). Preservation used to let one stale or
+ * partial bundle flag disagree with the URL and hide HLS rows as embeds, so
+ * every flag is derived — never kept — keeping the list, the badge, the
+ * player-mode pick and the proxy gate in agreement by construction.
+ */
 export function normalizeMobileSourceFlags<T>(source: T): T {
   if (!source || typeof source !== 'object') return source;
   const s = source as Record<string, unknown>;
   // `custom` is the extension contract's name for an iframe/embed URL. It is
-  // not itself one of the canonical playback kinds, so derive flags from the
-  // URL-aware resolver even when sourceType/type are already populated. The
-  // previous code compared the literal string `custom` with `embed`, stamped
-  // `isEmbed: false`, and made every Miki/Nami/Sasuke-style server disappear
-  // from the embed UI and route into the direct video player instead.
+  // not itself one of the canonical playback kinds — the resolver maps it to
+  // `embed` (see above), which is what keeps Miki/Nami/Sasuke-style servers in
+  // the embed UI instead of routing them into the direct video player.
   const resolvedKind = resolveStreamKind(s);
-  if (s.sourceType == null || s.type == null) {
-    if (s.sourceType == null) s.sourceType = resolvedKind;
-    if ((s as any).type == null) (s as any).type = resolvedKind;
-  }
-  if ((s as any).isM3U8 == null) (s as any).isM3U8 = resolvedKind === 'hls';
-  if ((s as any).isEmbed == null) (s as any).isEmbed = resolvedKind === 'embed';
-  if ((s as any).isTorrent == null) (s as any).isTorrent = resolvedKind === 'torrent';
+  s.sourceType = resolvedKind;
+  (s as any).type = resolvedKind;
+  (s as any).isM3U8 = resolvedKind === 'hls';
+  (s as any).isEmbed = resolvedKind === 'embed';
+  (s as any).isTorrent = resolvedKind === 'torrent';
   return source;
 }
 
-function hasHeaders(headers: unknown): headers is Record<string, string> {
-  const flat = normalizeMobileHeaders(headers);
-  return Object.keys(flat).length > 0;
-}
-
 /**
- * Proxy one normalized stream source + its subtitle tracks through the in-app
- * registry. Returns the source with `url`/`subtitles[].url` replaced by proxy
- * URLs and `originalUrl` preserved (desktop shape).
+ * Normalize one stream source (+ its subtitle tracks) for playback.
+ *
+ * With `tokenize: true` (default) header-gated HLS/MP4 URLs and subtitle
+ * tracks are registered with the in-app proxy (mobile-proxy:// tokens, or
+ * native loopback URLs when that server runs) with `originalUrl` preserved —
+ * the desktop `applyProxy` shape, used by the manga reader and downloaders.
+ *
+ * Mobile watch paths always tokenize. Current Android and iOS shells serve
+ * loopback URLs, while older shells keep the CapacitorHttp compatibility path;
+ * neither requires the hosted proxy. Never re-registers an already-proxied URL
+ * (either token shape) — nesting a loopback URL inside a fresh token clobbers
+ * `originalUrl` and orphans the inner token on expiry.
  */
-export function applyMobileProxyToSource<T>(source: T): T {
+export function applyMobileProxyToSource<T>(source: T, opts?: { tokenize?: boolean }): T {
   if (!source || typeof source !== 'object') return source;
   normalizeMobileSourceFlags(source);
+  const tokenize = opts?.tokenize !== false;
+  if (!tokenize) return source;
   const s = source as Record<string, any>;
   const rawHeaders = normalizeMobileHeaders(s.headers);
-  if (!hasHeaders(rawHeaders)) return source;
-
   const out: Record<string, any> = { ...s };
   const tracks = Array.isArray(s.subtitles) ? s.subtitles : null;
   if (tracks && tracks.length) {
@@ -750,7 +910,12 @@ export function applyMobileProxyToSource<T>(source: T): T {
 
   const kind = resolveStreamKind(out);
   const url = String(out.url || '');
-  if ((kind === 'hls' || kind === 'mp4') && /^https?:\/\//i.test(url) && !isMobileProxyUrl(url)) {
+  if (
+    (kind === 'hls' || kind === 'mp4') &&
+    /^https?:\/\//i.test(url) &&
+    !isMobileProxyUrl(url) &&
+    !isNativeProxyUrl(url)
+  ) {
     try {
       out.url = registerMobileSource({ url, headers: rawHeaders });
       out.originalUrl = url;
@@ -772,8 +937,7 @@ export function applyMobileProxyToPages<T extends { imageUrl?: string }>(pages: 
     const imageUrl = String((p as any).imageUrl || '');
     const headers = normalizeMobileHeaders((p as any).headers);
     if (!imageUrl || !/^https?:\/\//i.test(imageUrl)) return p;
-    if (isMobileProxyUrl((p as any).proxiedImageUrl)) return p;
-    if (!hasHeaders(headers)) return p;
+    if (isAnyProxyUrl((p as any).proxiedImageUrl)) return p;
     try {
       return { ...p, proxiedImageUrl: registerMobileSource({ url: imageUrl, headers }) };
     } catch {

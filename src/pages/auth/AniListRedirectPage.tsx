@@ -1,11 +1,12 @@
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSettingsModal } from '@/contexts/SettingsModalContext';
 import { exchangeAniListCode } from '@/lib/externalIntegrations';
+import { buildDesktopDeepLink, isDesktopApp, isDesktopOAuthState } from '@/lib/desktopOAuth';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Loader2, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 
 export default function AniListRedirectPage() {
@@ -13,12 +14,32 @@ export default function AniListRedirectPage() {
     const navigate = useNavigate();
     const { openSettings } = useSettingsModal();
     const { user, isLoading: authLoading, refreshProfile } = useAuth();
-    const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+    const [status, setStatus] = useState<'loading' | 'forwarding' | 'success' | 'error'>('loading');
     const [error, setError] = useState<string | null>(null);
 
     const hasRun = useRef(false);
 
+    // `tatakai://` handoff for desktop-initiated flows. Only used when this page
+    // loads in the system browser (not the desktop app itself).
+    const desktopDeepLink = useMemo(() => {
+        const qs = searchParams.toString();
+        return buildDesktopDeepLink(`/integration/anilist/redirect${qs ? `?${qs}` : ''}`);
+    }, [searchParams]);
+
     useEffect(() => {
+        // Desktop bridge: this callback was initiated from the desktop app (the
+        // provider echoed our `state` marker). The code belongs to the desktop
+        // session, so forward it to the app instead of consuming it here with
+        // the browser's session. Must run before any login check — the system
+        // browser may not be logged into Tatakai at all.
+        const stateParam = searchParams.get('state');
+        if (stateParam && isDesktopOAuthState(stateParam) && !isDesktopApp()) {
+            hasRun.current = true;
+            setStatus('forwarding');
+            window.location.href = desktopDeepLink;
+            return;
+        }
+
         // Wait until auth context has finished resolving before doing anything
         if (authLoading) return;
 
@@ -66,16 +87,31 @@ export default function AniListRedirectPage() {
         };
 
         completeAuth();
-    }, [searchParams, navigate, user, authLoading, refreshProfile]);
+    }, [searchParams, navigate, user, authLoading, refreshProfile, desktopDeepLink]);
 
     return (
         <div className="min-h-screen bg-background flex items-center justify-center p-4">
             <GlassPanel className="max-w-md w-full p-8 text-center space-y-6">
-                {status === 'loading' && (
+                {(status === 'loading' || status === 'forwarding') && (
                     <>
                         <Loader2 className="w-12 h-12 text-[#02A9FF] animate-spin mx-auto" />
-                        <h1 className="text-2xl font-bold">Linking AniList...</h1>
-                        <p className="text-muted-foreground">Please wait while we complete the authentication process.</p>
+                        <h1 className="text-2xl font-bold">
+                            {status === 'forwarding' ? 'Returning to the app...' : 'Linking AniList...'}
+                        </h1>
+                        <p className="text-muted-foreground">
+                            {status === 'forwarding'
+                                ? 'Login approved. Opening the Tatakai desktop app to finish linking.'
+                                : 'Please wait while we complete the authentication process.'}
+                        </p>
+                        {status === 'forwarding' && (
+                            <a
+                                href={desktopDeepLink}
+                                className="inline-flex items-center gap-2 mt-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                            >
+                                <ExternalLink className="w-4 h-4" />
+                                Open desktop app
+                            </a>
+                        )}
                     </>
                 )}
 

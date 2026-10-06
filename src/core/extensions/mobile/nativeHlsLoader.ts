@@ -133,7 +133,7 @@ export function createNativeHlsLoader(sourceHeaders: NativeHlsHeaders) {
           method: "GET",
           headers: extra,
           responseType: textResponse ? "text" : "arraybuffer",
-          connectTimeout: 6000,
+          connectTimeout: 3000,
           readTimeout: isManifest ? 8000 : 25000,
         } as any);
         return {

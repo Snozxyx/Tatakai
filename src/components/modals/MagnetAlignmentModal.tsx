@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router-dom';
 import { upsertLocalTorrentSessionHistory } from '@/lib/localStorage';
 import { ANILIST_GRAPHQL_ENDPOINT } from '@/lib/api/backendOrigin';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { isP2PDisabled } from '@/lib/torrent/p2pPolicy';
 
 interface MagnetAlignmentModalProps {
   isOpen: boolean;
@@ -270,6 +271,10 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
     const toastId = 'importing-magnet';
     try {
       toast.loading('Importing and aligning magnet...', { id: toastId });
+      if (isP2PDisabled()) {
+        toast.error('P2P torrents are disabled in Settings. Re-enable them to import this magnet.', { id: toastId });
+        return;
+      }
       if (torrentBuffer && torrentPreview?.blocked) {
         toast.error(torrentPreview.error || 'This torrent cannot be played.', { id: toastId });
         return;

@@ -10,6 +10,8 @@ import { useTheme } from '@/hooks/ui/useTheme';
 import { buildPreferredAnimeRouteId } from '@/lib/animeIdMapping';
 import { BlurhashImage } from '@/components/ui/blurhash-image';
 import { FeatureFlag, useFeatureFlag } from '@/core/feature-flags';
+import { Peekable } from '@/components/media/MediaQuickPeek';
+import { peekFromAnime } from '@/components/media/quickPeekStore';
 
 const GAP_PX = 16; // gap-4 in AnimeGrid
 
@@ -31,8 +33,20 @@ interface MemoizedAnimeCardProps {
 
 const MemoizedAnimeCard = memo(({ anime, isUltraLite, blurhashEnabled, measureRef, onClick }: MemoizedAnimeCardProps) => {
   const posterSrc = getHighQualityPoster(anime.poster, anime.anilistId);
+  const routeAnimeId = buildPreferredAnimeRouteId({
+    id: anime.id,
+    name: anime.name,
+    malId: anime.malId,
+    anilistId: anime.anilistId,
+  });
 
   return (
+    <Peekable
+      media={peekFromAnime(
+        anime,
+        routeAnimeId ? `/anime/${routeAnimeId}` : `/search?q=${encodeURIComponent(anime.name)}`,
+      )}
+    >
     <GlassPanel
       hoverEffect={!isUltraLite}
       className="group cursor-pointer overflow-hidden h-full"
@@ -89,6 +103,7 @@ const MemoizedAnimeCard = memo(({ anime, isUltraLite, blurhashEnabled, measureRe
         </div>
       </div>
     </GlassPanel>
+    </Peekable>
   );
 });
 

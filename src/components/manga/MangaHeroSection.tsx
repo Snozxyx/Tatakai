@@ -3,7 +3,8 @@ import { GlassPanel } from "@/components/ui/GlassPanel";
 import { UnifiedMediaCardProps } from "@/components/UnifiedMediaCard";
 import { getHighQualityImage } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { TouchEvent as ReactTouchEvent } from "react";
 
 interface MangaHeroSectionProps {
   spotlight: UnifiedMediaCardProps["item"];
@@ -17,11 +18,10 @@ export function MangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
 
   const allSpotlights = spotlights.length > 0 ? spotlights.slice(0, 5) : [spotlight];
   const activeSpotlight = allSpotlights[currentIndex] || spotlight;
-  if (!activeSpotlight) return null;
-  const spotlightName = String(activeSpotlight.name || "Untitled");
-  const spotlightPoster = String(activeSpotlight.poster || "");
-  const spotlightType = activeSpotlight.type || "Manga";
-  const spotlightStatus = activeSpotlight.status || "Ongoing";
+  const spotlightName = String(activeSpotlight?.name || "Untitled");
+  const spotlightPoster = String(activeSpotlight?.poster || "");
+  const spotlightType = activeSpotlight?.type || "Manga";
+  const spotlightStatus = activeSpotlight?.status || "Ongoing";
 
   useEffect(() => {
     if (allSpotlights.length <= 1) return;
@@ -38,29 +38,60 @@ export function MangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
   }, [allSpotlights.length]);
 
   const handleRead = () => {
-    navigate(`/manga/${activeSpotlight.id}`);
+    if (activeSpotlight) navigate(`/manga/${activeSpotlight.id}`);
   };
+
+  const goTo = (idx: number) => {
+    if (idx === currentIndex) return;
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setCurrentIndex(idx);
+      setIsTransitioning(false);
+    }, 250);
+  };
+
+  // Swipe between spotlights on touch — parity with the anime hero.
+  const touchXRef = useRef<number | null>(null);
+  const onTouchStart = (e: ReactTouchEvent) => {
+    touchXRef.current = e.touches[0].clientX;
+  };
+  const onTouchEnd = (e: ReactTouchEvent) => {
+    if (touchXRef.current == null) return;
+    const dx = e.changedTouches[0].clientX - touchXRef.current;
+    touchXRef.current = null;
+    if (Math.abs(dx) < 48 || allSpotlights.length <= 1) return;
+    const next = (currentIndex + (dx < 0 ? 1 : -1) + allSpotlights.length) % allSpotlights.length;
+    goTo(next);
+  };
+
+  if (!activeSpotlight) return null;
 
   return (
     <section className="relative mb-16 md:mb-24">
-      <div className="lg:hidden relative">
+      <div
+        className="lg:hidden relative overflow-hidden rounded-3xl border border-white/[0.08] bg-background/40 shadow-2xl shadow-black/50"
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+      >
         <div className="absolute inset-0 h-[400px] overflow-hidden">
           <img
             src={getHighQualityImage(spotlightPoster)}
             alt=""
             className="w-full h-full object-cover scale-105 brightness-50"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-background/50 via-background/85 to-background" />
+          <div className="absolute inset-0 bg-gradient-to-b from-primary/15 via-background/85 to-background" />
+          {/* Ambient glow — same token language as the anime hero */}
+          <div className="absolute -top-16 left-1/2 h-40 w-3/4 -translate-x-1/2 rounded-full bg-primary/25 blur-[80px]" aria-hidden />
         </div>
 
         <div
-          className={`relative z-10 pt-8 px-2 transition-all duration-500 ${
+          className={`relative z-10 pt-8 px-4 pb-5 transition-all duration-500 ${
             isTransitioning ? "opacity-0 translate-y-2" : "opacity-100 translate-y-0"
           }`}
         >
           <div className="flex gap-4 mb-6">
             <div className="w-32 flex-shrink-0">
-              <GlassPanel className="overflow-hidden rounded-xl">
+              <GlassPanel className="overflow-hidden rounded-2xl ring-1 ring-white/10 shadow-2xl shadow-black/60">
                 <img
                   src={getHighQualityImage(spotlightPoster)}
                   alt={spotlightName}
@@ -70,16 +101,16 @@ export function MangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
             </div>
 
             <div className="flex-1 min-w-0 py-2">
-              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-amber/30 bg-amber/10 text-amber text-[10px] font-bold tracking-wider uppercase mb-2">
+              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-amber/30 bg-amber-500/15 backdrop-blur-md text-amber text-[10px] font-bold tracking-wider uppercase mb-2 shadow-lg shadow-black/30">
                 <Star className="w-2.5 h-2.5 fill-amber" />
                 Featured Manga
               </div>
 
-              <h1 className="font-display text-xl font-black tracking-tight leading-tight gradient-text mb-2 line-clamp-2">
+              <h1 className="font-display text-xl font-black tracking-tight leading-tight text-white text-balance drop-shadow-lg mb-2 line-clamp-3">
                 {spotlightName}
               </h1>
 
-              <div className="text-xs text-muted-foreground">
+              <div className="text-xs font-medium text-white/65">
                 {spotlightType} •{" "}
                 {activeSpotlight.chapters
                   ? `${activeSpotlight.chapters} Chapters`
@@ -91,29 +122,30 @@ export function MangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
           <div className="flex gap-3">
             <button
               onClick={handleRead}
-              className="flex-1 h-12 rounded-full bg-foreground text-background font-bold text-sm hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg"
+              className="flex-1 h-12 rounded-2xl bg-white text-black font-bold text-sm hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 shadow-xl shadow-black/40 ring-1 ring-white/40"
             >
-              <BookOpen className="w-4 h-4 fill-background" />
+              <BookOpen className="w-4 h-4 fill-black" />
               Read Now
             </button>
           </div>
 
           {allSpotlights.length > 1 && (
-            <div className="flex items-center justify-center gap-2 pt-6">
+            <div className="flex items-center justify-center gap-1 pt-4">
               {allSpotlights.map((_, idx) => (
                 <button
                   key={idx}
-                  onClick={() => {
-                    setIsTransitioning(true);
-                    setTimeout(() => {
-                      setCurrentIndex(idx);
-                      setIsTransitioning(false);
-                    }, 300);
-                  }}
-                  className={`transition-all duration-300 rounded-full ${
-                    idx === currentIndex ? "w-6 h-1.5 bg-foreground" : "w-1.5 h-1.5 bg-muted-foreground/50"
-                  }`}
-                />
+                  onClick={() => goTo(idx)}
+                  aria-label={`Show spotlight ${idx + 1}`}
+                  className="flex h-7 w-7 items-center justify-center"
+                >
+                  <span
+                    className={`transition-all duration-300 rounded-full ${
+                      idx === currentIndex
+                        ? "w-6 h-1.5 bg-white"
+                        : "w-1.5 h-1.5 bg-white/35"
+                    }`}
+                  />
+                </button>
               ))}
             </div>
           )}

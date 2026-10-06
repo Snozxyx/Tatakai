@@ -44,6 +44,7 @@ contextBridge.exposeInMainWorld('electron', {
     selectFile: (options) => ipcRenderer.invoke('select-file', options),
     openPath: (path) => ipcRenderer.invoke('open-path', path),
     streamLocalFile: (filePath) => ipcRenderer.invoke('media:stream-local-file', filePath),
+    debridRequest: (payload) => ipcRenderer.invoke('debrid:request', payload),
     openExternal: (url) => {
         if (/^https?:\/\//i.test(String(url || ''))) {
             return ipcRenderer.invoke('shell:open-external', url);

@@ -16,6 +16,8 @@ import { getHighQualityPoster } from '@/lib/api';
 import { useHoverPreview } from '@/hooks/useHoverPreview';
 import { cn } from '@/lib/utils';
 import { handlePosterFallback, rankBadgeClass, rankRingClass, type PosterItem } from './types';
+import { Peekable } from '@/components/media/MediaQuickPeek';
+import { peekFromHref } from '@/components/media/quickPeekStore';
 
 interface PosterCardProps {
   item: PosterItem;
@@ -43,6 +45,7 @@ export function PosterCard({ item, rank, eager, footer, preview, className }: Po
   });
 
   return (
+    <Peekable media={peekFromHref(item.href, item)}>
     <div
       className={cn('group relative', className)}
       // Only wired when a preview is possible: the handlers set state, and on a
@@ -142,5 +145,6 @@ export function PosterCard({ item, rank, eager, footer, preview, className }: Po
 
       {footer}
     </div>
+    </Peekable>
   );
 }

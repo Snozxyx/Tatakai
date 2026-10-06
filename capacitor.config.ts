@@ -13,9 +13,12 @@ const config: CapacitorConfig = {
     ]
   },
   android: {
-    allowMixedContent: true,
+    allowMixedContent: false,
     captureInput: true,
-    webContentsDebuggingEnabled: true, // Enable for debugging
+    // WebView remote debugging is a dev-only escape hatch: leaving it on in
+    // release builds exposes the app's WebView to any USB-connected debugger
+    // and costs runtime overhead on low-end phones.
+    webContentsDebuggingEnabled: false,
     backgroundColor: '#09090b',
     buildOptions: {
       releaseType: 'APK'

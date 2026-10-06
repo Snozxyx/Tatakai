@@ -23,6 +23,8 @@ import { useHoverPreview } from "@/hooks/useHoverPreview";
 import { buildPreferredAnimeRouteId } from "@/lib/animeIdMapping";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWatchlistItem, useAddToWatchlist, useRemoveFromWatchlist } from "@/hooks/user/useWatchlist";
+import { useLongPress } from "@/hooks/ui/useLongPress";
+import { openMediaQuickPeek } from "@/components/media/quickPeekStore";
 
 interface AnimeCardWithPreviewProps {
   anime: AnimeCardType;
@@ -130,6 +132,27 @@ function AnimeCardWithPreviewInner({ anime, showPreview = true, disableClick = f
 
   const isBusy = isWatchlistLoading || addToWatchlist.isPending || removeFromWatchlist.isPending;
 
+  // Long-press quick peek with the card's own fields (detail enriches inside).
+  const longPress = useLongPress({
+    onLongPress: () => {
+      if (disableClick) return;
+      openMediaQuickPeek({
+        kind: "anime",
+        id: anime.id,
+        name: anime.name,
+        poster: anime.poster,
+        anilistId: previewAniListId,
+        type: anime.type,
+        year: anime.year,
+        rating: anime.rating,
+        episodesSub: anime.episodes?.sub,
+        episodesDub: anime.episodes?.dub,
+        routeTo,
+      });
+    },
+    disabled: disableClick,
+  });
+
   // Optimized class: absolute inset-0 guarantees it stretches to the container's bounds
   const posterClass = `absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-[0.33,1,0.68,1] ${
     preview.isActive ? 'opacity-0 scale-105' : 'opacity-100 group-hover:scale-110'
@@ -143,6 +166,7 @@ function AnimeCardWithPreviewInner({ anime, showPreview = true, disableClick = f
       className="tk-pressable group relative overflow-hidden rounded-xl border border-white/5 bg-neutral-900 transition-[border-color] duration-300 hover:border-white/20 focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 focus-within:ring-offset-background w-full h-full aspect-[2/3] p-0"
       onMouseEnter={preview.onEnter}
       onMouseLeave={preview.onLeave}
+      {...longPress}
     >
       {/* Layer 1: Media Container - Absolutely positioned to guarantee edge-to-edge coverage */}
       <div className="absolute inset-0 z-0 bg-neutral-900/50">

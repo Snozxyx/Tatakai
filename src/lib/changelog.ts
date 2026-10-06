@@ -14,6 +14,21 @@ export interface ChangelogRelease {
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '6.0.6',
+    date: '2026-10-06',
+    changes: [
+      'In-App APK Updater: Android updates can now be checked, downloaded directly in-app with a progress indicator, and installed seamlessly without leaving the app',
+      'Native Mobile Loopback Proxy: High-performance local proxy on Android and iOS (127.0.0.1) matching desktop for video streaming, HLS playlists, headers replay, and offline media caching',
+      'Quick Peek Sheet: Added long-press quick-peek and swipe-to-dismiss preview sheets for anime and manga cards on mobile',
+      'Auto-Download Next: Automatic queuing of the next episode or chapter upon download completion, paired with Wi-Fi only constraints and auto-storage eviction for watched items',
+      'Deep Linking & Universal Links: Support for tatakai:// custom protocol and https://tatakai.me universal links jumping straight to anime, episodes, manga reader, and OAuth callbacks',
+      'Debrid & Torrent Hardening: Major overhaul for Real-Debrid and TorBox clients with token checks, query-cache bypass, tracker boosts, and a toggleable P2P torrent kill-switch',
+      'Manga Reader Resilience: Fixed sticky cross-chapter page errors, added reliable provider sorting, and enhanced local-first progress sync that merges offline reading progress',
+      'Download Modal Wizard: Refactored anime and manga download flows into an intuitive multi-step wizard with source, language, and scanlator selection',
+      'Desktop & Mobile Playback Polishing: Desktop double-click fullscreen hints, mobile player fullscreen layout fixes, and Android embed pop-under hijacking prevention',
+    ],
+  },
+  {
     version: '6.0.5',
     date: '2026-10-04',
     changes: [

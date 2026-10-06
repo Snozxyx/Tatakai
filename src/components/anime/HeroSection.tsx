@@ -72,7 +72,7 @@ export const HeroSection = memo(function HeroSection({ spotlight, spotlights = [
     <section className="relative mb-12 md:mb-24" style={{ contentVisibility: 'auto' }}>
       {/* Mobile Layout — immersive banner, swipeable */}
       <div
-        className="lg:hidden relative overflow-hidden rounded-3xl border border-white/[0.08]"
+        className="lg:hidden relative overflow-hidden rounded-3xl border border-white/[0.08] bg-background/40 shadow-2xl shadow-black/50"
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
@@ -86,8 +86,10 @@ export const HeroSection = memo(function HeroSection({ spotlight, spotlights = [
             decoding="async"
             className="w-full h-full object-cover scale-105 brightness-[0.55]"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/80 to-background" />
+          <div className="absolute inset-0 bg-gradient-to-b from-primary/15 via-background/80 to-background" />
           <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-background to-transparent" />
+          {/* Ambient glow — same token language as the desktop hero */}
+          <div className="absolute -top-16 left-1/2 h-40 w-3/4 -translate-x-1/2 rounded-full bg-primary/25 blur-[80px]" aria-hidden />
         </div>
 
         {/* Mobile content */}
@@ -96,7 +98,7 @@ export const HeroSection = memo(function HeroSection({ spotlight, spotlights = [
         }`}>
           {/* Small poster + info */}
           <div className="flex gap-3.5 mb-4">
-            <div className="w-28 flex-shrink-0 overflow-hidden rounded-2xl border border-white/15 shadow-2xl">
+            <div className="w-28 flex-shrink-0 overflow-hidden rounded-2xl border border-white/15 shadow-2xl shadow-black/60 ring-1 ring-white/10">
               <img
                 src={getHighQualityImage(activeSpotlight.poster)}
                 alt={activeSpotlight.name}
@@ -107,12 +109,12 @@ export const HeroSection = memo(function HeroSection({ spotlight, spotlights = [
             </div>
 
             <div className="flex-1 min-w-0 py-1">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-amber/30 bg-black/50 backdrop-blur-sm text-amber text-[10px] font-bold tracking-wider uppercase mb-2">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-amber/30 bg-black/50 backdrop-blur-md text-amber text-[10px] font-bold tracking-wider uppercase mb-2 shadow-lg shadow-black/30">
                 <Star className="w-2.5 h-2.5 fill-amber" />
                 #{activeSpotlight.rank} Spotlight
               </div>
 
-              <h1 className="font-display text-2xl font-black tracking-tight leading-[1.05] text-white drop-shadow-lg mb-2 line-clamp-3">
+              <h1 className="font-display text-2xl font-black tracking-tight leading-[1.05] text-white text-balance drop-shadow-lg mb-2 line-clamp-3">
                 {activeSpotlight.name}
               </h1>
 
@@ -120,7 +122,7 @@ export const HeroSection = memo(function HeroSection({ spotlight, spotlights = [
                 {activeSpotlight.otherInfo.slice(0, 4).map((info, idx) => (
                   <span
                     key={idx}
-                    className="shrink-0 px-2 py-0.5 rounded-md border border-white/15 bg-black/50 backdrop-blur-sm text-[10px] font-semibold text-white/80"
+                    className="shrink-0 px-2 py-0.5 rounded-md border border-white/15 bg-black/50 backdrop-blur-md text-[10px] font-semibold text-white/80"
                   >
                     {info}
                   </span>
@@ -142,7 +144,7 @@ export const HeroSection = memo(function HeroSection({ spotlight, spotlights = [
           <div className="flex gap-2.5">
             <button
               onClick={handleWatch}
-              className="flex-1 h-[52px] rounded-2xl bg-white text-black font-bold text-[15px] active:scale-[0.98] transition-transform flex items-center justify-center gap-2 shadow-xl"
+              className="flex-1 h-[52px] rounded-2xl bg-white text-black font-bold text-[15px] active:scale-[0.98] transition-transform flex items-center justify-center gap-2 shadow-xl shadow-black/40 ring-1 ring-white/40"
             >
               <Play className="w-4 h-4 fill-black" />
               Watch Now
@@ -152,7 +154,7 @@ export const HeroSection = memo(function HeroSection({ spotlight, spotlights = [
               animeName={activeSpotlight.name}
               animePoster={activeSpotlight.poster}
               variant="icon"
-              className="h-[52px] w-[52px] shrink-0 rounded-2xl border border-white/15 bg-black/50 backdrop-blur-sm flex items-center justify-center active:scale-95 transition-transform"
+              className="h-[52px] w-[52px] shrink-0 rounded-2xl border border-white/15 bg-black/50 backdrop-blur-md ring-1 ring-white/10 flex items-center justify-center active:scale-95 transition-transform"
             />
           </div>
 

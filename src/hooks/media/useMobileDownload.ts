@@ -96,10 +96,41 @@ export function useMobileDownload() {
     markCancelled(id);
   };
 
-  const retryDownload = (_id: string) => {
-    toast.info('Re-download from the series page', {
-      description: 'Open the anime or manga and pick the episode / chapter again.',
-    });
+  const retryDownload = (id: string) => {
+    const item = queue.find((q) => q.id === id);
+    // Manga re-downloads need the chapter's source resolution, which only the
+    // manga page holds — the offline hub renders an "Open manga" button for
+    // those rows instead of retrying here.
+    if (!item || item.kind === 'manga') {
+      toast.info('Re-download from the manga page', {
+        description: 'Open the manga and pick the chapter again.',
+      });
+      return;
+    }
+    void (async () => {
+      try {
+        const { retryMobileDownload } = await import('@/core/download/mobile/mobileDownloader');
+        const res = await retryMobileDownload(id);
+        if (res.ok) {
+          toast.success('Download restarted');
+          return;
+        }
+        const reason = 'reason' in res && typeof res.reason === 'string' ? res.reason : 'unknown';
+        if (reason === 'missing_stream_url') {
+          toast.info('Re-download from the series page', {
+            description: 'The original stream link expired. Open the anime and pick the episode again.',
+          });
+        } else if (reason === 'already_downloading') {
+          toast.info('Already downloading');
+        } else {
+          toast.error('Could not restart the download', { description: String(reason || '') });
+        }
+      } catch (error) {
+        toast.error('Could not restart the download', {
+          description: error instanceof Error ? error.message : String(error),
+        });
+      }
+    })();
   };
 
   return {

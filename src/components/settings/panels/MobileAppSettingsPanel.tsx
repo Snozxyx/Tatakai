@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   Bell,
@@ -32,7 +32,11 @@ import { useTheme } from '@/hooks/ui/useTheme';
 import { triggerHaptic } from '@/lib/haptics';
 import { isCapacitor, isIOS } from '@/lib/platform/platform';
 import {
+  cancelMobileUpdateDownload,
   checkMobileUpdate,
+  downloadMobileUpdate,
+  installMobileUpdate,
+  isAndroidAutoUpdateTarget,
   openMobileReleasePage,
   useMobileUpdateState,
 } from '@/core/update/mobile-update';
@@ -153,11 +157,165 @@ async function clearWebCaches(): Promise<number> {
   return keys.length;
 }
 
+// Debrid pulls in the orchestrator + two API clients even when the user only
+// flips haptics — load it on demand so the panel opens fast on low-end phones.
+const DebridSettingsPanel = lazy(() =>
+  import('@/components/settings/DebridSettingsPanel').then((m) => ({ default: m.DebridSettingsPanel })),
+);
+
+/**
+ * Self-contained app-update section. It owns the `useMobileUpdateState`
+ * subscription so per-tick download progress re-renders ONLY this subtree —
+ * previously every progress event re-rendered the whole 600-line panel,
+ * including all switches and the debrid client form.
+ */
+const AppUpdateSection = memo(function AppUpdateSection() {
+  const mobileUpdate = useMobileUpdateState();
+  const { openSettings } = useSettingsModal();
+  const autoCapable = isAndroidAutoUpdateTarget() && !!mobileUpdate.downloadUrl;
+
+  const handleUpdateAction = () => {
+    if (mobileUpdate.phase === 'available') {
+      if (autoCapable) void downloadMobileUpdate();
+      else void openMobileReleasePage();
+      return;
+    }
+    if (mobileUpdate.phase === 'downloaded' || mobileUpdate.phase === 'installing') {
+      void installMobileUpdate();
+      return;
+    }
+    void checkMobileUpdate({ announce: true });
+  };
+
+  return (
+    <SettingsSection
+      title="App updates"
+      description="Check GitHub Releases and install mobile updates manually."
+      action={
+        mobileUpdate.phase === 'available' || mobileUpdate.phase === 'downloaded' || mobileUpdate.phase === 'downloading'
+          ? <SettingsBadge tone="warning">Update available</SettingsBadge>
+          : mobileUpdate.phase === 'current'
+            ? <SettingsBadge>Up to date</SettingsBadge>
+            : undefined
+      }
+    >
+      <SettingRow
+        icon={Download}
+        title={
+          mobileUpdate.phase === 'available'
+            ? `Tatakai ${mobileUpdate.latestVersion} is available`
+            : mobileUpdate.phase === 'downloading'
+              ? `Downloading ${mobileUpdate.latestVersion}… ${Math.round(Number(mobileUpdate.progress ?? 0))}%`
+              : mobileUpdate.phase === 'downloaded' || mobileUpdate.phase === 'installing'
+                ? `Tatakai ${mobileUpdate.latestVersion} is ready to install`
+                : 'Check for updates'
+        }
+        description={
+          isIOS()
+            ? 'iOS releases are unsigned. Download the IPA, then sign and sideload it with your own tool.'
+            : autoCapable || mobileUpdate.phase === 'downloading' || mobileUpdate.phase === 'downloaded'
+              ? 'Android updates download and install inside the app — no browser needed.'
+              : 'Android updates open the latest release so you can install the new package manually.'
+        }
+        control={
+          <div className="flex shrink-0 items-center gap-2">
+            {mobileUpdate.phase === 'downloading' && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void cancelMobileUpdateDownload()}
+              >
+                Cancel
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant={
+                mobileUpdate.phase === 'available' ||
+                mobileUpdate.phase === 'downloaded' ||
+                mobileUpdate.phase === 'installing'
+                  ? 'default'
+                  : 'outline'
+              }
+              size="sm"
+              onClick={handleUpdateAction}
+              disabled={mobileUpdate.phase === 'checking' || mobileUpdate.phase === 'downloading'}
+              className="gap-2"
+            >
+              {mobileUpdate.phase === 'checking' || mobileUpdate.phase === 'installing' ? (
+                <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : mobileUpdate.phase === 'available' ? (
+                autoCapable ? (
+                  <Download className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                )
+              ) : mobileUpdate.phase === 'downloaded' ? (
+                <Download className="h-4 w-4" aria-hidden="true" />
+              ) : (
+                <RefreshCw className="h-4 w-4" aria-hidden="true" />
+              )}
+              {mobileUpdate.phase === 'checking'
+                ? 'Checking'
+                : mobileUpdate.phase === 'available'
+                  ? autoCapable ? 'Download' : 'Open releases'
+                  : mobileUpdate.phase === 'downloading'
+                    ? `${Math.round(Number(mobileUpdate.progress ?? 0))}%`
+                    : mobileUpdate.phase === 'downloaded'
+                      ? 'Install'
+                      : mobileUpdate.phase === 'installing'
+                        ? 'Opening…'
+                        : 'Check now'}
+            </Button>
+          </div>
+        }
+      />
+      {(mobileUpdate.phase === 'downloading' || mobileUpdate.phase === 'downloaded') && (
+        <div className="px-4 pb-3">
+          <div
+            className="h-1.5 overflow-hidden rounded-full bg-white/10"
+            role="progressbar"
+            aria-valuenow={Math.round(Number(mobileUpdate.progress ?? (mobileUpdate.phase === 'downloaded' ? 100 : 0)))}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            <div
+              className="h-full rounded-full bg-primary transition-[width]"
+              style={{ width: `${mobileUpdate.phase === 'downloaded' ? 100 : Math.round(Number(mobileUpdate.progress ?? 0))}%` }}
+            />
+          </div>
+        </div>
+      )}
+      {mobileUpdate.phase === 'error' && (
+        <p role="status" className="px-4 pb-3 text-xs text-red-300">
+          {mobileUpdate.message || 'The update check could not be completed.'}
+        </p>
+      )}
+      <SettingRow
+        icon={ScrollText}
+        title="What's new"
+        description="Read the changelog for this version."
+        control={
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => openSettings('changelog')}
+            className="gap-2"
+          >
+            <ScrollText className="h-4 w-4" />
+            Open
+          </Button>
+        }
+      />
+    </SettingsSection>
+  );
+});
+
 export function MobileAppSettingsPanel(_props: { section?: string }) {
   const { config, updateConfig, resetConfig } = useMobileConfig();
   const { reduceMotion, setReduceMotion } = useTheme();
-  const { openSettings } = useSettingsModal();
-  const mobileUpdate = useMobileUpdateState();
   const [device, setDevice] = useState<DeviceSummary>({});
   const [clearing, setClearing] = useState(false);
   const mounted = useRef(true);
@@ -223,14 +381,6 @@ export function MobileAppSettingsPanel(_props: { section?: string }) {
     void applyKeyboardResize('native');
     void applyKeepAwake(false);
     toast.success('Mobile settings reset to defaults');
-  };
-
-  const handleUpdateAction = () => {
-    if (mobileUpdate.phase === 'available') {
-      void openMobileReleasePage();
-      return;
-    }
-    void checkMobileUpdate({ announce: true });
   };
 
   const nativeBadge = isCapacitor() ? null : (
@@ -373,6 +523,65 @@ export function MobileAppSettingsPanel(_props: { section?: string }) {
         </div>
       </SettingsSection>
 
+      <Suspense fallback={null}>
+        <DebridSettingsPanel />
+      </Suspense>
+
+      <SettingsSection
+        title="Data saver"
+        description="Cap quality to 720p, force low-memory buffers, disable autoplay and heavy preloading."
+      >
+        <div className="flex flex-col divide-y divide-white/5">
+          <SettingRow
+            title="Data saver"
+            description="Best for metered links. Posters stay full-size; streams and preloads shrink."
+            control={
+              <Switch
+                checked={config.dataSaver}
+                onCheckedChange={(v) => {
+                  updateConfig({ dataSaver: v });
+                  if (v) void triggerHaptic('success');
+                }}
+                aria-label="Data saver"
+              />
+            }
+          />
+          <SettingRow
+            title="Auto-download next"
+            description="Queue the next episode / chapter when one finishes downloading."
+            control={
+              <Switch
+                checked={config.autoDownloadNext}
+                onCheckedChange={(v) => updateConfig({ autoDownloadNext: v })}
+                aria-label="Auto-download next"
+              />
+            }
+          />
+          <SettingRow
+            title="WiFi only"
+            description="Only auto-download on unmetered WiFi. Manual downloads always work."
+            control={
+              <Switch
+                checked={config.wifiOnlyDownloads}
+                onCheckedChange={(v) => updateConfig({ wifiOnlyDownloads: v })}
+                aria-label="WiFi only downloads"
+              />
+            }
+          />
+          <SettingRow
+            title="Auto-evict watched"
+            description="Free watched offline items first when storage runs low."
+            control={
+              <Switch
+                checked={config.autoEvictWatched}
+                onCheckedChange={(v) => updateConfig({ autoEvictWatched: v })}
+                aria-label="Auto-evict watched"
+              />
+            }
+          />
+        </div>
+      </SettingsSection>
+
       <SettingsSection title="Storage" description="Free up space used by cached pages and images.">
         <SettingRow
           icon={HardDrive}
@@ -406,76 +615,7 @@ export function MobileAppSettingsPanel(_props: { section?: string }) {
         />
       </SettingsSection>
 
-      <SettingsSection
-        title="App updates"
-        description="Check GitHub Releases and install mobile updates manually."
-        action={
-          mobileUpdate.phase === 'available'
-            ? <SettingsBadge tone="warning">Update available</SettingsBadge>
-            : mobileUpdate.phase === 'current'
-              ? <SettingsBadge>Up to date</SettingsBadge>
-              : undefined
-        }
-      >
-        <SettingRow
-          icon={Download}
-          title={
-            mobileUpdate.phase === 'available'
-              ? `Tatakai ${mobileUpdate.latestVersion} is available`
-              : 'Check for updates'
-          }
-          description={
-            isIOS()
-              ? 'iOS releases are unsigned. Download the IPA, then sign and sideload it with your own tool.'
-              : 'Android updates open the latest release so you can install the new package manually.'
-          }
-          control={
-            <Button
-              type="button"
-              variant={mobileUpdate.phase === 'available' ? 'default' : 'outline'}
-              size="sm"
-              onClick={handleUpdateAction}
-              disabled={mobileUpdate.phase === 'checking'}
-              className="gap-2"
-            >
-              {mobileUpdate.phase === 'checking' ? (
-                <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" />
-              ) : mobileUpdate.phase === 'available' ? (
-                <ExternalLink className="h-4 w-4" aria-hidden="true" />
-              ) : (
-                <RefreshCw className="h-4 w-4" aria-hidden="true" />
-              )}
-              {mobileUpdate.phase === 'checking'
-                ? 'Checking'
-                : mobileUpdate.phase === 'available'
-                  ? 'Open releases'
-                  : 'Check now'}
-            </Button>
-          }
-        />
-        {mobileUpdate.phase === 'error' && (
-          <p role="status" className="px-4 pb-3 text-xs text-red-300">
-            {mobileUpdate.message || 'The update check could not be completed.'}
-          </p>
-        )}
-        <SettingRow
-          icon={ScrollText}
-          title="What's new"
-          description="Read the changelog for this version."
-          control={
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => openSettings('changelog')}
-              className="gap-2"
-            >
-              <ScrollText className="h-4 w-4" />
-              Open
-            </Button>
-          }
-        />
-      </SettingsSection>
+      <AppUpdateSection />
 
       <SettingsSection title="Device" description="This device and app build.">
         <div className="rounded-lg border border-white/10 bg-white/[0.02] px-4 py-3 text-sm">

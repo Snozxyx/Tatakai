@@ -10,6 +10,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { getProxiedImageUrl } from '@/lib/api';
 import { HomeSectionHeading } from '@/components/home/HomeSectionHeading';
+import { Peekable } from '@/components/media/MediaQuickPeek';
+import { peekFromAnime } from '@/components/media/quickPeekStore';
 
 function formatTimeLeft(remainingSeconds: number) {
   if (remainingSeconds <= 0) return 'Almost finished';
@@ -85,8 +87,14 @@ export function ContinueWatching() {
             : '/placeholder.svg';
 
           return (
-            <Link
+            <Peekable
               key={item.id}
+              media={peekFromAnime(
+                { id: item.anime_id, name: item.anime_name, poster: item.anime_poster },
+                `/anime/${item.anime_id}`,
+              )}
+            >
+            <Link
               to={`/watch/${encodeURIComponent(item.episode_id)}?t=${Math.floor(progressSeconds)}`}
               aria-label={`Resume ${item.anime_name}, episode ${item.episode_number}${percent !== null ? `, ${percent}% watched` : ''}`}
               className="group flex min-h-[176px] overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:transition-none motion-reduce:hover:translate-y-0"
@@ -159,6 +167,7 @@ export function ContinueWatching() {
                 </div>
               </div>
             </Link>
+            </Peekable>
           );
         })}
       </div>

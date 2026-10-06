@@ -5,6 +5,8 @@ import { cn } from '@/lib/utils';
 import { Layers, ChevronRight, ChevronLeft } from 'lucide-react';
 import { useRef } from 'react';
 import { Button } from '@/components/ui/button';
+import { Peekable } from '@/components/media/MediaQuickPeek';
+import { peekFromAnime } from '@/components/media/quickPeekStore';
 
 interface AnimeSeasonsProps {
   animeId: string;
@@ -80,8 +82,14 @@ export function AnimeSeasons({ animeId, compact = false, showTitle = true }: Ani
                   : `S${season.seasonNumber}`;
 
             return (
-              <Link
+              <Peekable
                 key={season.id}
+                media={peekFromAnime(
+                  { id: season.id, name: season.name, poster: season.poster },
+                  `/anime/${season.id}`,
+                )}
+              >
+              <Link
                 to={`/anime/${season.id}`}
                 className={cn(
                   "flex-shrink-0 group/item block",
@@ -132,6 +140,7 @@ export function AnimeSeasons({ animeId, compact = false, showTitle = true }: Ani
                   <p className="text-[9px] text-muted-foreground px-1">{season.year}</p>
                 )}
               </Link>
+              </Peekable>
             );
           })}
         </div>

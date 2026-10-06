@@ -45,8 +45,24 @@ export type StartDownloadPayload = {
 };
 
 /**
+ * Shared torrent-URL sniff. Covers magnets, .torrent files AND the desktop
+ * torrent bridge (`http://127.0.0.1:<port>/webtorrent/<hash>/…`), whose
+ * `rawUrl` is an http URL but must still take the torrent session path —
+ * routing it into ffmpeg/HLS is what made "stream" downloads crawl.
+ */
+function isTorrentDownloadUrl(url: string): boolean {
+  const u = String(url || '');
+  const low = u.toLowerCase();
+  return (
+    low.startsWith('magnet:') ||
+    low.includes('.torrent') ||
+    low.includes('/webtorrent/') ||
+    low.startsWith('torrent-session://')
+  );
+}
+/**
  * Thin binding over the app-lifetime `download-monitor` singleton. The monitor
- * owns the (single) IPC subscription and history recording; this hook only
+ * owns the (single) IPC subscription + history recording; this hook only
  * exposes the live state map and the start/cancel actions. See
  * `src/core/download/download-monitor.ts` for why the subscription can't live
  * here (preload's `removeDownloadListeners` is global/destructive).
@@ -68,8 +84,7 @@ export function useDownload() {
         if (!url || typeof url !== 'string') {
           return { ok: false as const, reason: 'missing_stream_url' as const };
         }
-        const sourceType: 'hls' | 'torrent' =
-          url.startsWith('magnet:') || url.includes('.torrent') ? 'torrent' : 'hls';
+        const sourceType: 'hls' | 'torrent' = isTorrentDownloadUrl(url) ? 'torrent' : 'hls';
         localStorage.setItem(
           `tatakai:dl:meta:${payload.episodeId}`,
           JSON.stringify({
@@ -80,6 +95,13 @@ export function useDownload() {
             sourceType,
             resolvedLanguage: payload.resolvedLanguage || 'unknown',
             startedAt: new Date().toISOString(),
+            // Resumable fields: the offline hub's Retry button re-enqueues
+            // from this meta without needing the series page (and its fresh
+            // source resolution) again.
+            url,
+            headers: payload.headers,
+            originalUrl: payload.originalUrl,
+            subtitles: payload.subtitles,
           }),
         );
         markQueued(payload.episodeId, {
@@ -125,8 +147,7 @@ export function useDownload() {
         return { ok: false as const, reason: 'missing_download_path' as const };
       }
 
-      const sourceType: 'hls' | 'torrent' =
-        url.startsWith('magnet:') || url.includes('.torrent') ? 'torrent' : 'hls';
+      const sourceType: 'hls' | 'torrent' = isTorrentDownloadUrl(url) ? 'torrent' : 'hls';
 
       // Persist metadata BEFORE the optimistic markQueued so the monitor can
       // enrich the entry (name/poster/torrent-badge) on first sight.

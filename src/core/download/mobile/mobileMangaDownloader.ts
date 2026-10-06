@@ -17,7 +17,9 @@ import { isCapacitor } from '@/lib/platform/platform';
 import {
   fetchViaMobileProxy,
   isMobileProxyUrl,
+  isNativeProxyUrl,
   normalizeMobileHeaders,
+  resolveMobileProxy,
 } from '@/core/extensions/mobile/mobileProxy';
 import type { MangaDownloadChapter, MangaDownloadSeries } from '@/types/electron-bridge';
 import {
@@ -68,8 +70,17 @@ function pageCandidates(page: DownloadablePage): string[] {
     if (value && !out.includes(value)) out.push(value);
   };
 
+  // Native loopback (`http://127.0.0.1:<port>/stream/<token>`) is the BEST
+  // candidate: headers are replayed natively and it avoids a JS-bridge fetch.
+  // Previously these were filtered out, forcing a direct CDN fetch that 404'd
+  // on Referer-locked hosts when headers were incomplete. Dead native tokens
+  // still fall through to the direct URL below via resolve failure.
   if (isMobileProxyUrl(proxied)) push(proxied);
-  else if (proxied && !/^https?:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?\//i.test(proxied)) push(proxied);
+  else if (isNativeProxyUrl(proxied)) {
+    // Only prefer a live token; an expired one would 410 and waste retries.
+    if (resolveMobileProxy(proxied)) push(proxied);
+    else if (proxied) push(proxied);
+  } else if (proxied) push(proxied);
   push(original);
   return out;
 }
@@ -105,25 +116,21 @@ export async function downloadMangaChapterMobile(
   try {
     const { Filesystem, Directory } = await import('@capacitor/filesystem');
 
-    // Resolve pages through the extension runtime (routes to the mobile dispatch).
+    // Desktop parity: resolve AND download per source. The primary source may
+    // resolve pages whose CDN URLs are all dead (rotated/signed links → every
+    // image 404s) while an alternative scanlator serves fine. First source
+    // with >0 downloaded pages wins.
     const { fetchExtensionMangaPages } = await import('@/core/content/manga-extension-runtime');
-    const read = await fetchExtensionMangaPages({
-      extensionId: chapter.provider || '',
-      chapterKey: chapter.chapterKey,
-      providerChapterId: chapter.providerChapterId,
-      anilistId: series.anilistId,
-      alternatives: chapter.alternatives?.map((a) => ({
-        provider: a.provider || '',
-        chapterKey: a.chapterKey || '',
-        providerChapterId: a.providerChapterId,
-      })),
-    });
-
-    const pages = read.success ? read.data?.pages ?? [] : [];
-    if (!pages.length) {
-      markMangaError(jobId, 'No pages available for this chapter.');
-      downloadServiceFinish(jobId, { ok: false, label: svcLabel });
-      return { ok: false, reason: 'no_pages' };
+    type SourceAttempt = { provider: string; chapterKey: string; providerChapterId?: string };
+    const attempts: SourceAttempt[] = [];
+    const pushAttempt = (provider: string, chapterKey: string, providerChapterId?: string) => {
+      if (!provider || !chapterKey) return;
+      if (attempts.some((a) => a.provider === provider && a.chapterKey === chapterKey)) return;
+      attempts.push({ provider, chapterKey, providerChapterId });
+    };
+    pushAttempt(chapter.provider || '', chapter.chapterKey, chapter.providerChapterId);
+    for (const a of chapter.alternatives || []) {
+      pushAttempt(a.provider || '', a.chapterKey || '', a.providerChapterId);
     }
 
     const dir = chapterDir(series.anilistId, chapter.chapterKey);
@@ -133,65 +140,161 @@ export async function downloadMangaChapterMobile(
       /* exists */
     }
 
+    let usedProvider: string | null = null;
     let sizeBytes = 0;
-    const total = pages.length;
-    for (let i = 0; i < total; i++) {
+    let okPages = 0;
+    let totalPages = 0;
+    let lastErrors: string[] = [];
+    let attemptedProviders: string[] = [];
+
+    for (const attempt of attempts) {
       if (cancelled.has(jobId)) {
         markMangaError(jobId, 'cancelled');
         downloadServiceFinish(jobId, { ok: false, cancelled: true, label: svcLabel });
         return { ok: false, reason: 'cancelled' };
       }
-      const page = pages[i] as DownloadablePage;
-      const candidates = pageCandidates(page);
-      if (!candidates.length) continue;
-
-      // In-app proxy pages resolve natively with header replay (the WebView
-      // fetch cannot send the CDN Referer); plain URLs keep the direct path.
-      // Each page retries transient blips so one 429/radio drop doesn't fail
-      // the whole chapter.
-      let buf: ArrayBuffer | null = null;
-      let lastErr = '';
-      for (const src of candidates) {
-        for (let attempt = 0; attempt < 3; attempt++) {
-          try {
-            const fetched = await fetchViaMobileProxy(src, {
-              originalUrl: page.originalUrl || page.imageUrl,
-              headers: normalizeMobileHeaders(page.headers),
-              responseType: 'arraybuffer',
-              timeoutMs: 30000,
-            });
-            if (!fetched.ok || !fetched.data || fetched.data.byteLength === 0) {
-              throw new Error(`page ${i + 1}: HTTP ${fetched.status || 'fetch failed'}`);
-            }
-            buf = fetched.data;
-            break;
-          } catch (e) {
-            lastErr = e instanceof Error ? e.message : String(e);
-            if (attempt + 1 < 3) await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
-          }
-        }
-        if (buf) break;
-      }
-      if (!buf) throw new Error(lastErr || `page ${i + 1}: download failed`);
-      sizeBytes += buf.byteLength;
-
-      const filePath = `${dir}/${String(i + 1).padStart(4, '0')}.${extFromUrl(String(page.imageUrl || candidates[0]))}`;
-      await Filesystem.writeFile({
-        path: filePath,
-        directory: Directory.Documents,
-        data: toBase64(buf),
-        recursive: true,
-      });
-
-      const pagePct = Math.round(((i + 1) / total) * 100);
-      markMangaProgress(jobId, {
+      // Resolve pages for this source only (no cross-source blending).
+      const read = await fetchExtensionMangaPages({
+        extensionId: attempt.provider,
+        chapterKey: attempt.chapterKey,
+        providerChapterId: attempt.providerChapterId,
         anilistId: series.anilistId,
-        chapterKey: chapter.chapterKey,
-        page: i + 1,
-        totalPages: total,
-        percent: pagePct,
+        alternatives: [],
       });
-      downloadServiceProgress(jobId, svcLabel, pagePct);
+      const pages = read.success ? read.data?.pages ?? [] : [];
+      if (!pages.length) {
+        lastErrors = [read.message || `No pages from ${attempt.provider}`];
+        attemptedProviders.push(attempt.provider);
+        continue;
+      }
+      attemptedProviders.push(attempt.provider);
+
+      // Clean partials from a previous dead source so files never mix across
+      // scanlators (same 0001.* names).
+      if (usedProvider !== null || okPages > 0 || lastErrors.length > 0) {
+        try {
+          const { files } = await Filesystem.readdir({ path: dir, directory: Directory.Documents });
+          const names = (files || []).map((f: unknown) => (typeof f === 'string' ? f : String((f as { name?: string }).name || '')));
+          for (const name of names) {
+            if (!/^\d{4}\./.test(name)) continue;
+            try {
+              await Filesystem.deleteFile({ path: `${dir}/${name}`, directory: Directory.Documents });
+            } catch { /* already gone */ }
+          }
+        } catch { /* best-effort */ }
+      }
+
+      const total = pages.length;
+      let attemptOk = 0;
+      let attemptBytes = 0;
+      const pageErrors: string[] = [];
+      let attemptCancelled = false;
+      for (let i = 0; i < total; i++) {
+        if (cancelled.has(jobId)) {
+          attemptCancelled = true;
+          break;
+        }
+        const page = pages[i] as DownloadablePage;
+        const candidates = pageCandidates(page);
+        if (!candidates.length) {
+          pageErrors.push(`page ${i + 1}: no URL`);
+          continue;
+        }
+
+        // In-app proxy pages resolve natively with header replay (the WebView
+        // fetch cannot send the CDN Referer); plain URLs keep the direct path.
+        // A single dead image (HTTP 404 from a rotated CDN URL) skips that
+        // page instead of aborting the whole chapter.
+        let buf: ArrayBuffer | null = null;
+        let lastErr = '';
+        for (const src of candidates) {
+          for (let retry = 0; retry < 3; retry++) {
+            try {
+              const fetched = await fetchViaMobileProxy(src, {
+                originalUrl: page.originalUrl || page.imageUrl,
+                headers: normalizeMobileHeaders(page.headers),
+                responseType: 'arraybuffer',
+                timeoutMs: 30000,
+              });
+              if (!fetched.ok || !fetched.data || fetched.data.byteLength === 0) {
+                const status = Number(fetched.status) || 0;
+                // A 404 is authoritative (dead CDN URL) — don't waste 2 more
+                // retries on the same candidate, move to the next candidate.
+                if (status === 404) {
+                  lastErr = `page ${i + 1}: HTTP 404`;
+                  break;
+                }
+                throw new Error(`page ${i + 1}: HTTP ${status || 'fetch failed'}`);
+              }
+              // Guard against HTML error pages saved as images (e.g. a CDN
+              // 404 page returned with 200): must look like an image.
+              const ct = String(fetched.contentType || '').split(';')[0].trim().toLowerCase();
+              if (ct && !ct.startsWith('image/') && !ct.includes('octet-stream')) {
+                lastErr = `page ${i + 1}: unexpected content-type ${ct || 'unknown'}`;
+                break;
+              }
+              buf = fetched.data;
+              break;
+            } catch (e) {
+              lastErr = e instanceof Error ? e.message : String(e);
+              // Don't retry authoritative 404s — try the next candidate instead.
+              if (/HTTP 404/.test(lastErr)) break;
+              if (retry + 1 < 3) await new Promise((r) => setTimeout(r, 600 * (retry + 1)));
+            }
+          }
+          if (buf) break;
+        }
+        if (!buf) {
+          // Skip dead pages like desktop does; fail only when nothing survived.
+          pageErrors.push(lastErr || `page ${i + 1}: download failed`);
+          continue;
+        }
+        attemptOk++;
+        attemptBytes += buf.byteLength;
+
+        const filePath = `${dir}/${String(i + 1).padStart(4, '0')}.${extFromUrl(String(page.imageUrl || candidates[0]))}`;
+        await Filesystem.writeFile({
+          path: filePath,
+          directory: Directory.Documents,
+          data: toBase64(buf),
+          recursive: true,
+        });
+
+        const pagePct = Math.round(((i + 1) / total) * 100);
+        markMangaProgress(jobId, {
+          anilistId: series.anilistId,
+          chapterKey: chapter.chapterKey,
+          page: i + 1,
+          totalPages: total,
+          percent: pagePct,
+        });
+        downloadServiceProgress(jobId, svcLabel, pagePct);
+      }
+
+      if (attemptCancelled) {
+        markMangaError(jobId, 'cancelled');
+        downloadServiceFinish(jobId, { ok: false, cancelled: true, label: svcLabel });
+        return { ok: false, reason: 'cancelled' };
+      }
+      if (attemptOk > 0) {
+        usedProvider = attempt.provider;
+        okPages = attemptOk;
+        sizeBytes = attemptBytes;
+        totalPages = total;
+        lastErrors = pageErrors;
+        break;
+      }
+      lastErrors = pageErrors.length ? pageErrors : [`No images from ${attempt.provider}`];
+    }
+
+    if (okPages === 0) {
+      const tried = attemptedProviders.length ? ` (tried: ${attemptedProviders.join(', ')})` : '';
+      const hint = lastErrors.some((e) => /404/.test(e))
+        ? `All page images returned 404${tried} — the sources removed or moved this chapter. Try another chapter or check for extension updates.`
+        : (lastErrors[0] || 'No pages downloaded.') + tried;
+      markMangaError(jobId, hint);
+      downloadServiceFinish(jobId, { ok: false, label: svcLabel });
+      return { ok: false, reason: hint };
     }
 
     markMangaCompleted({
@@ -199,10 +302,10 @@ export async function downloadMangaChapterMobile(
       chapterKey: chapter.chapterKey,
       chapterNumber: chapter.chapterNumber ?? null,
       volume: chapter.volume ?? null,
-      provider: chapter.provider ?? null,
+      provider: usedProvider ?? chapter.provider ?? null,
       title: series.title,
       localDir: dir,
-      pageCount: total,
+      pageCount: okPages,
       sizeBytes,
     });
     downloadServiceFinish(jobId, { ok: true, label: svcLabel });

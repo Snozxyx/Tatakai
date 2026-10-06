@@ -4,6 +4,8 @@ import { UnifiedMediaCardProps } from "@/components/UnifiedMediaCard";
 import { useNavigate } from "react-router-dom";
 import { getHighQualityImage } from "@/lib/api";
 import { HomeSectionHeading } from "@/components/home/HomeSectionHeading";
+import { Peekable } from "@/components/media/MediaQuickPeek";
+import { peekFromManga } from "@/components/media/quickPeekStore";
 
 interface MangaTrendingGridProps {
   items: UnifiedMediaCardProps["item"][];
@@ -28,6 +30,7 @@ const MangaTrendingCard = memo(function MangaTrendingCard({
   const navigate = useNavigate();
 
   return (
+    <Peekable media={peekFromManga(item, `/manga/${item.id}`)}>
     <div
       onClick={() => navigate(`/manga/${item.id}`)}
       className={`relative group rounded-3xl overflow-hidden cursor-pointer ${spanClass} border border-border/30 min-h-[200px] md:min-h-0 active:scale-[0.99]`}
@@ -59,6 +62,7 @@ const MangaTrendingCard = memo(function MangaTrendingCard({
         </div>
       </div>
     </div>
+    </Peekable>
   );
 })
 

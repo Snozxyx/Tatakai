@@ -4,6 +4,37 @@ All notable changes to Tatakai are documented here.
 
 ---
 
+## [6.0.6] - 2026-10-06
+
+**Feature & Stability release.** Major mobile media pipeline upgrade with native loopback proxy and in-app APK updater, universal deep links and OAuth bridge, TorBox & Real-Debrid orchestrator hardening, auto-download next episode/chapter, and reader resilience.
+
+### Added
+- **Mobile In-App Updater** — Sideloaded Android APK updates can now be checked, downloaded in-app with real-time progress indicators, and handed directly to Android's package installer without opening an external browser.
+- **Native Mobile Loopback Proxy** — Android & iOS native local loopback media proxy (`127.0.0.1`) matching desktop's `LocalProxyServer`, enabling full header replay, Range requests, and playlist rewrite for `<video>`, `<img>`, HLS streams, and subtitle fetches.
+- **Mobile Quick Peek Sheet** — Thumb-friendly swipe-to-dismiss bottom sheet and long-press quick-peek preview for media cards and posters across mobile views.
+- **Auto-Download Next & Storage Manager** — Automatic queuing of the next episode or chapter upon download completion, Wi-Fi only download gating, and automatic eviction of watched offline media.
+- **Universal Links & Mobile Deep Linking** — Registered `tatakai://` custom schemes and `https://tatakai.me/*` / `https://app.tatakai.me/*` universal App Links for deep linking directly into episodes, anime details, manga reader, and OAuth handoffs.
+- **P2P Torrent Policy & Kill-Switch** — Configurable user toggle in Debrid settings to completely disable P2P swarm traffic while retaining direct cloud debrid streaming.
+- **Double-Click Desktop Fullscreen Hint** — Helpful discovery tooltip and disambiguated single-click play/pause vs double-click fullscreen on the desktop video player.
+- **HLS to MP4 Remuxing on Mobile** — Integrated Android `dev.ffmpegkit-maintained:ffmpeg-kit-https` (16 KB page-aligned for Android 15+) to remux downloaded HLS streams into standalone MP4 files matching desktop capabilities.
+
+### Changed
+- **Debrid Provider Orchestration** — Overhauled Real-Debrid and TorBox clients with robust token verification, multipart request generation, multi-file selection, query caching bypass during polling, and unified `DebridApiError` diagnostics.
+- **Desktop & Mobile Download Flows** — Refactored anime and manga download modals into a streamlined step-by-step wizard (Series → Episodes/Chapters → Server/Source selection) with scanlator and language filtering.
+- **Discord Webhook Forwarder & Error Logging** — Added smart client context detection (OS, browser, app version, route), 5-minute per-user throttling, 1-hour deduplication, rate limit backoff (429 handling), and isolated warning logs from webhook spam.
+- **Continue Reading & Progress Sync** — Local-first optimistic progress persistence merging local device history with Supabase records (newest-wins) ensuring seamless sync even through offline transitions.
+- **Vite & Electron Build Memory** — Increased Node memory limit to 6GB (`NODE_OPTIONS=--max-old-space-size=6144`) across production and Electron build pipelines to prevent out-of-memory errors on large bundles.
+
+### Fixed
+- **Manga Reader Image Lifecycle & Chapter Identity** — Fixed sticky error states across chapters by keying pages by chapter scope and URL, skipping redundant blob wrapping on native loopback URLs, and ranking provider sources by proven reliability.
+- **Embed Pop-under & Navigation Hijacking** — Hardened Android `AntiHijackWebViewClient` and `AdHosts` with embed-active pop-under blocking to prevent untrusted player iframes from hijacking top-level app navigation.
+- **Mobile Torrent Swarm Acceleration** — Injected curated default public fallback trackers for trackerless magnet links and infohashes, reduced initial prebuffer threshold to 2MB, and eliminated seek stuttering on already-downloaded byte ranges.
+- **Desktop OAuth Redirect Mismatch** — Adopted an HTTPS-to-deep-link state bridge for AniList and MyAnimeList OAuth, allowing desktop authentication without requiring custom scheme registration on provider dashboards.
+- **Mobile Bottom Navigation Fullscreen Leak** — Ensured mobile bottom navigation bar immediately unmounts when the mobile video player enters CSS-fallback fullscreen.
+- **Haptic Feedback Throttling** — Added a 120ms throttle to rapid semantic haptic events and respected the system `prefers-reduced-motion` accessibility preference.
+
+---
+
 ## [6.0.5] - 2026-10-04
 
 **Patch release.** Every platform finally ships a working build at the same time, and release notes become reachable from inside the app on desktop, mobile, and web.

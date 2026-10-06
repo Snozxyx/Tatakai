@@ -24,14 +24,15 @@ export const logger = {
   warn: (...args: any[]) => {
     if (!import.meta.env.PROD) {
       origConsole.warn(...args);
-    } else {
-      // In production, optionally send warnings as low-priority logs
-      try {
-        const first = args[0];
-        const message = typeof first === 'string' ? first : JSON.stringify(first);
-        void logClientError(new Error(`[console.warn] ${message}`), { args });
-      } catch {}
     }
+    // NOTE: warnings are intentionally NOT forwarded to Discord. They are still
+    // recorded via logClientError with level 'warning' (DB opt-in only) so
+    // they don't contribute to webhook spam.
+    try {
+      const first = args[0];
+      const message = typeof first === 'string' ? first : safePreview(first);
+      void logClientError(new Error(`[console.warn] ${message}`), { args: previewArgs(args) }, { level: 'warning' });
+    } catch {}
   },
   error: async (...args: any[]) => {
     // Always keep original error output so developers can inspect locally
@@ -39,19 +40,41 @@ export const logger = {
 
     try {
       const first = args[0];
-      const err = first instanceof Error ? first : new Error(args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' '));
+      const err = first instanceof Error ? first : new Error(args.map(a => (typeof a === 'string' ? a : safePreview(a))).join(' '));
 
       // Log to client admin_logs
-      await logClientError(err, { args: args.slice(1) });
+      await logClientError(err, { args: previewArgs(args.slice(1)) }, { level: 'error' });
 
       // Send to Sentry if available
       try {
         const { captureException } = await import('@/lib/sentry');
-        captureException(err, { args: args.slice(1) });
+        captureException(err, { args: previewArgs(args.slice(1)) });
       } catch {}
     } catch {}
   },
 };
+
+function safePreview(value: unknown): string {
+  try {
+    if (typeof value === 'string') return value.slice(0, 300);
+    return JSON.stringify(value)?.slice(0, 300) ?? String(value);
+  } catch {
+    return '[unserializable]';
+  }
+}
+
+function previewArgs(args: unknown[]): unknown[] {
+  // Keep only a small, serializable preview so error payloads stay tiny.
+  return args.slice(0, 3).map((a) => {
+    if (typeof a === 'string') return a.slice(0, 300);
+    try {
+      const json = JSON.stringify(a);
+      return json ? json.slice(0, 300) : String(a);
+    } catch {
+      return '[unserializable]';
+    }
+  });
+}
 
 // Optionally patch console in production to remove noisy dev logs
 export function initConsoleProtection() {

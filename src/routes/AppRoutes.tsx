@@ -7,6 +7,7 @@ import { useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
 import { WebWatchGate } from '@/components/layout/WebWatchGate';
 import { Capacitor } from '@capacitor/core';
 import { initializePlayerAdapters } from '@/core/player/adapters-init';
+import { queryClient } from '@/lib/queryClient';
 
 // Base Pages
 const Index = lazy(() => import("../pages/base/Index"));
@@ -199,6 +200,102 @@ export function GlobalListeners() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [location.pathname]);
+
+  // Progress reconciliation on foreground + realtime. Stale-while-revalidate
+  // alone (5m desktop / 10m mobile) meant the other device's progress stayed
+  // invisible until a manual reload — the "Continue Reading isn't syncing"
+  // report. Refetch both history and readlist whenever the app becomes active
+  // again (app switch, lock/unlock, returning from the native player, window
+  // focus on web), and subscribe to the user's own rows so an update on one
+  // device invalidates the rails on the other within seconds.
+  useEffect(() => {
+    const refreshProgress = () => {
+      queryClient.invalidateQueries({ queryKey: ['watch_history'] });
+      queryClient.invalidateQueries({ queryKey: ['continue_watching'] });
+      queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] });
+      queryClient.invalidateQueries({ queryKey: ['manga-readlist'] });
+      queryClient.invalidateQueries({ queryKey: ['manga-readlist-item'] });
+    };
+
+    let unsubState: (() => Promise<void>) | null = null;
+    let stateActive = !Capacitor.isNativePlatform();
+
+    if (isNative) {
+      void import('@capacitor/app').then(({ AppState }) => {
+        return AppState.getState().then((current) => {
+          stateActive = current === 'active';
+        }).catch(() => undefined).then(() => {
+          return AppState.addEventListener('statechange', (event) => {
+            const nowActive = event.isActive;
+            if (nowActive && !stateActive) refreshProgress();
+            stateActive = nowActive;
+          });
+        });
+      }).then((handle) => {
+        unsubState = typeof handle?.remove === 'function' ? handle.remove : null;
+      }).catch(() => undefined);
+    }
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible' && !stateActive) refreshProgress();
+      stateActive = document.visibilityState === 'visible';
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    const onFocus = () => refreshProgress();
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', onFocus);
+      if (unsubState) void unsubState().catch(() => undefined);
+    };
+  }, [isNative]);
+
+  // Realtime cross-device invalidation: another device's write to our own
+  // `watch_history` / `manga_readlist` rows refreshes this device's rails
+  // without waiting for stale-time expiry or a foreground event.
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    let cleanup: (() => void) | undefined;
+    void (async () => {
+      try {
+        const channel = supabase
+          .channel(`progress-sync-${user.id}`)
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'watch_history', filter: `user_id=eq.${user.id}` },
+            () => {
+              queryClient.invalidateQueries({ queryKey: ['watch_history'] });
+              queryClient.invalidateQueries({ queryKey: ['continue_watching'] });
+            },
+          )
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'manga_readlist', filter: `user_id=eq.${user.id}` },
+            () => {
+              queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] });
+              queryClient.invalidateQueries({ queryKey: ['manga-readlist'] });
+              queryClient.invalidateQueries({ queryKey: ['manga-readlist-item'] });
+            },
+          );
+        await channel.subscribe();
+        if (cancelled) {
+          void supabase.removeChannel(channel);
+          return;
+        }
+        cleanup = () => {
+          void supabase.removeChannel(channel).catch(() => undefined);
+        };
+      } catch {
+        /* realtime unavailable — foreground refresh still covers sync */
+      }
+    })();
+    return () => {
+      cancelled = true;
+      cleanup?.();
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     if (isLoading) return;

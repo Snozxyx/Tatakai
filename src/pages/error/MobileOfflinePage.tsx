@@ -18,12 +18,14 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import {
   Loader2, Download, Trash2, Play, HardDrive, FolderOpen, BookOpen,
-  CheckCircle2, XCircle, X, FileVideo, ChevronDown,
+  CheckCircle2, XCircle, X, FileVideo, ChevronDown, RotateCw, Sparkles,
 } from 'lucide-react';
 import { useMobileDownload, type MobileDownloadQueueItem } from '@/hooks/media/useMobileDownload';
 import { toast } from 'sonner';
 import { db, type DownloadHistoryEntry, type OfflineChapter } from '@/core/db/tatakai-db';
 import { getHistoryByStatus } from '@/core/download/download-history-service';
+import { peekAutoDownloadNext } from '@/core/download/mobile/autoDownloadNext';
+import { evictWatchedAnime } from '@/core/download/mobile/storageManager';
 import { triggerHaptic } from '@/lib/haptics';
 
 function formatBytes(bytes?: number | null): string {
@@ -84,12 +86,24 @@ function seriesKey(id: number, title: string): string {
 
 export default function MobileOfflinePage() {
   const navigate = useNavigate();
-  const { isNative, queue, activeDownloads, cancelDownload } = useMobileDownload();
+  const { isNative, queue, activeDownloads, cancelDownload, retryDownload } = useMobileDownload();
+  const [freeingWatched, setFreeingWatched] = useState(false);
+  // One-shot auto-download-next intent (armed when an episode finishes).
+  // Plain render read (cheap localStorage JSON parse) — no hook, so it stays
+  // above the `!isNative` early return and always reflects the latest intent.
+  let upNext: ReturnType<typeof peekAutoDownloadNext> = null;
+  try {
+    upNext = peekAutoDownloadNext();
+  } catch {
+    upNext = null;
+  }
   const [mangaChapters, setMangaChapters] = useState<OfflineChapter[]>([]);
   const [animeHistory, setAnimeHistory] = useState<DownloadHistoryEntry[]>([]);
   const [loadingLists, setLoadingLists] = useState(true);
   const [deleteMangaTarget, setDeleteMangaTarget] = useState<OfflineChapter | null>(null);
+  const [deleteAnimeTarget, setDeleteAnimeTarget] = useState<DownloadHistoryEntry | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
   const [libraryFilter, setLibraryFilter] = useState<'all' | 'anime' | 'manga'>('all');
 
   const mangaGroups = useMemo(() => {
@@ -172,7 +186,26 @@ export default function MobileOfflinePage() {
 
   const failedItems = queue.filter((q) => q.status === 'failed');
   const hasAnything =
-    activeDownloads.length > 0 || mangaChapters.length > 0 || animeHistory.length > 0 || failedItems.length > 0;
+    activeDownloads.length > 0 || mangaChapters.length > 0 || animeHistory.length > 0 || failedItems.length > 0 || !!upNext;
+
+  const handleFreeWatched = async () => {
+    setFreeingWatched(true);
+    try {
+      const removed = await evictWatchedAnime();
+      if (removed > 0) {
+        void triggerHaptic('success');
+        toast.success(`Freed ${removed} watched item${removed > 1 ? 's' : ''}`);
+        await refreshLists();
+      } else {
+        toast.info('Nothing to free', { description: 'No watched downloads found, or auto-evict is off in mobile settings.' });
+      }
+    } catch {
+      void triggerHaptic('error');
+      toast.error('Could not free storage');
+    } finally {
+      setFreeingWatched(false);
+    }
+  };
 
   const handleReadManga = (ch: OfflineChapter) => {
     void triggerHaptic('tap');
@@ -188,6 +221,16 @@ export default function MobileOfflinePage() {
     if (!localPath) {
       void triggerHaptic('error');
       toast.error('This download has no playable local file.');
+      return;
+    }
+    // Rows written before the size-floor validation (e.g. a few-hundred-byte
+    // block page saved as video) can never play — say so instead of opening
+    // the player into "Error loading video".
+    if (entry.fileSizeBytes != null && entry.fileSizeBytes < 64 * 1024 && !/^torrent-session:\/\//i.test(localPath)) {
+      void triggerHaptic('error');
+      toast.error('This file is broken (too small to be video).', {
+        description: 'Delete it and download the episode again.',
+      });
       return;
     }
 
@@ -226,6 +269,77 @@ export default function MobileOfflinePage() {
     }
   };
 
+  const handleRetryAnime = async (entry: DownloadHistoryEntry) => {
+    // History rows from older builds lack episodeId — fall back to matching
+    // the live queue by series + episode number.
+    const episodeId =
+      entry.episodeId ||
+      queue.find((q) => q.kind === 'anime' && q.animeTitle === entry.animeTitle && q.episode === entry.episodeNumber)?.id;
+    if (!episodeId) {
+      void triggerHaptic('error');
+      toast.info('Re-download from the series page', {
+        description: 'This entry is from an older version and cannot be retried here.',
+      });
+      return;
+    }
+    if (queue.some((q) => q.id === episodeId && (q.status === 'queued' || q.status === 'downloading'))) {
+      toast.info('Already downloading');
+      return;
+    }
+    setRetryingId(entry.id);
+    try {
+      const { retryMobileDownload, deleteMobileAnimeDownload } = await import('@/core/download/mobile/mobileDownloader');
+      const res = await retryMobileDownload(episodeId);
+      if (res.ok) {
+        // Drop the broken row so the retry never plays stale bytes; the new
+        // attempt records a fresh row on completion.
+        await deleteMobileAnimeDownload(entry.id, entry.animeTitle, entry.episodeNumber);
+        void triggerHaptic('success');
+        toast.success(`Re-downloading Episode ${entry.episodeNumber}`);
+        await refreshLists();
+      } else {
+        const reason = 'reason' in res && typeof res.reason === 'string' ? res.reason : 'unknown';
+        if (reason === 'missing_stream_url') {
+          toast.info('Re-download from the series page', {
+            description: 'The original stream link expired. Open the anime and pick the episode again.',
+          });
+        } else {
+          toast.error('Could not restart the download', { description: String(reason || '') });
+        }
+      }
+    } catch (error) {
+      void triggerHaptic('error');
+      toast.error('Could not restart the download', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setRetryingId(null);
+    }
+  };
+
+  const handleDeleteAnime = async () => {
+    if (!deleteAnimeTarget) return;
+    setIsDeleting(true);
+    try {
+      const { deleteMobileAnimeDownload } = await import('@/core/download/mobile/mobileDownloader');
+      const res = await deleteMobileAnimeDownload(deleteAnimeTarget.id, deleteAnimeTarget.animeTitle, deleteAnimeTarget.episodeNumber);
+      if (!res.ok) {
+        throw new Error(typeof (res as { reason?: unknown }).reason === 'string' ? String((res as { reason?: unknown }).reason) : 'delete failed');
+      }
+      {
+        setAnimeHistory((prev) => prev.filter((h) => h.id !== deleteAnimeTarget.id));
+        void triggerHaptic('success');
+        toast.success(`Episode ${deleteAnimeTarget.episodeNumber} deleted from disk`);
+      }
+    } catch {
+      void triggerHaptic('error');
+      toast.error('Failed to delete episode');
+    } finally {
+      setIsDeleting(false);
+      setDeleteAnimeTarget(null);
+    }
+  };
+
   return (
     <div className="min-h-screen">
       <Background />
@@ -255,7 +369,37 @@ export default function MobileOfflinePage() {
               <div><p className="text-lg font-bold tabular-nums">{libraryStats.items}</p><p className="text-[10px] uppercase tracking-wider text-muted-foreground">Items</p></div>
               <div><p className="text-lg font-bold tabular-nums">{formatBytes(libraryStats.bytes)}</p><p className="text-[10px] uppercase tracking-wider text-muted-foreground">Storage</p></div>
             </div>
+            {animeHistory.length > 0 && (
+              <button
+                type="button"
+                onClick={handleFreeWatched}
+                disabled={freeingWatched}
+                className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground disabled:opacity-50"
+              >
+                {freeingWatched ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                {freeingWatched ? 'Freeing…' : 'Free up watched episodes'}
+              </button>
+            )}
           </section>
+
+          {/* Auto-download-next intent: Ep N finished → Ep N+1 is one tap away
+              (or already auto-fetched when its player button resolved). */}
+          {upNext && (
+            <button
+              type="button"
+              onClick={() => { void triggerHaptic('navigate'); navigate(`/anime/${upNext.animeId}`); }}
+              className="mb-5 flex w-full items-center gap-3 rounded-2xl border border-primary/30 bg-primary/10 p-3 text-left shadow-sm transition-colors hover:bg-primary/15 active:scale-[0.99]"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15">
+                <Sparkles className="h-5 w-5 text-primary" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold">Up next: Episode {upNext.nextEpisode}</span>
+                <span className="block truncate text-xs text-muted-foreground">{upNext.animeTitle} — tap to open</span>
+              </span>
+              <Download className="h-4 w-4 shrink-0 text-primary" />
+            </button>
+          )}
 
           {(animeGroups.length > 0 || mangaGroups.length > 0) && (
             <div role="tablist" aria-label="Offline library filter" className="mb-5 grid grid-cols-3 rounded-2xl border border-white/10 bg-white/[0.03] p-1">
@@ -374,27 +518,64 @@ export default function MobileOfflinePage() {
                           <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
                         </summary>
                         <div className="space-y-1 border-t border-white/[0.07] p-2">
-                          {group.items.map((h) => (
-                            <button
+                          {group.items.map((h) => {
+                            const broken = h.fileSizeBytes != null && h.fileSizeBytes < 64 * 1024 && !/^torrent-session:\/\//i.test(String(h.localPath || ''));
+                            return (
+                            <div
                               key={h.id}
-                              type="button"
-                              onClick={() => handlePlayAnime(h)}
-                              className="flex min-h-12 w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-white/[0.04] active:bg-white/[0.08]"
-                              aria-label={`Play episode ${h.episodeNumber}`}
+                              className="flex min-h-12 w-full items-center gap-2 rounded-xl px-2 py-2.5 transition-colors hover:bg-white/[0.04]"
                             >
-                              <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500" />
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium">Episode {h.episodeNumber}</p>
-                                <p className="truncate text-xs text-muted-foreground">
-                                  {h.fileSizeBytes ? formatBytes(h.fileSizeBytes) : 'Downloaded'}{h.completedAt ? ` · ${formatDate(h.completedAt)}` : ''}
-                                </p>
-                              </div>
-                              <Badge variant="secondary" className="shrink-0 text-[10px]">
-                                {h.sourceType === 'torrent' ? 'Torrent' : h.sourceType === 'hls' ? 'HLS' : 'Video'}
-                              </Badge>
-                              <Play className="h-4 w-4 shrink-0 text-primary" />
-                            </button>
-                          ))}
+                              <button
+                                type="button"
+                                onClick={() => handlePlayAnime(h)}
+                                className="flex min-w-0 flex-1 items-center gap-3 text-left active:bg-white/[0.08]"
+                                aria-label={`Play episode ${h.episodeNumber}`}
+                              >
+                                {broken ? (
+                                  <XCircle className="h-4 w-4 shrink-0 text-amber-400" />
+                                ) : (
+                                  <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500" />
+                                )}
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-medium">Episode {h.episodeNumber}</p>
+                                  <p className="truncate text-xs text-muted-foreground">
+                                    {h.fileSizeBytes ? formatBytes(h.fileSizeBytes) : 'Downloaded'}{h.completedAt ? ` · ${formatDate(h.completedAt)}` : ''}
+                                    {broken ? ' · broken' : ''}
+                                  </p>
+                                </div>
+                                <Badge variant="secondary" className="shrink-0 text-[10px]">
+                                  {h.sourceType === 'torrent' ? 'Torrent' : h.sourceType === 'hls' ? 'HLS' : 'Video'}
+                                </Badge>
+                                <Play className="h-4 w-4 shrink-0 text-primary" />
+                              </button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-9 w-9 shrink-0 p-0"
+                                disabled={retryingId === h.id}
+                                onClick={() => { void triggerHaptic('tap'); void handleRetryAnime(h); }}
+                                aria-label={`Re-download episode ${h.episodeNumber}`}
+                                title="Re-download"
+                              >
+                                {retryingId === h.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <RotateCw className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-9 w-9 shrink-0 p-0 text-destructive"
+                                onClick={() => { void triggerHaptic('warning'); setDeleteAnimeTarget(h); }}
+                                aria-label={`Delete episode ${h.episodeNumber}`}
+                                title="Delete from disk"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            );
+                          })}
                         </div>
                       </details>
                     ))}
@@ -402,7 +583,8 @@ export default function MobileOfflinePage() {
                 </section>
               )}
 
-              {/* Failed this session */}
+              {/* Failed this session — anime retries in place, manga deep-links
+                  to its page (chapter resolution only exists there). */}
               {failedItems.length > 0 && (
                 <section>
                   <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
@@ -415,9 +597,30 @@ export default function MobileOfflinePage() {
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-sm truncate">{item.animeTitle || item.title || 'Download'}</p>
                           <p className="text-xs text-red-300/80 truncate">
-                            {item.error || 'Download failed — retry from the series page.'}
+                            {item.error || 'Download failed.'}
                           </p>
                         </div>
+                        {item.kind === 'anime' ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-9 shrink-0 gap-1.5 px-3"
+                            onClick={() => { void triggerHaptic('tap'); retryDownload(item.id); }}
+                            aria-label={`Retry download of ${item.animeTitle || 'episode'}`}
+                          >
+                            <RotateCw className="w-4 h-4" /><span className="text-xs font-semibold">Retry</span>
+                          </Button>
+                        ) : item.anilistId ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-9 shrink-0 gap-1.5 px-3"
+                            onClick={() => { void triggerHaptic('navigate'); navigate(`/manga/${item.anilistId}`); }}
+                            aria-label="Open manga to re-download"
+                          >
+                            <BookOpen className="w-4 h-4" /><span className="text-xs font-semibold">Open</span>
+                          </Button>
+                        ) : null}
                       </div>
                     ))}
                   </div>
@@ -427,6 +630,28 @@ export default function MobileOfflinePage() {
           )}
         </div>
       </main>
+
+      {/* Delete anime dialog — removes the file(s) from disk + the history row */}
+      <Dialog open={!!deleteAnimeTarget} onOpenChange={() => setDeleteAnimeTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Episode?</DialogTitle>
+            <DialogDescription>
+              Delete Episode {deleteAnimeTarget?.episodeNumber} of “{deleteAnimeTarget?.animeTitle}” from disk?
+              {deleteAnimeTarget?.fileSizeBytes ? ` This frees ${formatBytes(deleteAnimeTarget.fileSizeBytes)}.` : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteAnimeTarget(null)} disabled={isDeleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteAnime} disabled={isDeleting}>
+              {isDeleting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete manga dialog */}
       <Dialog open={!!deleteMangaTarget} onOpenChange={() => setDeleteMangaTarget(null)}>

@@ -207,6 +207,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               email: u.email,
               displayName: u.user_metadata?.display_name || u.user_metadata?.full_name || u.email?.split('@')[0],
               provider: u.app_metadata?.provider || 'oauth',
+              userId: u.id,
             });
           }
         }

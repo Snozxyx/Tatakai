@@ -201,7 +201,14 @@ async function downloadEpisode({ url, output, headers = {}, onProgress, episodeI
             inputOptions.push('-headers', `${headerEntries.map(([k, v]) => `${k}: ${v}`).join('\r\n')}\r\n`);
         }
         inputOptions.push('-protocol_whitelist', 'file,http,https,tcp,tls,crypto');
-        command.inputOptions(inputOptions);
+        // Spread (NOT an array): fluent-ffmpeg splits single-array elements on
+        // spaces when they form exactly 2 parts — a lone `-headers` blob like
+        // "Origin: https://host" became `-headers "Origin:" + positional
+        // "https://host", which ffmpeg then treated as the OUTPUT file
+        // ("Unable to find a suitable output format for 'https://…'").
+        // Variadic args disable that splitting; every element is already a
+        // single argv token, so the command is byte-identical except fixed.
+        command.inputOptions(...inputOptions);
         command.outputOptions([
             '-f', 'mp4',
             '-c', 'copy',

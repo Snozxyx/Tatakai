@@ -8,6 +8,8 @@ import { useContentSafetySettings } from "@/hooks/user/useContentSafetySettings"
 import { useMangaHome } from "@/hooks/api/useMangaHome";
 import { inferMangaAdultFlag } from "@/lib/contentSafety";
 import { HomeSectionHeading } from "@/components/home/HomeSectionHeading";
+import { Peekable } from "@/components/media/MediaQuickPeek";
+import { peekFromManga } from "@/components/media/quickPeekStore";
 
 type MangaCardItem = UnifiedMediaCardProps["item"];
 
@@ -64,6 +66,7 @@ function MangaShowcaseCard({ item }: { item: MangaCardItem }) {
   const status = formatStatus(item.status);
 
   return (
+    <Peekable media={peekFromManga(item, `/manga/${item.id}`)}>
     <GlassPanel
       className="group relative cursor-pointer overflow-hidden transition-transform duration-300 ease-out hover:-translate-y-1"
       onClick={() => navigate(`/manga/${item.id}`)}
@@ -132,6 +135,7 @@ function MangaShowcaseCard({ item }: { item: MangaCardItem }) {
         </div>
       </div>
     </GlassPanel>
+    </Peekable>
   );
 }
 

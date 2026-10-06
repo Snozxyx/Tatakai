@@ -30,6 +30,20 @@ import {
 
 const POPUP_VISIBILITY_EVENT = 'tatakai-v6-popup-visibility';
 const POPUP_ACTIVE_CLASS = 'v6-popup-active';
+// Mirrors MobileVideoPlayer's CSS-fallback fullscreen signal (see
+// MOBILE_PLAYER_FULLSCREEN_CLASS/EVENT there — duplicated to keep this
+// chrome module free of the player's heavy imports).
+const PLAYER_FULLSCREEN_EVENT = 'tatakai-mobile-player-fullscreen';
+const PLAYER_FULLSCREEN_CLASS = 'mobile-player-fullscreen';
+
+function isPlayerFullscreenActive(): boolean {
+  if (typeof document === 'undefined') return false;
+  return (
+    document.body.classList.contains(PLAYER_FULLSCREEN_CLASS) ||
+    document.documentElement.classList.contains(PLAYER_FULLSCREEN_CLASS) ||
+    Boolean(document.fullscreenElement)
+  );
+}
 
 // Routes where the bottom bar is noise — auth / onboarding / error / fullscreen-ish.
 const HIDDEN_PREFIXES = [
@@ -125,6 +139,7 @@ export function MobileNav() {
       document.body.classList.contains(POPUP_ACTIVE_CLASS)
     );
   });
+  const [isPlayerFullscreen, setIsPlayerFullscreen] = useState<boolean>(() => isPlayerFullscreenActive());
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
@@ -155,29 +170,45 @@ export function MobileNav() {
     };
   }, []);
 
-  const isActive = (path: string) => location.pathname === path;
-  // Check if haptics are enabled from localStorage
-  const getHapticEnabled = () => {
-    try {
-      const config = localStorage.getItem('tatakai_mobile_config');
-      if (config) {
-        return JSON.parse(config).hapticFeedback !== false;
-      }
-    } catch (e) {}
-    return true;
-  };
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
+    const syncPlayerFullscreen = () => {
+      setIsPlayerFullscreen(isPlayerFullscreenActive());
+    };
+
+    const handlePlayerFullscreenEvent = (event: Event) => {
+      const detail = (event as CustomEvent<{ fullscreen?: boolean }>).detail;
+      if (typeof detail?.fullscreen === 'boolean') {
+        setIsPlayerFullscreen(detail.fullscreen);
+        return;
+      }
+      syncPlayerFullscreen();
+    };
+
+    syncPlayerFullscreen();
+    window.addEventListener(PLAYER_FULLSCREEN_EVENT, handlePlayerFullscreenEvent as EventListener);
+    document.addEventListener('fullscreenchange', syncPlayerFullscreen);
+    document.addEventListener('webkitfullscreenchange', syncPlayerFullscreen);
+
+    return () => {
+      window.removeEventListener(PLAYER_FULLSCREEN_EVENT, handlePlayerFullscreenEvent as EventListener);
+      document.removeEventListener('fullscreenchange', syncPlayerFullscreen);
+      document.removeEventListener('webkitfullscreenchange', syncPlayerFullscreen);
+    };
+  }, []);
+
+  const isActive = (path: string) => location.pathname === path;
+
+  // `impact()` already respects the `hapticFeedback` toggle, reduced-motion
+  // and the rapid-tap throttle in `@/lib/haptics` — no local config parsing.
   const hapticNavigate = useCallback((path: string) => {
-    if (getHapticEnabled()) {
-      impact('light');
-    }
+    void impact('light');
     navigate(path);
   }, [navigate, impact]);
 
   const hapticOpenSettings = useCallback(() => {
-    if (getHapticEnabled()) {
-      impact('light');
-    }
+    void impact('light');
     openSettings();
   }, [impact, openSettings]);
 
@@ -190,9 +221,11 @@ export function MobileNav() {
     : undefined;
 
   // Hide where there is no need: auth/onboarding/error flows, when a takeover
-  // popup is active, and while the settings sheet is open (so the sheet owns
-  // the bottom of the screen and its own nav stays tappable).
-  if (isAnnouncementPopupActive || open || isHiddenRoute(location.pathname)) {
+  // popup is active, while the settings sheet is open (so the sheet owns
+  // the bottom of the screen and its own nav stays tappable), and while the
+  // mobile player holds CSS-fallback fullscreen (the player covers the
+  // viewport; the bar must not paint above it on any device).
+  if (isAnnouncementPopupActive || open || isPlayerFullscreen || isHiddenRoute(location.pathname)) {
     return null;
   }
 
@@ -201,6 +234,7 @@ export function MobileNav() {
 
   const navContent = (
     <div
+      data-mobile-nav
       className="md:hidden fixed inset-x-0 bottom-0 z-[60]"
       role="navigation"
       aria-label="Main navigation"

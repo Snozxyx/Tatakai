@@ -107,10 +107,21 @@ function inferLanguage(source) {
 
 const isHls = (url) => /\.m3u8($|[?#/])/i.test(String(url || ''));
 
+/**
+ * Canonical playback-kind resolver. Precedence mirrors the mobile
+ * `resolveStreamKind` and the renderer's `isEmbedSource` exactly —
+ * torrent > embed (contract `custom`/`embed` type or explicit flag) >
+ * hls (explicit type, isM3U8 flag, or .m3u8 URL) > mp4 > embed fallback —
+ * so HLS rows with extractor-style URLs (no .m3u8 in the URL, type/isM3U8
+ * signals only) no longer collapse into the embed bucket on any platform.
+ */
 function resolveSourceType(s) {
-    if (s.sourceType === 'torrent') return 'torrent';
-    if (s.sourceType === 'hls' || isHls(s.url)) return 'hls';
-    if (s.sourceType === 'mp4' || /\.(mp4|m4v|webm|mkv)($|[?#])/i.test(s.url || '')) return 'mp4';
+    const t = String(s.sourceType || s.type || '').toLowerCase();
+    const url = String(s.url || '');
+    if (t === 'torrent' || s.isTorrent === true || /^magnet:/i.test(url)) return 'torrent';
+    if (t === 'custom' || t === 'embed' || s.isEmbed === true) return 'embed';
+    if (t === 'hls' || s.isM3U8 === true || isHls(url)) return 'hls';
+    if (t === 'mp4' || /\.(mp4|m4v|webm|mkv)($|[?#])/i.test(url)) return 'mp4';
     return 'embed';
 }
 

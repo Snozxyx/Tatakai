@@ -50,6 +50,7 @@ export interface ReaderSettings {
   preloading: ReaderPreloading;
   loadingMethod: ReaderLoadingMethod;
   loadingStrategy: ReaderLoadingStrategy;
+  panelCrop: boolean; // small phones: full-bleed pages (vertical) / height-fit (paged)
 }
 
 const DEFAULT_SETTINGS: ReaderSettings = {
@@ -81,6 +82,7 @@ const DEFAULT_SETTINGS: ReaderSettings = {
   preloading: 'partial',
   loadingMethod: 'native',
   loadingStrategy: 'lazy',
+  panelCrop: false,
 };
 
 const STORAGE_KEY = 'reader-settings';
@@ -147,6 +149,7 @@ const normalizeSettings = (raw: Partial<ReaderSettings> | null | undefined): Rea
   loadingStrategy: VALID_STRATEGY.has(raw?.loadingStrategy as ReaderLoadingStrategy)
     ? (raw!.loadingStrategy as ReaderLoadingStrategy)
     : DEFAULT_SETTINGS.loadingStrategy,
+  panelCrop: asBool(raw?.panelCrop, DEFAULT_SETTINGS.panelCrop),
 });
 
 const areSettingsEqual = (left: ReaderSettings, right: ReaderSettings) =>

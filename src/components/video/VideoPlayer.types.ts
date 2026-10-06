@@ -9,6 +9,8 @@ export interface PlaybackSource {
   isM3U8: boolean;
   quality?: string;
   sourceType?: string;
+  episodeNumber?: number;
+  filenameHint?: string;
   /** Upstream URL + request headers retained by the mobile in-app proxy. */
   originalUrl?: string;
   headers?: Record<string, string>;

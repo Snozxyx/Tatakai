@@ -23,6 +23,8 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), seoPreviewPlugin()],
+    // Production console/debugger stripping (terser `drop_console` parity).
+    esbuild: mode === 'production' ? { drop: ['console', 'debugger'] } : {},
     base: isElectronBuild ? './' : '/',
     resolve: {
       alias: {
@@ -58,13 +60,15 @@ export default defineConfig(({ mode }) => {
     build: {
       // Only generate sourcemaps if explicitly enabled (for debugging)
       sourcemap: mode === 'production' && ((process.env.ENABLE_SOURCEMAPS || env.ENABLE_SOURCEMAPS) === 'true'),
-      minify: 'terser',
-      terserOptions: {
-        compress: {
-          drop_console: mode === 'production', // Remove console.log in production
-          drop_debugger: mode === 'production',
-        },
-      },
+      // Skip the gzip-size pass: it re-compresses every chunk in memory after
+      // minify and was a measurable part of peak build memory on this repo's
+      // ~5000-module graph. Output files are unchanged.
+      reportCompressedSize: false,
+      // esbuild minify: terser OOM'd its worker on this graph even with a 6GB
+      // heap (worker threads don't inherit NODE_OPTIONS), failing every
+      // production build. esbuild is Vite's default minifier, uses a fraction
+      // of the memory, and console/debugger stripping is preserved below.
+      minify: 'esbuild',
       // Webapp specific build config
       rollupOptions: {
         output: {

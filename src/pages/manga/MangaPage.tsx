@@ -59,27 +59,7 @@ import {
 import type { MediaRelation } from "@/core/content/types";
 import { ContentEditSheet, type EditableColumns } from "@/components/admin/ContentEditSheet";
 import { MangaDownloadModal } from "@/components/manga/MangaDownloadModal";
-
-// Reliability order for the reader's cross-source fallback. Mirrors the
-// extension's MANGA_PROVIDERS priority: deterministic mappers (mangadex/comick)
-// and clean HTTP scrapers first, best-effort/CF-gated sources last. A chapter's
-// sources are sorted by this before being handed to the reader as `alternatives`
-// so a dead source falls through to the most trustworthy sibling.
-const MANGA_PROVIDER_RELIABILITY = [
-  "mangadex",
-  "mangapill",
-  "mangakatana",
-  "weebcentral",
-  "nelomanga",
-  "comick",
-  "atsu",
-  "webtoons",
-  "demonicscans",
-];
-function providerReliabilityRank(provider?: string | null): number {
-  const idx = MANGA_PROVIDER_RELIABILITY.indexOf(String(provider || "").toLowerCase());
-  return idx === -1 ? MANGA_PROVIDER_RELIABILITY.length : idx;
-}
+import { sortMangaChapterSources } from "@/lib/reader/mangaSourceSelection";
 
 // --- Helper Component: Relation Tree ---
 function RelationTree({ relations }: { relations: MediaRelation[] }) {
@@ -671,9 +651,7 @@ export default function MangaPage() {
   // Reliability-sort a chapter's sources so the reader's cross-source fallback
   // tries the most trustworthy sibling first when a source yields no pages.
   const sortedSourcesFor = (chapter: { sources?: MangaChapterSource[] } | null | undefined) =>
-    [...(chapter?.sources || [])].sort(
-      (a, b) => providerReliabilityRank(a.provider) - providerReliabilityRank(b.provider),
-    );
+    sortMangaChapterSources(chapter?.sources);
 
   // Navigate to the reader for a specific chapter+source, passing the chapter's
   // reliability-sorted sources as router state (`alternatives`) for fallback.

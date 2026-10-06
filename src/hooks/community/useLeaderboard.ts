@@ -80,9 +80,23 @@ export function useLeaderboard(
       const { data, error } = await query;
 
       if (error) {
-        // Fallback for active if RPC doesn't exist
-        if (type === 'active' && error.code === '42883') {
-          return getActiveLeaderboardFallback(limit);
+        // Fallback for active if the RPC doesn't exist on this backend.
+        // Missing function surfaces as 42883 (direct postgres), PGRST202, or
+        // a 404 "Could not find the function" from PostgREST — all mean the
+        // migration hasn't been applied, so compute locally instead of
+        // erroring (and retry-spamming) forever.
+        if (type === 'active') {
+          const code = String((error as { code?: unknown }).code || '');
+          const msg = String((error as Error).message || '');
+          const status = Number((error as { status?: unknown }).status);
+          if (
+            code === '42883' ||
+            code === 'PGRST202' ||
+            status === 404 ||
+            /could not find the function/i.test(msg)
+          ) {
+            return getActiveLeaderboardFallback(limit);
+          }
         }
         throw error;
       }

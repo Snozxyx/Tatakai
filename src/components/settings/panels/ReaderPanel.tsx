@@ -142,6 +142,7 @@ export function ReaderPanel() {
             }
           />
           <SettingRow title="Double page" description="Paged mode: show two pages side by side" control={<Switch checked={settings.doublePage} onCheckedChange={(c) => updateSetting('doublePage', c)} />} />
+          <SettingRow title="Panel crop" description="Small phones: full-bleed pages in vertical mode, height-fit in paged mode" control={<Switch checked={settings.panelCrop} onCheckedChange={(c) => updateSetting('panelCrop', c)} />} />
           <SettingRow
             title="Brightness"
             description="Dim the pages for comfortable reading"

@@ -84,6 +84,23 @@ public final class AdHosts {
         "tatakai.app", "tatakai.to", "tatakai.me"
     ));
 
+    /**
+     * Hosts the app's own UI legitimately opens externally (desktop's
+     * {@code TRUSTED_EXTERNAL_SUFFIXES}). While an untrusted embed is on
+     * screen, any top-frame navigation to a host outside this set (+ first
+     * party + loopback + LAN) is treated as a click-hijack and swallowed —
+     * desktop {@code evaluateWindowOpen} embed-popunder parity.
+     */
+    private static final Set<String> TRUSTED_EXTERNAL = new HashSet<>(Arrays.asList(
+        "github.com", "githubusercontent.com",
+        "anilist.co", "myanimelist.net", "kitsu.io", "simkl.com",
+        "mangadex.org", "annas-archive.org",
+        "discord.com", "discord.gg", "dsc.gg", "discordapp.com",
+        "twitter.com", "x.com", "facebook.com", "reddit.com",
+        "tatakai.app", "tatakai.to", "tatakai.me",
+        "localhost", "127.0.0.1"
+    ));
+
     /** Lower-cased, `www.`-stripped hostname, or "" when unparseable. */
     public static String hostnameOf(String url) {
         if (url == null || url.isEmpty()) return "";
@@ -111,6 +128,38 @@ public final class AdHosts {
         if (host == null || host.isEmpty()) return false;
         if (host.equals("localhost") || host.equals("127.0.0.1") || host.equals("::1")) return true;
         return matchesSuffix(host, FIRST_PARTY);
+    }
+
+    /** True for loopback (local proxy / torrent stream server) hosts. */
+    public static boolean isLoopbackHost(String host) {
+        if (host == null || host.isEmpty()) return false;
+        String h = host.toLowerCase(Locale.ROOT);
+        return h.equals("localhost") || h.equals("127.0.0.1") || h.equals("::1")
+            || h.equals("0.0.0.0") || h.equals("[::1]");
+    }
+
+    /** Desktop {@code isTrustedExternal} parity (trusted + first-party + LAN). */
+    public static boolean isTrustedExternal(String url) {
+        String host = hostnameOf(url);
+        if (host.isEmpty()) return false;
+        if (isLoopbackHost(host)) return true;
+        if (host.startsWith("10.")
+            || host.startsWith("192.168.")
+            || host.matches("172\\.(1[6-9]|2\\d|3[01])\\..*")) return true;
+        return matchesSuffix(host, TRUSTED_EXTERNAL) || matchesSuffix(host, FIRST_PARTY);
+    }
+
+    /**
+     * Desktop {@code evaluateWindowOpen} embed-popunder verdict: while an embed
+     * is on screen, any unknown (non-trusted) target is refused. Ad-network
+     * targets are always refused.
+     */
+    public static boolean isEmbedPopunder(String url, boolean embedActive) {
+        if (!embedActive) return false;
+        String host = hostnameOf(url);
+        if (host.isEmpty()) return false;
+        if (isHardBlockedHost(host)) return true;
+        return !isTrustedExternal(url);
     }
 
     /** Hard ad/popunder host — always blocked, in any frame. */

@@ -33,7 +33,6 @@ import {
   Flag,
   Share2,
   Users,
-  TrendingUp,
   CircleCheck,
   Download,
   Upload,
@@ -45,6 +44,7 @@ import { useVideoSettings } from "@/hooks/media/useVideoSettings";
 import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from "@/hooks/ui/useIsNativeApp";
 import { useIsMobile } from "@/hooks/ui/use-mobile";
 import { hasTorrentService } from "@/lib/platform/platform";
+import { debridOrchestrator } from "@/core/providers/debrid-orchestrator";
 import { buildUniqueSimpleNameMap, getFriendlyServerName, getSimpleServerDisplayName } from "@/lib/serverNames";
 import { updateLocalContinueWatching, getLocalContinueWatching } from "@/lib/localStorage";
 import { getLocalTorrentSessionHistory, updateLocalTorrentSessionHistory, upsertLocalTorrentSessionHistory } from "@/lib/localStorage";
@@ -65,8 +65,6 @@ import { TorrentSessionPanel } from "@/components/watch/TorrentSessionPanel";
 import { ReviewPopup } from "@/components/ui/ReviewPopup";
 import { OpenInAppButton } from "@/components/common/OpenInAppButton";
 import { Button } from "@/components/ui/button";
-import { MarketplaceSubmitModal } from "@/components/ui/MarketplaceSubmitModal";
-import { MarketplaceModal } from "@/components/ui/MarketplaceModal";
 import { SourceLanguageTabs } from "@/components/watch/SourceLanguageTabs";
 import { SourceTypeBadge } from "@/components/watch/SourceTypeBadge";
 import { normalizeWatchLanguageKey } from "@/lib/languageUtils";
@@ -164,6 +162,18 @@ export default function WatchPage() {
   const { episodeId } = useParams<{ episodeId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  // Parse this before the debrid/torrent hooks below. Keeping it near the data
+  // queries used to put early effects in the temporal dead zone when they
+  // needed to cancel an in-flight debrid resolve on episode changes.
+  const decodedEpisodeId = useMemo(() => {
+    if (!episodeId) return "";
+    const decoded = decodeURIComponent(episodeId);
+    if (decoded.includes("?ep=")) {
+      const [animeSlug, queryPart] = decoded.split("?ep=");
+      return `${animeSlug}?ep=${queryPart}`;
+    }
+    return decoded;
+  }, [episodeId]);
   const { user } = useAuth();
   const { settings } = useVideoSettings();
   const isNative = useIsNativeApp();
@@ -277,6 +287,20 @@ export default function WatchPage() {
     isEmbed?: boolean;
     isM3U8?: boolean;
   }>(null);
+  const [debridPlaybackSource, setDebridPlaybackSource] = useState<null | {
+    id: string;
+    url: string;
+    mode: 'debrid';
+    quality?: string;
+    sourceType: 'debrid';
+    providerName: string;
+    providerKey: string;
+    isEmbed: false;
+    isM3U8: boolean;
+    filenameHint?: string;
+    episodeNumber?: number;
+  }>(null);
+  const [debridPlaybackLoading, setDebridPlaybackLoading] = useState(false);
   const [torrentPlaybackLoading, setTorrentPlaybackLoading] = useState(false);
   const [torrentPlaybackError, setTorrentPlaybackError] = useState<string | null>(null);
   const [torrentLiveStats, setTorrentLiveStats] = useState<any | null>(null);
@@ -284,6 +308,23 @@ export default function WatchPage() {
   const [autoRepairCount, setAutoRepairCount] = useState(0);
   const torrentCompletionHandledRef = useRef(false);
   const lastPlaybackTimeRef = useRef(0);
+  const debridResolveGenerationRef = useRef(0);
+
+  const leaveDebridPlayback = useCallback(() => {
+    // The provider calls themselves cannot be aborted on every transport, so a
+    // generation guard prevents a late result from replacing a newer source.
+    debridResolveGenerationRef.current += 1;
+    setDebridPlaybackSource(null);
+    setDebridPlaybackLoading(false);
+  }, []);
+
+  useEffect(() => {
+    leaveDebridPlayback();
+  }, [decodedEpisodeId, leaveDebridPlayback]);
+
+  useEffect(() => () => {
+    debridResolveGenerationRef.current += 1;
+  }, []);
 
   const formatTorrentRate = useCallback((value?: number) => {
     if (!Number.isFinite(value || 0) || (value || 0) <= 0) return '0 KB/s';
@@ -367,6 +408,76 @@ export default function WatchPage() {
       return;
     }
 
+    const debridProvider = debridOrchestrator.getActiveProviderName();
+    if (debridProvider) {
+      const generation = ++debridResolveGenerationRef.current;
+      leaveTorrentSession();
+      pendingPlaybackCommitRef.current = true;
+      setCommittedPlaybackSource(null);
+      setCommittedPlaybackHeaders(null);
+      setLockedSourceUrl(null);
+      setDebridPlaybackSource(null);
+      setDebridPlaybackLoading(true);
+      setTorrentPlaybackError(null);
+
+      const filenameHint = String(source?.torrentTitle || source?.title || source?.name || '');
+      const episodeNumber = Number(source?.episodeNumber) || undefined;
+
+      try {
+        // Resolve once here, before choosing desktop or mobile playback. Both
+        // players now receive the same concrete HTTP URL and never race by
+        // creating the provider torrent twice (plus the orchestrator's
+        // 10min magnet cache dedupes re-mounts).
+        const aborter = new AbortController();
+        const genAtStart = generation;
+        const onAbort = () => aborter.abort();
+        // Store aborter so unmount/navigation cancels polling instead of
+        // hammering the API in the background.
+        (debridResolveGenerationRef as { currentAbort?: AbortController }).currentAbort?.abort();
+        (debridResolveGenerationRef as { currentAbort?: AbortController }).currentAbort = aborter;
+        const resolvedUrl = await debridOrchestrator.resolveMagnetToStream(magnet, {
+          episodeNumber,
+          filenameHint,
+          signal: aborter.signal,
+          onProgress: (state, progress) => {
+            if (genAtStart !== debridResolveGenerationRef.current) return;
+            const pct = typeof progress === 'number' && Number.isFinite(progress) && progress > 0
+              ? ` ${Math.round(progress)}%`
+              : '';
+            // Uncached torrents prepare for minutes — surface state so the
+            // spinner reads as progress, not a hang.
+            setTorrentPlaybackError(`Preparing via ${debridProvider === 'torbox' ? 'TorBox' : 'Real-Debrid'} (${state}${pct})…`);
+          },
+        });
+        if (generation !== debridResolveGenerationRef.current) return;
+
+        setTorrentPlaybackError(null);
+        setDebridPlaybackSource({
+          id: magnet,
+          url: resolvedUrl,
+          mode: 'debrid',
+          quality: source?.quality,
+          sourceType: 'debrid',
+          providerName: debridProvider === 'torbox' ? 'TorBox' : 'Real-Debrid',
+          providerKey: debridProvider,
+          isEmbed: false,
+          isM3U8: /\.m3u8(?:$|[?#/])/i.test(resolvedUrl),
+          filenameHint,
+          episodeNumber,
+        });
+      } catch (error: any) {
+        if (generation !== debridResolveGenerationRef.current) return;
+        const message = error?.message || 'Could not resolve this release with the selected debrid service.';
+        toast.error(message);
+      } finally {
+        if (generation === debridResolveGenerationRef.current) {
+          setDebridPlaybackLoading(false);
+        }
+      }
+      return;
+    }
+
+    leaveDebridPlayback();
     const runtime = (window as any).tatakaiRuntime;
     if (!torrentServiceAvailable || typeof runtime?.startTorrentSession !== 'function') {
       setTorrentPlaybackError('Torrent playback is unavailable in this app build.');
@@ -425,7 +536,7 @@ export default function WatchPage() {
       setTorrentPlaybackLoading(false);
       setTorrentPlaybackError(err?.message || 'Could not start this torrent.');
     }
-  }, [torrentServiceAvailable, optimizeTorrentStorage, location.search, location.pathname, navigate]);
+  }, [torrentServiceAvailable, optimizeTorrentStorage, location.search, location.pathname, navigate, leaveTorrentSession, leaveDebridPlayback]);
 
   const torrentVerified = Boolean(torrentSessionId && torrentLiveStats?.done === true && torrentLiveStats?.verified !== false);
   const torrentTimelineLocked = Boolean(torrentSessionId && !torrentVerified);
@@ -443,6 +554,8 @@ export default function WatchPage() {
   const torrentTakeoverActive = Boolean(
     torrentSessionId || torrentPlaybackLoading || torrentPlaybackSource,
   );
+  const debridTakeoverActive = debridPlaybackLoading || Boolean(debridPlaybackSource);
+  const playbackTakeoverActive = torrentTakeoverActive || debridTakeoverActive;
 
   useEffect(() => {
     let cancelled = false;
@@ -763,18 +876,6 @@ export default function WatchPage() {
     void handleTorrentCompleted();
   }, [torrentServiceAvailable, torrentSessionId, torrentLiveStats?.done]);
 
-  // Parse the episode ID properly - extract the actual episode ID
-  const decodedEpisodeId = useMemo(() => {
-    if (!episodeId) return "";
-    const decoded = decodeURIComponent(episodeId);
-    // If it contains ?ep=, extract the proper format
-    if (decoded.includes("?ep=")) {
-      const [animeSlug, queryPart] = decoded.split("?ep=");
-      return `${animeSlug}?ep=${queryPart}`;
-    }
-    return decoded;
-  }, [episodeId]);
-
   // Extract anime ID (everything before ?ep=)
   const animeId = useMemo(() => {
     if (!decodedEpisodeId) return "";
@@ -806,8 +907,6 @@ export default function WatchPage() {
   const [failedServers, setFailedServers] = useState<Set<string>>(new Set());
   const [showReviewPopup, setShowReviewPopup] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
-  const [isMarketplaceModalOpen, setIsMarketplaceModalOpen] = useState(false);
-  const [isMarketplaceListVisible, setIsMarketplaceListVisible] = useState(false);
   const [offlineSources, setOfflineSources] = useState<any[]>([]);
   const [offlineManifest, setOfflineManifest] = useState<any>(null);
   const [offlineSubtitles, setOfflineSubtitles] = useState<Array<{ lang: string; url: string; label?: string }>>([]);
@@ -840,13 +939,18 @@ export default function WatchPage() {
 
   // Arm the app-level ad/popunder blocker for the lifetime of this page only.
   // Third-party embeds are the sole place the app renders untrusted markup, so
-  // filtering the rest of the app can only produce false positives.
+  // filtering the rest of the app can only produce false positives. Fans out
+  // to desktop (`ad-blocker.cjs`) and Android (`SecurityState`) alike.
   useEffect(() => {
-    const security = (window as any).electron?.security;
-    if (!security?.setWatchActive) return;
-    security.setWatchActive(true);
+    let active = true;
+    void import('@/core/mobile/securityBridge').then(({ setWatchActiveBridge }) => {
+      if (active) setWatchActiveBridge(true);
+    }).catch(() => undefined);
     return () => {
-      security.setWatchActive(false);
+      active = false;
+      void import('@/core/mobile/securityBridge').then(({ setWatchActiveBridge }) => {
+        setWatchActiveBridge(false);
+      }).catch(() => undefined);
     };
   }, []);
 
@@ -1211,8 +1315,12 @@ export default function WatchPage() {
     }
 
     pendingPlaybackCommitRef.current = true;
+    // A hosted-source choice explicitly ends the debrid takeover. Without
+    // this, the resolved debrid URL continued to win playback selection even
+    // though the newly clicked server was highlighted in the UI.
+    leaveDebridPlayback();
     setSelectedServerIndex(nextIndex);
-  }, []);
+  }, [leaveDebridPlayback]);
 
   // Keep selected server stable when list order changes during progressive discovery.
   useEffect(() => {
@@ -1607,7 +1715,7 @@ export default function WatchPage() {
   // result immediately so entering a watch page behaves like desktop and does
   // not require tapping a language-group source first.
   useEffect(() => {
-    if (selectedServerIndex !== -1 || availableServers.length > 0 || torrentTakeoverActive) return;
+    if (selectedServerIndex !== -1 || availableServers.length > 0 || playbackTakeoverActive) return;
 
     const playable = visibleSources.filter((source: any) => (
       !!source?.url && source.isTorrent !== true && source.sourceType !== "torrent"
@@ -1635,7 +1743,7 @@ export default function WatchPage() {
     availableServers.length,
     selectedServerIndex,
     selectRegularServer,
-    torrentTakeoverActive,
+    playbackTakeoverActive,
     visibleSources,
   ]);
 
@@ -1934,7 +2042,7 @@ export default function WatchPage() {
   }, [lockedSourceUrl, isPlaybackSourceBlocked]);
 
   const playbackHeaders = useMemo<{ Referer?: string; "User-Agent"?: string;[key: string]: string | undefined }>(() => {
-    if (torrentPlaybackSource) {
+    if (torrentPlaybackSource || debridPlaybackSource) {
       return {};
     }
 
@@ -1954,17 +2062,18 @@ export default function WatchPage() {
       Referer: chosenReferer || baseHeaders?.Referer,
       "User-Agent": baseHeaders?.["User-Agent"],
     };
-  }, [sourceDataForPlayback?.headers?.Referer, sourceDataForPlayback?.headers?.["User-Agent"], (selectedSource as any)?.headers, (selectedSource as any)?.refererCandidates, refererRetryIndex, torrentPlaybackSource]);
+  }, [sourceDataForPlayback?.headers?.Referer, sourceDataForPlayback?.headers?.["User-Agent"], (selectedSource as any)?.headers, (selectedSource as any)?.refererCandidates, refererRetryIndex, torrentPlaybackSource, debridPlaybackSource]);
 
   const playbackCandidateSource = useMemo(() => {
+    if (debridPlaybackSource) return debridPlaybackSource;
     if (torrentPlaybackSource) return torrentPlaybackSource;
     // A torrent has been confirmed but its stream URL is not ready yet. Falling
     // back to the previously selected stream here is what left the old source
     // playing behind the torrent, so the candidate is deliberately empty for the
     // duration of the handover — the player shows its loading state instead.
-    if (torrentTakeoverActive) return null;
+    if (playbackTakeoverActive) return null;
     return resolvedSelectedSource || null;
-  }, [torrentPlaybackSource, torrentTakeoverActive, resolvedSelectedSource]);
+  }, [debridPlaybackSource, torrentPlaybackSource, playbackTakeoverActive, resolvedSelectedSource]);
 
   useEffect(() => {
     if (!playbackCandidateSource) {
@@ -1973,7 +2082,7 @@ export default function WatchPage() {
       // case where the old source must go immediately whatever that flag says —
       // it is the source the user just replaced, and keeping it mounted is what
       // kept the previous stream audible.
-      if (pendingPlaybackCommitRef.current || torrentTakeoverActive) {
+      if (pendingPlaybackCommitRef.current || playbackTakeoverActive) {
         setCommittedPlaybackSource(null);
         setCommittedPlaybackHeaders(null);
       }
@@ -1995,13 +2104,16 @@ export default function WatchPage() {
       setCommittedPlaybackSource(playbackCandidateSource);
       setCommittedPlaybackHeaders(playbackHeaders);
     }
-  }, [playbackCandidateSource, playbackHeaders, committedPlaybackSource, torrentTakeoverActive]);
+  }, [playbackCandidateSource, playbackHeaders, committedPlaybackSource, playbackTakeoverActive]);
 
   const activePlaybackSource = committedPlaybackSource || playbackCandidateSource;
   const activePlaybackHeaders = committedPlaybackHeaders || playbackHeaders;
-  const playbackLoading = torrentPlaybackLoading || !playbackCandidateSource || !sourceReady;
+  const playbackLoading = torrentPlaybackLoading || debridPlaybackLoading || !playbackCandidateSource || !sourceReady;
 
   const playbackSources = useMemo(() => {
+    if (debridPlaybackSource) {
+      return [debridPlaybackSource];
+    }
     if (torrentPlaybackSource) {
       return [torrentPlaybackSource];
     }
@@ -2010,7 +2122,7 @@ export default function WatchPage() {
     // has to be empty, not "the direct streams minus the torrent" — VideoPlayer
     // takes `sources[0]` on auto quality, so anything left in here is a stream
     // that keeps playing while the torrent spins up.
-    if (torrentTakeoverActive) {
+    if (playbackTakeoverActive) {
       return [];
     }
 
@@ -2036,13 +2148,13 @@ export default function WatchPage() {
     const activeIndex = directOnly.findIndex((source: any) => source.url === activeUrl);
     if (activeIndex <= 0) return directOnly;
     return [directOnly[activeIndex], ...directOnly.filter((_, i) => i !== activeIndex)];
-  }, [torrentPlaybackSource, torrentTakeoverActive, visibleSources, activePlaybackSource?.url]);
+  }, [debridPlaybackSource, torrentPlaybackSource, playbackTakeoverActive, visibleSources, activePlaybackSource?.url]);
 
   useEffect(() => {
     let cancelled = false;
 
     const runPreflight = async () => {
-      if (!activePlaybackSource || isOfflineMode || activePlaybackSource.isEmbed || activePlaybackSource.sourceType === 'torrent') {
+      if (!activePlaybackSource || isOfflineMode || activePlaybackSource.isEmbed || activePlaybackSource.sourceType === 'torrent' || activePlaybackSource.sourceType === 'debrid' || /^magnet:/i.test(activePlaybackSource.url)) {
         setSourceReady(true);
         setSourcePreflightError(null);
         return;
@@ -2107,30 +2219,6 @@ export default function WatchPage() {
       cancelled = true;
     };
   }, [activePlaybackSource?.url, activePlaybackSource?.providerName, activePlaybackSource?.server, activePlaybackSource?.isEmbed, isOfflineMode, isMobileApp, activePlaybackHeaders?.Referer, activePlaybackHeaders?.["User-Agent"], category, currentServer?.serverName, animeId, decodedEpisodeId, user?.id]);
-
-  // Separate Marketplace sources
-  const marketplaceSources = useMemo(() => {
-    return visibleSources
-      .filter(s => s.langCode?.startsWith('marketplace-'))
-      .map((source: any) => {
-        const meta = (source?.metadata && typeof source.metadata === 'object') ? source.metadata : {};
-        return {
-          ...source,
-          sourceType: source.sourceType || meta.sourceType || (source.magnetLink || meta.magnet_link ? 'magnet' : undefined),
-          magnetLink: source.magnetLink || meta.magnet_link,
-          torrentFileUrl: source.torrentFileUrl || meta.torrent_file_url,
-          externalUrl: source.externalUrl || meta.external_url,
-          streamUrl: source.streamUrl || meta.stream_url || source.url,
-          quality: source.quality || meta.quality,
-          codec: source.codec || meta.codec,
-          audio: source.audio || meta.audio,
-          subtitleType: source.subtitleType || meta.subtitleType,
-          episodeRange: source.episodeRange || meta.episodeRange,
-          releaseGroup: source.releaseGroup || meta.releaseGroup,
-          notes: source.notes || meta.notes,
-        };
-      });
-  }, [visibleSources]);
 
   const officialServerNameSet = useMemo(() => {
     return new Set(availableServers.map((server) => String(server.serverName || "").trim().toLowerCase()).filter(Boolean));
@@ -2360,6 +2448,11 @@ export default function WatchPage() {
     initialSavedRef.current = decodedEpisodeId;
 
     const timeout = setTimeout(async () => {
+      // Only seed the "started watching" row once playback actually began. On
+      // slow servers source resolution takes longer than 5s, so this used to
+      // write a zero-progress row that then raced — and sometimes beat — the
+      // user's real position when another device merged its history.
+      if (lastPlaybackTimeRef.current <= 0) return;
       if (user) {
         try {
           console.debug('[WatchPage] Saving watch history with IDs:', {
@@ -2972,9 +3065,13 @@ export default function WatchPage() {
                   referer={activePlaybackHeaders?.Referer}
                   onError={handleVideoError}
                 />
-              ) : isMobileApp && activePlaybackSource?.sourceType === 'torrent' ? (
+              ) : isMobileApp && (
+                activePlaybackSource?.sourceType === 'torrent'
+                || activePlaybackSource?.sourceType === 'debrid'
+              ) ? (
                 <NativeTorrentPlayer
                   url={activePlaybackSource.url}
+                  streamKind={activePlaybackSource.sourceType === 'debrid' ? 'debrid' : 'torrent'}
                   title={animeData?.info.name}
                   poster={animeData?.info.poster}
                   subtitles={normalizedSubtitles}
@@ -2982,7 +3079,7 @@ export default function WatchPage() {
                   initialSeekSeconds={initialSeekSeconds}
                   introWindow={sourceDataForPlayback?.intro || null}
                   outroWindow={sourceDataForPlayback?.outro || null}
-                  torrentStats={torrentLiveStats}
+                  torrentStats={activePlaybackSource.sourceType === 'torrent' ? torrentLiveStats : null}
                   onProgressUpdate={handleProgressUpdate}
                   onEpisodeEnd={handleEpisodeEnd}
                   onBack={() => navigate(-1)}
@@ -3014,6 +3111,14 @@ export default function WatchPage() {
                   onBack={() => navigate(-1)}
                   hideTimelineUi={Boolean(torrentSessionId && !torrentVerified)}
                   isOffline={isOfflineMode}
+                  sourceType={(activePlaybackSource as any)?.sourceType}
+                  torrentUrl={
+                    String((activePlaybackSource as any)?.sourceType || '').toLowerCase() === 'torrent' ||
+                    String((activePlaybackSource as any)?.sourceType || '').toLowerCase() === 'debrid' ||
+                    String((activePlaybackSource as any)?.url || '').startsWith('magnet:')
+                      ? (torrentLiveStats as any)?.rawUrl
+                      : undefined
+                  }
                 />
               ) : (
                 <VideoPlayer
@@ -3331,33 +3436,24 @@ export default function WatchPage() {
                           </div>
                         )}
 
-                        {/* Community Marketplace Entry Point */}
-                        <div className="flex flex-col gap-4 p-4 rounded-2xl bg-primary/5 border border-primary/10 shadow-inner group">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center group-hover:bg-primary/30 transition-colors">
-                                <Globe className="w-5 h-5 text-primary" />
-                              </div>
-                              <div>
-                                <h4 className="text-sm font-bold tracking-tight">Community Marketplace</h4>
-                                <p className="text-[10px] text-muted-foreground"> {marketplaceSources.length} community sources available</p>
-                              </div>
-                            </div>
-                            <Button
-                              onClick={() => setIsMarketplaceListVisible(true)}
-                              className="rounded-xl px-6 font-black uppercase tracking-widest text-[10px] gap-2 shadow-lg shadow-primary/20 hover:scale-105 transition-all"
-                            >
-                              <TrendingUp className="w-3.5 h-3.5" /> View Marketplace
-                            </Button>
-                          </div>
-                        </div>
-
                         {/* Torrent releases — sortable on the fields that decide the pick */}
                         <TorrentSourcePanel
                           sources={torrentSources}
-                          activeUrl={torrentPlaybackSource?.url}
-                          canPlayTorrent={torrentServiceAvailable}
-                          onSelect={setPendingTorrentSource}
+                          activeUrl={debridPlaybackSource?.id || torrentPlaybackSource?.url}
+                          canPlayTorrent={torrentServiceAvailable || debridOrchestrator.hasActiveProvider()}
+                          onSelect={(source) => {
+                            const contextualSource = {
+                              ...source,
+                              episodeNumber: currentEpisode?.number,
+                            };
+                            if (debridOrchestrator.hasActiveProvider()) {
+                              setSelectedLangCode(source.langCode);
+                              setPreferredServerName(source.providerName || null);
+                              void playTorrentSource(contextualSource);
+                              return;
+                            }
+                            setPendingTorrentSource(contextualSource);
+                          }}
                         />
 
                         {/* Language Groups (Categorized External Sources) */}
@@ -3676,19 +3772,6 @@ export default function WatchPage() {
         targetType="server"
         targetId={decodedEpisodeId || animeId || "unknown"}
         targetName={`${animeData?.info.name || (isOfflineMode ? offlineManifest?.animeName : '')}`}
-      />
-
-      <MarketplaceSubmitModal
-        isOpen={isMarketplaceModalOpen}
-        onClose={() => setIsMarketplaceModalOpen(false)}
-        animeId={animeId || ""}
-        animeName={animeData?.info.name || (isOfflineMode ? offlineManifest?.animeName : '') || ""}
-        episodeNumber={currentEpisode?.number}
-      />
-
-      <MarketplaceModal
-        isOpen={isMarketplaceListVisible}
-        onClose={() => setIsMarketplaceListVisible(false)}
       />
 
       {/* Gate on the swarm switch — see `pendingTorrentSource`. */}

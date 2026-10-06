@@ -24,6 +24,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useCustomHome, useCustomSearch, useCustomSource } from "@/hooks/api/useCustomSource";
 import { ExtensionSlot } from "@/core/extensions/ExtensionSlot";
 import type { CustomMediaCard, CustomSearchFilters } from "@/core/extensions/sdk/types";
+import { isCapacitor } from "@/lib/platform/platform";
+import { registerMobileSource } from "@/core/extensions/mobile/mobileProxy";
 
 /** Map a source card to the shared card contract, routing to the custom info page. */
 function toUnifiedCustomCard(
@@ -34,7 +36,9 @@ function toUnifiedCustomCard(
   return {
     id: String(card.id),
     name: card.title,
-    poster: card.image || "",
+    poster: card.image && isCapacitor() && /^https?:/i.test(card.image)
+      ? registerMobileSource({ url: card.image })
+      : card.image || "",
     mediaType: kind === "read" ? "manga" : "anime",
     status: card.badge || undefined,
     href: `${base}/info/${encodeURIComponent(card.id)}`,

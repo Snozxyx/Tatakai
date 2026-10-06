@@ -22,6 +22,25 @@ interface WatchHistoryItem {
   anilist_id?: number | null;
 }
 
+const NEWEST_WINS_TOLERANCE_MS = 1000;
+
+/**
+ * Newest-wins with a tolerance window. Two writes that land within a second of
+ * each other (the mobile save on pause, then the desktop's stale zero-progress
+ * row) compare as a tie on `watched_at` rounding, and the row order alone would
+ * decide. Break that tie toward the row with the higher progress — a real
+ * position is never worse than the zero the episode write raced past.
+ */
+export function isNewerOrBetter(
+  incoming: Pick<WatchHistoryItem, 'progress_seconds' | 'watched_at'>,
+  existing: Pick<WatchHistoryItem, 'progress_seconds' | 'watched_at'>,
+): boolean {
+  const delta = new Date(incoming.watched_at).getTime() - new Date(existing.watched_at).getTime();
+  if (delta > NEWEST_WINS_TOLERANCE_MS) return true;
+  if (delta < -NEWEST_WINS_TOLERANCE_MS) return false;
+  return (incoming.progress_seconds || 0) > (existing.progress_seconds || 0);
+}
+
 export function useWatchHistory(limit?: number) {
   const { user } = useAuth();
 
@@ -99,7 +118,10 @@ export function useContinueWatching() {
       try {
         for (const it of getLocalContinueWatching()) {
           const existing = byEpisode.get(it.episodeId);
-          if (existing && new Date(it.watchedAt).getTime() <= new Date(existing.watched_at).getTime()) {
+          if (existing && !isNewerOrBetter(
+            { progress_seconds: it.progressSeconds, watched_at: it.watchedAt },
+            existing,
+          )) {
             continue;
           }
           byEpisode.set(it.episodeId, {
@@ -134,10 +156,7 @@ export function useContinueWatching() {
 
           for (const row of ((data as WatchHistoryItem[]) || [])) {
             const existing = byEpisode.get(row.episode_id);
-            if (
-              !existing ||
-              new Date(row.watched_at).getTime() > new Date(existing.watched_at).getTime()
-            ) {
+            if (!existing || isNewerOrBetter(row, existing)) {
               byEpisode.set(row.episode_id, row);
             }
           }
@@ -443,10 +462,22 @@ export async function getSavedProgress(
   }
 
   if (candidates.length === 0) return null;
-  candidates.sort(
-    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-  );
-  return candidates[0];
+  // Newest-wins with the 1s tie-break (same rule as the rail merge): a stale
+  // zero-progress seed must never beat a real position that landed within the
+  // same second — the "resume restarts at 0:00 on the other device" bug.
+  let best = candidates[0];
+  for (let i = 1; i < candidates.length; i += 1) {
+    const incoming = candidates[i];
+    if (
+      isNewerOrBetter(
+        { progress_seconds: incoming.progress, watched_at: incoming.updatedAt },
+        { progress_seconds: best.progress, watched_at: best.updatedAt },
+      )
+    ) {
+      best = incoming;
+    }
+  }
+  return best;
 }
 
 /**

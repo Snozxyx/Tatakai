@@ -17,6 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton-custom';
 import { toast } from 'sonner';
 import { fetchCombinedSources } from '@/lib/api';
 import { useDownload } from '@/hooks/media/useDownload';
+import { hasTorrentService } from '@/lib/platform/platform';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getLanguageLabel } from '@/core/download/language-resolver';
 import { getKnownServerOptions } from '@/lib/serverNames';
@@ -564,7 +565,7 @@ export default function OfflineLibraryPage() {
               <Plus className="w-4 h-4" />
               Import Videos
             </Button>
-            {isNative && (window as any).tatakaiRuntime?.startTorrentSession && (
+            {isNative && hasTorrentService() && (window as any).tatakaiRuntime?.startTorrentSession && (
               <Button variant="outline" size="sm" onClick={() => setTorrentModalOpen(true)} className="gap-2">
                 <Magnet className="w-4 h-4" />
                 Torrent Download

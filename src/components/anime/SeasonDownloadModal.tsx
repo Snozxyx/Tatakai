@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Download, X, CheckCircle2, Circle, FolderOpen, AlertCircle,
-  Bot, Loader2, RefreshCw, Play, Languages, Server,
+  Bot, Loader2, RefreshCw, Play, Languages, Server, ChevronLeft,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GlassPanel } from '@/components/ui/GlassPanel';
@@ -12,6 +12,8 @@ import { useDownload } from '@/hooks/media/useDownload';
 import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from '@/hooks/ui/useIsNativeApp';
 import { normalizeLanguage, getLanguageLabel } from '@/core/download/language-resolver';
 import { getSimpleServerDisplayName } from '@/lib/serverNames';
+import { fetchEpisodeServers } from '@/lib/api';
+import type { EpisodeServer } from '@/types/anime';
 import {
   resolveExtensionApiBase,
   streamExtensionSources,
@@ -406,6 +408,7 @@ export const SeasonDownloadModal = ({
   malId,
 }: SeasonDownloadModalProps) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [step, setStep] = useState<'series' | 'episodes' | 'server'>('series');
   const [isStarting, setIsStarting] = useState(false);
   const [downloadPath, setDownloadPath] = useState<string>('');
   const { startDownload, downloadStates = {} } = useDownload();
@@ -418,8 +421,27 @@ export const SeasonDownloadModal = ({
   const [probed, setProbed] = useState(false);       // a probe has completed at least once
   const [probeNonce, setProbeNonce] = useState(0);    // bump to force a re-probe
   const [probeSources, setProbeSources] = useState<DlSource[]>([]);
+  // WatchPage-method server list: per-episode dispatch servers (same call the
+  // watch page renders), unioned across the sampled episodes.
+  const [dispatchServers, setDispatchServers] = useState<EpisodeServer[]>([]);
   const [selectedLangCode, setSelectedLangCode] = useState<string>('');
   const [selectedServerKey, setSelectedServerKey] = useState<string>('auto');
+
+  /**
+   * A dispatch server matches a probed/downloadable source when any of the
+   * server's identities equals the source's server key (same comparison the
+   * watch page uses to pair servers with sources).
+   */
+  const serverMatchesSource = (server: EpisodeServer, serverKey: string): boolean => {
+    const key = String(serverKey || '').trim().toLowerCase();
+    if (!key) return false;
+    const ids = [server.serverName, server.providerKey, server.providerName]
+      .map((v) => String(v || '').trim().toLowerCase())
+      .filter(Boolean);
+    if (ids.includes(key)) return true;
+    const base = (s: string) => s.split('-')[0];
+    return ids.some((id) => base(id) === base(key));
+  };
 
   const languageOptions = useMemo(() => {
     const m = new Map<string, string>();
@@ -428,14 +450,75 @@ export const SeasonDownloadModal = ({
   }, [probeSources]);
 
   const serverOptions = useMemo(() => {
-    const m = new Map<string, string>();
+    // WatchPage method: dedupe by serverName, rank by the extension's
+    // providerPriority (stable), display via the same label helper.
+    const seen = new Map<string, EpisodeServer>();
+    for (const server of dispatchServers) {
+      const norm = String(server?.serverName || '').trim().toLowerCase();
+      if (!norm || seen.has(norm)) continue;
+      seen.set(norm, server);
+    }
+    let ranked = [...seen.values()]
+      .map((server, idx) => ({ server, idx }))
+      .sort((a, b) => {
+        const pa = Number.isFinite((a.server as any)?.providerPriority)
+          ? Number((a.server as any).providerPriority)
+          : Number.MAX_SAFE_INTEGER;
+        const pb = Number.isFinite((b.server as any)?.providerPriority)
+          ? Number((b.server as any).providerPriority)
+          : Number.MAX_SAFE_INTEGER;
+        return pa === pb ? a.idx - b.idx : pa - pb;
+      })
+      .map(({ server }) => server);
+    // Same noise filter as the watch page: hide the plain TatakaiAPI row when
+    // provider servers exist.
+    if (ranked.length > 1) {
+      const filtered = ranked.filter((s) => {
+        const label = getSimpleServerDisplayName(s.serverName, s.displayName || s.providerName || s.serverName);
+        return s.isProviderServer || label !== 'TatakaiAPI';
+      });
+      if (filtered.length > 0) ranked = filtered;
+    }
+    const fromDispatch = ranked.map((server) => {
+      const name = getSimpleServerDisplayName(server.serverName, server.displayName || server.providerName || server.serverName);
+      let hasHls = false;
+      let hasTorrent = false;
+      for (const s of probeSources) {
+        if (!serverMatchesSource(server, s.serverKey)) continue;
+        if (s.isTorrent) hasTorrent = true; else hasHls = true;
+      }
+      return { key: server.serverName, name, hasHls, hasTorrent };
+    });
+    if (fromDispatch.length > 0) return fromDispatch;
+    // Dispatch unreachable (offline/backend down): fall back to the probed
+    // source enumeration so the picker still offers something.
+    const m = new Map<string, { name: string; hasHls: boolean; hasTorrent: boolean }>();
     probeSources
       .filter(s => !selectedLangCode || s.langCode === selectedLangCode)
-      .forEach(s => { if (!m.has(s.serverKey)) m.set(s.serverKey, s.serverName); });
-    return Array.from(m, ([key, name]) => ({ key, name: getSimpleServerDisplayName(name, name) }));
-  }, [probeSources, selectedLangCode]);
+      .forEach(s => {
+        const entry = m.get(s.serverKey) || { name: s.serverName, hasHls: false, hasTorrent: false };
+        if (s.isTorrent) entry.hasTorrent = true; else entry.hasHls = true;
+        m.set(s.serverKey, entry);
+      });
+    return Array.from(m, ([key, v]) => ({ key, name: getSimpleServerDisplayName(key, v.name), hasHls: v.hasHls, hasTorrent: v.hasTorrent }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dispatchServers, probeSources, selectedLangCode]);
 
-  const representativeId = episodes[0]?.episodeId;
+  // Sample episodes (first / middle / last) for server discovery: different
+  // episodes are often served by different hosts, so probing only episodes[0]
+  // hid servers that only carry later episodes — especially on mobile where
+  // the picker must show ALL HLS servers up front.
+  const sampleEpisodes = useMemo(() => {
+    if (episodes.length === 0) return [];
+    const picks = [episodes[0], episodes[Math.floor(episodes.length / 2)], episodes[episodes.length - 1]];
+    const seen = new Set<string>();
+    return picks.filter((ep) => {
+      if (seen.has(ep.episodeId)) return false;
+      seen.add(ep.episodeId);
+      return true;
+    });
+  }, [episodes]);
+  const representativeId = sampleEpisodes.map((e) => e.episodeId).join('|');
 
   // Cache resolved sources per episode so the probe's work is reused at download
   // time and repeated Start clicks don't re-scrape. Cleared when the anime changes.
@@ -473,38 +556,109 @@ export const SeasonDownloadModal = ({
     } else if (isOpen && isMobile) {
       setDownloadPath('App Storage');
     }
+    if (isOpen) {
+      // Always start the wizard on the series step when (re)opened.
+      setStep('series');
+    }
   }, [isOpen, isDesktop, isMobile]);
 
-  // Probe a representative episode to discover available languages & servers.
-  // This is the background warm-up kicked off the moment the modal opens.
+  // Probe the sampled episodes to discover available languages & servers.
+  // Two enumerations run together, exactly like the watch page:
+  //  1. dispatch servers (`fetchEpisodeServers`, the watch page's own call)
+  //     → the server picker list, unioned across sampled episodes;
+  //  2. downloadable sources (extension fan-out) → language options,
+  //     HLS/Torrent badges, and the actual download URLs.
+  // Sequential source probing on every platform: overlapping provider batches
+  // starve the WebView on mobile and hammer hosts on desktop. Dispatch calls
+  // are cheap metadata POSTs and run in parallel.
   useEffect(() => {
-    if (!isOpen || !isNative || !representativeId) return;
+    if (!isOpen || !isNative || sampleEpisodes.length === 0) return;
     let cancelled = false;
     setProbing(true);
-    const rep = episodes[0];
-    resolveEpisodeCached(rep)
-      .then(({ sources }) => {
-        if (cancelled) return;
-        setProbeSources(sources);
-        // Honor the user's global preferred language (Auto-Download settings)
-        // when it's among the detected languages; otherwise keep the current
-        // pick if still valid, else fall back to the first available.
-        const savedLang = normalizeLanguage(localStorage.getItem('tatakai_default_language') || '');
-        const firstLang = sources[0]?.langCode || '';
-        setSelectedLangCode(prev => {
-          if (savedLang && sources.some(s => s.langCode === savedLang)) return savedLang;
-          if (prev && sources.some(s => s.langCode === prev)) return prev;
-          return firstLang;
-        });
-        // Seed the preferred server from the global default when a detected
-        // server shares its base provider key.
-        const savedServerBase = (localStorage.getItem('tatakai_default_server') || '').split('-')[0];
-        if (savedServerBase) {
-          const match = sources.find(s => (s.serverKey || '').split('-')[0] === savedServerBase);
-          if (match) setSelectedServerKey(prev => (prev === 'auto' ? match.serverKey : prev));
+    // Local timeout so a hanging backend/SSE stream can never leave the
+    // picker on "Detecting…" forever — every path below settles.
+    const withProbeTimeout = <T,>(promise: Promise<T>, ms: number, label: string): Promise<T> => {
+      let timer: ReturnType<typeof setTimeout> | null = null;
+      const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out`)), ms);
+      });
+      return Promise.race([promise, timeout]).finally(() => {
+        if (timer) clearTimeout(timer);
+      }) as Promise<T>;
+    };
+    // 1. WatchPage-method server list (per-episode dispatch, sub+dub).
+    void Promise.allSettled(
+      sampleEpisodes.map((ep) =>
+        withProbeTimeout(fetchEpisodeServers(ep.episodeId), 12000, 'Server list').catch(() => ({ sub: [], dub: [] })),
+      ),
+    ).then((settled) => {
+      if (cancelled) return;
+      const union: EpisodeServer[] = [];
+      const seen = new Set<string>();
+      for (const r of settled) {
+        if (r.status !== 'fulfilled') continue;
+        for (const s of [...(r.value?.sub || []), ...(r.value?.dub || [])]) {
+          const norm = String(s?.serverName || '').trim().toLowerCase();
+          if (!norm || seen.has(norm)) continue;
+          seen.add(norm);
+          union.push(s);
         }
-      })
-      .finally(() => { if (!cancelled) { setProbing(false); setProbed(true); } });
+      }
+      setDispatchServers(union);
+      // Seed the preferred server from the global default when a detected
+      // server shares its base provider key (watch page seeds the same way).
+      const savedServerBase = (localStorage.getItem('tatakai_default_server') || '').split('-')[0];
+      if (savedServerBase) {
+        const match = union.find((s) =>
+          [s.serverName, s.providerKey].some((v) => String(v || '').split('-')[0] === savedServerBase),
+        );
+        if (match) setSelectedServerKey((prev) => (prev === 'auto' ? match.serverName : prev));
+      }
+    }).catch(() => {
+      /* dispatch down — probe-source fallback still lists servers */
+    });
+    (async () => {
+      try {
+        const merged: DlSource[] = [];
+        const seenUrls = new Set<string>();
+        for (const rep of sampleEpisodes) {
+          if (cancelled) break;
+          try {
+            const { sources } = await withProbeTimeout(resolveEpisodeCached(rep), 25000, 'Source probe');
+            for (const s of sources) {
+              if (!seenUrls.has(s.url)) {
+                seenUrls.add(s.url);
+                merged.push(s);
+              }
+            }
+          } catch {
+            /* one dead sample must not kill discovery */
+          }
+        }
+        if (cancelled) return;
+        setProbeSources(merged);
+      // Honor the user's global preferred language (Auto-Download settings)
+      // when it's among the detected languages; otherwise keep the current
+      // pick if still valid, else fall back to the first available.
+      const savedLang = normalizeLanguage(localStorage.getItem('tatakai_default_language') || '');
+      const firstLang = merged[0]?.langCode || '';
+      setSelectedLangCode(prev => {
+        if (savedLang && merged.some(s => s.langCode === savedLang)) return savedLang;
+        if (prev && merged.some(s => s.langCode === prev)) return prev;
+        return firstLang;
+      });
+      if (!cancelled) { setProbing(false); setProbed(true); }
+      } catch {
+        // Unexpected failure above must still settle the picker (the chained
+        // .catch below is the final backstop).
+        if (!cancelled) { setProbing(false); setProbed(true); }
+        throw new Error('probe failed');
+      }
+    })().catch(() => {
+      // Never leave the picker stuck on "Detecting…" — show whatever (if
+      // anything) resolved, or the empty state with a retry button.
+      if (!cancelled) { setProbing(false); setProbed(true); }
+    });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, isNative, representativeId, resolveEpisodeCached, probeNonce]);
@@ -582,10 +736,19 @@ export const SeasonDownloadModal = ({
       if (langCode && candidates.length === 0) { noSourceInLang.push(ep); continue; }
 
       // Chosen server first, then cascade through the rest by priority.
+      // The choice is a watch-page dispatch server; probed sources are paired
+      // to it the same way the player pairs servers with sources.
       if (selectedServerKey && selectedServerKey !== 'auto') {
+        const sel = selectedServerKey.toLowerCase();
+        const chosen = dispatchServers.find(
+          (s) => String(s.serverName || '').trim().toLowerCase() === sel,
+        );
+        const matches = (s: DlSource) => chosen
+          ? serverMatchesSource(chosen, s.serverKey)
+          : String(s.serverKey || '').trim().toLowerCase() === sel;
         candidates = [
-          ...candidates.filter(s => s.serverKey === selectedServerKey),
-          ...candidates.filter(s => s.serverKey !== selectedServerKey),
+          ...candidates.filter(matches),
+          ...candidates.filter((s) => !matches(s)),
         ];
       }
 
@@ -686,6 +849,68 @@ export const SeasonDownloadModal = ({
             </button>
           </div>
 
+          {/* Wizard steps: 1 series → 2 episodes → 3 server */}
+          <div className="flex items-center gap-2 px-0.5" aria-label="Download steps">
+            {(['series', 'episodes', 'server'] as const).map((s, i) => (
+              <div key={s} className="flex items-center gap-2">
+                {i > 0 && <div className="h-px w-6 bg-white/15" />}
+                <button
+                  type="button"
+                  disabled={s !== 'series' && !(s === 'episodes' && step === 'server')}
+                  onClick={() => {
+                    if (s === 'series') setStep('series');
+                    else if (s === 'episodes' && step === 'server') setStep('episodes');
+                  }}
+                  className={`flex items-center gap-1.5 text-[11px] font-semibold ${step === s ? 'text-primary' : 'text-muted-foreground'}`}
+                >
+                  <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${step === s ? 'bg-primary text-white' : 'bg-white/10'}`}>
+                    {i + 1}
+                  </span>
+                  {s === 'series' ? 'Series' : s === 'episodes' ? 'Episodes' : 'Server'}
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {step === 'series' ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+                {posterUrl ? (
+                  <img src={posterUrl} alt={`${animeName} poster`} className="h-24 w-16 shrink-0 rounded-xl object-cover shadow-md" loading="lazy" />
+                ) : (
+                  <span className="flex h-24 w-16 shrink-0 items-center justify-center rounded-xl bg-primary/15"><Play className="h-7 w-7 text-primary" /></span>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-base font-bold">{animeName}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {episodes.length} episode{episodes.length === 1 ? '' : 's'} available
+                    {isMobile ? ' · downloads as MP4' : ''}
+                  </p>
+                  <div className="mt-1.5 flex items-center text-[11px] text-muted-foreground">
+                    <FolderOpen className="mr-1 h-3 w-3 shrink-0" />
+                    <span className="truncate">{downloadPath || 'App Storage'}</span>
+                  </div>
+                </div>
+              </div>
+              <p className="px-1 text-xs text-muted-foreground">
+                Next: pick episodes, then the language and server to download from.
+              </p>
+              <Button
+                onClick={() => { void triggerHaptic('tap'); setStep('episodes'); }}
+                disabled={episodes.length === 0 || !isNative}
+                className="w-full h-12 rounded-xl font-bold"
+              >
+                <span className="flex items-center">Choose episodes <Play className="ml-2 h-4 w-4 fill-current" /></span>
+              </Button>
+            </div>
+          ) : null}
+          {step === 'episodes' && (
+          <>
+          <div className="flex items-center px-0.5 -mb-2">
+            <Button variant="ghost" size="sm" onClick={() => { void triggerHaptic('tap'); setStep('series'); }} className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground">
+              <ChevronLeft className="h-3.5 w-3.5" /> Series
+            </Button>
+          </div>
           {/* Tabs */}
           <Tabs defaultValue="episodes">
             <TabsList className="bg-white/5 border border-white/10 rounded-xl p-1 w-full">
@@ -699,10 +924,10 @@ export const SeasonDownloadModal = ({
 
             {/* Episodes tab */}
             <TabsContent value="episodes" className="mt-4 space-y-5">
-              {/* Step 1 — pick episodes */}
+              {/* Step 2 — pick episodes */}
               <section className="space-y-2.5">
                 <StepHeader
-                  n={1}
+                  n={2}
                   label="Select episodes"
                   hint={`${selectedIds.size}/${episodes.length}`}
                 />
@@ -758,11 +983,39 @@ export const SeasonDownloadModal = ({
                 </ScrollArea>
               </section>
 
-              {/* Step 2 — language (hard filter) + server (soft preference) */}
+              <Button
+                onClick={() => { void triggerHaptic('tap'); setStep('server'); }}
+                disabled={selectedIds.size === 0}
+                className="sticky bottom-[max(0px,env(safe-area-inset-bottom))] z-20 w-full h-14 sm:h-16 rounded-xl sm:rounded-2xl font-bold glow-primary flex-col gap-0.5 shadow-[0_-18px_36px_hsl(var(--background))]"
+              >
+                <span className="flex items-center text-base sm:text-lg">
+                  {selectedIds.size > 0 ? `Continue with ${selectedIds.size} episode${selectedIds.size > 1 ? 's' : ''}` : 'Select episodes'}
+                  <ChevronLeft className="ml-2 h-5 w-5 rotate-180" />
+                </span>
+              </Button>
+            </TabsContent>
+
+
+            {/* Auto-download tab */}
+            <TabsContent value="auto" className="mt-4">
+              <AutoDownloadTab animeId={animeId} animeName={animeName} episodes={episodes} />
+            </TabsContent>
+          </Tabs>
+          </>
+          )}
+          {step === 'server' && (
+          <>
+          <div className="flex items-center px-0.5">
+            <Button variant="ghost" size="sm" onClick={() => { void triggerHaptic('tap'); setStep('episodes'); }} className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground">
+              <ChevronLeft className="h-3.5 w-3.5" /> Episodes
+            </Button>
+          </div>
+
+              {/* Step 3 — language (hard filter) + server (soft preference) */}
               {showSourcePicker && (
                 <section className="space-y-2.5">
                   <StepHeader
-                    n={2}
+                    n={3}
                     label="Language & server"
                     hint={probing ? 'Detecting…' : (languageOptions.length ? `${languageOptions.length} language${languageOptions.length > 1 ? 's' : ''}` : undefined)}
                   />
@@ -825,13 +1078,19 @@ export const SeasonDownloadModal = ({
                               <button
                                 key={s.key}
                                 onClick={() => setSelectedServerKey(s.key)}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                                   selectedServerKey === s.key
                                     ? 'bg-primary text-white border-primary'
                                     : 'bg-white/5 border-white/10 hover:border-white/20'
                                 }`}
                               >
                                 {s.name}
+                                {s.hasHls && !s.hasTorrent && (
+                                  <span className={`rounded px-1 text-[9px] font-bold ${selectedServerKey === s.key ? 'bg-white/20' : 'bg-emerald-500/15 text-emerald-300'}`}>HLS</span>
+                                )}
+                                {s.hasTorrent && !s.hasHls && (
+                                  <span className={`rounded px-1 text-[9px] font-bold ${selectedServerKey === s.key ? 'bg-white/20' : 'bg-amber-500/15 text-amber-300'}`}>TORRENT</span>
+                                )}
                               </button>
                             ))}
                           </div>
@@ -866,14 +1125,8 @@ export const SeasonDownloadModal = ({
                   </>
                 )}
               </Button>
-            </TabsContent>
-
-
-            {/* Auto-download tab */}
-            <TabsContent value="auto" className="mt-4">
-              <AutoDownloadTab animeId={animeId} animeName={animeName} episodes={episodes} />
-            </TabsContent>
-          </Tabs>
+          </>
+          )}
         </GlassPanel>
       </div>
     </div>

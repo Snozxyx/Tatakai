@@ -34,12 +34,17 @@ export interface MobileConfig {
   // Display & orientation
   statusBarStyle: StatusBarStyle; // 'auto' follows the app theme
   orientationLock: OrientationLock; // lock the whole app, or 'auto' to allow rotation
-  forceLandscapeInPlayer: boolean; // rotate to landscape when a video player opens
+  forceLandscapeInPlayer: boolean; // rotate to landscape when a video opens
   keyboardResize: KeyboardResizeMode; // how the webview reacts to the soft keyboard
   // Notifications (local notifications; see lib/mobile/notifications.ts)
   downloadNotifications: boolean; // ongoing download-progress notification
   downloadCompleteNotifications: boolean; // completion notification
   generalNotifications: boolean; // route in-app notifications to the tray
+  // Data & offline (mobile smooth-experience bundle)
+  dataSaver: boolean; // cap quality, preload, autoplay on metered links
+  autoDownloadNext: boolean; // queue the next episode/chapter when one finishes
+  wifiOnlyDownloads: boolean; // only auto-download on unmetered WiFi
+  autoEvictWatched: boolean; // free watched offline items when storage is tight
 }
 
 export const DEFAULT_MOBILE_CONFIG: MobileConfig = {
@@ -54,6 +59,10 @@ export const DEFAULT_MOBILE_CONFIG: MobileConfig = {
   downloadNotifications: true,
   downloadCompleteNotifications: true,
   generalNotifications: true,
+  dataSaver: false,
+  autoDownloadNext: false,
+  wifiOnlyDownloads: true,
+  autoEvictWatched: false,
 };
 
 const STORAGE_KEY = 'tatakai_mobile_config';
@@ -89,6 +98,10 @@ function normalizeConfig(raw: Partial<MobileConfig> | null | undefined): MobileC
       DEFAULT_MOBILE_CONFIG.downloadCompleteNotifications,
     ),
     generalNotifications: asBool(raw?.generalNotifications, DEFAULT_MOBILE_CONFIG.generalNotifications),
+    dataSaver: asBool(raw?.dataSaver, DEFAULT_MOBILE_CONFIG.dataSaver),
+    autoDownloadNext: asBool(raw?.autoDownloadNext, DEFAULT_MOBILE_CONFIG.autoDownloadNext),
+    wifiOnlyDownloads: asBool(raw?.wifiOnlyDownloads, DEFAULT_MOBILE_CONFIG.wifiOnlyDownloads),
+    autoEvictWatched: asBool(raw?.autoEvictWatched, DEFAULT_MOBILE_CONFIG.autoEvictWatched),
   };
 }
 
@@ -143,11 +156,46 @@ export function useMobileConfig() {
   }, []);
 
   const updateConfig = (patch: Partial<MobileConfig>) => {
-    setConfig(patchMobileConfig(patch));
+    // Build from the live state (not a storage re-read) and bail when nothing
+    // changed: every toggle previously allocated a new object + sync-broadcast,
+    // re-rendering this panel and every other subscriber even for no-ops.
+    // The broadcast is deferred so the toggle animation paints first.
+    setConfig((prev) => {
+      const next = normalizeConfig({ ...prev, ...patch });
+      if (configsEqual(prev, next)) return prev;
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore quota / serialization errors */
+      }
+      queueMicrotask(() => {
+        try {
+          window.dispatchEvent(new CustomEvent(UPDATE_EVENT));
+        } catch {
+          /* ignore */
+        }
+      });
+      return next;
+    });
   };
 
   const resetConfig = () => {
-    setConfig(patchMobileConfig(DEFAULT_MOBILE_CONFIG));
+    setConfig((prev) => {
+      if (configsEqual(prev, DEFAULT_MOBILE_CONFIG)) return prev;
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_MOBILE_CONFIG));
+      } catch {
+        /* ignore */
+      }
+      queueMicrotask(() => {
+        try {
+          window.dispatchEvent(new CustomEvent(UPDATE_EVENT));
+        } catch {
+          /* ignore */
+        }
+      });
+      return normalizeConfig(DEFAULT_MOBILE_CONFIG);
+    });
   };
 
   return { config, updateConfig, resetConfig };

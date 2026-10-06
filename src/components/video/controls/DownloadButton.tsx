@@ -1,8 +1,11 @@
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Download, Check, RotateCw, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useDownload } from "@/hooks/media/useDownload";
 import { readProxyQuerySnapshot } from "@/lib/api/proxy-utils";
+import { consumeAutoDownloadNext, peekAutoDownloadNext } from "@/core/download/mobile/autoDownloadNext";
+import { loadMobileConfig } from "@/hooks/ui/useMobileConfig";
+import { isWifiOnlyBlocked } from "@/core/download/mobile/storageManager";
 
 /**
  * The player's HLS `currentSource.url` is a *proxied* URL
@@ -39,6 +42,15 @@ interface DownloadButtonProps {
   torrentUrl?: string;
   headers?: Record<string, string>;
   animeId?: string | number | null;
+  /** Caption tracks for the currently playing episode — saved as sidecars. */
+  subtitles?: Array<{
+    url: string;
+    lang?: string;
+    label?: string;
+    language?: string;
+    originalUrl?: string;
+    headers?: unknown;
+  }>;
 }
 
 /**
@@ -58,11 +70,19 @@ export function DownloadButton({
   torrentUrl,
   headers,
   animeId,
+  subtitles,
 }: DownloadButtonProps) {
   const { isEnabled, downloadStates, startDownload } = useDownload();
 
-  const isTorrent =
-    sourceType === "torrent" || Boolean(torrentUrl) || Boolean(sourceUrl?.startsWith("magnet:"));
+  // Only treat the episode as a torrent when the *playing* source is one.
+  // A stale `torrentUrl` (session state that survives switching back to a
+  // stream) must never hijack a stream download into the slow torrent path.
+  const sourceTypeNorm = String(sourceType || '').toLowerCase();
+  const isTorrentSource =
+    sourceTypeNorm === "torrent" ||
+    sourceTypeNorm === "debrid" ||
+    Boolean(sourceUrl?.startsWith("magnet:"));
+  const isTorrent = isTorrentSource;
   const effectiveUrl = isTorrent ? torrentUrl || sourceUrl : sourceUrl;
 
   const state = episodeId ? downloadStates[episodeId] : undefined;
@@ -74,11 +94,26 @@ export function DownloadButton({
     return Number.isFinite(n) && n > 0 ? n : undefined;
   }, [animeId]);
 
-  if (!isEnabled) return null;
+  // Keep only caption tracks with a real URL and a non-thumbnail language so
+  // season/thumbnail metadata never gets written as a bogus sidecar.
+  const downloadableSubtitles = useMemo(() => {
+    if (!subtitles?.length) return undefined;
+    const out = subtitles
+      .filter((s) => {
+        const u = String(s?.url || '').trim();
+        if (!u) return false;
+        const lang = String(s?.lang || s?.language || s?.label || '').trim().toLowerCase();
+        if (!lang) return false;
+        if (/thumbnail/i.test(lang) || /thumbnail/i.test(u)) return false;
+        return true;
+      })
+      .map((s) => ({ ...s, url: String(s.url).trim() }));
+    return out.length ? out : undefined;
+  }, [subtitles]);
 
   const busy = status === "queued" || status === "downloading";
 
-  const handleClick = async () => {
+  const startNow = useCallback(async () => {
     if (busy) return;
     if (!episodeId) {
       toast.error("Can't download: episode is not identified yet");
@@ -103,6 +138,7 @@ export function DownloadButton({
       headers: dl.headers,
       posterUrl,
       animeId: numericAnimeId,
+      subtitles: downloadableSubtitles,
     });
 
     if (res.ok) {
@@ -119,13 +155,58 @@ export function DownloadButton({
       case "missing_stream_url":
         toast.error("No stream URL to download");
         break;
+      case "mobile_download_failed": {
+        const detail = typeof (res as { error?: unknown }).error === "string" ? String((res as { error?: unknown }).error) : "";
+        // The mobile queue reports "already queued" through this reason.
+        if (detail.includes("already_downloading")) toast.info("Already downloading");
+        else toast.error(detail || "Download failed");
+        break;
+      }
       case "ipc_error":
         toast.error(typeof res.error === "string" ? res.error : "Failed to start download");
         break;
       default:
         toast.error("Downloads are only available on desktop");
     }
+  }, [busy, episodeId, effectiveUrl, isTorrent, headers, startDownload, animeName, episodeNumber, posterUrl, numericAnimeId, downloadableSubtitles]);
+
+  const handleClick = () => {
+    void startNow();
   };
+
+  // Auto-download-next: a completed episode N arms a one-shot intent for N+1.
+  // When this button mounts for that exact episode with a resolved stream URL,
+  // download it without a tap (WiFi-only guard keeps the intent until WiFi).
+  const autoFiredRef = useRef(false);
+  useEffect(() => {
+    if (autoFiredRef.current || busy || status === "completed" || !effectiveUrl || !episodeId) return;
+    if (numericAnimeId == null || episodeNumber == null) return;
+    let enabled = false;
+    try {
+      enabled = loadMobileConfig().autoDownloadNext === true;
+    } catch {
+      return;
+    }
+    if (!enabled) return;
+    let intent: { animeId: number; nextEpisode: number } | null = null;
+    try {
+      intent = peekAutoDownloadNext();
+    } catch {
+      return;
+    }
+    if (!intent || Number(intent.animeId) !== numericAnimeId || Number(intent.nextEpisode) !== Number(episodeNumber)) return;
+    if (isWifiOnlyBlocked()) return;
+    autoFiredRef.current = true;
+    try {
+      consumeAutoDownloadNext(numericAnimeId);
+    } catch {
+      /* intent already peeked — proceed anyway */
+    }
+    toast.success(`Auto-downloading Ep ${episodeNumber} on WiFi`);
+    void startNow();
+  }, [busy, status, effectiveUrl, episodeId, episodeNumber, numericAnimeId, startNow]);
+
+  if (!isEnabled) return null;
 
   let icon = <Download className="w-4 h-4 md:w-5 md:h-5" />;
   let title = "Download episode";

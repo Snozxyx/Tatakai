@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Magnet, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { isP2PDisabled } from '@/lib/torrent/p2pPolicy';
 
 interface TorrentDownloadModalProps {
   open: boolean;
@@ -27,6 +28,10 @@ export function TorrentDownloadModal({ open, onClose, downloadPath }: TorrentDow
   const startSession = useCallback(async (magnet: string, infoHash?: string, label?: string) => {
     const runtime = (window as any).tatakaiRuntime;
     if (!runtime?.startTorrentSession) { toast.error('Torrent session is not available.'); return; }
+    if (isP2PDisabled()) {
+      toast.error('P2P torrents are disabled in Settings. Re-enable them to start this download.');
+      return;
+    }
     const sessionKey = infoHash || magnet.slice(0, 40);
     setStarting(sessionKey); setError(null);
     try {

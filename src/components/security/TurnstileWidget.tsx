@@ -26,7 +26,13 @@ interface TurnstileApi {
       callback?: (token: string) => void;
       "expired-callback"?: () => void;
       "error-callback"?: () => void;
+      "timeout-callback"?: () => void;
       theme?: "auto" | "light" | "dark";
+      size?: "normal" | "compact" | "flexible" | "invisible";
+      retry?: "auto" | "never";
+      "retry-interval"?: number;
+      "refresh-expired"?: "auto" | "manual" | "never";
+      "refresh-timeout"?: "auto" | "manual" | "never";
       action?: string;
     }
   ) => string;
@@ -52,9 +58,28 @@ function loadTurnstileScript(): Promise<void> {
       `script[src^="https://challenges.cloudflare.com/turnstile/v0/api.js"]`
     );
     if (existing) {
-      existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () => reject(new Error("turnstile script failed")));
-      if (window.turnstile) resolve();
+      // The script tag may already be in the DOM but still loading (common on
+      // iOS Safari after a content-blocker hiccup). Wait for it instead of
+      // resolving early, and allow a later retry by clearing the cache on error.
+      if (window.turnstile) {
+        resolve();
+        return;
+      }
+      const onLoad = () => {
+        cleanup();
+        resolve();
+      };
+      const onError = () => {
+        cleanup();
+        scriptPromise = null;
+        reject(new Error("turnstile script failed"));
+      };
+      const cleanup = () => {
+        existing.removeEventListener("load", onLoad);
+        existing.removeEventListener("error", onError);
+      };
+      existing.addEventListener("load", onLoad);
+      existing.addEventListener("error", onError);
       return;
     }
     const script = document.createElement("script");
@@ -62,7 +87,10 @@ function loadTurnstileScript(): Promise<void> {
     script.async = true;
     script.defer = true;
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error("turnstile script failed"));
+    script.onerror = () => {
+      scriptPromise = null;
+      reject(new Error("turnstile script failed"));
+    };
     document.head.appendChild(script);
   });
   return scriptPromise;
@@ -76,17 +104,18 @@ interface TurnstileWidgetProps {
   onToken: (token: string) => void;
   onExpire?: () => void;
   onError?: () => void;
+  onTimeout?: () => void;
   action?: string;
   className?: string;
 }
 
 export const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
-  function TurnstileWidget({ onToken, onExpire, onError, action, className }, ref) {
+  function TurnstileWidget({ onToken, onExpire, onError, onTimeout, action, className }, ref) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const widgetIdRef = useRef<string | null>(null);
     // Keep the latest callbacks without forcing a re-render/re-mount of the widget.
-    const cbRef = useRef({ onToken, onExpire, onError });
-    cbRef.current = { onToken, onExpire, onError };
+    const cbRef = useRef({ onToken, onExpire, onError, onTimeout });
+    cbRef.current = { onToken, onExpire, onError, onTimeout };
 
     useImperativeHandle(ref, () => ({
       reset: () => {
@@ -111,10 +140,20 @@ export const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidget
           widgetIdRef.current = window.turnstile.render(containerRef.current, {
             sitekey: TURNSTILE_SITE_KEY,
             theme: "auto",
+            // Flexible width prevents clipping/overflow on narrow iPhone
+            // viewports (390px). Auto-retry + auto-refresh keeps an expired or
+            // failed challenge (e.g. iCloud Private Relay / content-blocker
+            // hiccup) from bricking the form with a dead "Verification failed".
+            size: "flexible",
+            retry: "auto",
+            "retry-interval": 1500,
+            "refresh-expired": "auto",
+            "refresh-timeout": "auto",
             action,
             callback: (token) => cbRef.current.onToken(token),
             "expired-callback": () => cbRef.current.onExpire?.(),
             "error-callback": () => cbRef.current.onError?.(),
+            "timeout-callback": () => cbRef.current.onTimeout?.() ?? cbRef.current.onError?.(),
           });
         })
         .catch(() => {
@@ -137,6 +176,8 @@ export const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidget
     }, [action]);
 
     if (!isTurnstileEnabled()) return null;
-    return <div ref={containerRef} className={className} />;
+    // Width-constrained wrapper: the flexible widget fills this box and never
+    // overflows a 320–390px iPhone viewport; min-height avoids layout shift.
+    return <div ref={containerRef} className={className} style={{ width: "100%", maxWidth: 320, minHeight: 65, overflow: "hidden" }} />;
   }
 );

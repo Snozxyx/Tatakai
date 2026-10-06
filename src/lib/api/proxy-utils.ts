@@ -1,6 +1,7 @@
 import { getActiveStreamingProxySnapshot } from '@/hooks/user/useProxySettings';
 import { resolveBackendOrigin } from '@/lib/api/backendOrigin';
 import { isMobileProxyUrl } from '@/core/extensions/mobile/mobileProxy';
+import { downgradePosterForDataSaver, isDataSaverEnabled } from '@/lib/mobile/dataSaver';
 
 const STREAM_PROXY_PASSWORD = String(
   import.meta.env.VITE_STREAM_PROXY_PASSWORD || import.meta.env.VITE_PROXY_PASSWORD || ''
@@ -66,7 +67,14 @@ export function getProxiedImageUrl(rawUrl?: string): string {
 export function getHighQualityImage(rawUrl?: string, _anilistId?: number): string {
   const url = String(rawUrl || '').trim();
   if (!url) return '/placeholder.svg';
-  
+
+  // Data-saver: serve the medium variant instead of upgrading to large.
+  try {
+    if (isDataSaverEnabled()) return downgradePosterForDataSaver(url);
+  } catch {
+    /* storage unavailable — fall through to the upgrade path */
+  }
+
   // Upgrade to larger versions if available
   return url
     .replace('/cover/small/', '/cover/large/')
@@ -85,10 +93,32 @@ export function getHighQualityImage(rawUrl?: string, _anilistId?: number): strin
 export function getHighQualityPoster(rawUrl?: string, anilistId?: number): string {
   const url = String(rawUrl || '').trim();
   if (!url) return '/placeholder.svg';
+  try {
+    if (isDataSaverEnabled()) return downgradePosterForDataSaver(url);
+  } catch {
+    /* storage unavailable — fall through to the upgrade path */
+  }
   return url
     .replace('/cover/medium/', '/cover/large/')
     .replace('/banner/small/', '/banner/large/')
     .replace('/banner/medium/', '/banner/large/');
+}
+
+// Debrid CDN links are IP-pinned/expiring: the proxy's IP != the device IP, so
+// wrapping them returns 403 and leaks the token via the proxy logs. Play direct.
+const DEBRID_DIRECT_HOST_SUFFIXES = [
+  'real-debrid.com',
+  'torbox.app',
+  'torboxcdn.com',
+];
+
+export function isDebridDirectUrl(value: string): boolean {
+  try {
+    const host = new URL(String(value || '')).hostname.toLowerCase();
+    return DEBRID_DIRECT_HOST_SUFFIXES.some((h) => host === h || host.endsWith(`.${h}`));
+  } catch {
+    return false;
+  }
 }
 
 function buildProxyUrl(rawUrl: string, referer?: string, userAgent?: string, type: 'video' | 'subtitle' = 'video'): string {
@@ -97,6 +127,8 @@ function buildProxyUrl(rawUrl: string, referer?: string, userAgent?: string, typ
   // the remote proxy would strip the replay headers that make it work.
   if (isMobileProxyUrl(url)) return url;
   if (!url || isLocalLike(url) || !/^https?:/i.test(url)) return url;
+  // Debrid direct links must never go through the shared proxy.
+  if (type === 'video' && isDebridDirectUrl(url)) return url;
 
   const snapshot = getActiveStreamingProxySnapshot();
   const base = snapshot.url || STREAM_PROXY_BASE;

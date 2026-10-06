@@ -5,6 +5,8 @@ export interface PlaybackSource {
   url: string;
   mode: PlaybackMode;
   quality?: string;
+  episodeNumber?: number;
+  filenameHint?: string;
 }
 
 export interface PlayerCoreState {

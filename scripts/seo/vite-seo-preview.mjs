@@ -20,7 +20,7 @@
  * Every failure degrades to the default HTML / a pass-through — a slow or down
  * backend never breaks a page load.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { matchEntityRoute } from './routes.mjs';
@@ -33,11 +33,12 @@ import {
 } from './inject.mjs';
 
 const DEFAULT_OG_IMAGE = `${SITE_ORIGIN}/assets/logo/tatakaibanner.png`;
-const SITEMAP_RE = /^\/sitemap(-[\w.-]+)?\.xml$/;
+const SITEMAP_RE = /^\/sitemap(-[\w.-]+)?\.(xml|xsl)$/;
 
 export function seoPreviewPlugin() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const distIndex = join(scriptDir, '..', '..', 'dist', 'index.html');
+  const distDir = join(scriptDir, '..', '..', 'dist');
+  const distIndex = join(distDir, 'index.html');
 
   let baseIndexHtml = null;
   const getBaseHtml = () => {
@@ -60,20 +61,40 @@ export function seoPreviewPlugin() {
           const rawUrl = req.url || '/';
           const pathname = rawUrl.split('?')[0];
 
-          // ---- Sitemap: stream from the backend generator ----
+          // ---- Sitemap: stream from the backend generator (with local dist fallback) ----
           if (SITEMAP_RE.test(pathname)) {
+            const isXsl = pathname.endsWith('.xsl');
+            const expectedType = isXsl ? 'text/xsl; charset=utf-8' : 'application/xml; charset=utf-8';
             try {
               const upstream = `${SHARE_API_ORIGIN}/api/public${pathname}`;
-              const r = await fetch(upstream, { headers: { accept: 'application/xml' } });
-              if (!r.ok) return next();
-              const xml = await r.text();
-              res.setHeader('Content-Type', 'application/xml; charset=utf-8');
-              res.setHeader('Cache-Control', 'public, max-age=3600');
-              res.end(xml);
-              return;
+              const r = await fetch(upstream, {
+                headers: { accept: isXsl ? 'text/xsl, text/xml, application/xml, */*' : 'application/xml' },
+              });
+              if (r.ok) {
+                const text = await r.text();
+                res.setHeader('Content-Type', expectedType);
+                res.setHeader('Cache-Control', 'public, max-age=3600');
+                res.end(text);
+                return;
+              }
             } catch {
-              return next();
+              // Proceed to local disk fallback below
             }
+
+            // Local fallback if upstream returned non-200 or errored (e.g. dist/sitemap.xsl)
+            const localFile = join(distDir, pathname.replace(/^\/+/, ''));
+            if (existsSync(localFile)) {
+              try {
+                const diskContent = readFileSync(localFile, 'utf8');
+                res.setHeader('Content-Type', expectedType);
+                res.setHeader('Cache-Control', 'public, max-age=3600');
+                res.end(diskContent);
+                return;
+              } catch {
+                return next();
+              }
+            }
+            return next();
           }
 
           // ---- Per-entity meta injection ----

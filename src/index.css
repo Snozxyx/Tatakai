@@ -767,7 +767,30 @@ body[data-theme='brutalist-concrete'] .gradient-text {
 .video-player-container.is-player-fullscreen {
   position: fixed !important;
   inset: 0 !important;
-  z-index: 9999 !important;
+  z-index: 99999 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+}
+
+/* ── Mobile player fullscreen (Capacitor / mobile browsers) ───────────────
+ * The mobile player uses the CSS fallback above instead of the Fullscreen
+ * API, so it toggles `.mobile-player-fullscreen` on <body>/<html> while
+ * active. Belt-and-suspenders with MobileNav's own event subscription: even
+ * when an ancestor stacking context traps the player's fixed positioning on
+ * some devices, the navs cannot paint above the video. The overflow rule
+ * backs the player's inline `body{overflow:hidden}` so exiting always
+ * restores scrolling (see clearFullscreenStyles).
+ */
+body.mobile-player-fullscreen {
+  overflow: hidden !important;
+}
+
+body.mobile-player-fullscreen [data-sidebar],
+body.mobile-player-fullscreen [data-mobile-nav],
+html.mobile-player-fullscreen [data-sidebar],
+html.mobile-player-fullscreen [data-mobile-nav] {
+  display: none !important;
 }
 
 .video-player-container:fullscreen video,
@@ -2057,4 +2080,28 @@ body[data-theme="harvest"] .glass-panel {
     min-height: 2.5rem;
     padding: 0.625rem;
   }
+}
+
+/* Quick-peek bottom sheet: slide up with a small bounce, overlay fades in.
+   GPU-only transforms, matching the app's other entrance animations. */
+@keyframes peek-sheet-in {
+  0% { opacity: 0; transform: translate3d(0, 64px, 0); }
+  55% { opacity: 1; transform: translate3d(0, -8px, 0); }
+  78% { transform: translate3d(0, 4px, 0); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+.animate-peek-sheet-in {
+  animation: peek-sheet-in 0.5s cubic-bezier(0.32, 0.9, 0.35, 1);
+}
+@keyframes peek-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-peek-overlay-in {
+  animation: peek-overlay-in 0.25s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-peek-sheet-in,
+  .animate-peek-overlay-in { animation: none; }
 }

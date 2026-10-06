@@ -66,7 +66,18 @@ function extFromUrl(url, contentType) {
 /**
  * Fetch one page image with its per-page headers into `dir` as `baseName.<ext>`.
  * Skips re-download when a non-empty file with that basename already exists.
+ * Retries transient network/5xx blips once; an HTTP 404 is authoritative
+ * (dead CDN URL) and is thrown immediately so the caller can fall through to
+ * the next source instead of burning retries on a dead link.
  */
+function isRetryableImageError(err) {
+    const status = err?.response?.status;
+    if (status === 404) return false;
+    if (typeof status === 'number') return status >= 500 || status === 429;
+    const code = String(err?.code || '');
+    return code === 'ECONNABORTED' || code === 'ETIMEDOUT' || code === 'ECONNRESET' || !status;
+}
+
 async function downloadImage(url, dir, baseName, headers, signal) {
     if (!fsMod.existsSync(dir)) fsMod.mkdirSync(dir, { recursive: true });
 
@@ -76,47 +87,59 @@ async function downloadImage(url, dir, baseName, headers, signal) {
         if (size > 0) return { file: existing, size };
     }
 
-    const response = await axios({
-        url,
-        method: 'GET',
-        responseType: 'stream',
-        timeout: 45000,
-        signal,
-        headers: {
-            'User-Agent': DEFAULT_UA,
-            Accept: 'image/avif,image/webp,image/apng,image/*,*/*',
-            ...(headers || {}),
-        },
-        maxRedirects: 5,
-        validateStatus: (s) => s >= 200 && s < 400,
-    });
+    let lastErr = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+            const response = await axios({
+                url,
+                method: 'GET',
+                responseType: 'stream',
+                timeout: 45000,
+                signal,
+                headers: {
+                    'User-Agent': DEFAULT_UA,
+                    Accept: 'image/avif,image/webp,image/apng,image/*,*/*',
+                    Referer: headers?.Referer || headers?.referer || undefined,
+                    ...(headers || {}),
+                },
+                maxRedirects: 5,
+                validateStatus: (s) => s >= 200 && s < 400,
+            });
 
-    const ext = extFromUrl(url, response.headers?.['content-type']);
-    const file = `${baseName}.${ext}`;
-    const outputPath = pathMod.join(dir, file);
-    const writer = fsMod.createWriteStream(outputPath);
-    response.data.pipe(writer);
+            const ext = extFromUrl(url, response.headers?.['content-type']);
+            const file = `${baseName}.${ext}`;
+            const outputPath = pathMod.join(dir, file);
+            const writer = fsMod.createWriteStream(outputPath);
+            response.data.pipe(writer);
 
-    return new Promise((resolve, reject) => {
-        writer.on('finish', () => {
-            try {
-                const size = fsMod.statSync(outputPath).size;
-                if (size > 0) resolve({ file, size });
-                else {
-                    fsMod.unlinkSync(outputPath);
-                    reject(new Error('Downloaded image is empty'));
-                }
-            } catch (e) {
-                reject(e);
-            }
-        });
-        writer.on('error', reject);
-        response.data.on('error', (err) => {
-            try { writer.destroy(); } catch (_) { /* empty */ }
-            try { if (fsMod.existsSync(outputPath)) fsMod.unlinkSync(outputPath); } catch (_) { /* empty */ }
-            reject(err);
-        });
-    });
+            return await new Promise((resolve, reject) => {
+                writer.on('finish', () => {
+                    try {
+                        const size = fsMod.statSync(outputPath).size;
+                        if (size > 0) resolve({ file, size });
+                        else {
+                            fsMod.unlinkSync(outputPath);
+                            reject(new Error('Downloaded image is empty'));
+                        }
+                    } catch (e) {
+                        reject(e);
+                    }
+                });
+                writer.on('error', reject);
+                response.data.on('error', (err) => {
+                    try { writer.destroy(); } catch (_) { /* empty */ }
+                    try { if (fsMod.existsSync(outputPath)) fsMod.unlinkSync(outputPath); } catch (_) { /* empty */ }
+                    reject(err);
+                });
+            });
+        } catch (err) {
+            lastErr = err;
+            if (signal?.aborted) throw err;
+            if (!isRetryableImageError(err) || attempt === 1) throw err;
+            await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+        }
+    }
+    throw lastErr || new Error('Download failed');
 }
 
 module.exports = function registerMangaDownloadManager(ipcMain, app, fs, path, logger, getMainWindow, runtimeApi) {
@@ -182,12 +205,7 @@ module.exports = function registerMangaDownloadManager(ipcMain, app, fs, path, l
      *
      * @returns {Promise<Array<{ imageUrl, headers }>>}
      */
-    async function resolvePagesWithHeaders(chapter) {
-        if (!workerPool) throw new Error('extension worker pool unavailable (runtimeApi not wired)');
-        const mangaExts = listMangaExtensionEntries();
-        if (mangaExts.length === 0) throw new Error('No manga extension loaded');
-        if (ensureExtensionFetchProxy) await ensureExtensionFetchProxy();
-
+    function buildChapterSources(chapter) {
         // Each "source" keeps its own sub-provider name + chapterKey. The reader
         // lets the user pick a provider; honor that (and any alternatives) here.
         const sources = [];
@@ -204,6 +222,51 @@ module.exports = function registerMangaDownloadManager(ipcMain, app, fs, path, l
         for (const alt of Array.isArray(chapter.alternatives) ? chapter.alternatives : []) {
             pushSource(alt.provider, alt.chapterKey, alt.providerChapterId);
         }
+        return sources;
+    }
+
+    async function resolveSingleSourcePages(source, chapter, mangaExts) {
+        let lastError = null;
+        for (const { id, entry } of mangaExts) {
+            try {
+                const code = fs.readFileSync(entry.bundlePath, 'utf8');
+                await workerPool.getOrSpawn(id, code, entry.manifest);
+                const result = await workerPool.invoke(id, 'getMangaPages', [
+                    {
+                        chapterKey: source.chapterKey,
+                        provider: source.provider, // SUB-PROVIDER (e.g. "mangadex") — matches the reader
+                        providerChapterId: source.providerChapterId,
+                        anilistId: chapter.anilistId,
+                    },
+                ]);
+                const rawPages = Array.isArray(result) ? result : result?.pages || [];
+                const pages = [];
+                for (const p of Array.isArray(rawPages) ? rawPages : []) {
+                    const imageUrl = String(p?.imageUrl || '');
+                    if (!imageUrl) continue;
+                    const headers =
+                        p.headers && typeof p.headers === 'object' && Object.keys(p.headers).length > 0
+                            ? p.headers
+                            : null;
+                    pages.push({ imageUrl, headers });
+                }
+                logger.info(`[MangaDL] ${id}.getMangaPages(provider=${source.provider}) → ${pages.length} usable page(s) (raw=${Array.isArray(rawPages) ? rawPages.length : 0})`);
+                if (pages.length > 0) return pages;
+            } catch (err) {
+                lastError = err.message;
+                logger.warn(`[MangaDL] getMangaPages failed for ext=${id} provider=${source.provider}: ${err.message}`);
+            }
+        }
+        throw new Error(lastError || `No pages returned for source ${source.provider || '(none)'}`);
+    }
+
+    async function resolvePagesWithHeaders(chapter) {
+        if (!workerPool) throw new Error('extension worker pool unavailable (runtimeApi not wired)');
+        const mangaExts = listMangaExtensionEntries();
+        if (mangaExts.length === 0) throw new Error('No manga extension loaded');
+        if (ensureExtensionFetchProxy) await ensureExtensionFetchProxy();
+
+        const sources = buildChapterSources(chapter);
         logger.info(
             `[MangaDL] resolving pages for chapterKey=${chapter.chapterKey} — ${sources.length} source(s): ` +
             sources.map((s) => s.provider || '(none)').join(' → '),
@@ -211,35 +274,10 @@ module.exports = function registerMangaDownloadManager(ipcMain, app, fs, path, l
 
         let lastError = null;
         for (const source of sources) {
-            for (const { id, entry } of mangaExts) {
-                try {
-                    const code = fs.readFileSync(entry.bundlePath, 'utf8');
-                    await workerPool.getOrSpawn(id, code, entry.manifest);
-                    const result = await workerPool.invoke(id, 'getMangaPages', [
-                        {
-                            chapterKey: source.chapterKey,
-                            provider: source.provider, // SUB-PROVIDER (e.g. "mangadex") — matches the reader
-                            providerChapterId: source.providerChapterId,
-                            anilistId: chapter.anilistId,
-                        },
-                    ]);
-                    const rawPages = Array.isArray(result) ? result : result?.pages || [];
-                    const pages = [];
-                    for (const p of Array.isArray(rawPages) ? rawPages : []) {
-                        const imageUrl = String(p?.imageUrl || '');
-                        if (!imageUrl) continue;
-                        const headers =
-                            p.headers && typeof p.headers === 'object' && Object.keys(p.headers).length > 0
-                                ? p.headers
-                                : null;
-                        pages.push({ imageUrl, headers });
-                    }
-                    logger.info(`[MangaDL] ${id}.getMangaPages(provider=${source.provider}) → ${pages.length} usable page(s) (raw=${Array.isArray(rawPages) ? rawPages.length : 0})`);
-                    if (pages.length > 0) return pages;
-                } catch (err) {
-                    lastError = err.message;
-                    logger.warn(`[MangaDL] getMangaPages failed for ext=${id} provider=${source.provider}: ${err.message}`);
-                }
+            try {
+                return await resolveSingleSourcePages(source, chapter, mangaExts);
+            } catch (err) {
+                lastError = err.message;
             }
         }
         throw new Error(lastError || 'No pages returned for chapter');
@@ -268,48 +306,110 @@ module.exports = function registerMangaDownloadManager(ipcMain, app, fs, path, l
         try {
             if (!fs.existsSync(chapDir)) fs.mkdirSync(chapDir, { recursive: true });
 
-            const pages = await resolvePagesWithHeaders({ ...chapter, anilistId: series.anilistId });
-            if (state.cancelled) throw new Error('cancelled');
+            // Try each source's pages for DOWNLOAD, not just resolution: the
+            // primary source may resolve pages whose CDN URLs are dead (HTTP
+            // 404 from rotated/signed links) while an alternative scanlator
+            // serves fine. First source with >0 downloaded pages wins.
+            const chapterWithAnilist = { ...chapter, anilistId: series.anilistId };
+            const sources = buildChapterSources(chapterWithAnilist);
+            if (!workerPool) throw new Error('extension worker pool unavailable (runtimeApi not wired)');
+            const mangaExts = listMangaExtensionEntries();
+            if (mangaExts.length === 0) throw new Error('No manga extension loaded');
+            if (ensureExtensionFetchProxy) await ensureExtensionFetchProxy();
 
-            const totalPages = pages.length;
-            const pageEntries = [];
+            let pages = [];
+            let usedSource = sources[0] || null;
+            let lastResolveError = null;
+            let downloadedFromSource = null;
+            let pageEntries = [];
             let sizeBytes = 0;
+            let totalPages = 0;
 
-            for (let i = 0; i < totalPages; i++) {
+            for (const source of sources) {
                 if (state.cancelled) throw new Error('cancelled');
-                const baseName = String(i + 1).padStart(3, '0');
+                let candidatePages = [];
                 try {
-                    const { file, size } = await downloadImage(
-                        pages[i].imageUrl,
-                        chapDir,
-                        baseName,
-                        pages[i].headers,
-                        state.abort.signal,
-                    );
-                    sizeBytes += size;
-                    pageEntries.push({ pageNumber: i + 1, file, sizeBytes: size });
+                    candidatePages = await resolveSingleSourcePages(source, chapterWithAnilist, mangaExts);
                 } catch (err) {
-                    if (state.cancelled) throw new Error('cancelled');
-                    logger.warn(`[MangaDownload] page ${i + 1} failed (${jobId}): ${err.message}`);
+                    lastResolveError = err.message;
+                    logger.warn(`[MangaDL] source ${source.provider || '(none)'} resolve failed: ${err.message}`);
+                    continue;
                 }
-                send('manga-download-progress', {
-                    jobId,
-                    anilistId: series.anilistId,
-                    chapterKey: chapter.chapterKey,
-                    page: i + 1,
-                    totalPages,
-                    percent: totalPages ? Math.round(((i + 1) / totalPages) * 100) : 0,
-                });
+                if (state.cancelled) throw new Error('cancelled');
+
+                // Clean partial files from a previous dead source attempt so
+                // extensions/stale pages never mix across scanlators.
+                if (downloadedFromSource !== null) {
+                    try {
+                        for (const f of fsMod.readdirSync(chapDir)) {
+                            if (/^\d{3}\./.test(f)) fsMod.unlinkSync(pathMod.join(chapDir, f));
+                        }
+                    } catch (_) { /* best-effort */ }
+                }
+
+                const attemptEntries = [];
+                let attemptBytes = 0;
+                for (let i = 0; i < candidatePages.length; i++) {
+                    if (state.cancelled) throw new Error('cancelled');
+                    const baseName = String(i + 1).padStart(3, '0');
+                    try {
+                        const { file, size } = await downloadImage(
+                            candidatePages[i].imageUrl,
+                            chapDir,
+                            baseName,
+                            candidatePages[i].headers,
+                            state.abort.signal,
+                        );
+                        attemptBytes += size;
+                        attemptEntries.push({ pageNumber: i + 1, file, sizeBytes: size });
+                    } catch (err) {
+                        if (state.cancelled) throw new Error('cancelled');
+                        logger.warn(`[MangaDownload] page ${i + 1} failed (${jobId}, src=${source.provider || '?'}): ${err.message}`);
+                    }
+                    send('manga-download-progress', {
+                        jobId,
+                        anilistId: series.anilistId,
+                        chapterKey: chapter.chapterKey,
+                        page: i + 1,
+                        totalPages: candidatePages.length,
+                        percent: candidatePages.length ? Math.round(((i + 1) / candidatePages.length) * 100) : 0,
+                    });
+                }
+
+                if (attemptEntries.length > 0) {
+                    pages = candidatePages;
+                    usedSource = source;
+                    downloadedFromSource = source;
+                    pageEntries = attemptEntries;
+                    sizeBytes = attemptBytes;
+                    totalPages = candidatePages.length;
+                    if (source !== sources[0]) {
+                        logger.info(`[MangaDL] ${jobId} fell through to alternative source ${source.provider} (${pageEntries.length}/${totalPages} pages)`);
+                    }
+                    break;
+                }
+                logger.warn(`[MangaDL] source ${source.provider || '(none)'} downloaded 0/${candidatePages.length} pages — trying next source`);
+                lastResolveError = `Source ${source.provider || '(none)'} returned dead image links (404)`;
             }
 
-            if (pageEntries.length === 0) throw new Error('No pages downloaded');
+            if (pageEntries.length === 0) {
+                const all404 = /404/.test(String(lastResolveError || ''));
+                throw new Error(
+                    lastResolveError
+                        ? all404
+                            ? `${lastResolveError}. The chapter's image links are dead — try another provider/source.`
+                            : lastResolveError
+                        : 'No pages downloaded',
+                );
+            }
 
             // Chapter manifest.
+            const effectiveProvider = usedSource?.provider ?? chapter.provider ?? null;
             const chapterManifest = {
                 chapterKey: chapter.chapterKey,
                 chapterNumber: chapter.chapterNumber ?? null,
                 volume: chapter.volume ?? null,
-                provider: chapter.provider ?? null,
+                provider: effectiveProvider,
                 pageCount: pageEntries.length,
                 sizeBytes,
                 pages: pageEntries,
@@ -322,7 +422,7 @@ module.exports = function registerMangaDownloadManager(ipcMain, app, fs, path, l
                 chapterKey: chapter.chapterKey,
                 chapterNumber: chapter.chapterNumber ?? null,
                 volume: chapter.volume ?? null,
-                provider: chapter.provider ?? null,
+                provider: effectiveProvider,
                 dir: path.basename(chapDir),
                 pageCount: pageEntries.length,
                 sizeBytes,
@@ -336,7 +436,7 @@ module.exports = function registerMangaDownloadManager(ipcMain, app, fs, path, l
                 chapterKey: chapter.chapterKey,
                 chapterNumber: chapter.chapterNumber ?? null,
                 volume: chapter.volume ?? null,
-                provider: chapter.provider ?? null,
+                provider: effectiveProvider,
                 title: series.title,
                 localDir: chapDir,
                 pageCount: pageEntries.length,

@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getMangaReadByKey } from "@/core/content/manga-client";
 import type { MangaPage, MappedMangaChapter } from "@/types/manga";
+import {
+  pickMangaChapterSource,
+  sortMangaChapterSources,
+} from "@/lib/reader/mangaSourceSelection";
 
 /**
  * Cross-chapter continuous scroll (vertical/webtoon mode).
@@ -27,11 +31,8 @@ export interface ReaderSegment {
   scanlator: string | null; // scanlation group of the source that served the pages
   providerChapterId: string | null; // provider-native chapter id
   extensionId: string | null; // runtime extension namespace that served the pages
-}
-
-function pickSource(chapter: MappedMangaChapter, preferProvider?: string) {
-  const src = chapter.sources || [];
-  return src.find((s) => s.provider === preferProvider) || src[0] || null;
+  requestedProvider: string;
+  fallbackUsed: boolean;
 }
 
 export function useContinuousReader(params: {
@@ -51,9 +52,14 @@ export function useContinuousReader(params: {
   // Indices currently in-flight or already resolved — dedupe across sentinel spam.
   const busyRef = useRef<Set<number>>(new Set());
   const doneRef = useRef<Set<number>>(new Set());
+  // Generation guard: an in-flight loadChapter from the previous entry chapter
+  // must not append into the reset stream after navigation (stale segments
+  // from ch1 appearing inside ch2's scroll surface).
+  const generationRef = useRef(0);
 
   // New navigation (or toggling the feature) starts a fresh stream from the entry.
   useEffect(() => {
+    generationRef.current += 1;
     setAfter([]);
     setBefore([]);
     busyRef.current = new Set();
@@ -64,28 +70,38 @@ export function useContinuousReader(params: {
     async (index: number): Promise<ReaderSegment | null> => {
       const chapter = chapters[index];
       if (!chapter) return null;
-      const source = pickSource(chapter, preferProvider);
+      const source = pickMangaChapterSource(chapter.sources, preferProvider);
       if (!source) return null;
+      const alternatives = sortMangaChapterSources(chapter.sources);
       const resp = await getMangaReadByKey(mangaId, source.chapterKey, {
         provider: source.provider,
         providerChapterId: source.providerChapterId,
-        alternatives: chapter.sources,
+        alternatives,
       });
       const pages = resp?.data?.pages ?? [];
       if (!pages.length) return null;
+      const servedProvider = resp?.data?.chapter?.provider || source.provider;
+      const servedKey = resp?.data?.chapter?.chapterKey || source.chapterKey;
+      const servedSource = chapter.sources?.find(
+        (candidate) =>
+          candidate.provider === servedProvider && candidate.chapterKey === servedKey,
+      ) || source;
       return {
         index,
-        key: source.chapterKey,
+        key: servedKey,
         number: chapter.chapterNumber,
         title:
           chapter.chapterTitle ||
           (chapter.chapterNumber != null ? `Chapter ${chapter.chapterNumber}` : "Chapter"),
-        provider: resp?.data?.chapter?.provider || source.provider,
-        language: resp?.data?.chapter?.language ?? source.language,
+        provider: servedProvider,
+        language: resp?.data?.chapter?.language ?? servedSource.language,
         pages,
-        scanlator: source.scanlator ?? null,
-        providerChapterId: resp?.data?.chapter?.providerChapterId || source.providerChapterId || null,
+        scanlator: servedSource.scanlator ?? null,
+        providerChapterId: resp?.data?.chapter?.providerChapterId || servedSource.providerChapterId || null,
         extensionId: resp?.data?.readMeta?.provider ?? resp?.data?.chapter?.provider ?? null,
+        requestedProvider: source.provider,
+        fallbackUsed:
+          Boolean(resp?.data?.readMeta?.fallbackUsed) || servedProvider !== source.provider,
       };
     },
     [chapters, mangaId, preferProvider],
@@ -100,8 +116,10 @@ export function useContinuousReader(params: {
     if (busyRef.current.has(nextIdx) || doneRef.current.has(nextIdx)) return;
     busyRef.current.add(nextIdx);
     setLoadingNext(true);
+    const gen = generationRef.current;
     try {
       const seg = await loadChapter(nextIdx);
+      if (gen !== generationRef.current) return; // navigated mid-fetch: drop stale segment
       if (seg) {
         doneRef.current.add(nextIdx);
         setAfter((prev) => (prev.some((s) => s.index === nextIdx) ? prev : [...prev, seg]));
@@ -110,7 +128,7 @@ export function useContinuousReader(params: {
       /* leave the sentinel able to retry on the next scroll */
     } finally {
       busyRef.current.delete(nextIdx);
-      setLoadingNext(false);
+      if (gen === generationRef.current) setLoadingNext(false);
     }
   }, [enabled, after, entryIndex, chapters.length, loadChapter]);
 
@@ -122,8 +140,10 @@ export function useContinuousReader(params: {
     if (busyRef.current.has(prevIdx) || doneRef.current.has(prevIdx)) return;
     busyRef.current.add(prevIdx);
     setLoadingPrev(true);
+    const gen = generationRef.current;
     try {
       const seg = await loadChapter(prevIdx);
+      if (gen !== generationRef.current) return; // navigated mid-fetch: drop stale segment
       if (seg) {
         doneRef.current.add(prevIdx);
         setBefore((prev) => (prev.some((s) => s.index === prevIdx) ? prev : [seg, ...prev]));
@@ -132,7 +152,7 @@ export function useContinuousReader(params: {
       /* retry on next upward scroll */
     } finally {
       busyRef.current.delete(prevIdx);
-      setLoadingPrev(false);
+      if (gen === generationRef.current) setLoadingPrev(false);
     }
   }, [enabled, before, entryIndex, loadChapter]);
 

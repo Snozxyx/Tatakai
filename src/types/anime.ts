@@ -160,10 +160,10 @@ export interface EpisodeData {
    *
    * Kept strictly separate from `episodeId`. This used to *be* the `episodeId`
    * whenever AniList had a streaming row, which broke every consumer that parses
-   * the id: `/playback/dispatch` could extract neither a tatakaiId nor an episode
-   * number from `https://www.crunchyroll.com/watch/…` and answered 400, the
-   * header rendered "Episode ?", and the Supabase view counter 406'd on a URL
-   * where it expected an id.
+   * the id: source resolution could extract neither a tatakaiId nor an episode
+   * number from `https://www.crunchyroll.com/watch/…`, the header rendered
+   * "Episode ?", and the Supabase view counter 406'd on a URL where it
+   * expected an id.
    */
   externalUrl?: string;
 }

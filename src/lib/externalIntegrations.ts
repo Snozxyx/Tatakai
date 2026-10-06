@@ -84,14 +84,18 @@ const ANILIST_AUTH_URL = 'https://anilist.co/api/v2/oauth/authorize';
 // AniList GraphQL is reached through the TatakaiAPI proxy (see anilistQuery).
 
 // The redirect URI that AniList sends the code back to must be identical in the
-// authorize request and the token exchange. On desktop the connect handler uses
-// a `tatakai://` deep link instead of the web origin, so we persist whichever URI
-// initiated the flow and read it back at exchange time.
+// authorize request and the token exchange. Desktop uses the same https URI as
+// web (AniList allows only ONE registered redirect URI) plus a `state` marker;
+// the web redirect page forwards desktop-marked callbacks to the app via
+// `tatakai://` (see desktopOAuth.ts). We persist whichever URI initiated the
+// flow and read it back at exchange time.
 const ANILIST_REDIRECT_STORAGE_KEY = 'anilist_redirect_uri';
+const ANILIST_STATE_STORAGE_KEY = 'anilist_oauth_state';
 
-// Generate AniList OAuth URL. Pass an explicit `redirectUri` (e.g. a desktop
-// deep link) to override the default web redirect.
-export function getAniListAuthUrl(redirectUri?: string): string {
+// Generate AniList OAuth URL. Pass an explicit `redirectUri` to override the
+// default web redirect, and `state` to tag the flow (desktop passes
+// `buildDesktopOAuthState()` so the https bridge page can route back to the app).
+export function getAniListAuthUrl(redirectUri?: string, state?: string): string {
   if (!ANILIST_CLIENT_ID) {
     throw new Error('Missing VITE_ANILIST_CLIENT_ID');
   }
@@ -99,6 +103,8 @@ export function getAniListAuthUrl(redirectUri?: string): string {
   const effectiveRedirect = redirectUri || ANILIST_REDIRECT_URI;
   try {
     localStorage.setItem(ANILIST_REDIRECT_STORAGE_KEY, effectiveRedirect);
+    if (state) localStorage.setItem(ANILIST_STATE_STORAGE_KEY, state);
+    else localStorage.removeItem(ANILIST_STATE_STORAGE_KEY);
   } catch { /* localStorage unavailable — exchange falls back to default */ }
 
   const params = new URLSearchParams({
@@ -106,6 +112,7 @@ export function getAniListAuthUrl(redirectUri?: string): string {
     redirect_uri: effectiveRedirect,
     response_type: 'code',
   });
+  if (state) params.set('state', state);
 
   return `${ANILIST_AUTH_URL}?${params.toString()}`;
 }
@@ -142,6 +149,7 @@ export async function exchangeAniListCode(code: string, userId: string): Promise
   }
 
   try { localStorage.removeItem(ANILIST_REDIRECT_STORAGE_KEY); } catch { /* ignore */ }
+  try { localStorage.removeItem(ANILIST_STATE_STORAGE_KEY); } catch { /* ignore */ }
   return true;
 }
 

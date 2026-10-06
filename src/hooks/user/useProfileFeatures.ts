@@ -198,7 +198,10 @@ export async function fetchNekosBestGifs(category?: string, amount = 12): Promis
   const perCategory = Math.max(1, Math.ceil(amount / categories.length));
   const results = await Promise.allSettled(
     categories.map(async (cat) => {
-      const res = await fetch(`${NEKOS_BEST_API}/${cat}?amount=${Math.min(perCategory, 20)}`);
+      // Proxied like waifu.im/nekosia: a direct browser fetch is refused with
+      // a 403 + CORS error. Non-OK (including upstream rejections) yields []
+      // so one dead category never kills the gallery.
+      const res = await fetch(getProxiedJsonUrl(`${NEKOS_BEST_API}/${cat}?amount=${Math.min(perCategory, 20)}`));
       if (!res.ok) return [] as NekosImage[];
       const data = await res.json();
       return (data?.results ?? []).map((r: any, i: number): NekosImage => ({
@@ -296,7 +299,9 @@ async function fetchNekosiaLandscape(limit = 8): Promise<NekosImage[]> {
   const MIN_ASPECT = 1.3;
 
   const results = await Promise.allSettled(
-    ['catgirl', 'uniform', 'cosplay'].map(async (category) => {
+    // NOTE: `cosplay` is not a real nekosia category (upstream 400s it) —
+    // `maid` is verified working.
+    ['catgirl', 'uniform', 'maid'].map(async (category) => {
       const res = await fetch(getProxiedJsonUrl(`${NEKOSIA_API}/images/${category}?count=14`));
       if (!res.ok) return [] as NekosImage[];
       const data = await res.json();

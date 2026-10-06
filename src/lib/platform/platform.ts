@@ -14,6 +14,7 @@
  */
 
 import { Capacitor } from '@capacitor/core';
+import { isP2PDisabled } from '@/lib/torrent/p2pPolicy';
 
 function readForceNative(): boolean {
   const v = String(import.meta.env.VITE_FORCE_NATIVE_APP || '').toLowerCase();
@@ -121,8 +122,17 @@ export function hasDownloadService(): boolean {
  * presence — not just `isAndroid()` — keeps torrent UI hidden on an Android
  * build that hasn't bundled the native plugin yet, instead of offering an
  * action that would fail.
+ *
+ * The user's P2P kill-switch (Settings → Debrid → "Disable P2P torrents")
+ * forces this to false: no swarm session can start anywhere, while debrid
+ * resolution (server-side, no swarm) keeps working.
  */
 export function hasTorrentService(): boolean {
+  try {
+    if (isP2PDisabled()) return false;
+  } catch {
+    /* policy unreadable — fall through to capability detection */
+  }
   if (isDesktop()) return true;
   if (isAndroid() && typeof window !== 'undefined') {
     // `bootstrapMobile()` installs the JS adapters just after the native bridge

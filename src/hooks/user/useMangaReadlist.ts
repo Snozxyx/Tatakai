@@ -289,26 +289,49 @@ export function useMangaContinueReading(limit: number = 6) {
   return useQuery({
     queryKey: ['manga-continue-reading', user?.id || 'guest', limit],
     queryFn: async () => {
-      if (!user) return [];
-
-      const { data, error } = await supabase
-        .from('manga_readlist')
-        .select('*')
-        .eq('user_id', user.id)
-        .not('last_chapter_key', 'is', null)
-        .order('updated_at', { ascending: false })
-        .limit(limit);
-
-      if (error) {
-        if (isMissingTableError(error)) {
-          return getLocalMangaReadlist()
-            .filter((row) => Boolean(row.last_chapter_key))
-            .slice(0, limit);
+      // Merge the local mirror (written on every page turn, survives offline)
+      // with Supabase rows newest-wins per manga — same shape as Continue
+      // Watching, so a chapter finished on mobile appears on desktop.
+      const byManga = new Map<string, MangaReadlistItem>();
+      try {
+        for (const row of getLocalMangaReadlist()) {
+          if (!row.last_chapter_key) continue;
+          byManga.set(row.manga_id, row);
         }
-        throw error;
+      } catch {
+        /* ignore */
       }
 
-      return (data || []) as MangaReadlistItem[];
+      if (!user) {
+        return Array.from(byManga.values())
+          .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+          .slice(0, limit);
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('manga_readlist')
+          .select('*')
+          .eq('user_id', user.id)
+          .not('last_chapter_key', 'is', null)
+          .order('updated_at', { ascending: false })
+          .limit(Math.max(limit, 30));
+
+        if (error) throw error;
+        for (const row of (data || []) as MangaReadlistItem[]) {
+          const existing = byManga.get(row.manga_id);
+          if (!existing || new Date(row.updated_at).getTime() >= new Date(existing.updated_at).getTime()) {
+            byManga.set(row.manga_id, row);
+          }
+        }
+      } catch (error) {
+        if (!isMissingTableError(error) && byManga.size === 0) throw error;
+        // Missing table / offline: fall through with the local rows.
+      }
+
+      return Array.from(byManga.values())
+        .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+        .slice(0, limit);
     },
   });
 }
@@ -497,8 +520,17 @@ export function useSaveMangaReadingProgress() {
         throw new Error('Missing manga progress context');
       }
 
+      // Offline/guest writes were dropped (`return null`), so progress made on
+      // a phone with no signal never reached the desktop. Mirror the anime
+      // path: persist locally first, then Supabase — the rail merges both.
       if (!user) {
-        return null;
+        return upsertLocalMangaReadlist({
+          ...input,
+          mangaId,
+          mangaTitle,
+          status: 'reading',
+          silentToast: true,
+        });
       }
 
       const cachedEntry = queryClient.getQueryData<MangaReadlistItem | null>([
@@ -550,26 +582,41 @@ export function useSaveMangaReadingProgress() {
         updated_at: safeNow(),
       };
 
-      const { data, error } = await supabase
-        .from('manga_readlist')
-        .upsert(payload, { onConflict: 'user_id,manga_id' })
-        .select()
-        .single();
-
-      if (error) {
-        if (isMissingTableError(error)) {
-          return upsertLocalMangaReadlist({
-            ...input,
-            mangaId,
-            mangaTitle,
-            status: statusToPersist,
-            silentToast: true,
-          });
-        }
-        throw error;
+      // Local mirror first: survives kill/offline and feeds Continue Reading
+      // on this device even when the Supabase write is still in flight.
+      try {
+        upsertLocalMangaReadlist({
+          ...input,
+          mangaId,
+          mangaTitle,
+          status: statusToPersist,
+          silentToast: true,
+        });
+      } catch {
+        /* local mirror best-effort */
       }
 
-      return data as MangaReadlistItem;
+      try {
+        const { data, error } = await supabase
+          .from('manga_readlist')
+          .upsert(payload, { onConflict: 'user_id,manga_id' })
+          .select()
+          .single();
+
+        if (error) throw error;
+        return data as MangaReadlistItem;
+      } catch (error) {
+        // Offline / transient failure: keep the local row so the position is
+        // not lost; it reconciles on the next foreground refresh / sign-in.
+        // Missing-table (fresh backend) uses the same path.
+        return upsertLocalMangaReadlist({
+          ...input,
+          mangaId,
+          mangaTitle,
+          status: statusToPersist,
+          silentToast: true,
+        });
+      }
     },
     onSuccess: (data) => {
       if (!data) return;

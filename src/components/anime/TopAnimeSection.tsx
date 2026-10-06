@@ -3,6 +3,8 @@ import { Trophy } from "lucide-react";
 import { TopAnime, getHighQualityPoster } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { Peekable } from "@/components/media/MediaQuickPeek";
+import { peekFromAnime } from "@/components/media/quickPeekStore";
 
 interface TopAnimeSectionProps {
   today: TopAnime[];
@@ -69,8 +71,8 @@ export const TopAnimeSection = memo(function TopAnimeSection({ today, week, mont
       {/* Grid — plain cards on mobile (no backdrop-blur / hover scale) for 60fps scroll */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-5">
         {getAnimes().slice(0, 10).map((anime, idx) => (
+          <Peekable key={anime.id} media={peekFromAnime(anime, `/anime/${anime.id}`)}>
           <button
-            key={anime.id}
             type="button"
             onClick={() => navigate(`/anime/${anime.id}`)}
             className="group overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03] text-left transition-transform duration-200 active:scale-[0.98] md:hover:border-white/[0.14]"
@@ -107,6 +109,7 @@ export const TopAnimeSection = memo(function TopAnimeSection({ today, week, mont
               </div>
             </div>
           </button>
+          </Peekable>
         ))}
       </div>
     </section>

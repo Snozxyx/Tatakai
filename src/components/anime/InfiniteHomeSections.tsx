@@ -10,6 +10,8 @@ import { cn } from '@/lib/utils';
 import { AnimeCardWithPreview } from './AnimeCardWithPreview';
 import { useIsMobile } from '@/hooks/ui/use-mobile';
 import { HomeSectionHeading } from '@/components/home/HomeSectionHeading';
+import { Peekable } from '@/components/media/MediaQuickPeek';
+import { peekFromAnime } from '@/components/media/quickPeekStore';
 
 const shouldEnablePreview = (anime: AnimeCard): boolean =>
   !/^(mal|anilist)-/i.test(String(anime?.id || '').trim());
@@ -22,6 +24,12 @@ const MAX_SECTIONS = 30;
 // ----------------------------------------------------------------------
 const MobileAnimeCard = memo(function MobileAnimeCard({ anime }: { anime: AnimeCard }) {
   return (
+    <Peekable
+      media={peekFromAnime(
+        anime,
+        anime.id ? `/anime/${anime.id}` : `/search?q=${encodeURIComponent(anime.name || 'anime')}`,
+      )}
+    >
     <div
       className="relative overflow-hidden rounded-xl border border-white/5 bg-neutral-900 active:scale-[0.98] transition-transform duration-200"
       style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 260px' }}
@@ -60,6 +68,7 @@ const MobileAnimeCard = memo(function MobileAnimeCard({ anime }: { anime: AnimeC
         </div>
       </div>
     </div>
+    </Peekable>
   );
 });
 
@@ -140,6 +149,7 @@ const FeaturedLayout = memo(function FeaturedLayout({ animes, isMobile }: Layout
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
       <div className="md:col-span-1 lg:row-span-2 h-full min-h-[400px]">
+        <Peekable media={peekFromAnime(featured, `/anime/${featured.id}`)}>
         <div
           onClick={() => navigate(`/anime/${featured.id}`)}
           className="group relative h-full w-full rounded-2xl overflow-hidden cursor-pointer border border-white/10 bg-neutral-900"
@@ -172,6 +182,7 @@ const FeaturedLayout = memo(function FeaturedLayout({ animes, isMobile }: Layout
             </div>
           </div>
         </div>
+        </Peekable>
       </div>
       <div className="md:col-span-1 lg:col-span-2 grid grid-cols-2 gap-4 md:gap-5">
         {rest.map((anime) => <Card key={anime.id} anime={anime} isMobile={isMobile} />)}

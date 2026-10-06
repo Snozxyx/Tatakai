@@ -18,6 +18,8 @@ import { cn } from "@/lib/utils";
 import { splitRating } from "@/lib/mediaRating";
 import { AdultBadge, MetaBadge, ScoreBadge } from "@/components/MediaCardBadges";
 import { useIsMobile } from "@/hooks/ui/use-mobile";
+import { useLongPress } from "@/hooks/ui/useLongPress";
+import { openMediaQuickPeek, type QuickPeekMedia } from "@/components/media/quickPeekStore";
 
 export interface UnifiedMediaCardProps {
   item: {
@@ -88,6 +90,33 @@ export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant =
     return null;
   };
 
+  // Long-press quick peek — card fields paint instantly, genres/synopsis
+  // enrich lazily inside the sheet. Characters have no peek target.
+  const peekMedia: QuickPeekMedia | null =
+    !isCharacter && routeTo
+      ? {
+          kind: isAnime ? "anime" : "manga",
+          id: item.id,
+          name: item.name,
+          poster: item.poster,
+          anilistId: item.anilistId ?? null,
+          type: isManga ? mediaBadgeLabel : item.type,
+          status: item.status,
+          year: item.year,
+          rating: item.rating,
+          episodesSub: item.episodes?.sub,
+          episodesDub: item.episodes?.dub,
+          chapters: item.chapters,
+          routeTo,
+        }
+      : null;
+  const longPress = useLongPress({
+    onLongPress: () => {
+      if (peekMedia) openMediaQuickPeek(peekMedia);
+    },
+    disabled: !peekMedia,
+  });
+
   const renderMetadata = () => {
     if (isCharacter) return null;
 
@@ -118,6 +147,7 @@ export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant =
           className
         )}
         style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 300px' }}
+        {...longPress}
       >
         <div className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.04] md:transition-all md:duration-300 md:group-hover:border-white/20 md:group-hover:shadow-xl md:group-hover:shadow-black/60 md:group-hover:-translate-y-1">
           <img
@@ -326,6 +356,7 @@ export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant =
           routeTo && 'cursor-pointer',
           className,
         )}
+        {...longPress}
       >
         {overlayInner}
       </div>
@@ -339,6 +370,7 @@ export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant =
         routeTo && 'cursor-pointer',
         className,
       )}
+      {...longPress}
     >
       {overlayInner}
     </GlassPanel>

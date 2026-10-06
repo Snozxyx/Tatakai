@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { CloudOff, HardDrive, RefreshCw, X } from 'lucide-react';
+import { CloudOff, Download, HardDrive, RefreshCw, X } from 'lucide-react';
 import { useBackendStatus } from '@/contexts/BackendStatusContext';
 import { useIsNativeApp } from '@/hooks/ui/useIsNativeApp';
+import { useMobileDownload } from '@/hooks/media/useMobileDownload';
 
 /**
  * OfflineBanner — a slim, non-blocking notice for the "server-down" state:
@@ -26,6 +27,9 @@ export function OfflineBanner() {
   const location = useLocation();
   const navigate = useNavigate();
   const [dismissed, setDismissed] = useState(false);
+  // Live queue count so an in-flight download isn't mistaken for a stall while
+  // the banner is up. Empty everywhere except Capacitor (monitor-only read).
+  const { activeDownloads } = useMobileDownload();
 
   // Already on a local/offline page, or nothing to fall back to on web.
   const onOfflinePage =
@@ -42,6 +46,12 @@ export function OfflineBanner() {
         <CloudOff className="h-4 w-4 shrink-0 text-amber-500" />
         <p className="flex-1 text-sm text-foreground/90">
           Our servers are unreachable right now. Your downloads are still available offline.
+          {activeDownloads.length > 0 && (
+            <span className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+              <Download className="h-3 w-3 animate-pulse" />
+              {activeDownloads.length} download{activeDownloads.length > 1 ? 's' : ''} still running
+            </span>
+          )}
         </p>
         <button
           onClick={() => navigate('/downloads')}

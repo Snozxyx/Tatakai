@@ -4,6 +4,7 @@ import { playbackEventBus, PlayerEvents } from './PlaybackEventBus';
 import { buildProxyCandidateUrls, isLoopbackProxyUrl } from './stream-resolver';
 import { upsertLocalTorrentSessionHistory } from '@/lib/localStorage';
 import { setActivity, clearActivity } from '@/core/activity/activity-monitor';
+import { isP2PDisabled } from '@/lib/torrent/p2pPolicy';
 
 const fmtSpeed = (b?: number): string | null => {
   if (!b || b <= 0) return null;
@@ -26,11 +27,14 @@ export class TorrentAdapter extends AbstractSourceAdapter {
       const referer = (source as any).headers?.Referer;
       const userAgent = (source as any).headers?.['User-Agent'];
 
-      let finalUrl = source.url;
-      if (!isLoopbackProxyUrl(source.url)) {
-        const proxyCandidates = buildProxyCandidateUrls(source.url, referer, userAgent);
-        finalUrl = proxyCandidates[0] || source.url;
-      }
+      // Loopback (native torrent server / desktop proxy) plays directly.
+      // Remote HTTP torrents get the same proxy candidate ladder as direct
+      // MP4 so one dead candidate costs a re-mount, not a server switch.
+      const candidates = !isLoopbackProxyUrl(source.url)
+        ? buildProxyCandidateUrls(source.url, referer, userAgent).slice(0, 8)
+        : [source.url];
+      const finalUrl = candidates[0] || source.url;
+      let candidateIndex = 0;
 
       videoElement.src = finalUrl;
 
@@ -50,12 +54,37 @@ export class TorrentAdapter extends AbstractSourceAdapter {
       videoElement.onplaying = () => playbackEventBus.emit(PlayerEvents.BUFFERING, false);
       videoElement.onended = () => playbackEventBus.emit(PlayerEvents.ENDED);
       videoElement.onloadedmetadata = () => playbackEventBus.emit(PlayerEvents.LOADED);
-      videoElement.onerror = (e) => playbackEventBus.emit(PlayerEvents.ERROR, e);
+      videoElement.onerror = () => {
+        if (candidateIndex < candidates.length - 1) {
+          candidateIndex += 1;
+          try {
+            videoElement.src = candidates[candidateIndex];
+            videoElement.load();
+            if (options.autoPlay) videoElement.play().catch(() => {});
+            return;
+          } catch {
+            /* fall through */
+          }
+        }
+        playbackEventBus.emit(PlayerEvents.ERROR, {
+          reason: 'torrent_http_error',
+          url: candidates[candidateIndex],
+        });
+      };
       return;
     }
 
     // source.url for torrent mode is the infoHash or magnet
     const infoHash = source.url;
+
+    // Hard stop for the P2P kill-switch: even a path that bypasses the UI
+    // gates must never join a swarm. HTTP/file URLs above are already-resolved
+    // media (debrid, loopback, direct) and are unaffected.
+    if (isP2PDisabled()) {
+      const err = new Error('P2P torrents are disabled in Settings. Use a debrid service to play this release.');
+      playbackEventBus.emit(PlayerEvents.ERROR, err.message);
+      throw err;
+    }
     
     try {
       // 1. Start torrent session via bridge
@@ -89,7 +118,23 @@ export class TorrentAdapter extends AbstractSourceAdapter {
         // Ignore storage failures.
       }
 
-      // 2. Get stream URL
+      // 2. Wait for the head of the file before mounting <video>: the native
+      // loopback server answers 503 while nothing is verifiable, which the
+      // player would surface as a hard error. Best-effort (8s) so a slow swarm
+      // still starts instead of stalling on the spinner.
+      try {
+        const ensure = (window as any).tatakaiRuntime.ensureTorrentPrebuffer;
+        if (typeof ensure === 'function' && this.sessionId) {
+          await Promise.race([
+            ensure(this.sessionId),
+            new Promise((resolve) => setTimeout(resolve, 8000)),
+          ]);
+        }
+      } catch {
+        /* start anyway — progress overlay shows peers/speed */
+      }
+
+      // 3. Get stream URL
       const stream = await (window as any).tatakaiRuntime.getTorrentStreamUrl(this.sessionId);
       if (!stream.success) {
         throw new Error(stream.error || 'Failed to get torrent stream URL');
@@ -105,7 +150,7 @@ export class TorrentAdapter extends AbstractSourceAdapter {
         videoElement.play().catch(() => {});
       }
 
-      // 3. Listen for progress events
+      // 4. Listen for progress events
       this.stopListener = (window as any).tatakaiRuntime.onTorrentProgress((stats: any) => {
         if (stats.sessionId === this.sessionId) {
           playbackEventBus.emit('torrent:progress', stats);

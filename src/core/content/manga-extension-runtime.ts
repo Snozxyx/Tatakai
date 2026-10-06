@@ -39,7 +39,11 @@ function getRuntime(): ElectronRuntime {
 
 function hasExtensionRuntime(): boolean {
   const w = getRuntime();
-  return Boolean(w.electron?.invokeExtension || w.tatakaiRuntime?.invokeExtension);
+  return Boolean(
+    w.electron?.invokeExtension ||
+    w.tatakaiRuntime?.invokeExtension ||
+    (typeof window !== "undefined" && (window as any).tatakaiMobileExtensions),
+  );
 }
 
 async function listMangaExtensions(): Promise<string[]> {
@@ -476,6 +480,17 @@ export interface MangaPageAttempt {
 }
 
 /**
+ * One page request identity. `providerChapterId` is intentionally included:
+ * resume links may first try without it, then receive the correct private id
+ * from the asynchronously loaded chapter list. Treating those as duplicates
+ * discarded the valid retry and made Continue Reading fail until the user
+ * backed out and opened the chapter directly.
+ */
+export function mangaPageAttemptIdentity(attempt: MangaPageAttempt): string {
+  return `${attempt.provider}::${attempt.chapterKey}::${attempt.providerChapterId || ""}`;
+}
+
+/**
  * Read a chapter's pages, falling back across the chapter's other sources.
  *
  * A chapter often has several sources (mangadex/allmanga/…). Any one can be
@@ -504,7 +519,7 @@ export async function fetchExtensionMangaPages(params: {
 
   for (const attempt of attempts) {
     if (!attempt.provider || !attempt.chapterKey) continue;
-    const key = `${attempt.provider}::${attempt.chapterKey}`;
+    const key = mangaPageAttemptIdentity(attempt);
     if (seen.has(key)) continue;
     seen.add(key);
     attempted.push(attempt.provider);
@@ -579,10 +594,10 @@ async function fetchOneSourcePages(params: {
   if (!hasExtensionRuntime()) {
     return {
       success: false,
-      message: "Manga chapter reading requires the Tatakai desktop app.",
+      message: "Manga chapter reading requires the Tatakai app extension runtime.",
       guidance: {
         code: "EXTENSION_RUNTIME_REQUIRED",
-        message: "Open this chapter in the Tatakai desktop app with a manga extension installed.",
+        message: "Open this chapter in the Tatakai desktop or mobile app with a manga extension installed.",
         retryable: false,
       },
     };
@@ -766,7 +781,11 @@ function buildReadResponse(
       chapter: {
         chapterKey: params.chapterKey,
         anilistId: params.anilistId ?? 0,
-        provider,
+        // `chapter.provider` is the user-facing sub-provider (mangadex,
+        // comick, ...), while `readMeta.provider` is the extension namespace
+        // that actually served it. Returning the namespace in both fields made
+        // Next lose the active source and fall back to raw discovery order.
+        provider: params.extensionId,
         providerChapterId: params.providerChapterId || params.chapterKey,
         number: derivedNumber,
         title: meta?.title ?? null,

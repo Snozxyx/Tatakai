@@ -1,7 +1,7 @@
 {
   "name": "tatakai",
   "private": true,
-  "version": "6.0.5",
+  "version": "6.0.6",
   "description": "Tatakai — an extension-based otaku community for tracking anime & manga",
   "author": {
     "name": "Tatakai",
@@ -16,8 +16,8 @@
     "dev": "concurrently \"npm:dev:web\" \"npm:dev:api\"",
     "dev:web": "vite",
     "dev:api": "npm --prefix TatakaiAPI start",
-    "build": "cross-env NODE_ENV=production vite build",
-    "build:dev": "vite build --mode development",
+    "build": "cross-env NODE_ENV=production NODE_OPTIONS=--max-old-space-size=6144 vite build",
+    "build:dev": "cross-env NODE_OPTIONS=--max-old-space-size=6144 vite build --mode development",
     "lint": "eslint .",
     "type-check": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json",
     "check:migrations": "node scripts/check-migrations.mjs",
@@ -28,7 +28,7 @@
     "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:8090 && cross-env ELECTRON_DEVTOOLS=1 electron desktop/main.cjs\"",
     "assets:installer": "node scripts/generate-installer-assets.cjs",
     "assets:cloudflared": "node scripts/fetch-cloudflared.cjs",
-    "electron:build": "npm run assets:installer && npm run assets:cloudflared && cross-env ELECTRON_BUILD=true vite build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --config.npmRebuild=false --config.electronDist=node_modules/electron/dist",
+    "electron:build": "npm run assets:installer && npm run assets:cloudflared && cross-env ELECTRON_BUILD=true NODE_OPTIONS=--max-old-space-size=6144 vite build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --config.npmRebuild=false --config.electronDist=node_modules/electron/dist",
     "assets:generate": "node scripts/generate-assets.cjs",
     "mobile:dev": "npm run build && npx cap open android",
     "mobile:ios": "npm run build && npx cap open ios",

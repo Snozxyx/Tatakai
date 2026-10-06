@@ -160,6 +160,12 @@ export interface DownloadHistoryEntry {
   posterUrl?: string;
   episodeNumber: number;
   episodeName?: string;
+  /**
+   * Download-monitor job id for this episode (the player's episode id). Links
+   * the row to the `tatakai:dl:retry:<episodeId>` snapshot so completed rows
+   * can be retried in place. Absent on rows written by older builds.
+   */
+  episodeId?: string;
   /** Final outcome of this attempt. */
   status: 'completed' | 'failed' | 'cancelled';
   sourceType: 'hls' | 'torrent' | 'unknown';

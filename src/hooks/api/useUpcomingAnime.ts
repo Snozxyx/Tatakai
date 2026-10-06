@@ -56,12 +56,16 @@ interface JikanResponse {
 }
 
 async function fetchUpcomingAnime(page: number = 1): Promise<JikanResponse> {
+  // Jikan rate-limits aggressively and the host can hang (observed
+  // ERR_CONNECTION_TIMED_OUT in dev) — fail fast instead of holding the
+  // section in skeleton state until the browser gives up.
   const response = await fetch(
     `https://api.jikan.moe/v4/seasons/upcoming?page=${page}&limit=12`,
     {
       headers: {
         'Accept': 'application/json',
       },
+      signal: AbortSignal.timeout(15000),
     }
   );
 
@@ -77,6 +81,8 @@ export function useUpcomingAnime(page: number = 1) {
     queryKey: ["upcoming_anime", page],
     queryFn: () => fetchUpcomingAnime(page),
     staleTime: 10 * 60 * 1000, // 10 minutes
-    retry: 2,
+    // One retry only: Jikan 429s hard on bursts, and two extra hung attempts
+    // used to triple the console spam before the section gave up.
+    retry: 1,
   });
 }

@@ -118,6 +118,11 @@ export async function installMobileKaiExtension(
     };
   }
 
+  // React Query caches custom-source discovery for several minutes. Tell all
+  // extension consumers about this new bundle immediately, otherwise a source
+  // installed on mobile stays invisible until cache expiry or an app restart.
+  notifyExtensionsChanged();
+
   return {
     success: true,
     extensionId: merged.id,
@@ -142,6 +147,7 @@ export async function uninstallMobileExtension(id: string): Promise<void> {
     }
   }
   await db.mobileExtensionBundles.delete(id);
+  notifyExtensionsChanged();
 }
 
 /** Register every cached bundle into the runtime. Returns how many registered. */

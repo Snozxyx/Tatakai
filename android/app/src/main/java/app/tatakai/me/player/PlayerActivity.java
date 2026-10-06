@@ -6,6 +6,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 import android.util.Rational;
 import android.view.Gravity;
 import android.view.View;
@@ -42,6 +43,7 @@ import java.util.Map;
 
 /** Full-screen hardware-accelerated torrent player. */
 public class PlayerActivity extends AppCompatActivity {
+    private static final String TAG = "TatakaiPlayer";
     static final String EXTRA_URL = "url";
     static final String EXTRA_TITLE = "title";
     static final String EXTRA_START_POSITION_MS = "startPositionMs";
@@ -69,13 +71,16 @@ public class PlayerActivity extends AppCompatActivity {
     private long outroEndMs = -1L;
     private boolean completed = false;
     private boolean closingEventSent = false;
+    /** Torrent range waits can take many seconds; bound how many times we retry before surfacing an error. */
+    private int errorRecoveries = 0;
+    private static final int MAX_ERROR_RECOVERIES = 2;
 
     private final Runnable ticker = new Runnable() {
         @Override public void run() {
             if (player == null) return;
             emitProgress();
             updateSkipButton();
-            handler.postDelayed(this, 5000L);
+            handler.postDelayed(this, 2000L);
         }
     };
 
@@ -139,13 +144,16 @@ public class PlayerActivity extends AppCompatActivity {
             DefaultDataSource.Factory dataSourceFactory = new DefaultDataSource.Factory(this, httpFactory);
             DefaultMediaSourceFactory mediaSourceFactory = new DefaultMediaSourceFactory(dataSourceFactory);
             // Torrent streams start with almost no buffered data on slow swarms.
-            // The default 50s min-buffer keeps the spinner up for a long time;
-            // a small fast-start buffer gets first frames on screen quickly while
-            // rebuffering stays cheap (ExoPlayer refills in the background).
+            // The default 50s min-buffer keeps the spinner up for a long time, so
+            // the minimum stays lean for a fast first frame. The rebuffer targets
+            // are wider than the old 1.5s/2s pair: with a lean buffer, a 1.5s
+            // rebuffer threshold made playback visibly stutter the moment the
+            // swarm hiccuped, which read as "the video froze" even though the
+            // stream was simply downloading.
             // Embedded MKV audio/subtitle tracks are parsed from the same source,
             // so a lean buffer also exposes them sooner in the track selector.
             DefaultLoadControl fastStartLoadControl = new DefaultLoadControl.Builder()
-                .setBufferDurationsMs(5000, 15000, 1500, 2000)
+                .setBufferDurationsMs(10000, 30000, 2500, 5000)
                 .setTargetBufferBytes(-1)
                 .setPrioritizeTimeOverSizeThresholds(true)
                 .build();
@@ -195,6 +203,27 @@ public class PlayerActivity extends AppCompatActivity {
             }
 
             @Override public void onPlayerError(PlaybackException error) {
+                // Torrent data behind the loopback range server often needs another
+                // second or two of download time; the first network error is
+                // routinely transient. Recover with the same retry semantics
+                // ExoPlayer gives desktop's HTTP playback, and only then give up.
+                if (errorRecoveries < MAX_ERROR_RECOVERIES) {
+                    errorRecoveries += 1;
+                    String detail = error.getMessage() == null ? "stream interrupted" : error.getMessage();
+                    Log.w(TAG, "Playback error (recovery " + errorRecoveries + "/" + MAX_ERROR_RECOVERIES + "): " + detail);
+                    emitProgress();
+                    handler.postDelayed(() -> {
+                        if (player == null) return;
+                        try {
+                            player.seekToDefaultPosition();
+                            player.prepare();
+                            player.play();
+                        } catch (Exception ignored) {
+                            // prepare() on a dead source throws; onPlayerError reports it.
+                        }
+                    }, 1000L * errorRecoveries);
+                    return;
+                }
                 JSObject event = payload();
                 event.put("message", error.getMessage() == null ? "Unable to play this torrent file." : error.getMessage());
                 NativePlayerPlugin.emit("playerError", event);

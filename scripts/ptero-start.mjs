@@ -4,7 +4,7 @@ import { dirname, join, extname, normalize } from 'node:path';
 import { existsSync, createReadStream, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { matchEntityRoute } from './seo/routes.mjs';
-import { resolveMeta, renderTags, injectIntoHtml, SITE_ORIGIN } from './seo/inject.mjs';
+import { resolveMeta, renderTags, injectIntoHtml, SITE_ORIGIN, SHARE_API_ORIGIN } from './seo/inject.mjs';
 
 const port = Number(process.env.PORT || process.env.SERVER_PORT || 8088);
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -15,6 +15,7 @@ const distIndex = join(distDir, 'index.html');
 
 /** Site default og:image, used when a matched entity has no image of its own. */
 const DEFAULT_OG_IMAGE = `${SITE_ORIGIN}/tatakaibanner.png`;
+const SITEMAP_RE = /^\/sitemap(-[\w.-]+)?\.(xml|xsl)$/;
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -22,6 +23,8 @@ const MIME_TYPES = {
   '.mjs': 'application/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
+  '.xml': 'application/xml; charset=utf-8',
+  '.xsl': 'text/xsl; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
@@ -63,9 +66,32 @@ function startStaticServer() {
     console.warn('[ptero-start] Could not read index.html for SEO injection:', err.message);
   }
 
-  const server = createServer((req, res) => {
+  const server = createServer(async (req, res) => {
     const reqPath = (req.url || '/').split('?')[0];
     const cleanPath = normalize(reqPath).replace(/^([.][.][/\\])+/, '');
+    const sitemapMatch = cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}`;
+
+    // Dynamic Sitemap: proxy to TatakaiAPI generator
+    if (SITEMAP_RE.test(sitemapMatch)) {
+      const isXsl = sitemapMatch.endsWith('.xsl');
+      const expectedType = isXsl ? 'text/xsl; charset=utf-8' : 'application/xml; charset=utf-8';
+      try {
+        const upstream = `${SHARE_API_ORIGIN}/api/public${sitemapMatch}`;
+        const r = await fetch(upstream, {
+          headers: { accept: isXsl ? 'text/xsl, text/xml, application/xml, */*' : 'application/xml' },
+        });
+        if (r.ok) {
+          const body = await r.text();
+          res.setHeader('Content-Type', expectedType);
+          res.setHeader('Cache-Control', 'public, max-age=3600');
+          res.end(body);
+          return;
+        }
+      } catch {
+        // Fall back to local disk below
+      }
+    }
+
     const filePath = cleanPath === '/' ? distIndex : join(distDir, cleanPath.replace(/^[/\\]/, ''));
 
     // Real file on disk (assets, /index.html, favicon, …): stream it untouched.

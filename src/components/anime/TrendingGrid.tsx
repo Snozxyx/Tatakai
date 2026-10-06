@@ -6,6 +6,8 @@ import { useState, useRef, useEffect } from "react";
 import Hls from "hls.js";
 import { buildPreferredAnimeRouteId } from "@/lib/animeIdMapping";
 import { usePreviewSource } from "@/hooks/usePreviewSource";
+import { Peekable } from "@/components/media/MediaQuickPeek";
+import { peekFromAnime } from "@/components/media/quickPeekStore";
 
 interface TrendingGridProps {
   animes: TrendingAnime[];
@@ -190,6 +192,12 @@ const TrendingCard = memo(function TrendingCard({ anime, spanClass }: { anime: T
   }, [isHovering, loading, previewUrl]);
 
   return (
+    <Peekable
+      media={peekFromAnime(
+        { id: anime.id, name: anime.name, poster: anime.poster, anilistId: previewAniListId },
+        routeAnimeId ? `/anime/${routeAnimeId}` : `/search?q=${encodeURIComponent(anime.name)}`,
+      )}
+    >
     <div
       onClick={() => {
         if (routeAnimeId) {
@@ -262,6 +270,7 @@ const TrendingCard = memo(function TrendingCard({ anime, spanClass }: { anime: T
         </div>
       </div>
     </div>
+    </Peekable>
   );
 })
 

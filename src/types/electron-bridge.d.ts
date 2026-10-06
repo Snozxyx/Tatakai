@@ -16,6 +16,19 @@ export interface ElectronThemePersistPayload {
 export interface ElectronBridge {
   getPlatform?: () => Promise<string>;
   persistTheme?: (payload: ElectronThemePersistPayload) => Promise<{ success?: boolean; error?: string }>;
+  debridRequest?: (payload: {
+    url: string;
+    method?: 'GET' | 'POST';
+    headers?: Record<string, string>;
+    body?: string;
+    timeoutMs?: number;
+  }) => Promise<{
+    status: number;
+    statusText?: string;
+    url?: string;
+    headers?: Record<string, string>;
+    body?: string;
+  }>;
   startDownload?: (payload: Record<string, unknown>) => Promise<{ success?: boolean; error?: string; status?: string }>;
   cancelDownload?: (params: { episodeId?: string; animePath?: string }) => Promise<{ success?: boolean }>;
   getDownloadsDir?: (customPath?: string) => Promise<string>;
@@ -59,7 +72,8 @@ export interface MangaDownloadChapter {
   chapterNumber?: number | null;
   volume?: number | string | null;
   language?: string;
-  alternatives?: Array<{ provider?: string; chapterKey?: string; providerChapterId?: string }>;
+  scanlator?: string | null;
+  alternatives?: Array<{ provider?: string; chapterKey?: string; providerChapterId?: string; language?: string; scanlator?: string | null }>;
 }
 
 /** manga = JP, manhwa = KR, manhua = CN/TW — drives the Dynamic Island badge. */

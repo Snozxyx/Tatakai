@@ -2,7 +2,12 @@ import Hls from 'hls.js';
 import { AbstractSourceAdapter, AdapterLoadOptions } from './SourceAdapterRegistry';
 import { PlaybackMode } from './player-core';
 import { playbackEventBus, PlayerEvents } from './PlaybackEventBus';
-import { buildProxyCandidateUrls, isLoopbackProxyUrl } from './stream-resolver';
+import {
+  buildProxyCandidateUrls,
+  firstFulfilled,
+  isLoopbackProxyUrl,
+  probePlaybackCandidate,
+} from './stream-resolver';
 import { getProfileKnobs } from '@/lib/memoryProfile';
 
 export class HlsAdapter extends AbstractSourceAdapter {
@@ -29,7 +34,7 @@ export class HlsAdapter extends AbstractSourceAdapter {
    * permanently broken URL (an expired proxy token, a 403, a body Chrome
    * refuses to decode) loops forever and the player just sits there.
    */
-  private static readonly MAX_NETWORK_RETRIES = 3;
+  private static readonly MAX_NETWORK_RETRIES = 2;
   private static readonly MAX_MEDIA_RETRIES = 2;
 
   async load(options: AdapterLoadOptions): Promise<void> {
@@ -50,6 +55,25 @@ export class HlsAdapter extends AbstractSourceAdapter {
         ? buildProxyCandidateUrls(source.url, referer, userAgent, undefined, undefined, refererCandidates)
         : [source.url];
     if (this.candidates.length === 0) this.candidates = [source.url];
+
+    // Fast-start: race candidates in parallel and mount the first that answers
+    // instead of blindly mounting candidates[0] (a dead proxy cost ~5-15s of
+    // spinner before failover). Loopback/direct single URLs skip the probe.
+    if (this.candidates.length > 1) {
+      const probes = this.candidates.map(async (url) => {
+        const ok = await probePlaybackCandidate(url, { timeoutMs: 1500, range: false });
+        if (!ok) throw new Error('dead');
+        return url;
+      });
+      try {
+        const winner = await firstFulfilled(probes);
+        this.candidates = [winner, ...this.candidates.filter((u) => u !== winner)];
+      } catch {
+        // All probes failed (probe-hostile CDN): keep ladder order, hls.js is
+        // the real probe.
+      }
+    }
+
     this.candidateIndex = 0;
     this.networkRetries = 0;
     this.mediaRetries = 0;
@@ -67,23 +91,39 @@ export class HlsAdapter extends AbstractSourceAdapter {
       return;
     }
 
-    // Buffer sizes come from the active memory profile (read per-load so a mid-
-    // session profile change applies to the next source). Unlimited restores the
-    // historical 300/600/1200; Balanced/Low shrink the resident buffer.
-    const { backBufferLength, maxBufferLength, maxMaxBufferLength } = getProfileKnobs().hls;
+    // Buffer sizes come from the effective memory profile (data-saver forces
+    // `low`). Read per-load so a mid-session profile change applies to the next
+    // source. Unlimited restores the historical 300/600/1200.
+    const { getEffectiveMemoryProfile } = await import('@/lib/mobile/dataSaver');
+    const { backBufferLength, maxBufferLength, maxMaxBufferLength } =
+      getProfileKnobs(getEffectiveMemoryProfile()).hls;
 
     this.hls = new Hls({
       enableWorker: true,
-      lowLatencyMode: true,
+      // VOD is not low-latency live: lowLatencyMode adds part-request overhead
+      // and hurts time-to-first-frame on proxied segments. Off = faster start.
+      lowLatencyMode: false,
       backBufferLength,
       maxBufferLength,
       maxMaxBufferLength,
       startFragPrefetch: true,
-      abrEwmaDefaultEstimate: 5000000, // 5Mbps initial estimate
-      fragLoadingMaxRetry: 6,
-      fragLoadingRetryDelay: 1000,
-      levelLoadingMaxRetry: 6,
-      manifestLoadingMaxRetry: 6,
+      // Start low then ramp: `-1/auto` could open with a multi-MB 1080p
+      // fragment on a slow link (first-frame stall). Mobile player already
+      // uses `startLevel: 0` for this reason — unify the behaviour.
+      startLevel: 0,
+      abrEwmaDefaultEstimate: 4000000, // 4Mbps: healthy links ramp instantly, ABR still drops fast on slow links
+      abrBandWidthFactor: 0.9,
+      abrBandWidthUpFactor: 0.8,
+      maxStarvationDelay: 2,
+      maxLoadingDelay: 2,
+      // Fast dead-server failover: fail over to the next proxy candidate after
+      // ~2s instead of looking like "very slow" (~30s). Matches mobile tuning.
+      fragLoadingMaxRetry: 1,
+      fragLoadingRetryDelay: 400,
+      levelLoadingMaxRetry: 2,
+      levelLoadingRetryDelay: 400,
+      manifestLoadingMaxRetry: 1,
+      manifestLoadingRetryDelay: 400,
     });
 
     this.hls.loadSource(finalUrl);
@@ -206,7 +246,7 @@ export class HlsAdapter extends AbstractSourceAdapter {
   private restartLoad(): void {
     if (this.recovering) return;
     this.recovering = true;
-    const delay = 500 * this.networkRetries;
+    const delay = 250 * this.networkRetries;
     setTimeout(() => {
       this.recovering = false;
       try {

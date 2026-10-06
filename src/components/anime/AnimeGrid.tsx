@@ -9,6 +9,8 @@ import { useIsMobile } from "@/hooks/ui/use-mobile";
 import { buildPreferredAnimeRouteId } from "@/lib/animeIdMapping";
 import { BlurhashImage } from "@/components/ui/blurhash-image";
 import { FeatureFlag, useFeatureFlag } from '@/core/feature-flags';
+import { Peekable } from "@/components/media/MediaQuickPeek";
+import { peekFromAnime, peekFromManga } from "@/components/media/quickPeekStore";
 
 interface AnimeGridProps {
   animes: AnimeCard[];
@@ -113,6 +115,13 @@ export const AnimeGrid = memo(function AnimeGrid({
             }
             navigate(`/search?q=${encodeURIComponent(anime.name)}`);
           };
+          const cardRouteTo = (() => {
+            const mediaType = (anime as any).mediaType || 'anime';
+            const baseRoute = mediaType === 'manga' ? '/manga' : '/anime';
+            return routeAnimeId
+              ? `${baseRoute}/${routeAnimeId}`
+              : `/search?q=${encodeURIComponent(anime.name)}`;
+          })();
 
           // Phones: a plain card instead of GlassPanel. GlassPanel applies
           // `backdrop-blur-2xl`, so a grid of these forces one invisible (the
@@ -140,7 +149,15 @@ export const AnimeGrid = memo(function AnimeGrid({
               };
 
           return (
-            <CardWrapper key={cardKey} onClick={goToCard} {...(wrapperProps as any)}>
+            <Peekable
+              key={cardKey}
+              media={
+                (anime as any).mediaType === 'manga'
+                  ? peekFromManga(anime as any, cardRouteTo)
+                  : peekFromAnime(anime, cardRouteTo)
+              }
+            >
+            <CardWrapper onClick={goToCard} {...(wrapperProps as any)}>
               <div className={`relative ${cardSizeClasses[gridSize]}`} style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 260px' }}>
                 {blurhashEnabled ? (
                   <BlurhashImage
@@ -213,6 +230,7 @@ export const AnimeGrid = memo(function AnimeGrid({
                 </div>
               </div>
             </CardWrapper>
+            </Peekable>
           );
         })}
       </div>

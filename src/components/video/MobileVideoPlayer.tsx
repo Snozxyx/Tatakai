@@ -32,20 +32,26 @@ import { KeepAwake } from '@capacitor-community/keep-awake';
 import { cn } from "@/lib/utils";
 import { formatTime } from "@/core/player/time-utils";
 import { buildSubtitleFetchCandidates, getSubtitleSelectionKey, isBrowserReadyVttUrl, normalizeSubtitleToVtt } from "@/core/player/subtitle-utils";
+import { buildMobilePlaybackCandidates, firstFulfilled, markProxyWorking, probePlaybackCandidate } from "@/core/player/stream-resolver";
+import { getProfileKnobs } from "@/lib/memoryProfile";
+import { capQualityForDataSaver, getEffectiveMemoryProfile, shouldAutoplayVideo } from "@/lib/mobile/dataSaver";
 import { UpNextOverlay } from "./overlays/UpNextOverlay";
 import { VideoSettingsPanel } from "./VideoSettingsPanel";
 import { buildSubtitleCueStyle } from "@/lib/video/subtitleStyle";
 import { ensureCustomSubtitleFontLoaded } from "@/lib/video/customSubtitleFont";
+import { triggerHaptic } from "@/lib/haptics";
 import { useActiveCues } from "./hooks/useActiveCues";
-import { createNativeHlsLoader } from "@/core/extensions/mobile/nativeHlsLoader";
 import {
-  fetchMobileProxyText,
-  getMobileProxyMediaBlobUrl,
+  isAnyProxyUrl,
   isMobileProxyUrl,
+  getNativeProxyBaseUrl,
+  registerMobileSource,
   reregisterMobileSource,
   resolveMobileProxy,
   unwrapMobileProxyUrl,
 } from "@/core/extensions/mobile/mobileProxy";
+import { createNativeHlsLoader } from "@/core/extensions/mobile/nativeHlsLoader";
+import { DownloadButton } from "./controls/DownloadButton";
 
 interface MobileVideoPlayerProps {
   sources: Array<{ url: string; isM3U8: boolean; quality?: string }>;
@@ -72,6 +78,10 @@ interface MobileVideoPlayerProps {
   onBack?: () => void;
   episodeTitle?: string;
   isOffline?: boolean;
+  /** Playing source type (hls/torrent/…) — gates torrent download URL like desktop. */
+  sourceType?: string;
+  /** Torrent magnet/bridge URL — only used when the playing source is a torrent. */
+  torrentUrl?: string;
 }
 
 // formatTime + subtitle helper functions moved to @/core/player/*
@@ -150,6 +160,24 @@ type SkipSegment = {
   type: 'op' | 'ed' | 'mixed-op' | 'mixed-ed' | 'recap';
 };
 
+// Recovery budgets. Bounds come from desktop's HlsAdapter, which the mobile
+// player did not have until now.
+const MAX_SAME_URL_RETRIES = 1;
+const MAX_MEDIA_RECOVERIES = 2;
+const PROBE_CANDIDATES = 3;
+// How long a `waiting` state may persist before we treat the stream as dead
+// and run the recovery ladder. 6s (was 12s): long enough to ride out a slow
+// first segment on LTE, short enough that a frozen episode recovers instead
+// of spinning.
+const STALL_TIMEOUT_MS = 6_000;
+
+// Body/html class + window event the mobile player toggles while its
+// CSS-fallback fullscreen is active. App chrome (MobileNav/Sidebar) hides on
+// both so a trapped stacking context on some devices can't leave the nav
+// painted above the video.
+export const MOBILE_PLAYER_FULLSCREEN_CLASS = 'mobile-player-fullscreen';
+export const MOBILE_PLAYER_FULLSCREEN_EVENT = 'tatakai-mobile-player-fullscreen';
+
 export function MobileVideoPlayer({
   sources,
   subtitles = [],
@@ -175,6 +203,8 @@ export function MobileVideoPlayer({
   onBack,
   episodeTitle,
   isOffline,
+  sourceType,
+  torrentUrl,
 }: MobileVideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -211,7 +241,14 @@ export function MobileVideoPlayer({
   const hasTatakaiSkipSegments = tatakaiSkipSegments.length > 0;
   const effectiveSkipSegments = hasTatakaiSkipSegments ? tatakaiSkipSegments : aniskipSegments;
 
-  const resolvedPoster = poster ? getProxiedImageUrl(poster) : undefined;
+  const nativeMobile = Capacitor.isNativePlatform();
+  const resolvedPoster = useMemo(() => {
+    if (!poster) return undefined;
+    if (nativeMobile && getNativeProxyBaseUrl() && /^https?:/i.test(poster)) {
+      return registerMobileSource({ url: poster });
+    }
+    return nativeMobile ? poster : getProxiedImageUrl(poster);
+  }, [poster, nativeMobile]);
 
   // Player state
   const [isPlaying, setIsPlaying] = useState(false);
@@ -224,6 +261,14 @@ export function MobileVideoPlayer({
   const [isBuffering, setIsBuffering] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const retryCountRef = useRef(0);
+  // Recovery bookkeeping. `retryCountRef` is same-URL retries; the rest drive
+  // the candidate ladder and the media (buffer-append) recovery path.
+  const candidateIndexRef = useRef(0);
+  const mediaRetryRef = useRef(0);
+  const recoveringRef = useRef(false);
+  const recoverRef = useRef<(() => void) | null>(null);
+  const metadataAutoplayCleanup = useRef<(() => void) | null>(null);
+  const stallTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [currentSubtitle, setCurrentSubtitle] = useState<string>(settings.subtitleLanguage);
   const [showSubtitleMenu, setShowSubtitleMenu] = useState(false);
   const [showFullSettings, setShowFullSettings] = useState(false);
@@ -276,7 +321,7 @@ export function MobileVideoPlayer({
   const lastSavedProgressRef = useRef<number>(0);
   const PROGRESS_SAVE_INTERVAL = 15;
   const currentSource = useMemo(
-    () => selectPreferredSource(sources, settings.defaultQuality),
+    () => selectPreferredSource(sources, capQualityForDataSaver(settings.defaultQuality)),
     [sources, settings.defaultQuality],
   );
   const sourceUrlKey = currentSource?.url || '';
@@ -290,6 +335,10 @@ export function MobileVideoPlayer({
   // component is reused for server switches, so clear that source-local error
   // whenever a different URL is selected; otherwise the new source never gets
   // a video element or a chance to initialize.
+  //
+  // Resolved debrid stream URL for magnet: sources (async — the mount effect
+  // below waits for it). Cleared here so a server switch re-resolves.
+  const [debridResolvedUrl, setDebridResolvedUrl] = useState<string | null>(null);
   useEffect(() => {
     setVideoError(null);
     retryCountRef.current = 0;
@@ -297,48 +346,8 @@ export function MobileVideoPlayer({
     setIsBuffering(false);
     setHlsAudioTracks([]);
     setCurrentHlsAudioTrack(-1);
-    setUseDirectBlobFallback(false);
+    setDebridResolvedUrl(null);
   }, [sourceUrlKey]);
-
-  // In-app proxy direct file (MP4/WebM): `<video>` cannot play the opaque
-  // `mobile-proxy://` token, so resolve it to a blob URL through the native
-  // client (header replay). HLS never needs this — the native hls.js loader
-  // resolves tokens per-request (playlist rewrite included).
-  const isProxyDirectFile =
-    !isOffline &&
-    !!currentSource?.url &&
-    isMobileProxyUrl(currentSource.url) &&
-    sourceTypeKey !== 'm3u8';
-  const [directBlobUrl, setDirectBlobUrl] = useState<string | null>(null);
-  const [directBlobFailed, setDirectBlobFailed] = useState(false);
-  const [useDirectBlobFallback, setUseDirectBlobFallback] = useState(false);
-
-  useEffect(() => {
-    if (!isProxyDirectFile || !currentSource?.url || !useDirectBlobFallback) {
-      setDirectBlobUrl(null);
-      setDirectBlobFailed(false);
-      return;
-    }
-    let cancelled = false;
-    setDirectBlobUrl(null);
-    setDirectBlobFailed(false);
-    // Blob URLs are cached (and owned) by the proxy module — never revoke here.
-    getMobileProxyMediaBlobUrl(currentSource.url, {
-      originalUrl: (currentSource as any)?.originalUrl,
-      headers: (currentSource as any)?.headers,
-    }).then((blob) => {
-      if (cancelled) return;
-      if (blob) setDirectBlobUrl(blob);
-      else setDirectBlobFailed(true);
-    }).catch(() => {
-      if (!cancelled) setDirectBlobFailed(true);
-    });
-    return () => {
-      cancelled = true;
-    };
-    // `currentSource` (not just its URL key) because the token's recovery
-    // headers ride on the source object itself.
-  }, [sourceUrlKey, isOffline, isProxyDirectFile, currentSource, useDirectBlobFallback]);
 
   // Fetch skip times for intro/outro
   useEffect(() => {
@@ -376,6 +385,9 @@ export function MobileVideoPlayer({
     autoSkippedWindowRef.current = key;
     setCurrentTime(activeSkip.endTime);
     setActiveSkip(null);
+    // Mobile feedback for the auto-skip toggle (Settings → Video → Skip intro).
+    void triggerHaptic('success');
+    toast.success('Skipped intro', { id: 'mobile-autoskip', duration: 1800 });
   }, [activeSkip, settings.autoSkipIntro]);
 
   // Keep screen awake while playing
@@ -528,222 +540,441 @@ export function MobileVideoPlayer({
     if (!video || !currentSource?.url) return;
 
     const source = currentSource;
-    // Dead-token recovery: the in-app proxy map is in-memory, so a
-    // Dexie-seeded source from before a restart (or past the 15-minute token
-    // TTL) carries a token that no longer resolves. Re-mint it from the
-    // source's own upstream URL + headers instead of mounting an unloadable
-    // src (the "failed to load video" state).
+    // Android receives desktop-shaped loopback URLs from the extension host.
+    // Keep them intact: unwrapping here forced every manifest and segment back
+    // through the hosted proxy, which was the mobile/desktop speed gap. A
+    // cached token from an earlier app process/port is re-minted from the
+    // source-carried upstream URL and headers before mounting.
     let activeSourceUrl = source.url;
-    if (!isOffline && isMobileProxyUrl(activeSourceUrl) && !resolveMobileProxy(activeSourceUrl)) {
-      const fresh = reregisterMobileSource({
+    if (
+      !isOffline &&
+      isAnyProxyUrl(activeSourceUrl) &&
+      !resolveMobileProxy(activeSourceUrl) &&
+      (source as any)?.originalUrl
+    ) {
+      activeSourceUrl = reregisterMobileSource({
         url: activeSourceUrl,
-        originalUrl: (source as any)?.originalUrl,
-        headers: (source as any)?.headers,
+        originalUrl: (source as any).originalUrl,
+        headers: (source as any).headers,
       });
-      if (isMobileProxyUrl(fresh)) activeSourceUrl = fresh;
     }
-    // Always route cross-origin http(s) sources through the streaming proxy on
-    // mobile — not only when a Referer is present. hls.js fetches the manifest
-    // and segments with XHR/fetch, which the raw origin blocks with no CORS
-    // header, so an un-proxied direct/HLS source failed to load and only embeds
-    // (iframes, no CORS) played. The proxy adds `Access-Control-Allow-Origin: *`
-    // and forwards Referer/UA. `getProxiedVideoUrl` leaves local-like URLs
-    // untouched (asset://, blob:, and the torrent loopback 127.0.0.1 server), so
-    // those still play directly.
-    const isHls = source.isM3U8 || (source as any).sourceType === 'hls' || /\.m3u8(?:$|[?#/])/i.test(activeSourceUrl);
-    const useNativeHlsTransport = !isOffline && isHls && Capacitor.isNativePlatform();
-    const finalUrl = !useNativeHlsTransport && !isOffline && /^https?:/i.test(activeSourceUrl)
-      ? getProxiedVideoUrl(activeSourceUrl, playbackReferer || undefined, playbackUserAgent || undefined)
-      : activeSourceUrl;
-
-    // A proxy token without the native transport (e.g. web preview of a mobile
-    // session): the default hls.js loader cannot resolve tokens, so fall back
-    // to the remote proxy over the recovered upstream URL (server-side header
-    // replay). On native, HLS keeps the token — the native loader resolves it.
-    let resolvedFinalUrl = finalUrl;
-    if (isMobileProxyUrl(finalUrl) && !useNativeHlsTransport && !isOffline) {
-      const upstream = unwrapMobileProxyUrl(finalUrl, {
-        originalUrl: (source as any)?.originalUrl,
-      });
-      resolvedFinalUrl = /^https?:/i.test(upstream)
-        ? getProxiedVideoUrl(upstream, playbackReferer || undefined, playbackUserAgent || undefined)
-        : upstream;
-    }
-    const finalUrlResolved = resolvedFinalUrl;
-
-    // Cleanup previous HLS instance
-    if (hlsRef.current) {
-      hlsRef.current.destroy();
-      hlsRef.current = null;
-    }
-
-    let metadataAutoplayHandler: (() => void) | null = null;
-
-    if (isHls && Hls.isSupported()) {
-      const hls = new Hls({
-        enableWorker: true,
-        lowLatencyMode: true,
-        autoStartLoad: true,
-        startFragPrefetch: true,
-        // Start with the smallest rendition for the first frame, then ramp up
-        // aggressively once the first native fragment reports throughput. The
-        // previous -1 auto start could choose a multi-megabyte 1080p fragment
-        // before the bridge had any bandwidth sample.
-        startLevel: 0,
-        abrEwmaDefaultEstimate: 5_000_000,
-        abrBandWidthFactor: 0.9,
-        abrBandWidthUpFactor: 0.8,
-        maxStarvationDelay: 2,
-        maxLoadingDelay: 2,
-        // Mobile-tuned: enough forward buffer to avoid immediate rebuffering,
-        // without making startup wait on a large memory target.
-        backBufferLength: 30,
-        maxBufferLength: 20,
-        maxMaxBufferLength: 40,
-        maxBufferSize: 60 * 1000 * 1000,
-        capLevelToPlayerSize: true,
-        manifestLoadingMaxRetry: 2,
-        levelLoadingMaxRetry: 3,
-        fragLoadingMaxRetry: 2,
-        manifestLoadingRetryDelay: 800,
-        levelLoadingRetryDelay: 800,
-        fragLoadingRetryDelay: 800,
-        ...(useNativeHlsTransport ? {
-          loader: createNativeHlsLoader({
-            referer: playbackReferer || undefined,
-            userAgent: playbackUserAgent || undefined,
-            origin: headers?.Origin,
+    // Debrid resolution: magnet links must be resolved to a stream URL before
+    // HLS/direct detection runs. WatchPage pre-resolves once and hands both
+    // players an HTTP URL, so this path only fires for direct magnet mounts —
+    // the in-memory resolve cache in the orchestrator dedupes any double-mount
+    // into a single provider torrent.
+    if (!isOffline && activeSourceUrl.startsWith('magnet:')) {
+      if (!debridResolvedUrl) {
+        setIsBuffering(true);
+        const controller = new AbortController();
+        let alive = true;
+        void import('@/core/providers/debrid-orchestrator').then((m) =>
+          m.debridOrchestrator.resolveMagnetToStream(activeSourceUrl, {
+            episodeNumber: (source as any).episodeNumber ?? (source as any).episode,
+            // WatchPage threads torrentTitle/title/name; standalone mounts may
+            // only carry title — fall back through all of them so season packs
+            // still pick the right episode file.
+            filenameHint: (source as any).filenameHint
+              ?? (source as any).torrentTitle
+              ?? (source as any).title
+              ?? (source as any).name,
+            signal: controller.signal,
+            onProgress: (state, progress) => {
+              if (!alive) return;
+              const pct = typeof progress === 'number' && Number.isFinite(progress)
+                ? ` ${Math.round(progress)}%`
+                : '';
+              // Uncached torrents need minutes: show state instead of a dead spinner.
+              setIsBuffering(true);
+              if (/download|prepar|convert|processing/i.test(state)) {
+                setVideoError(null);
+              }
+              void pct;
+            },
           }),
-        } : {}),
+        ).then(
+          (resolvedUrl) => {
+            if (alive) setDebridResolvedUrl(resolvedUrl);
+          },
+          (err: unknown) => {
+            if (!alive) return;
+            if ((err as Error)?.name === 'AbortError') return;
+            setVideoError((err instanceof Error ? err.message : String(err)) || 'Debrid resolution failed');
+            setIsBuffering(false);
+          },
+        );
+        return () => {
+          alive = false;
+          controller.abort();
+        };
+      }
+      activeSourceUrl = debridResolvedUrl;
+    }
+    // Opaque proxy tokens are supported by the custom HLS loader, but a direct
+    // MP4/WebM cannot be mounted as a `mobile-proxy://` media src. An older
+    // shell without the loopback plugin uses its upstream URL device-direct.
+    const sourceLooksHls = source.isM3U8 ||
+      (source as any).sourceType === 'hls' ||
+      /\.m3u8(?:$|[?#/])/i.test(activeSourceUrl);
+    const isDebridOrigin = (source as any)?.sourceType === 'debrid' || (source as any)?.mode === 'debrid';
+    // Sources from custom/direct integrations may bypass the extension host.
+    // Register them here as a final guard so native playback stays on the
+    // device-local iOS/Android proxy and never uses Tatakai's hosted proxy.
+    if (
+      nativeMobile && !isOffline && !isDebridOrigin &&
+      /^https?:/i.test(activeSourceUrl) && !isAnyProxyUrl(activeSourceUrl)
+    ) {
+      activeSourceUrl = registerMobileSource({
+        url: activeSourceUrl,
+        headers: {
+          ...(((source as any)?.headers || {}) as Record<string, string>),
+          ...(playbackReferer ? { Referer: playbackReferer } : {}),
+          ...(playbackUserAgent ? { 'User-Agent': playbackUserAgent } : {}),
+          ...(headers?.Origin ? { Origin: headers.Origin } : {}),
+        },
       });
+    }
+    if (!sourceLooksHls && isMobileProxyUrl(activeSourceUrl)) {
+      activeSourceUrl = unwrapMobileProxyUrl(activeSourceUrl, {
+        originalUrl: (source as any)?.originalUrl,
+      });
+    }
 
-      hls.loadSource(finalUrlResolved);
-      hls.attachMedia(video);
-      hlsRef.current = hls;
+    // Loopback sources are already proxied and must stay local. A non-native
+    // web render retains its normal backend fallback.
+    const upstreamUrl = activeSourceUrl;
+    const isHls = sourceLooksHls;
+    // Debrid CDN links are IP-pinned to the device: the hosted proxy's IP
+    // would 403 them, so resolved debrid streams always play direct (same as
+    // the desktop DebridAdapter). getProxiedVideoUrl also bypasses known
+    // debrid hosts — this covers the source regardless of CDN host.
+    const hostedUrl = !nativeMobile && !isOffline && !isDebridOrigin && /^https?:/i.test(upstreamUrl)
+      ? getProxiedVideoUrl(upstreamUrl, playbackReferer || undefined, playbackUserAgent || undefined)
+      : upstreamUrl;
+    // Candidate ladder: native/mobile proxy tokens are single, authoritative
+    // candidates. Only web renders race raw URLs against a backend candidate.
+    const replayHeaders = (((source as any)?.headers || {}) as Record<string, string>);
+    // Header-gated sources cannot be played direct because the CDN validates
+    // headers the WebView cannot send; the loopback service owns those headers.
+    const needsHeaderReplay = Boolean(playbackReferer || headers?.Origin) ||
+      Object.keys(replayHeaders).some((name) =>
+        ['referer', 'origin', 'cookie', 'authorization'].includes(String(name).toLowerCase()),
+      );
+    let candidates = isAnyProxyUrl(upstreamUrl)
+      ? [upstreamUrl]
+      : buildMobilePlaybackCandidates(
+        /^https?:/i.test(upstreamUrl) ? upstreamUrl : activeSourceUrl,
+        {
+          proxiedUrl: hostedUrl,
+          referer: playbackReferer || undefined,
+          userAgent: playbackUserAgent || undefined,
+          refererCandidates: (source as any)?.refererCandidates,
+        },
+      );
+    if (!isAnyProxyUrl(upstreamUrl) && needsHeaderReplay) {
+      candidates = candidates.filter((url) => /^https?:/i.test(url) && url !== upstreamUrl);
+      if (!candidates.includes(hostedUrl)) candidates.unshift(hostedUrl);
+    }
+    if (!candidates.length) candidates = [hostedUrl];
+    candidateIndexRef.current = 0;
+    mediaRetryRef.current = 0;
+    retryCountRef.current = 0;
+    setRetryCount(0);
+    recoverRef.current = null;
 
-      const syncAudioTracks = () => {
-        try {
-          const list = (hls.audioTracks || []).map((t: { id?: number; name?: string; lang?: string }, i: number) => ({
-            id: typeof t.id === 'number' ? t.id : i,
-            label: String(t.name || `Audio ${i + 1}`),
-            lang: String(t.lang || 'und'),
-          }));
-          setHlsAudioTracks(list);
-          setCurrentHlsAudioTrack(typeof hls.audioTrack === 'number' ? hls.audioTrack : -1);
-        } catch {
-          /* audio probe best-effort */
+    function giveUp(statusCode?: number, reason?: string): void {
+      setVideoError("Failed to load video. Please try another server.");
+      onError?.({ statusCode, reason });
+    }
+
+    let mounted = false;
+    let disposed = false;
+
+    // Shared recovery ladder, reachable from both the hls.js error handler and
+    // the media-element stall watchdog (the "server works but the video froze"
+    // case never hit either until now).
+    function recover(): void {
+      if (disposed) return;
+      if (recoveringRef.current) return;
+      recoveringRef.current = true;
+      try {
+        if (mediaRetryRef.current < MAX_MEDIA_RECOVERIES && hlsRef.current) {
+          mediaRetryRef.current += 1;
+          if (mediaRetryRef.current > 1) {
+            // hls.js's documented escalation for a buffer append that keeps
+            // failing (same fix desktop's HlsAdapter applies).
+            try { (hlsRef.current as any).swapAudioCodec?.(); } catch { /* not all builds */ }
+          }
+          try { hlsRef.current.recoverMediaError(); return; } catch { /* fall through */ }
+        }
+        if (retryCountRef.current < MAX_SAME_URL_RETRIES) {
+          retryCountRef.current += 1;
+          setRetryCount(retryCountRef.current);
+          if (hlsRef.current) {
+            try { hlsRef.current.startLoad(); return; } catch { /* fall through */ }
+          }
+          try { video.load(); return; } catch { /* fall through */ }
+        }
+
+        if (candidateIndexRef.current < candidates.length - 1) {
+          candidateIndexRef.current += 1;
+          retryCountRef.current = 0;
+          setRetryCount(0);
+          mediaRetryRef.current = 0;
+          console.warn(`[MobileVideoPlayer] failing over to candidate ${candidateIndexRef.current + 1}/${candidates.length}`);
+          mountAt(candidateIndexRef.current);
+          return;
+        }
+
+        giveUp();
+      } finally {
+        recoveringRef.current = false;
+      }
+    }
+
+    function mountAt(index: number): void {
+      if (disposed) return;
+      mounted = true;
+      const finalUrlResolved = candidates[Math.min(Math.max(index, 0), candidates.length - 1)];
+
+      // Cleanup previous HLS instance
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+
+      // A leftover src from a failed attempt makes the next attachMedia look
+      // like a no-op, so reset the element between attempts.
+      try {
+        video.pause();
+        video.removeAttribute("src");
+        video.load();
+      } catch {
+        /* element may already be detached */
+      }
+
+      let metadataAutoplayHandler: (() => void) | null = null;
+      metadataAutoplayCleanup.current = () => {
+        if (metadataAutoplayHandler) {
+          video.removeEventListener('loadedmetadata', metadataAutoplayHandler);
+          metadataAutoplayHandler = null;
         }
       };
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        syncAudioTracks();
+
+      if (isHls && Hls.isSupported()) {
+        // Buffer sizes follow the effective profile (data-saver forces `low`).
+        const { backBufferLength, maxBufferLength, maxMaxBufferLength } =
+          getProfileKnobs(getEffectiveMemoryProfile()).hls;
+        const hls = new Hls({
+          enableWorker: true,
+          // VOD fast-start: low-latency mode adds part-request overhead on
+          // proxied segments. Off matches desktop HlsAdapter tuning.
+          lowLatencyMode: false,
+          autoStartLoad: true,
+          startFragPrefetch: true,
+          // Start with the smallest rendition for the first frame, then ramp up
+          // aggressively once the first native fragment reports throughput. The
+          // previous -1 auto start could choose a multi-megabyte 1080p fragment
+          // before the bridge had any bandwidth sample.
+          startLevel: 0,
+          // Conservative initial estimate for LTE: the old 5 Mbps started with
+          // a heavy 1080p fragment before the bridge had any bandwidth sample,
+          // delaying first frame and causing early rebuffering.
+          abrEwmaDefaultEstimate: 1_000_000,
+          abrBandWidthFactor: 0.9,
+          abrBandWidthUpFactor: 0.8,
+          maxStarvationDelay: 2,
+          maxLoadingDelay: 2,
+          // Mobile-tuned: enough forward buffer to avoid immediate rebuffering,
+          // without making startup wait on a large memory target.
+          backBufferLength,
+          maxBufferLength,
+          maxMaxBufferLength,
+          // capping to player size made fullscreen rotation re-evaluate levels
+          // mid-episode and rebuffer; the ABR defaults handle mobile well enough.
+          capLevelToPlayerSize: false,
+          // 30 MB (was 60 MB): enough forward buffer to avoid immediate
+          // rebuffering without GC/memory pressure stalling low-end phones.
+          maxBufferSize: 30 * 1000 * 1000,
+          // Fast failover: dead proxy candidate advances after ~1s, not ~5s.
+          // Default XHR against loopback uses no per-segment JS bridge;
+          // Referer/UA replay
+          // happens inside the native service.
+          manifestLoadingMaxRetry: 1,
+          levelLoadingMaxRetry: 2,
+          fragLoadingMaxRetry: 1,
+          manifestLoadingRetryDelay: 400,
+          levelLoadingRetryDelay: 400,
+          fragLoadingRetryDelay: 400,
+          // `mobile-proxy://` is the compatibility path for older cached
+          // rows. Android/iOS loopback URLs use hls.js's native XHR
+          // loader so fragments stream over localhost just like desktop.
+          ...(isMobileProxyUrl(finalUrlResolved) ? {
+            loader: createNativeHlsLoader({
+              referer: playbackReferer || undefined,
+              userAgent: playbackUserAgent || undefined,
+              origin: headers?.Origin,
+            }),
+          } : {}),
+        });
+
+        hls.loadSource(finalUrlResolved);
+        hls.attachMedia(video);
+        hlsRef.current = hls;
+
+        const syncAudioTracks = () => {
+          try {
+            const list = (hls.audioTracks || []).map((t: { id?: number; name?: string; lang?: string }, i: number) => ({
+              id: typeof t.id === 'number' ? t.id : i,
+              label: String(t.name || `Audio ${i + 1}`),
+              lang: String(t.lang || 'und'),
+            }));
+            setHlsAudioTracks(list);
+            setCurrentHlsAudioTrack(typeof hls.audioTrack === 'number' ? hls.audioTrack : -1);
+          } catch {
+            /* audio probe best-effort */
+          }
+        };
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          syncAudioTracks();
+          if (initialSeekSeconds && initialSeekSeconds > 0) {
+            video.currentTime = initialSeekSeconds;
+          }
+          if (shouldAutoplayVideo(settings.autoplay)) {
+            video.play().catch(console.error);
+          }
+        });
+        hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, syncAudioTracks);
+        hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, (_: unknown, data: { id?: number }) => {
+          if (typeof data?.id === 'number') setCurrentHlsAudioTrack(data.id);
+        });
+
+        // A buffered fragment means this candidate genuinely works, so the
+        // budget resets for whatever breaks later in the stream.
+        hls.on(Hls.Events.FRAG_BUFFERED, () => {
+          mediaRetryRef.current = 0;
+          retryCountRef.current = 0;
+        });
+
+        hls.on(Hls.Events.ERROR, (_, data) => {
+          if (!data?.fatal) return;
+          const status = Number((data as any)?.response?.code || (data as any)?.networkDetails?.status || 0);
+
+          if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            if (mediaRetryRef.current < MAX_MEDIA_RECOVERIES) {
+              mediaRetryRef.current += 1;
+              if (mediaRetryRef.current > 1) {
+                try { (hls as any).swapAudioCodec?.(); } catch { /* not all builds */ }
+              }
+              try { hls.recoverMediaError(); return; } catch { /* fall through */ }
+            }
+          }
+
+          if (retryCountRef.current < MAX_SAME_URL_RETRIES) {
+            retryCountRef.current += 1;
+            setRetryCount(retryCountRef.current);
+            console.warn(`[MobileVideoPlayer] retry ${retryCountRef.current}/${MAX_SAME_URL_RETRIES} (${String(data.details || 'error')}${status ? ` status=${status}` : ''})`);
+            try { hls.startLoad(); return; } catch { /* fall through */ }
+          }
+
+          if (candidateIndexRef.current < candidates.length - 1) {
+            candidateIndexRef.current += 1;
+            retryCountRef.current = 0;
+            setRetryCount(0);
+            mediaRetryRef.current = 0;
+            console.warn(`[MobileVideoPlayer] failing over to candidate ${candidateIndexRef.current + 1}/${candidates.length}`);
+            mountAt(candidateIndexRef.current);
+            return;
+          }
+
+          giveUp(status || undefined, `hls-${String(data.type || 'error')}-${String(data.details || 'fatal')}`);
+        });
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        // Safari native HLS support (iOS has no hls.js MSE path — the native
+        // element fetches segments itself, so it needs a network URL).
+        video.src = finalUrlResolved;
         if (initialSeekSeconds && initialSeekSeconds > 0) {
           video.currentTime = initialSeekSeconds;
         }
-        if (settings.autoplay) {
-          video.play().catch(console.error);
-        }
-      });
-      hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, syncAudioTracks);
-      hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, (_: unknown, data: { id?: number }) => {
-        if (typeof data?.id === 'number') setCurrentHlsAudioTrack(data.id);
-      });
 
-      hls.on(Hls.Events.ERROR, (_, data) => {
-        if (data.fatal) {
-          if (retryCountRef.current < 3) {
-            setRetryCount(prev => {
-              const next = prev + 1;
-              retryCountRef.current = next;
-              return next;
-            });
-            hls.loadSource(finalUrlResolved);
+        if (shouldAutoplayVideo(settings.autoplay)) {
+          metadataAutoplayHandler = () => {
+            video.play().catch(console.error);
+            video.removeEventListener('loadedmetadata', metadataAutoplayHandler!);
+          };
+
+          if (video.readyState >= 1) {
+            video.play().catch(console.error);
           } else {
-            setVideoError("Failed to load video. Please try another server.");
-            onError?.({
-              statusCode: Number((data as any)?.response?.code || 0) || undefined,
-              reason: `hls-${String(data.type || 'error')}-${String(data.details || 'fatal')}`,
-            });
+            video.addEventListener('loadedmetadata', metadataAutoplayHandler);
           }
         }
-      });
-    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      // Safari native HLS support (iOS has no hls.js MSE path — the native
-      // element fetches segments itself, so it needs a network URL).
-      video.src = finalUrlResolved;
-      if (initialSeekSeconds && initialSeekSeconds > 0) {
-        video.currentTime = initialSeekSeconds;
-      }
+      } else {
+        // Direct file: the mounted candidate is already the right URL —
+        // upstream direct for open CDNs (the media element needs no CORS for
+        // playback), loopback for gated ones, and direct for the
+        // torrent engine and offline files.
+        setIsBuffering(false);
+        video.src = finalUrlResolved;
+        if (initialSeekSeconds && initialSeekSeconds > 0) {
+          video.currentTime = initialSeekSeconds;
+        }
 
-      if (settings.autoplay) {
-        metadataAutoplayHandler = () => {
-          video.play().catch(console.error);
-          video.removeEventListener('loadedmetadata', metadataAutoplayHandler!);
-        };
+        if (shouldAutoplayVideo(settings.autoplay)) {
+          metadataAutoplayHandler = () => {
+            video.play().catch(console.error);
+            video.removeEventListener('loadedmetadata', metadataAutoplayHandler!);
+          };
 
-        if (video.readyState >= 1) {
-          video.play().catch(console.error);
-        } else {
-          video.addEventListener('loadedmetadata', metadataAutoplayHandler);
+          if (video.readyState >= 1) {
+            video.play().catch(console.error);
+          } else {
+            video.addEventListener('loadedmetadata', metadataAutoplayHandler);
+          }
         }
       }
-    } else {
-      // Direct MP4. A proxy token is opaque to `<video>` — play the resolved
-      // blob URL (native header replay); while it resolves, hold the loader
-      // instead of mounting an unloadable src (the "failed to load video"
-      // state came from exactly that). Blob failure falls back to the remote
-      // proxy over the recovered upstream URL.
-      let mp4Url = finalUrlResolved;
-      if (isMobileProxyUrl(activeSourceUrl) && !isOffline) {
-        const upstream = unwrapMobileProxyUrl(activeSourceUrl, {
-          originalUrl: (source as any)?.originalUrl,
-        });
-        if (!useDirectBlobFallback) {
-          // Open CDNs can go straight into the native media element. This
-          // avoids the hosted proxy's extra network hop and gives Android's
-          // player its own range requests / connection reuse. Header-gated
-          // sources still use the range-capable proxy and retain the native
-          // full-file fallback below if that route fails.
-          const tokenHeaders = resolveMobileProxy(activeSourceUrl)?.headers || (source as any)?.headers || {};
-          const needsHeaderReplay = Boolean(playbackReferer || headers?.Origin) ||
-            Object.keys(tokenHeaders).some((name) =>
-              ['referer', 'origin', 'cookie', 'authorization'].includes(name.toLowerCase()),
-            );
-          mp4Url = /^https?:/i.test(upstream) && needsHeaderReplay
-            ? getProxiedVideoUrl(upstream, playbackReferer || undefined, playbackUserAgent || undefined)
-            : upstream;
-        } else if (directBlobUrl) {
-          mp4Url = directBlobUrl;
-        } else if (directBlobFailed) {
-          setVideoError("Failed to load video. Please try another server.");
-          return;
-        } else {
-          setIsBuffering(true);
-          return;
-        }
-      }
-      setIsBuffering(false);
-      video.src = mp4Url;
-      if (initialSeekSeconds && initialSeekSeconds > 0) {
-        video.currentTime = initialSeekSeconds;
-      }
 
-      if (settings.autoplay) {
-        metadataAutoplayHandler = () => {
-          video.play().catch(console.error);
-          video.removeEventListener('loadedmetadata', metadataAutoplayHandler!);
-        };
-
-        if (video.readyState >= 1) {
-          video.play().catch(console.error);
-        } else {
-          video.addEventListener('loadedmetadata', metadataAutoplayHandler);
-        }
-      }
+      recoverRef.current = recover;
     }
 
+    // Probe before mounting: race the ladder in parallel and mount the first
+    // candidate that answers (~1.5s budget). Sequential mounting cost ~30s on
+    // a dead proxy base; this makes failover instant for both HLS (manifest
+    // probe, no Range) and direct (byte-0 probe). Single-candidate (loopback)
+    // ladders mount immediately — no probe delay on the fast path.
+    void (async () => {
+      if (!mounted && candidates.length > 1) {
+        const budget = 1500;
+        const slice = candidates.slice(0, PROBE_CANDIDATES);
+        const probes = slice.map(async (url, i) => {
+          const ok = await probePlaybackCandidate(url, {
+            timeoutMs: budget,
+            range: isHls ? false : true,
+          });
+          if (!ok) throw new Error(`dead:${i}`);
+          return i;
+        });
+        try {
+          const winner = await firstFulfilled(probes);
+          candidateIndexRef.current = winner;
+          // Persist the winner so the next episode skips dead bases entirely.
+          try {
+            const u = new URL(candidates[winner]);
+            markProxyWorking(`${u.origin}${u.pathname}`.replace(/\/$/, ''), u.searchParams.get('referer') || undefined);
+          } catch { /* health best-effort */ }
+        } catch {
+          // All probes failed — mount candidates[0], hls.js/media element is
+          // the real probe for hostile CDNs.
+        }
+      }
+      if (!disposed && !mounted) mountAt(candidateIndexRef.current);
+    })();
+
     return () => {
-      if (metadataAutoplayHandler) {
-        video.removeEventListener('loadedmetadata', metadataAutoplayHandler);
+      disposed = true;
+      if (metadataAutoplayCleanup.current) {
+        metadataAutoplayCleanup.current();
+        metadataAutoplayCleanup.current = null;
       }
 
       if (hlsRef.current) {
@@ -751,7 +982,7 @@ export function MobileVideoPlayer({
         hlsRef.current = null;
       }
     };
-  }, [sourceUrlKey, sourceTypeKey, initialSeekSeconds, isOffline, playbackReferer, playbackUserAgent, headers?.Origin, settings.autoplay, directBlobUrl, directBlobFailed, useDirectBlobFallback, onError]);
+  }, [currentSource, sourceUrlKey, sourceTypeKey, initialSeekSeconds, isOffline, nativeMobile, playbackReferer, playbackUserAgent, headers?.Origin, settings.autoplay, onError, debridResolvedUrl]);
 
   // Load subtitles — parallel + incremental so the first (English) track mounts
   // in ~1s instead of after every track serially times out. Each resolved track
@@ -780,26 +1011,23 @@ export function MobileVideoPlayer({
           subtitleSourceUrl,
           playbackReferer,
           Boolean(isOffline),
-          (url, referer) => getProxiedSubtitleUrl(url, referer)
+          (url, referer) => nativeMobile
+            ? registerMobileSource({
+                url,
+                headers: {
+                  ...(referer ? { Referer: referer } : {}),
+                  ...(playbackUserAgent ? { 'User-Agent': playbackUserAgent } : {}),
+                },
+              })
+            : getProxiedSubtitleUrl(url, referer)
         );
 
         let normalizedText = '';
         for (const candidateUrl of candidates) {
           try {
-            // In-app proxy track: resolve natively with header replay (the
-            // track CDN validates Referer exactly like the video CDN does —
-            // desktop proxies subtitles for the same reason).
-            if (isMobileProxyUrl(candidateUrl)) {
-              const text = await fetchMobileProxyText(candidateUrl, {
-                originalUrl: (sub as { originalUrl?: string }).originalUrl,
-                headers: (sub as { headers?: unknown }).headers,
-                timeoutMs: 8000,
-              });
-              if (!text) continue;
-              normalizedText = normalizeSubtitleToVtt(text);
-              if (normalizedText) break;
-              continue;
-            }
+            // Candidates are [raw, backend subtitle proxy]: raw first for
+            // open CDNs, then the backend fetch (server-side Referer replay
+            // + CORS) for gated ones.
             const response = await fetch(candidateUrl, {
               headers: {
                 Accept: 'text/vtt, text/plain, */*',
@@ -870,7 +1098,7 @@ export function MobileVideoPlayer({
         } catch { /* ignore */ }
       });
     };
-  }, [subtitles, playbackReferer, isOffline]);
+  }, [subtitles, playbackReferer, playbackUserAgent, isOffline, nativeMobile]);
 
   useEffect(() => {
     if (!subtitles.length || currentSubtitle === 'off') return;
@@ -909,8 +1137,30 @@ export function MobileVideoPlayer({
       const t = Math.floor(video.currentTime || 0);
       if (t > 0) onProgressUpdate?.(t, Math.floor(video.duration || 0) || 0, false, true);
     };
-    const handleWaiting = () => setIsBuffering(true);
-    const handlePlaying = () => setIsBuffering(false);
+    const handleWaiting = () => {
+      setIsBuffering(true);
+
+      // Stall watchdog: without this, a stream that stops delivering keeps the
+      // spinner forever — the exact "even if the server works the video
+      // froze" symptom. If playback doesn't resume within STALL_TIMEOUT_MS we
+      // run the same recovery ladder hls.js errors use.
+      if (stallTimeoutRef.current) clearTimeout(stallTimeoutRef.current);
+      stallTimeoutRef.current = setTimeout(() => {
+        stallTimeoutRef.current = null;
+        if (!videoRef.current || videoRef.current.ended) return;
+        const stuck = !videoRef.current.seeking && !videoRef.current.paused;
+        if (!stuck) return;
+        console.warn('[MobileVideoPlayer] stall timeout — recovering');
+        recoverRef.current?.();
+      }, STALL_TIMEOUT_MS);
+    };
+    const handlePlaying = () => {
+      setIsBuffering(false);
+      if (stallTimeoutRef.current) {
+        clearTimeout(stallTimeoutRef.current);
+        stallTimeoutRef.current = null;
+      }
+    };
     const handleProgress = () => {
       if (video.buffered.length > 0) {
         setBuffered(video.buffered.end(video.buffered.length - 1));
@@ -924,18 +1174,10 @@ export function MobileVideoPlayer({
       }
     };
     const handleError = () => {
-      if (isProxyDirectFile && !useDirectBlobFallback) {
-        // Only pay the full-file blob cost when the range-capable proxy is not
-        // reachable for this source.
-        video.removeEventListener('error', handleError);
-        video.pause();
-        video.removeAttribute('src');
-        video.load();
-        setUseDirectBlobFallback(true);
-        setIsBuffering(true);
-        return;
-      }
+      // The recovery ladder in the mount effect owns retries/failover; a bare
+      // media-element error here means the current candidate is spent.
       setVideoError("Error loading video");
+      void triggerHaptic('error');
       onError?.({
         reason: `media-element-${video.error?.code || 'unknown'}`,
       });
@@ -962,7 +1204,7 @@ export function MobileVideoPlayer({
       video.removeEventListener('ended', handleEnded);
       video.removeEventListener('error', handleError);
     };
-  }, [onEpisodeEnd, onProgressUpdate, onError, settings.autoNextEpisode, settings.autoNextCountdownSeconds, settings.sleepTimer, isProxyDirectFile, useDirectBlobFallback]);
+  }, [onEpisodeEnd, onProgressUpdate, onError, settings.autoNextEpisode, settings.autoNextCountdownSeconds, settings.sleepTimer]);
 
   // Up-Next countdown driver.
   useEffect(() => {
@@ -1043,36 +1285,78 @@ export function MobileVideoPlayer({
     }
   }, []);
 
-  const applyFullscreenStyles = useCallback(() => {
-    if (!containerRef.current) return;
+  // Shared fullscreen signal: body/html carry the class so app chrome
+  // (MobileNav, Sidebar) can hide even when an ancestor stacking context
+  // traps the player's fixed positioning on some devices. A window event
+  // with the same payload lets portaled chrome hide without polling.
+  const originalBodyOverflowRef = useRef<string | null>(null);
+  const isFullscreenRef = useRef(false);
+  isFullscreenRef.current = isFullscreen;
 
-    document.body.style.overflow = 'hidden';
-    containerRef.current.style.position = 'fixed';
-    containerRef.current.style.top = '0';
-    containerRef.current.style.left = '0';
-    containerRef.current.style.width = '100vw';
-    containerRef.current.style.height = '100vh';
-    containerRef.current.style.zIndex = '99999';
-    containerRef.current.style.backgroundColor = 'black';
+  const setPlayerFullscreenSignal = useCallback((on: boolean) => {
+    try {
+      document.body.classList.toggle(MOBILE_PLAYER_FULLSCREEN_CLASS, on);
+      document.documentElement.classList.toggle(MOBILE_PLAYER_FULLSCREEN_CLASS, on);
+      window.dispatchEvent(
+        new CustomEvent(MOBILE_PLAYER_FULLSCREEN_EVENT, { detail: { fullscreen: on } }),
+      );
+    } catch {
+      /* non-DOM environment */
+    }
   }, []);
+
+  const applyFullscreenStyles = useCallback(() => {
+    try {
+      if (originalBodyOverflowRef.current === null) {
+        originalBodyOverflowRef.current = document.body.style.overflow || '';
+      }
+      document.body.style.overflow = 'hidden';
+    } catch {
+      /* ignore */
+    }
+    const container = containerRef.current;
+    if (container) {
+      container.style.position = 'fixed';
+      container.style.top = '0';
+      container.style.left = '0';
+      container.style.width = '100vw';
+      container.style.height = '100vh';
+      container.style.zIndex = '99999';
+      container.style.backgroundColor = 'black';
+      container.classList.add('is-player-fullscreen');
+    }
+    setPlayerFullscreenSignal(true);
+  }, [setPlayerFullscreenSignal]);
 
   const clearFullscreenStyles = useCallback(() => {
-    if (!containerRef.current) return;
-
-    document.body.style.overflow = '';
-    containerRef.current.style.position = '';
-    containerRef.current.style.top = '';
-    containerRef.current.style.left = '';
-    containerRef.current.style.width = '';
-    containerRef.current.style.height = '';
-    containerRef.current.style.zIndex = '';
-    containerRef.current.style.backgroundColor = '';
-  }, []);
+    // Never early-return: the page scroll lock must be released even when the
+    // container already unmounted (previously left `body{overflow:hidden}`
+    // behind, freezing scroll until the app restarted).
+    try {
+      document.body.style.overflow =
+        originalBodyOverflowRef.current === null ? '' : originalBodyOverflowRef.current;
+    } catch {
+      /* ignore */
+    }
+    originalBodyOverflowRef.current = null;
+    const container = containerRef.current;
+    if (container) {
+      container.style.position = '';
+      container.style.top = '';
+      container.style.left = '';
+      container.style.width = '';
+      container.style.height = '';
+      container.style.zIndex = '';
+      container.style.backgroundColor = '';
+      container.classList.remove('is-player-fullscreen');
+    }
+    setPlayerFullscreenSignal(false);
+  }, [setPlayerFullscreenSignal]);
 
   const toggleFullscreen = async () => {
-    if (!containerRef.current) return;
+    if (!containerRef.current && !isFullscreenRef.current) return;
 
-    if (!isFullscreen) {
+    if (!isFullscreenRef.current) {
       if (Capacitor.isNativePlatform()) {
         try {
           await StatusBar.hide();
@@ -1085,19 +1369,51 @@ export function MobileVideoPlayer({
       applyFullscreenStyles();
       setIsFullscreen(true);
     } else {
-      if (Capacitor.isNativePlatform()) {
-        try {
-          await StatusBar.show();
-        } catch (e) {
-          console.warn('Failed to show status bar:', e);
+      try {
+        if (Capacitor.isNativePlatform()) {
+          try {
+            await StatusBar.show();
+          } catch (e) {
+            console.warn('Failed to show status bar:', e);
+          }
         }
-      }
 
-      await unlockOrientation();
-      clearFullscreenStyles();
-      setIsFullscreen(false);
+        await unlockOrientation();
+      } finally {
+        // Scroll lock + chrome signal must release even when the native
+        // calls above throw — otherwise the page stays unscrollable.
+        clearFullscreenStyles();
+        setIsFullscreen(false);
+      }
     }
   };
+
+  // The player uses a CSS fallback (not the Fullscreen API), but the OS /
+  // WebView can still tear down overlay state out from under us (back
+  // gesture, activity pause). Releasing here guarantees the page never gets
+  // stranded with `body{overflow:hidden}`.
+  useEffect(() => {
+    const handleNativeFullscreenChange = () => {
+      const nativeActive =
+        Boolean(document.fullscreenElement) ||
+        Boolean((document as unknown as { webkitFullscreenElement?: Element }).webkitFullscreenElement);
+      if (!nativeActive && isFullscreenRef.current) {
+        clearFullscreenStyles();
+        setIsFullscreen(false);
+        if (Capacitor.isNativePlatform()) {
+          StatusBar.show().catch(() => undefined);
+        }
+        unlockOrientation().catch(() => undefined);
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleNativeFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleNativeFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleNativeFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleNativeFullscreenChange);
+    };
+  }, [clearFullscreenStyles, unlockOrientation]);
 
   useEffect(() => {
     return () => {
@@ -1115,6 +1431,7 @@ export function MobileVideoPlayer({
   const togglePlay = () => {
     const video = videoRef.current;
     if (!video) return;
+    void triggerHaptic('toggle');
     if (isPlaying) {
       video.pause();
     } else {
@@ -1140,11 +1457,27 @@ export function MobileVideoPlayer({
   // Handle double-tap to seek
   const handleTap = (e: React.TouchEvent) => {
     if (isLocked) return;
+
+    // Control taps bubble to the player container after the button's click.
+    // Treating those as canvas taps schedules a second state change 300 ms
+    // later, which used to hide the controls immediately after Play, Settings,
+    // Fullscreen, etc.  Interactive non-button surfaces (the seek bar) opt in
+    // with the same marker.
+    const target = e.target;
+    if (
+      target instanceof Element &&
+      target.closest('button, [role="button"], [data-player-interactive="true"]')
+    ) {
+      return;
+    }
     
     const now = Date.now();
     const { clientX } = e.changedTouches[0];
-    const containerWidth = containerRef.current?.clientWidth || 0;
-    const isLeftSide = clientX < containerWidth / 2;
+    const containerRect = containerRef.current?.getBoundingClientRect();
+    const containerMidpoint = containerRect
+      ? containerRect.left + containerRect.width / 2
+      : window.innerWidth / 2;
+    const isLeftSide = clientX < containerMidpoint;
     
     const timeDiff = now - lastTapRef.current.time;
     const isDoubleTap = timeDiff < 300;
@@ -1154,7 +1487,8 @@ export function MobileVideoPlayer({
       if (doubleTapTimeoutRef.current) {
         clearTimeout(doubleTapTimeoutRef.current);
       }
-      
+      void triggerHaptic('select');
+
       const seekSeconds = 10;
       const direction = isLeftSide ? -1 : 1;
       seekAccumulatorRef.current += seekSeconds;
@@ -1204,6 +1538,7 @@ export function MobileVideoPlayer({
 
   // Subtitle change
   const handleSubtitleChange = (lang: string) => {
+    void triggerHaptic('select');
     setCurrentSubtitle(lang);
     setShowSubtitleMenu(false);
   };
@@ -1311,9 +1646,12 @@ export function MobileVideoPlayer({
   }
 
   return (
-    <div 
+    <div
       ref={containerRef}
-      className="relative w-full aspect-video bg-black select-none touch-none"
+      className={cn(
+        'video-player-container relative w-full aspect-video bg-black select-none touch-none',
+        isFullscreen && 'is-player-fullscreen',
+      )}
       onTouchEnd={handleTap}
     >
       {/* Video Element */}
@@ -1331,7 +1669,7 @@ export function MobileVideoPlayer({
           const subtitleSourceUrl = String(sub.url || '').trim();
           if (!subtitleSourceUrl) return null;
           const blobUrl = subtitleBlobs[subtitleSourceUrl] || subtitleBlobs[subtitleKey];
-          const proxiedSubtitleUrl = !isOffline
+          const proxiedSubtitleUrl = !isOffline && !nativeMobile
             ? getProxiedSubtitleUrl(subtitleSourceUrl, playbackReferer)
             : subtitleSourceUrl;
           const src = blobUrl || (isBrowserReadyVttUrl(proxiedSubtitleUrl || '') ? proxiedSubtitleUrl : undefined);
@@ -1365,7 +1703,7 @@ export function MobileVideoPlayer({
 
       {/* Loading Overlay */}
       {(isLoading || isBuffering) && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/30">
           <Loader2 className="w-16 h-16 text-primary animate-spin" />
         </div>
       )}
@@ -1388,7 +1726,7 @@ export function MobileVideoPlayer({
       {doubleTapSide && (
         <div 
           className={cn(
-            "absolute top-1/2 -translate-y-1/2 flex flex-col items-center gap-2",
+            "pointer-events-none absolute top-1/2 z-40 -translate-y-1/2 flex flex-col items-center gap-2",
             doubleTapSide === 'left' ? 'left-12' : 'right-12'
           )}
         >
@@ -1405,7 +1743,7 @@ export function MobileVideoPlayer({
 
       {/* Lock Screen Overlay */}
       {isLocked && showControls && (
-        <div className="absolute inset-0 flex items-center justify-center">
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/20">
           <button
             onClick={() => setIsLocked(false)}
             className="p-8 rounded-full bg-white/10 backdrop-blur-md border border-white/20"
@@ -1417,7 +1755,7 @@ export function MobileVideoPlayer({
 
       {/* Controls Overlay */}
       {showControls && !isLocked && (
-        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-transparent to-black/90">
+        <div className="absolute inset-0 z-30 bg-gradient-to-b from-black/80 via-transparent to-black/90">
           {/* Top Bar */}
           <div className="absolute top-0 left-0 right-0 p-3 safe-area-top">
             <div className="flex items-start justify-between gap-3">
@@ -1498,6 +1836,7 @@ export function MobileVideoPlayer({
             {/* Progress Bar */}
             <div 
               className="relative h-1.5 bg-white/20 rounded-full mb-3 touch-none"
+              data-player-interactive="true"
               onTouchStart={handleProgressSeek}
               onTouchMove={handleProgressSeek}
               onMouseMove={handleProgressBarHover}
@@ -1614,6 +1953,36 @@ export function MobileVideoPlayer({
                 >
                   <Camera className="w-5 h-5 text-white" />
                 </button>
+
+                {/* Download — desktop parity (stream or torrent, gated like VideoPlayer).
+                    Only when the episode is identified (WatchPage); custom/
+                    standalone mounts without an episodeId hide it. */}
+                {Boolean(episodeId) && (
+                <div className="rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-white [&_button]:!bg-transparent [&_button]:!p-2.5 [&_button]:!rounded-full [&_svg]:!w-5 [&_svg]:!h-5 [&_svg]:text-white">
+                  <DownloadButton
+                    episodeId={episodeId}
+                    animeName={animeName}
+                    episodeNumber={episodeNumber}
+                    posterUrl={animePoster ?? poster}
+                    sourceUrl={currentSource?.url}
+                    sourceType={(currentSource as any)?.sourceType ?? sourceType}
+                    torrentUrl={
+                      String((currentSource as any)?.sourceType ?? sourceType ?? '').toLowerCase() === 'torrent' ||
+                      String((currentSource as any)?.sourceType ?? sourceType ?? '').toLowerCase() === 'debrid' ||
+                      String(currentSource?.url || '').startsWith('magnet:')
+                        ? torrentUrl
+                        : undefined
+                    }
+                    headers={{
+                      ...(playbackReferer ? { Referer: playbackReferer } : {}),
+                      ...(playbackUserAgent ? { 'User-Agent': playbackUserAgent } : {}),
+                      ...(headers?.Origin ? { Origin: headers.Origin } : {}),
+                    }}
+                    animeId={animeId ?? (typeof malId === 'number' ? malId : null)}
+                    subtitles={subtitles}
+                  />
+                </div>
+                )}
               </div>
             </div>
           </div>
@@ -1622,7 +1991,7 @@ export function MobileVideoPlayer({
 
       {/* Server Info Badge */}
       {serverName && showControls && !isLocked && (
-        <div className="absolute top-20 right-3 px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-full border border-white/10">
+        <div className="pointer-events-none absolute top-20 right-3 z-40 px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-full border border-white/10">
           <span className="text-white/80 text-xs font-medium">{serverName}</span>
         </div>
       )}

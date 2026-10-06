@@ -37,7 +37,7 @@ export function MangaDiscoveryLane({ items }: MangaDiscoveryLaneProps) {
       <HomeSectionHeading
         icon={<Sparkles className="w-5 h-5 text-amber-400 fill-amber-400/20 animate-pulse" />}
         title="Discovery Lane"
-        subtitle="Handpicked random discovery with rich translucent backdrop visuals"
+        subtitle="Handpicked random discovery"
         action={
           <button
             onClick={handleShuffle}

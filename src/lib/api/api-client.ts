@@ -6,10 +6,7 @@ import { fetchAniZipMapping } from "@/lib/mapping/anizip";
 import { resolveApiV3Base } from "@/lib/api/backendOrigin";
 
 // Canonical backend `/api/v3` base. Resolves VITE_BACKEND_ORIGIN → origin of
-// VITE_TATAKAI_API_URL → http page origin (see backendOrigin.ts). The former
-// hardcoded "https://api.tatakai.app" fallback was a dead host, so any build
-// without VITE_TATAKAI_API_URL set (incl. the desktop app://) sent playback
-// dispatch to nowhere.
+// VITE_TATAKAI_API_URL → http page origin (see backendOrigin.ts).
 export const TATAKAI_API_URL = resolveApiV3Base();
 
 const GENRE_ALIASES: Record<string, string> = {
@@ -317,12 +314,9 @@ export async function fetchNextEpisodeSchedule(animeId: string) {
   return null;
 }
 
-/** True for anything that is a URL rather than an internal episode identifier. */
-function looksLikeUrl(value: string): boolean {
-  return /^[a-z][a-z0-9+.-]*:\/\//i.test(value) || value.startsWith("//");
-}
-
-/** V6 dispatch adapter: calls TatakaiAPI playback dispatcher and converts the metadata envelope into a StreamingData-compatible shape. Actual stream URLs are resolved by local extensions or runtime. */
+/** Central dispatch removed: source resolution is extension-local now (desktop
+ *  runtime, mobile in-WebView runtime). This stays as the shared shape so all
+ *  callers keep compiling; it resolves nothing over the network. */
 export async function fetchCombinedSources(
   episodeId: string | undefined,
   animeName: string | undefined,
@@ -333,72 +327,12 @@ export async function fetchCombinedSources(
   knownAnilistId?: number | string | null,
   knownMalId?: number | string | null
 ): Promise<StreamingData> {
-  const normalizedEpisodeId = String(episodeId || "").trim();
-
-  // An off-site watch URL is not an episode id. These leaked in from AniList
-  // `streamingEpisodes[].url`; the producers are fixed, but a stale cache entry or
-  // a bookmarked route can still deliver one, and sending it made the server
-  // answer 400 with nothing actionable in the console.
-  const isUrlId = looksLikeUrl(normalizedEpisodeId);
-
-  const parsedTatakaiId = (() => {
-    if (!normalizedEpisodeId || isUrlId) return null;
-    const idx = normalizedEpisodeId.indexOf("?");
-    if (idx > 0) return normalizedEpisodeId.slice(0, idx);
-    // No query string: the whole value is the id (uuid or numeric AniList id).
-    return /^[\w:-]+$/.test(normalizedEpisodeId) ? normalizedEpisodeId : null;
-  })();
-  const parsedEpisodeNumber = (() => {
-    const match = normalizedEpisodeId.match(/[?&]ep(?:isode)?=(\d{1,5})/i);
-    if (!match) return null;
-    const num = Number(match[1]);
-    return Number.isFinite(num) && num > 0 ? num : null;
-  })();
-
-  const resolvedEpisodeNumber = episodeNumber ?? parsedEpisodeNumber;
-
-  const res = await fetch(`${TATAKAI_API_URL}/playback/dispatch`, {
-    method: "POST",
-    headers: withClientHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify({
-      episodeId: isUrlId ? undefined : episodeId,
-      animeName,
-      episodeNumber: resolvedEpisodeNumber,
-      tatakaiId: parsedTatakaiId,
-      server,
-      category,
-      currentUserId,
-      anilistId: knownAnilistId,
-      malId: knownMalId,
-    }),
-  });
-
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    throw new Error(
-      `playback/dispatch ${res.status} for episodeId="${normalizedEpisodeId}" ` +
-      `(tatakaiId=${parsedTatakaiId ?? "none"}, ep=${resolvedEpisodeNumber ?? "none"}, ` +
-      `anilistId=${knownAnilistId ?? "none"})${detail ? `: ${detail.slice(0, 200)}` : ""}`
-    );
-  }
-
-  const envelope = await res.json();
-  const dispatch = unwrapApiData<any>(envelope);
-
-  // Convert dispatch metadata into StreamingData-compatible providerServers
-  const extensions: any[] = dispatch?.extensionsToTry ?? [];
-  const providerServers: EpisodeServer[] = extensions.map((ext, idx: number) => ({
-    serverId: idx,
-    serverName: ext.id,
-    providerKey: ext.id,
-    providerName: ext.name,
-    displayName: ext.name,
-    isProviderServer: true,
-    language: category,
-    isDub: category === "dub",
-    isEmbed: false,
-    hasM3U8: true,
-  }));
+  void episodeId;
+  void animeName;
+  void episodeNumber;
+  void server;
+  void category;
+  void currentUserId;
 
   const anilistID =
     typeof knownAnilistId === "string" ? Number(knownAnilistId) || null :
@@ -412,7 +346,7 @@ export async function fetchCombinedSources(
     sources: [],
     subtitles: [],
     tracks: [],
-    providerServers,
+    providerServers: [],
     anilistID,
     malID,
   };

@@ -375,13 +375,18 @@ export function useAddComment() {
       }
       toast.success('Comment posted');
 
-      // Notify Discord comment channel
+      // Notify Discord comment channel (detailed)
       notifyComment({
         userName: user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'Anonymous',
+        userId: user?.id,
         animeName: `${variables.entityType}:${variables.entityId}`,
+        entityType: variables.entityType,
+        entityId: variables.entityId,
         episodeId: variables.episodeId,
         content: variables.content,
         isSpoiler: variables.isSpoiler,
+        parentId: variables.parentId,
+        attachmentCount: variables.attachments?.length ?? 0,
       });
     },
     onError: (error: Error, _variables, context: any) => {

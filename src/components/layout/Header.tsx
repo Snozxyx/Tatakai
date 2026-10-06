@@ -197,15 +197,15 @@ export function Header() {
 
   return (
     <>
-      <header className={cn("md:hidden sticky z-50 bg-transparent", hasSolidTitlebar ? "top-8" : "top-0")}>
-        <div className="relative flex h-14 items-center justify-between bg-transparent px-3 pt-[env(safe-area-inset-top)]">
-          <div className="relative z-10 flex h-10 w-10 items-center justify-center rounded-full">
+      <header className={cn("md:hidden sticky z-50 border-b border-white/[0.06] bg-background/85 backdrop-blur-xl", hasSolidTitlebar ? "top-8" : "top-0")}>
+        <div className="relative flex h-14 items-center justify-between px-3 pt-[env(safe-area-inset-top)]">
+          <div className="relative z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] shadow-sm">
             <NotificationBell />
           </div>
           <button
             type="button"
             onClick={() => navigate(location.pathname.startsWith('/manga') ? '/' : '/manga')}
-            className="absolute left-1/2 top-1/2 z-10 inline-flex h-9 -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3.5 text-xs font-bold tracking-wide text-foreground shadow-sm transition-all hover:bg-white/[0.1] hover:border-white/20 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+            className="absolute left-1/2 top-1/2 z-10 inline-flex h-9 -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3.5 text-xs font-bold tracking-wide text-foreground shadow-sm transition-all hover:border-primary/40 hover:bg-white/[0.1] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
             aria-label={location.pathname.startsWith('/manga') ? 'Switch to Anime' : 'Switch to Manga'}
           >
             {location.pathname.startsWith('/manga') ? <BookOpen className="h-3.5 w-3.5 text-primary" /> : <Play className="h-3.5 w-3.5 fill-primary text-primary" />}
@@ -224,7 +224,7 @@ export function Header() {
                     </Avatar>
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-52 rounded-2xl border-white/10 bg-background/90 p-1.5 shadow-2xl backdrop-blur-xl">
+                <DropdownMenuContent align="end" className="w-52 rounded-2xl border-white/10 bg-background/90 p-1.5 shadow-2xl backdrop-blur-xl data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=open]:duration-150">
                   <DropdownMenuItem onClick={() => navigate(profile?.username ? `/@${profile.username}` : '/profile')} className="gap-2 rounded-xl px-3 py-2.5 font-medium"><User className="mr-1 h-4 w-4 text-muted-foreground" />Profile</DropdownMenuItem>
                   {(isAdmin || isModerator) && <DropdownMenuItem onClick={() => navigate('/admin')} className="gap-2 rounded-xl px-3 py-2.5 font-medium"><Shield className="mr-1 h-4 w-4 text-muted-foreground" />Admin navigation</DropdownMenuItem>}
                   <DropdownMenuSeparator className="bg-white/[0.06]" />

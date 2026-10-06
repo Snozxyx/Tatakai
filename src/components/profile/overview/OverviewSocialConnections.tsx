@@ -197,8 +197,11 @@ export function OverviewSocialConnections({
                             </p>
                             <UserBadges
                               badges={badgeMap?.[u.user_id]}
-                              size={11}
-                              max={1}
+                              size={14}
+                              max={3}
+                              // Card itself is a button — badges render static
+                              // (no nested <button>s).
+                              interactive={false}
                             />
                           </div>
                           {u.username && (

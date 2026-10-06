@@ -2,6 +2,8 @@ import { Calendar, ChevronLeft, ChevronRight, Star } from "lucide-react";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import { useUpcomingAnime, JikanAnime } from "@/hooks/api/useUpcomingAnime";
 import { useRef } from "react";
+import { Peekable } from "@/components/media/MediaQuickPeek";
+import { peekFromAnime } from "@/components/media/quickPeekStore";
 
 function UpcomingAnimeCard({ anime }: { anime: JikanAnime }) {
   const imageUrl = anime.images.webp?.large_image_url || anime.images.jpg.large_image_url;
@@ -12,7 +14,20 @@ function UpcomingAnimeCard({ anime }: { anime: JikanAnime }) {
       : anime.aired.string
     : null;
 
+  // Unreleased titles: info-only peek (no save, View goes to search).
+  const peekMedia = peekFromAnime(
+    {
+      id: `mal:${anime.mal_id}`,
+      name: title,
+      poster: imageUrl,
+      type: anime.type,
+      rating: anime.score ?? undefined,
+    },
+    `/search?q=${encodeURIComponent(title)}`,
+  );
+
   return (
+    <Peekable media={peekMedia ? { ...peekMedia, canSave: false } : null}>
     <GlassPanel
       hoverEffect
       className="group flex-shrink-0 w-[180px] sm:w-[200px] cursor-pointer overflow-hidden snap-start"
@@ -64,6 +79,7 @@ function UpcomingAnimeCard({ anime }: { anime: JikanAnime }) {
         </div>
       </div>
     </GlassPanel>
+    </Peekable>
   );
 }
 

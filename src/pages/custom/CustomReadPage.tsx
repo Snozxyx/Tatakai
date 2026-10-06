@@ -17,6 +17,7 @@ import { ReaderImage } from "@/components/reader/ReaderImage";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import { useReaderSettings } from "@/hooks/media/useReaderSettings";
 import { getProfileKnobs } from "@/lib/memoryProfile";
+import { readerPageRenderKey } from "@/lib/reader/imageLifecycle";
 import { useCustomRead, useCustomInfo, useCustomSource } from "@/hooks/api/useCustomSource";
 
 export default function CustomReadPage() {
@@ -117,7 +118,7 @@ export default function CustomReadPage() {
           <div className="flex flex-col items-center" style={{ gap: `${settings.gap}px` }}>
             {pages.map((page, idx) => (
               <ReaderImage
-                key={page.pageNumber}
+                key={readerPageRenderKey(chapterId || "", page)}
                 page={page}
                 mode={settings.loadingMethod}
                 style={widthStyle}
@@ -128,19 +129,31 @@ export default function CustomReadPage() {
         ) : (
           <div className="relative flex min-h-full items-center justify-center">
             {pages[pageIndex] ? (
-              <ReaderImage page={pages[pageIndex]} mode={settings.loadingMethod} style={widthStyle} eager />
+              <ReaderImage key={readerPageRenderKey(chapterId || "", pages[pageIndex])} page={pages[pageIndex]} mode={settings.loadingMethod} style={widthStyle} eager />
             ) : null}
             {settings.clickToTurn ? (
               <>
                 <button
+                  type="button"
+                  tabIndex={-1}
                   aria-label="Previous page"
-                  onClick={goPrevPage}
-                  className="absolute left-0 top-0 h-full w-1/3 cursor-w-resize"
+                  onClick={(e) => {
+                    goPrevPage();
+                    // Keep the invisible tap zone from holding focus and
+                    // painting a focus ring over the page on keyboard use.
+                    e.currentTarget.blur();
+                  }}
+                  className="absolute left-0 top-0 h-full w-1/3 cursor-w-resize bg-transparent outline-none focus:outline-none focus-visible:outline-none"
                 />
                 <button
+                  type="button"
+                  tabIndex={-1}
                   aria-label="Next page"
-                  onClick={goNextPage}
-                  className="absolute right-0 top-0 h-full w-1/3 cursor-e-resize"
+                  onClick={(e) => {
+                    goNextPage();
+                    e.currentTarget.blur();
+                  }}
+                  className="absolute right-0 top-0 h-full w-1/3 cursor-e-resize bg-transparent outline-none focus:outline-none focus-visible:outline-none"
                 />
               </>
             ) : null}

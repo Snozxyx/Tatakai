@@ -99,12 +99,38 @@ async function fireNative(event: HapticEvent): Promise<void> {
   }
 }
 
+/** Throttle rapid-fire ticks (tab switches, page turns) so they don't buzz-buzz. */
+let lastFireAt = 0;
+let lastFireEvent: HapticEvent | null = null;
+const THROTTLE_MS = 120;
+const THROTTLED_EVENTS: ReadonlySet<HapticEvent> = new Set([
+  'navigate', 'tap', 'select', 'light', 'reader-toggle',
+]);
+
+function prefersReducedMotion(): boolean {
+  try {
+    return typeof window !== 'undefined'
+      && typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Fire a haptic for a semantic event. Safe to call anywhere (async, never throws).
- * Silent when the user disabled haptics or the device has no motor.
+ * Silent when the user disabled haptics, prefers reduced motion, or the device
+ * has no motor. Rapid repeats of tick events are throttled.
  */
 export async function triggerHaptic(event: HapticEvent = 'tap'): Promise<void> {
   if (!hapticsEnabled()) return;
+  if (prefersReducedMotion()) return;
+  if (THROTTLED_EVENTS.has(event)) {
+    const now = Date.now();
+    if (event === lastFireEvent && now - lastFireAt < THROTTLE_MS) return;
+    lastFireAt = now;
+    lastFireEvent = event;
+  }
   if (isNative()) {
     await fireNative(event);
     return;

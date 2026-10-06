@@ -6,6 +6,7 @@
  * by the source's `kind`, and nothing here reads or writes the watchlist/readlist.
  */
 
+import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, BookOpen, Loader2, Play } from "lucide-react";
 import { Background } from "@/components/layout/Background";
@@ -18,6 +19,8 @@ import { GlassPanel } from "@/components/ui/GlassPanel";
 import { getProxiedImageUrl } from "@/lib/api";
 import { useCustomInfo, useCustomSource } from "@/hooks/api/useCustomSource";
 import { ExtensionSlot } from "@/core/extensions/ExtensionSlot";
+import { isCapacitor } from "@/lib/platform/platform";
+import { registerMobileSource } from "@/core/extensions/mobile/mobileProxy";
 
 export default function CustomInfoPage() {
   const navigate = useNavigate();
@@ -31,6 +34,13 @@ export default function CustomInfoPage() {
   const base = `/x/${namespace}/${sourceId}`;
   const entries = info?.entries ?? [];
   const meta = info?.meta ?? {};
+  const imageUrl = useMemo(() => {
+    const image = String(info?.image || "");
+    if (!image) return "";
+    return isCapacitor() && /^https?:/i.test(image)
+      ? registerMobileSource({ url: image })
+      : getProxiedImageUrl(image);
+  }, [info?.image]);
 
   const openEntry = (entryId: string) =>
     navigate(`${base}/${kind}/${encodeURIComponent(id || "")}/${encodeURIComponent(entryId)}`);
@@ -71,7 +81,7 @@ export default function CustomInfoPage() {
                 <div className="aspect-[2/3] overflow-hidden rounded-2xl border border-white/10 bg-white/5">
                   {info.image ? (
                     <img
-                      src={getProxiedImageUrl(info.image)}
+                      src={imageUrl}
                       alt={info.title}
                       className="h-full w-full object-cover"
                       loading="eager"

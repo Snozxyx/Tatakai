@@ -33,7 +33,8 @@ const DEFAULT_USER_AGENT =
 const DEFAULT_REFERER = 'https://megacloud.club/';
 
 // Upstream request timeout. HLS players re-request on failure, so keep it tight.
-const UPSTREAM_TIMEOUT_MS = 20_000;
+// 12s: healthy origins answer manifests in <2s; longer just delays failover.
+const UPSTREAM_TIMEOUT_MS = 12_000;
 
 // Response headers we copy verbatim from upstream on the pass-through path.
 // Deliberately an allowlist: copying `content-encoding` (Workers may have
@@ -277,7 +278,9 @@ async function handleProxy(request, env, requestUrl) {
       status: 200,
       headers: corsHeaders({
         'content-type': 'application/vnd.apple.mpegurl',
-        'cache-control': 'no-cache',
+        // Playlists mutate (live windows) but VOD playlists are static for
+        // seconds: 2s edge cache cuts manifest latency without staleness.
+        'cache-control': 'public, max-age=2',
       }),
     });
   }
@@ -298,7 +301,13 @@ async function handleProxy(request, env, requestUrl) {
 
   // Everything else (video segments, mp4/webm, images, generic assets) →
   // stream the body straight through with Range status preserved.
-  const headers = copyPassthroughHeaders(upstream, { 'cache-control': 'no-store' });
+  // Segments (.ts/.m4s/.key) are immutable: cache them at the edge for a day
+  // so repeat plays and seeks skip the upstream entirely. Byte-range (206)
+  // responses must not be edge-cached under the 200 key — keep them private.
+  const isRangeHit = upstream.status === 206 || request.headers.has('range');
+  const headers = copyPassthroughHeaders(upstream, {
+    'cache-control': isRangeHit ? 'private, max-age=0, no-store' : 'public, max-age=86400',
+  });
   if (!headers.has('content-type')) headers.set('content-type', 'application/octet-stream');
   return new Response(method === 'HEAD' ? null : upstream.body, {
     status: upstream.status,

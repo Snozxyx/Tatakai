@@ -267,6 +267,36 @@ async function describeDownloadFailure(response: Response, url: string): Promise
 export async function downloadExtensionKai(mainUrl: string): Promise<ArrayBuffer> {
   const isHttpUrl = /^https?:\/\//i.test(mainUrl);
 
+  // Native shells are not subject to browser CORS. Download the package with
+  // the device HTTP stack so mobile installs (especially custom sources) do
+  // not depend on the hosted Tatakai proxy at all.
+  if (isHttpUrl && Capacitor.isNativePlatform()) {
+    const response = await CapacitorHttp.get({
+      url: mainUrl,
+      responseType: 'arraybuffer',
+      connectTimeout: 10_000,
+      readTimeout: 30_000,
+    } as any);
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(`downloadExtensionKai: HTTP ${response.status}`);
+    }
+    const data = (response as any).data;
+    if (data instanceof ArrayBuffer) return data;
+    if (ArrayBuffer.isView(data)) {
+      const copy = new Uint8Array(data.byteLength);
+      copy.set(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
+      return copy.buffer;
+    }
+    if (typeof data === 'string') {
+      const compact = data.replace(/^data:[^,]*;base64,/, '').replace(/\s+/g, '');
+      const binary = atob(compact);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+      return bytes.buffer;
+    }
+    throw new Error('downloadExtensionKai: native client returned an unsupported payload');
+  }
+
   if (isHttpUrl) {
     try {
       const proxyUrl = `${resolveBackendOrigin()}/api/proxy/extension?url=${encodeURIComponent(mainUrl)}`;

@@ -12,6 +12,8 @@ import com.getcapacitor.Logger;
 import java.io.ByteArrayInputStream;
 import java.util.Map;
 
+import app.tatakai.me.proxy.SecurityState;
+
 /**
  * AntiHijackWebViewClient — the network-layer half of the mobile anti-click-hijack,
  * the WebView equivalent of desktop's `session.webRequest.onBeforeRequest`
@@ -60,12 +62,29 @@ public class AntiHijackWebViewClient extends BridgeWebViewClient {
             Uri uri = request.getUrl();
             String url = uri != null ? uri.toString() : null;
             if (url != null) {
-                Map<String, String> headers = request.getRequestHeaders();
-                String referer = headerIgnoreCase(headers, "Referer");
-                if (referer == null) referer = headerIgnoreCase(headers, "Origin");
-                if (AdHosts.shouldBlock(url, referer)) {
-                    Logger.debug("AntiHijack blocked request: " + AdHosts.hostnameOf(url));
+                // Never block the app's own loopback media (local proxy + torrent
+                // stream server) — same as desktop LOOPBACK_HOSTS exemption.
+                String host = AdHosts.hostnameOf(url);
+                if (AdHosts.isLoopbackHost(host)) {
+                    return super.shouldInterceptRequest(view, request);
+                }
+                // Desktop parity: the network filter is only armed while the
+                // watch page is mounted. Hard ad-network hosts are still always
+                // dropped (never a false positive); analytics + unknown hosts
+                // are gated on the filter so first-party telemetry elsewhere in
+                // the app is never cancelled.
+                if (AdHosts.isHardBlockedHost(host)) {
+                    Logger.debug("AntiHijack blocked request: " + host);
                     return blockedResponse();
+                }
+                if (SecurityState.isFilteringActive()) {
+                    Map<String, String> headers = request.getRequestHeaders();
+                    String referer = headerIgnoreCase(headers, "Referer");
+                    if (referer == null) referer = headerIgnoreCase(headers, "Origin");
+                    if (AdHosts.shouldBlock(url, referer)) {
+                        Logger.debug("AntiHijack blocked request: " + host);
+                        return blockedResponse();
+                    }
                 }
             }
         } catch (Exception ignored) {
@@ -79,11 +98,23 @@ public class AntiHijackWebViewClient extends BridgeWebViewClient {
         try {
             if (request.isForMainFrame()) {
                 Uri uri = request.getUrl();
-                String host = AdHosts.hostnameOf(uri != null ? uri.toString() : null);
+                String url = uri != null ? uri.toString() : null;
+                String host = AdHosts.hostnameOf(url);
                 if (AdHosts.isHardBlockedHost(host)) {
                     // Top-frame redirect hijack to an ad network — swallow it so the
                     // app frame is never navigated away from the player.
                     Logger.debug("AntiHijack blocked top-frame navigation: " + host);
+                    return true;
+                }
+                // Desktop `will-navigate` + `evaluateWindowOpen` embed-popunder
+                // parity: while an untrusted embed is on screen, no top-frame
+                // navigation may leave the app for an unknown third party.
+                // Loopback (local proxy / torrent), first-party and explicitly
+                // trusted hosts still pass through to Capacitor.
+                if (url != null && SecurityState.isEmbedActive()
+                    && !AdHosts.isLoopbackHost(host)
+                    && AdHosts.isEmbedPopunder(url, true)) {
+                    Logger.debug("AntiHijack blocked embed hijack navigation: " + host);
                     return true;
                 }
             }

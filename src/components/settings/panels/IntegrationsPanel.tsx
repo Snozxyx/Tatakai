@@ -14,8 +14,9 @@ import { getAniListAuthUrl, disconnectAniList } from '@/lib/externalIntegrations
 import {
   isDesktopApp,
   openOAuthInBrowser,
-  DESKTOP_ANILIST_REDIRECT_URI,
-  DESKTOP_MAL_REDIRECT_URI,
+  buildDesktopOAuthState,
+  getWebAnilistRedirectUri,
+  getWebMalRedirectUri,
 } from '@/lib/desktopOAuth';
 import { toast } from 'sonner';
 import { cn } from "@/lib/utils";
@@ -230,7 +231,10 @@ export function IntegrationsPanel() {
   const handleMALConnect = async () => {
     try {
       if (isDesktopApp()) {
-        const url = await getMalAuthUrl(DESKTOP_MAL_REDIRECT_URI);
+        // Desktop uses the shared https redirect + a state marker; the web
+        // redirect page forwards the callback to the app via `tatakai://`
+        // (AniList/MAL dashboards only need the https URI registered).
+        const url = await getMalAuthUrl(getWebMalRedirectUri(), buildDesktopOAuthState());
         if (openOAuthInBrowser(url)) {
           toast.info('Complete the MyAnimeList login in your browser, then return to the app.');
           return;
@@ -247,7 +251,8 @@ export function IntegrationsPanel() {
 
   const handleAniListConnect = () => {
     if (isDesktopApp()) {
-      const url = getAniListAuthUrl(DESKTOP_ANILIST_REDIRECT_URI);
+      // Same https bridge as MAL: `tatakai://` is never sent as redirect_uri.
+      const url = getAniListAuthUrl(getWebAnilistRedirectUri(), buildDesktopOAuthState());
       if (openOAuthInBrowser(url)) {
         toast.info('Complete the AniList login in your browser, then return to the app.');
         return;

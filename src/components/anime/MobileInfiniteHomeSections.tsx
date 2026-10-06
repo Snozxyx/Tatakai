@@ -8,6 +8,8 @@ import { useHomeData } from '@/hooks/api/useAnimeData';
 import { getHighQualityPoster } from '@/lib/api';
 import { buildPreferredAnimeRouteId } from '@/lib/animeIdMapping';
 import { HomeSectionHeading } from '@/components/home/HomeSectionHeading';
+import { useLongPress } from '@/hooks/ui/useLongPress';
+import { openMediaQuickPeek } from '@/components/media/quickPeekStore';
 
 // Cap so the DOM can't grow forever on phones — 12 sections × 8 cards max.
 const MAX_MOBILE_SECTIONS = 12;
@@ -26,6 +28,28 @@ const MobileCard = memo(function MobileCard({ anime }: { anime: any }) {
     anilistID: anime?.anilistID,
     anilist_id: anime?.anilist_id,
   });
+  const routeTo = routeId
+    ? `/anime/${routeId}`
+    : `/search?q=${encodeURIComponent(anime.name || 'anime')}`;
+
+  // Long-press quick peek — same widget as the desktop cards.
+  const longPress = useLongPress({
+    onLongPress: () => {
+      openMediaQuickPeek({
+        kind: 'anime',
+        id: String(anime.id ?? routeId ?? anime.name),
+        name: anime.name,
+        poster: anime.poster,
+        anilistId: anime.anilistId ?? anime?.anilistID ?? anime?.anilist_id ?? null,
+        type: anime.type,
+        year: anime.year,
+        rating: anime.rating,
+        episodesSub: anime.episodes?.sub,
+        episodesDub: anime.episodes?.dub,
+        routeTo,
+      });
+    },
+  });
 
   return (
     <button
@@ -39,6 +63,7 @@ const MobileCard = memo(function MobileCard({ anime }: { anime: any }) {
       }}
       className="w-full text-left active:scale-[0.98] transition-transform duration-150"
       style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 240px' }}
+      {...longPress}
     >
       {/* Plain card on mobile — no backdrop-blur / GlassPanel (GPU-heavy). */}
       <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03]">

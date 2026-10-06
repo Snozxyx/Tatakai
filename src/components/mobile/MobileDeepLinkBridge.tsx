@@ -24,6 +24,14 @@ export function MobileDeepLinkBridge() {
     (async () => {
       try {
         const { App } = await import('@capacitor/app');
+        // Cold start: the launch URL is NOT delivered via appUrlOpen.
+        try {
+          const launch = await App.getLaunchUrl();
+          const route = launch?.url ? toRoute(launch.url) : null;
+          if (route) navigate(route, { replace: true });
+        } catch {
+          /* no launch url */
+        }
         const handle = await App.addListener('appUrlOpen', ({ url }) => {
           const route = toRoute(url);
           if (route) navigate(route);
@@ -49,22 +57,51 @@ export function MobileDeepLinkBridge() {
 
 /**
  * Turn a deep-link URL into an in-app route path, or null when it isn't one.
- * Accepts both the custom scheme (`tatakai://path?...`) and https links whose
- * path should be routed. Only same-shape internal paths are honored.
+ *
+ * Accepts:
+ *  - `tatakai://integration/anilist/redirect?code=…`
+ *  - `tatakai://anime/123/ep/5` → `/anime/123?ep=5` (native share shorthand)
+ *  - `tatakai://watch/abc?ep=5`, `tatakai://manga/read/1?chapterKey=x`
+ *  - `https://tatakai.me/anime/123`, `https://app.tatakai.me/watch/…`
+ *
+ * NOTE: for the custom scheme, `new URL('tatakai://anime/123').pathname` is
+ * `/123` with host `anime` — the host IS the first path segment, so it must
+ * be re-attached (the old code dropped it and routed to `/123` → NotFound).
  */
-function toRoute(raw: string): string | null {
+export function toRoute(raw: string): string | null {
   if (typeof raw !== 'string' || !raw) return null;
   try {
-    // `tatakai://integration/anilist/redirect?code=…` → pathname is
-    // `/integration/...` when parsed with the custom scheme. For https links,
-    // take pathname + search directly.
     const u = new URL(raw);
-    const path = `${u.pathname}${u.search}${u.hash}`;
+    const isCustomScheme = u.protocol === 'tatakai:';
+    const host = String(u.host || '').toLowerCase();
+
+    let path: string;
+    if (isCustomScheme) {
+      // `tatakai://anime/123/ep/5` → host `anime` + pathname `/123/ep/5`.
+      // `tatakai:///watch/x` (empty host) → pathname only.
+      path = host ? `/${host}${u.pathname}${u.search}${u.hash}` : `${u.pathname}${u.search}${u.hash}`;
+      // `tatakai:watch/x` (opaque, no slashes) → pathname is `watch/x`.
+      if (!path.startsWith('/')) path = `/${path}`;
+    } else {
+      if (!/tatakai\.me$/i.test(u.hostname)) return null;
+      path = `${u.pathname}${u.search}${u.hash}`;
+    }
     if (!path.startsWith('/')) return `/${path}`;
+
+    // Shorthand: /anime/:id/ep/:n → /anime/:id?ep=:n (AnimePage resolves it).
+    const epMatch = path.match(/^\/anime\/([^/]+)\/ep\/([^/?#]+)([?#].*)?$/i);
+    if (epMatch) {
+      const [, id, ep, rest] = epMatch;
+      const sep = rest && rest.startsWith('?') ? '&' : '?';
+      return `/anime/${id}${rest || ''}${rest ? sep : '?'}ep=${encodeURIComponent(ep)}`;
+    }
     return path;
   } catch {
-    // Fallback: strip a leading `scheme://host` manually.
     const m = raw.match(/^[a-z][a-z0-9+.-]*:\/\/[^/]*(\/.*)$/i);
-    return m ? m[1] : null;
+    if (m) return m[1];
+    // Bare `tatakai:anime/1/ep/2` without slashes.
+    const bare = raw.match(/^tatakai:(.+)$/i);
+    if (bare) return bare[1].startsWith('/') ? bare[1] : `/${bare[1]}`;
+    return null;
   }
 }

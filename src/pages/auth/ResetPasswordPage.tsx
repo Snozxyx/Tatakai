@@ -6,7 +6,7 @@ import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Mail, Loader2, Lock, Eye, EyeOff, ShieldCheck, KeyRound } from 'lucide-react';
+import { ArrowLeft, Mail, Loader2, Lock, Eye, EyeOff, ShieldCheck, KeyRound, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -31,12 +31,22 @@ export default function ResetPasswordPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  // Mirrors AuthPage: surfaces a retry affordance when Cloudflare's own
+  // challenge fails (iPhone Private Relay / VPN / content blocker).
+  const [challengeError, setChallengeError] = useState(false);
   const turnstileRef = useRef<TurnstileWidgetHandle>(null);
   const turnstileEnabled = isTurnstileEnabled();
 
   const resetCaptcha = () => {
     turnstileRef.current?.reset();
     setCaptchaToken(null);
+    setChallengeError(false);
+  };
+
+  const retryChallenge = () => {
+    setChallengeError(false);
+    setCaptchaToken(null);
+    turnstileRef.current?.reset();
   };
 
   const handleSendCode = async (e: React.FormEvent) => {
@@ -176,14 +186,33 @@ export default function ResetPasswordPage() {
                   </div>
                 </div>
                 {turnstileEnabled && (
-                  <TurnstileWidget
-                    ref={turnstileRef}
-                    action="password_reset"
-                    onToken={setCaptchaToken}
-                    onExpire={() => setCaptchaToken(null)}
-                    onError={() => setCaptchaToken(null)}
-                    className="flex justify-center"
-                  />
+                  <div className="space-y-2">
+                    <TurnstileWidget
+                      ref={turnstileRef}
+                      action="password_reset"
+                      onToken={(token) => { setCaptchaToken(token); setChallengeError(false); }}
+                      onExpire={() => setCaptchaToken(null)}
+                      onError={() => { setCaptchaToken(null); setChallengeError(true); }}
+                      onTimeout={() => { setCaptchaToken(null); setChallengeError(true); }}
+                      className="flex justify-center"
+                    />
+                    {challengeError && !captchaToken && (
+                      <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-center">
+                        <p className="text-sm text-foreground font-medium">Verification didn't load correctly.</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          On iPhone this is usually iCloud Private Relay, a VPN, or a Safari content
+                          blocker interfering with the check. Disable them for this site, or try Safari.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={retryChallenge}
+                          className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
+                        >
+                          <RefreshCw className="w-4 h-4" /> Retry verification
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
                 <Button type="submit" className="w-full" disabled={isLoading || !email || (turnstileEnabled && !captchaToken)}>
                   {isLoading ? (

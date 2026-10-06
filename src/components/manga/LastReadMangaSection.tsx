@@ -18,6 +18,8 @@ import {
 import { useMangaContinueReading } from '@/hooks/user/useMangaReadlist';
 import { useAuth } from '@/contexts/AuthContext';
 import { getProxiedImageUrl } from '@/lib/api';
+import { Peekable } from '@/components/media/MediaQuickPeek';
+import { peekFromManga } from '@/components/media/quickPeekStore';
 
 const LIMIT = 6;
 
@@ -71,8 +73,14 @@ export function LastReadMangaSection() {
             const resumeHref = `/manga/read/${item.manga_id}?${resumeParams.toString()}`;
 
             return (
-              <ResumeCard
+              <Peekable
                 key={item.id}
+                media={peekFromManga(
+                  { id: item.manga_id, name: item.manga_title, poster: item.manga_poster },
+                  `/manga/${item.manga_id}`,
+                )}
+              >
+              <ResumeCard
                 href={resumeHref}
                 titleHref={`/manga/${item.manga_id}`}
                 poster={item.manga_poster ? getProxiedImageUrl(item.manga_poster) : undefined}
@@ -97,6 +105,7 @@ export function LastReadMangaSection() {
                 }
                 fallbackIcon={BookMarked}
               />
+              </Peekable>
             );
           })}
         </div>

@@ -39,8 +39,9 @@ function generateRandomString(length: number) {
  * Also stores the code_verifier in localStorage for later use.
  */
 const MAL_REDIRECT_STORAGE_KEY = 'mal_redirect_uri';
+const MAL_STATE_STORAGE_KEY = 'mal_oauth_state';
 
-export function getMalAuthUrl(redirectUriOverride?: string) {
+export function getMalAuthUrl(redirectUriOverride?: string, stateOverride?: string) {
     if (!MAL_CLIENT_ID) {
         throw new Error('Missing VITE_MAL_CLIENT_ID');
     }
@@ -59,12 +60,17 @@ export function getMalAuthUrl(redirectUriOverride?: string) {
     // if S256 is not explicitly required.
     const codeChallenge = codeVerifier;
 
+    // Desktop passes its bridge marker here so the https redirect page can
+    // forward the callback to the app; web flows keep a random CSRF value.
+    const state = stateOverride || generateRandomString(16);
+    localStorage.setItem(MAL_STATE_STORAGE_KEY, state);
+
     const params = new URLSearchParams({
         response_type: 'code',
         client_id: MAL_CLIENT_ID,
         code_challenge: codeChallenge,
         code_challenge_method: 'plain',
-        state: generateRandomString(16),
+        state,
         redirect_uri: redirectUri,
     });
 
@@ -129,6 +135,7 @@ export async function exchangeMalCode(code: string) {
 
     localStorage.removeItem('mal_code_verifier');
     localStorage.removeItem(MAL_REDIRECT_STORAGE_KEY);
+    try { localStorage.removeItem(MAL_STATE_STORAGE_KEY); } catch { /* ignore */ }
     return data;
 }
 

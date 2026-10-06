@@ -27,16 +27,20 @@ import { PopupDisplay } from "@/components/layout/PopupDisplay";
 import { LogViewer } from "@/components/debug/LogViewer";
 import { DevConsole } from "@/components/debug/DevConsole";
 import { GlobalListeners, DeepLinkHandler } from "@/routes/AppRoutes";
+import { MobileDeepLinkBridge } from "@/components/mobile/MobileDeepLinkBridge";
+import { MobileBackHandler } from "@/components/mobile/MobileBackHandler";
+import { MobileUpdateBanner } from "@/components/mobile/MobileUpdateBanner";
 import { EasterEggs } from "@/components/layout/EasterEggs";
 import { CelebrationHost } from "@/components/effects/Celebrate";
 import { MagnetAlignmentModal } from "@/components/modals/MagnetAlignmentModal";
 import { SettingsModal } from "@/components/settings/SettingsModal";
+import { MediaQuickPeekHost } from "@/components/media/MediaQuickPeek";
 import { ConfirmProvider } from "@/components/ui/confirm-dialog";
 import { CommunityRulesGateProvider } from "@/components/community/CommunityRulesGate";
 import { IdleReclaimProvider } from "@/contexts/IdleReclaimProvider";
 import { toast } from 'sonner';
 import { getLocalTorrentSessionHistory, getLocalTorrentSessionHistoryEnabled } from '@/lib/localStorage';
-import { triggerHaptic } from '@/lib/haptics';
+
 import { useMobileUpdateOrchestrator } from '@/core/update/mobile-update';
 
 const getDevModeEnabled = (): boolean => {
@@ -74,20 +78,11 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
   const isMobile = useIsPhone();
   const isMobileApp = useIsMobileApp();
 
-  // Light haptic tick on every page change (mobile web + native). Skips the
-  // first mount so opening the app doesn't buzz. Gated by the user's setting.
-  const lastHapticPathRef = useRef<string | null>(null);
-  useEffect(() => {
-    const path = location.pathname;
-    if (lastHapticPathRef.current === null) {
-      lastHapticPathRef.current = path;
-      return;
-    }
-    if (lastHapticPathRef.current !== path) {
-      lastHapticPathRef.current = path;
-      void triggerHaptic('navigate');
-    }
-  }, [location.pathname]);
+  // No route-change haptic here: tab presses already buzz via MobileNav's
+  // explicit user-gesture tick, and buzzing on *every* programmatic
+  // navigation (episode → episode, deep links, redirects) is buzz fatigue.
+  // Haptics stay on explicit user actions (tab press, toggle, page turn,
+  // success/error) through `triggerHaptic` at those call sites.
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -250,7 +245,9 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
     >
       <Toaster />
       <Sonner />
+      <MobileUpdateBanner />
       <OfflineBanner />
+      <MobileBackHandler />
       {/* Rendered OUTSIDE OfflineGate: the titlebar (drag region + window
           controls) must stay visible even when NoInternetPage takes over the
           viewport, otherwise the desktop window can't be moved or closed. */}
@@ -267,6 +264,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
             {deferredStartupReady && <PopupDisplay />}
             <LogViewer />
             <DeepLinkHandler />
+            <MobileDeepLinkBridge />
 
             <MagnetAlignmentModal
               isOpen={magnetModalOpen} 
@@ -280,6 +278,9 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
             />
 
             <SettingsModal />
+
+            {/* Long-press quick peek for anime/manga cards (global sheet). */}
+            <MediaQuickPeekHost />
 
             <main className="flex-1 w-full relative z-10">
               {children}

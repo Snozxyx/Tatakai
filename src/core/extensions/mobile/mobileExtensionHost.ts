@@ -279,9 +279,9 @@ export const mobileExtensionDispatch = {
         ? (chunk: { results?: any[]; diagnostic?: any }) => {
             streamed = true;
             const results = Array.isArray(chunk?.results) ? chunk.results : [];
-            // Desktop parity: header-gated HLS/MP4 + subtitle tracks go through
-            // the in-app proxy before the UI ever sees them (see mobileProxy —
-            // the mobile equivalent of the desktop LocalProxyServer).
+            // Register every mobile source locally. Current Android and iOS
+            // shells expose the desktop-shaped loopback path; older shells use
+            // the CapacitorHttp token loader without a hosted round-trip.
             const proxied = results.map((r) => applyMobileProxyToSource(r));
             for (const r of proxied) collected.push(r);
             // A throwing consumer must never abort the in-flight scrape.

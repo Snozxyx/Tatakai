@@ -55,12 +55,19 @@ import java.util.concurrent.TimeUnit;
 public class TatakaiTorrentPlugin extends Plugin {
     private static final String TAG = "TatakaiTorrent";
     private static final long METADATA_WAIT_MS = 20_000L;
+    // How long a range request at the download frontier waits for its full
+    // chunk. Bounds client threads from holding 20s of dead time per byte-range.
+    private static final long STREAM_EDGE_WAIT_MS = 6_000L;
+    // 2 MB (was 6 MB): playback starts after the first片 instead of waiting
+    // for a large window on slow swarms. Sequential prioritization keeps the
+    // frontier ahead once playback begins.
     private static final long PREBUFFER_BYTES = 2L * 1024L * 1024L;
     // ExoPlayer streams via many sequential range requests; a 2 MB cap with
     // `Connection: close` forced a reconnect every couple of seconds and made
     // playback stutter on slower swarms. 8 MB is still small enough for the
     // WebView <video> path (which pages the same server) while cutting native
-    // reconnects ~4x.
+    // reconnects ~4x. Only used near the live edge — ranges fully inside
+    // already-downloaded data are served contiguously (see LocalStreamServer).
     private static final long STREAM_CHUNK_BYTES = 8L * 1024L * 1024L;
 
     // The WebView page runs at https://localhost, which is cross-origin to this
@@ -73,6 +80,25 @@ public class TatakaiTorrentPlugin extends Plugin {
         + "Access-Control-Allow-Methods: GET, OPTIONS\r\n"
         + "Access-Control-Allow-Headers: Range\r\n"
         + "Access-Control-Expose-Headers: Content-Length, Content-Range, Accept-Ranges\r\n";
+
+    // Default public trackers injected when a magnet carries none (mirrors the
+    // desktop session-manager EXTRA_TRACKERS). Magnets without `tr=` params
+    // depend on DHT-only discovery, which is slow on mobile networks — a
+    // tracker boost is the main fix for "torrent is slow on mobile".
+    private static final String[] DEFAULT_TRACKERS = {
+        "udp://tracker.opentrackr.org:1337/announce",
+        "udp://open.stealth.si:80/announce",
+        "udp://tracker.torrent.eu.org:451/announce",
+        "udp://exodus.desync.com:6969/announce",
+        "udp://tracker.moeking.me:6969/announce",
+        "udp://tracker.bitsearch.to:1337/announce",
+        "udp://explodie.org:6969/announce",
+        "udp://open.demonii.com:1337/announce",
+        "udp://tracker.cyberia.is:6969/announce",
+        "udp://ipv4.tracker.harry.lu:80/announce",
+        "http://tracker.gbitt.info:80/announce",
+        "http://tracker.ipv6tracker.ru:80/announce",
+    };
 
     private final Object managerLock = new Object();
     private final Map<String, TorrentSession> sessions = new ConcurrentHashMap<>();
@@ -258,8 +284,43 @@ public class TatakaiTorrentPlugin extends Plugin {
         return root;
     }
 
+    /**
+     * Append default public trackers when a magnet carries none (or when only
+     * an info hash was supplied). Idempotent: magnets that already carry
+     * `tr=` params are returned unchanged.
+     */
+    private String withDefaultTrackers(String source) {
+        if (source == null) return "";
+        String trimmed = source.trim();
+        try {
+            if (!trimmed.regionMatches(true, 0, "magnet:", 0, 7)) {
+                String hash = trimmed;
+                if (!hash.matches("(?i)[a-f0-9]{40}")) return trimmed;
+                StringBuilder sb = new StringBuilder("magnet:?xt=urn:btih:").append(hash);
+                for (String tr : DEFAULT_TRACKERS) {
+                    sb.append("&tr=").append(java.net.URLEncoder.encode(tr, "UTF-8"));
+                }
+                return sb.toString();
+            }
+            if (trimmed.toLowerCase(Locale.US).contains("&tr=") || trimmed.toLowerCase(Locale.US).contains("?tr=")) {
+                return trimmed;
+            }
+            StringBuilder sb = new StringBuilder(trimmed);
+            String sep = trimmed.contains("?") ? "&" : "?";
+            // Ensure an xt param exists before appending trackers.
+            if (!trimmed.toLowerCase(Locale.US).contains("xt=")) return trimmed;
+            for (String tr : DEFAULT_TRACKERS) {
+                sb.append(sep).append("tr=").append(java.net.URLEncoder.encode(tr, "UTF-8"));
+                sep = "&";
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            return trimmed;
+        }
+    }
+
     private ParsedMagnet parseMagnet(String source) {
-        String magnet = source;
+        String magnet = withDefaultTrackers(source);
         if (!source.regionMatches(true, 0, "magnet:", 0, 7)) {
             String hash = source.trim();
             if (!hash.matches("(?i)[a-f0-9]{40}")) throw new IllegalArgumentException("Invalid magnet URI or info hash.");
@@ -618,10 +679,21 @@ public class TatakaiTorrentPlugin extends Plugin {
                     return;
                 }
 
-                long end = Math.min(requested[1], Math.min(source.file.length - 1L, available - 1L));
-                // Bounded responses make the video element request the next range
-                // as sequential libtorrent data becomes available.
-                end = Math.min(end, start + STREAM_CHUNK_BYTES - 1L);
+                // Ranges fully inside downloaded data are served contiguously:
+                // the old unconditional 8 MB cap made every backward seek jump
+                // 8 MiB early and stall mid-copy. The cap only applies near the
+                // live edge, where the requested end is not downloaded yet.
+                long end;
+                if (requested[1] <= available - 1L) {
+                    end = requested[1];
+                } else {
+                    end = Math.min(requested[1], Math.min(source.file.length - 1L, start + STREAM_CHUNK_BYTES - 1L));
+                    // Wait for the (capped) end rather than truncating to
+                    // whatever exists now, so the copy never reads sparse zeros
+                    // and the client does not have to re-request the same bytes.
+                    long reached = waitForAvailable(source.session, Math.min(source.file.length, end + 1L), STREAM_EDGE_WAIT_MS);
+                    end = Math.min(end, Math.max(start, reached - 1L));
+                }
                 if (end < start) {
                     writeError(output, 503, "Torrent data is buffering");
                     return;

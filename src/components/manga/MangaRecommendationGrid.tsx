@@ -3,6 +3,8 @@ import { GlassPanel } from '@/components/ui/GlassPanel';
 import { getProxiedImageUrl } from '@/lib/api';
 import { BookOpen, Star } from 'lucide-react';
 import type { EngineRecommendation } from '@/hooks/api/useRecommendationEngine';
+import { Peekable } from '@/components/media/MediaQuickPeek';
+import { peekFromManga } from '@/components/media/quickPeekStore';
 
 /** Grid of manga/manhwa/manhua recommendations from the manga engine. */
 export function MangaRecommendationGrid({
@@ -34,7 +36,20 @@ export function MangaRecommendationGrid({
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
       {recommendations.map((rec) => (
-        <GlassPanel key={rec.anime.id} hoverEffect className="group overflow-hidden">
+        <Peekable
+          key={rec.anime.id}
+          media={peekFromManga(
+            {
+              id: rec.anime.id,
+              name: rec.anime.title,
+              poster: rec.anime.poster,
+              type: rec.anime.format,
+              rating: rec.anime.score != null ? rec.anime.score : undefined,
+            },
+            `/manga/${rec.anime.id}`,
+          )}
+        >
+        <GlassPanel hoverEffect className="group overflow-hidden">
           <Link to={`/manga/${rec.anime.id}`} className="block">
             <div className="relative aspect-[2/3]">
               <img
@@ -60,6 +75,7 @@ export function MangaRecommendationGrid({
             </div>
           </Link>
         </GlassPanel>
+        </Peekable>
       ))}
     </div>
   );

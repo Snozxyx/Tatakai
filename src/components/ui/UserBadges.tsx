@@ -24,6 +24,46 @@ interface UserBadgesProps {
    * When provided, the tooltip shows the current tier + progress to next.
    */
   userStats?: Partial<Record<BadgeMetricKey, number>>;
+  /**
+   * Render badges as buttons (opens the detail dialog) or as static spans.
+   * Set to false when nested inside another interactive element (e.g. a
+   * profile card button) — nested <button>s are invalid HTML and React warns
+   * about them. Tooltips still work on hover.
+   */
+  interactive?: boolean;
+}
+
+/**
+ * Badge click target that degrades to a static span when nested inside another
+ * interactive element (no nested <button>s).
+ */
+function BadgeShell({
+  interactive,
+  onOpen,
+  className,
+  style,
+  label,
+  children,
+}: {
+  interactive: boolean;
+  onOpen: () => void;
+  className?: string;
+  style?: React.CSSProperties;
+  label: string;
+  children: React.ReactNode;
+}) {
+  if (interactive) {
+    return (
+      <button type="button" onClick={onOpen} className={className} style={style} aria-label={label}>
+        {children}
+      </button>
+    );
+  }
+  return (
+    <span role="img" aria-label={label} className={className} style={style}>
+      {children}
+    </span>
+  );
 }
 
 /**
@@ -39,6 +79,7 @@ export function UserBadges({
   className,
   featuredKey,
   userStats,
+  interactive = true,
 }: UserBadgesProps) {
   const [selectedBadge, setSelectedBadge] = useState<BadgeDef | null>(null);
   if (!badges || badges.length === 0) return null;
@@ -71,9 +112,9 @@ export function UserBadges({
           return (
             <Tooltip key={badge.key}>
               <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  onClick={() => { void triggerHaptic('tap'); setSelectedBadge(badge); }}
+                <BadgeShell
+                  interactive={interactive}
+                  onOpen={() => { void triggerHaptic('tap'); setSelectedBadge(badge); }}
                   className={cn(
                     'group/badge relative inline-flex items-center justify-center rounded-full shrink-0 outline-none',
                     'bg-[linear-gradient(180deg,rgba(255,255,255,0.10),rgba(255,255,255,0.02)_38%,rgba(0,0,0,0.55)_100%)]',
@@ -84,7 +125,7 @@ export function UserBadges({
                     isFeatured && 'ring-[1.5px] shadow-[0_0_0_1px_rgba(0,0,0,0.6),0_4px_16px_-4px_rgba(0,0,0,0.7)]'
                   )}
                   style={{ width: containerSize, height: containerSize }}
-                  aria-label={`${badge.label} badge (${rarity.label})${tierData ? ` - ${tierData.name}` : ''}`}
+                  label={`${badge.label} badge (${rarity.label})${tierData ? ` - ${tierData.name}` : ''}`}
                 >
                   {/* Top gloss — static premium highlight */}
                   <span
@@ -109,7 +150,7 @@ export function UserBadges({
                       aria-hidden="true"
                     />
                   )}
-                </button>
+                </BadgeShell>
               </TooltipTrigger>
 
               <TooltipContent
@@ -223,14 +264,15 @@ export function UserBadges({
         {overflow > 0 && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <button
-                type="button"
+              <BadgeShell
+                interactive={interactive}
+                onOpen={() => {}}
                 className="inline-flex items-center justify-center rounded-full bg-white/[0.04] hover:bg-white/[0.08] ring-1 ring-white/10 text-[10px] font-bold text-muted-foreground transition-colors duration-150 shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-white/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
                 style={{ width: size + 10, height: size + 10 }}
-                aria-label={`${overflow} more badges`}
+                label={`${overflow} more badges`}
               >
                 +{overflow}
-              </button>
+              </BadgeShell>
             </TooltipTrigger>
 
             <TooltipContent side="top" className="p-2.5 max-w-[200px] rounded-xl bg-[#0b0b0d]/95 border border-white/10 shadow-xl">

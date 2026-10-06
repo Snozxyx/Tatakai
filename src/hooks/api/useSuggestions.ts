@@ -115,6 +115,7 @@ export function useCreateSuggestion() {
           title: suggestion.title,
           description: suggestion.description,
           category: suggestion.category,
+          priority: 'normal',
           userId: user.id,
           userName: user.user_metadata?.display_name || user.email || undefined,
           imageUrl: suggestion.image_url,

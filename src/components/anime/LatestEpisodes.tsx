@@ -6,6 +6,8 @@ import { GlassPanel } from "@/components/ui/GlassPanel";
 import { HomeSectionHeading } from "@/components/home/HomeSectionHeading";
 import { AnimeCard, getHighQualityPoster } from "@/lib/api";
 import { usePreviewSource } from "@/hooks/usePreviewSource";
+import { Peekable } from "@/components/media/MediaQuickPeek";
+import { peekFromAnime } from "@/components/media/quickPeekStore";
 
 interface LatestEpisodesProps {
   animes: AnimeCard[];
@@ -33,6 +35,7 @@ function LatestEpisodeCard({ anime }: { anime: AnimeCard }) {
   const titles = [anime.name].filter(Boolean);
 
   return (
+    <Peekable media={peekFromAnime(anime, `/anime/${anime.id}`)}>
     <GlassPanel
       hoverEffect={false}
       className="group relative flex w-[260px] md:w-[300px] shrink-0 snap-start cursor-pointer items-stretch gap-3 md:gap-4 rounded-2xl border border-white/[0.05] bg-white/[0.02] p-3 active:scale-[0.98]"
@@ -102,6 +105,7 @@ function LatestEpisodeCard({ anime }: { anime: AnimeCard }) {
         </div>
       </div>
     </GlassPanel>
+    </Peekable>
   );
 }
 

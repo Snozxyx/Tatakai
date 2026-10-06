@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Eye, EyeOff, Mail, Lock, User, Play, ArrowLeft, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Play, ArrowLeft, ShieldCheck, RefreshCw } from 'lucide-react';
 import { z } from 'zod';
 import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from '@/hooks/ui/useIsNativeApp';
 import { cn } from '@/lib/utils';
@@ -72,6 +72,11 @@ export default function AuthPage() {
   const [displayName, setDisplayName] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  // Set when Cloudflare reports the challenge itself failed (red
+  // "Verification failed" state — common on iPhones with iCloud Private Relay,
+  // a VPN, or a Safari content blocker). Lets us show a retry affordance
+  // instead of leaving Sign In permanently disabled.
+  const [challengeError, setChallengeError] = useState(false);
   const turnstileRef = useRef<TurnstileWidgetHandle>(null);
   const turnstileEnabled = isTurnstileEnabled();
 
@@ -98,6 +103,23 @@ export default function AuthPage() {
   const resetCaptcha = () => {
     turnstileRef.current?.reset();
     setCaptchaToken(null);
+    setChallengeError(false);
+  };
+
+  const handleChallengeToken = (token: string) => {
+    setCaptchaToken(token);
+    setChallengeError(false);
+  };
+
+  const handleChallengeError = () => {
+    setCaptchaToken(null);
+    setChallengeError(true);
+  };
+
+  const retryChallenge = () => {
+    setChallengeError(false);
+    setCaptchaToken(null);
+    turnstileRef.current?.reset();
   };
 
   const validateForm = () => {
@@ -342,14 +364,33 @@ export default function AuthPage() {
               </div>
 
               {turnstileEnabled && (
-                <TurnstileWidget
-                  ref={turnstileRef}
-                  action={isLogin ? 'login' : 'signup'}
-                  onToken={setCaptchaToken}
-                  onExpire={() => setCaptchaToken(null)}
-                  onError={() => setCaptchaToken(null)}
-                  className="flex justify-center"
-                />
+                <div className="space-y-2">
+                  <TurnstileWidget
+                    ref={turnstileRef}
+                    action={isLogin ? 'login' : 'signup'}
+                    onToken={handleChallengeToken}
+                    onExpire={() => setCaptchaToken(null)}
+                    onError={handleChallengeError}
+                    onTimeout={handleChallengeError}
+                    className="flex justify-center"
+                  />
+                  {challengeError && !captchaToken && (
+                    <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-center">
+                      <p className="text-sm text-foreground font-medium">Verification didn't load correctly.</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        On iPhone this is usually iCloud Private Relay, a VPN, or a Safari content
+                        blocker interfering with the check. Disable them for this site, or try Safari.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={retryChallenge}
+                        className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
+                      >
+                        <RefreshCw className="w-4 h-4" /> Retry verification
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
 
               <Button

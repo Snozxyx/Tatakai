@@ -61,6 +61,7 @@ export function ReviewPopup({ isOpen: propIsOpen, onClose, animeId, animeName, u
 
             notifyReviewPopup({
                 userId: user?.id,
+                userName: (authUser?.user_metadata as any)?.display_name || authUser?.email?.split('@')[0],
                 animeId,
                 animeName,
                 rating,
