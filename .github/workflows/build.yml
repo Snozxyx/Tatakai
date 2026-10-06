@@ -38,10 +38,18 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: npm ci
         shell: bash
         env:
           PATH: /bin:/usr/bin:/usr/local/bin:$PATH
+        run: |
+          # macOS runners on Node 22 can hit a race in esbuild's postinstall
+          # (spawnSync Unknown system error -88). Retry with --ignore-scripts then
+          # manually invoke esbuild's install.js so the binary is present for the build.
+          if ! npm ci; then
+            echo "::warning::npm ci failed — retrying with --ignore-scripts"
+            npm ci --ignore-scripts
+            node node_modules/esbuild/install.js || true
+          fi
 
       - name: Test
         run: npm run test
@@ -83,10 +91,18 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
         shell: bash
         env:
           PATH: /bin:/usr/bin:/usr/local/bin:$PATH
+        run: |
+          # macOS runners on Node 22 can hit a race in esbuild's postinstall
+          # (spawnSync Unknown system error -88). Retry with --ignore-scripts then
+          # manually invoke esbuild's install.js so the binary is present for the build.
+          if ! npm ci; then
+            echo "::warning::npm ci failed — retrying with --ignore-scripts"
+            npm ci --ignore-scripts
+            node node_modules/esbuild/install.js || true
+          fi
 
       # Vite inlines import.meta.env.VITE_* at BUILD time. With no .env present on
       # CI (it's gitignored), every VITE_* becomes '' in the bundle â€” and
@@ -399,7 +415,13 @@ jobs:
   release:
     needs: [build-desktop, build-android, build-ios-unsigned]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    # Run on tag pushes even if build-desktop partially failed (e.g. macOS
+    # runner issue) so Windows/Linux/mobile artifacts still get released.
+    if: |
+      always() &&
+      startsWith(github.ref, 'refs/tags/') &&
+      needs.build-android.result == 'success' &&
+      (needs.build-desktop.result == 'success' || needs.build-desktop.result == 'failure')
 
     steps:
       - name: Download desktop artifacts â€” Windows
