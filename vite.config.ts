@@ -109,6 +109,7 @@ export default defineConfig(({ mode }) => {
       port: isWebMode ? 8081 : 8090, // Standard port for Electron dev
       // Allow Discord Activity iframe to embed the app
       allowedHosts: [
+        "*"
         "tatakai.me",
         "gabhasti.tech",
         "recording-farm-narrow-end.trycloudflare.com",
