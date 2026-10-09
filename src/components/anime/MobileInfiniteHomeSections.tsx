@@ -66,8 +66,8 @@ const MobileCard = memo(function MobileCard({ anime }: { anime: any }) {
       {...longPress}
     >
       {/* Plain card on mobile — no backdrop-blur / GlassPanel (GPU-heavy). */}
-      <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03]">
-        <div className="relative aspect-[2/3]">
+      <div className="mobile-poster-card overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03]">
+        <div className="mobile-poster-frame relative aspect-[2/3]">
           <img
             src={getHighQualityPoster(anime.poster || '', anime.anilistId)}
             alt={anime.name || 'Anime'}

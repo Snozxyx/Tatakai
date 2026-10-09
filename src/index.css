@@ -236,6 +236,42 @@ html.quality-animations * {
   }
 }
 
+/* Mobile browsing system: labels improve wayfinding while focused mode keeps the
+   card rhythm stable. All rules stay below md so desktop remains unchanged. */
+@media (max-width: 767px) {
+  .mobile-nav-label {
+    display: block;
+  }
+
+  [data-mobile-nav] > div {
+    min-height: 4.25rem;
+  }
+
+  [data-mobile-layout='classic'] .mobile-nav-label {
+    display: none;
+  }
+
+  .mobile-poster-frame,
+  .mobile-poster-card {
+    aspect-ratio: 2 / 3;
+  }
+
+  [data-mobile-layout='focused'] .mobile-poster-card {
+    border-radius: 1rem;
+    box-shadow: 0 8px 24px hsl(0 0% 0% / 0.22);
+  }
+
+  [data-mobile-layout='focused'] .mobile-poster-frame img {
+    object-position: center top;
+  }
+}
+
+@media (min-width: 768px) {
+  .mobile-nav-label {
+    display: none;
+  }
+}
+
 /* Native App Specific Optimizations */
 .capacitor-native {
   /* Disable text selection for app-like feel */

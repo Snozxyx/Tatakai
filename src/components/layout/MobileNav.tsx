@@ -104,7 +104,10 @@ function MobileNavButton({
             : 'group-hover:bg-white/[0.06] group-active:bg-white/[0.08]',
         )}
       >
-        <Icon className={cn('h-[22px] w-[22px] transition-transform duration-200', active ? 'scale-110' : 'group-hover:scale-105')} />
+        <span className="flex flex-col items-center gap-0.5">
+          <Icon className={cn('h-[21px] w-[21px] transition-transform duration-200', active ? 'scale-110' : 'group-hover:scale-105')} />
+          <span className="mobile-nav-label text-[10px] font-semibold leading-none tracking-tight">{label}</span>
+        </span>
         {badge != null && badge > 0 && (
           <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold tabular-nums text-primary-foreground shadow-lg">
             {badge > 99 ? '99+' : badge}
@@ -257,10 +260,13 @@ export function MobileNav() {
               )}
             >
               <span className={cn(
-                'flex h-9 min-w-[3rem] items-center justify-center rounded-full px-4 transition-all duration-200',
+                'flex min-w-[3rem] items-center justify-center rounded-full px-4 py-1.5 transition-all duration-200',
                 favActive ? 'bg-primary/15 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.25)]' : 'group-hover:bg-white/[0.06]',
               )}>
-                <Heart className={cn('h-[22px] w-[22px]', favActive && 'fill-primary/20')} />
+                <span className="flex flex-col items-center gap-0.5">
+                  <Heart className={cn('h-[21px] w-[21px]', favActive && 'fill-primary/20')} />
+                  <span className="mobile-nav-label text-[10px] font-semibold leading-none tracking-tight">Saved</span>
+                </span>
               </span>
             </button>
           </DropdownMenuTrigger>
@@ -290,10 +296,13 @@ export function MobileNav() {
                 title="More"
               >
                 <span className={cn(
-                  'flex h-9 min-w-[3rem] items-center justify-center rounded-full px-4 transition-all duration-200',
+                  'flex min-w-[3rem] items-center justify-center rounded-full px-4 py-1.5 transition-all duration-200',
                   customActive ? 'bg-primary/15 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.25)]' : 'group-hover:bg-white/[0.06]',
                 )}>
-                  <Plus className="h-[22px] w-[22px]" />
+                  <span className="flex flex-col items-center gap-0.5">
+                    <Plus className="h-[21px] w-[21px]" />
+                    <span className="mobile-nav-label text-[10px] font-semibold leading-none tracking-tight">More</span>
+                  </span>
                 </span>
               </button>
             </DropdownMenuTrigger>

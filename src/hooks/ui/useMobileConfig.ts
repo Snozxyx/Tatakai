@@ -24,6 +24,7 @@ import { useEffect, useState } from 'react';
 export type StatusBarStyle = 'auto' | 'light' | 'dark';
 export type OrientationLock = 'auto' | 'portrait' | 'landscape';
 export type KeyboardResizeMode = 'native' | 'body' | 'ionic' | 'none';
+export type MobileLayout = 'focused' | 'classic';
 
 export interface MobileConfig {
   // General
@@ -32,6 +33,7 @@ export interface MobileConfig {
   keepScreenAwake: boolean; // hold a wake lock app-wide
   devMode: boolean; // expose developer affordances
   // Display & orientation
+  mobileLayout: MobileLayout; // focused keeps mobile browsing consistent; classic preserves the prior shell
   statusBarStyle: StatusBarStyle; // 'auto' follows the app theme
   orientationLock: OrientationLock; // lock the whole app, or 'auto' to allow rotation
   forceLandscapeInPlayer: boolean; // rotate to landscape when a video opens
@@ -52,6 +54,7 @@ export const DEFAULT_MOBILE_CONFIG: MobileConfig = {
   reduceMotion: false,
   keepScreenAwake: false,
   devMode: false,
+  mobileLayout: 'focused',
   statusBarStyle: 'auto',
   orientationLock: 'auto',
   forceLandscapeInPlayer: false,
@@ -68,6 +71,7 @@ export const DEFAULT_MOBILE_CONFIG: MobileConfig = {
 const STORAGE_KEY = 'tatakai_mobile_config';
 const UPDATE_EVENT = 'tatakai-mobile-config-updated';
 
+const VALID_MOBILE_LAYOUTS = new Set<MobileLayout>(['focused', 'classic']);
 const VALID_STATUS_BAR = new Set<StatusBarStyle>(['auto', 'light', 'dark']);
 const VALID_ORIENTATION = new Set<OrientationLock>(['auto', 'portrait', 'landscape']);
 const VALID_KEYBOARD = new Set<KeyboardResizeMode>(['native', 'body', 'ionic', 'none']);
@@ -82,6 +86,9 @@ function normalizeConfig(raw: Partial<MobileConfig> | null | undefined): MobileC
     reduceMotion: asBool(raw?.reduceMotion, DEFAULT_MOBILE_CONFIG.reduceMotion),
     keepScreenAwake: asBool(raw?.keepScreenAwake, DEFAULT_MOBILE_CONFIG.keepScreenAwake),
     devMode: asBool(raw?.devMode, DEFAULT_MOBILE_CONFIG.devMode),
+    mobileLayout: VALID_MOBILE_LAYOUTS.has(raw?.mobileLayout as MobileLayout)
+      ? (raw!.mobileLayout as MobileLayout)
+      : DEFAULT_MOBILE_CONFIG.mobileLayout,
     statusBarStyle: VALID_STATUS_BAR.has(raw?.statusBarStyle as StatusBarStyle)
       ? (raw!.statusBarStyle as StatusBarStyle)
       : DEFAULT_MOBILE_CONFIG.statusBarStyle,

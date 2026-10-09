@@ -24,6 +24,7 @@ import {
 import {
   useMobileConfig,
   type KeyboardResizeMode,
+  type MobileLayout,
   type OrientationLock,
   type StatusBarStyle,
 } from '@/hooks/ui/useMobileConfig';
@@ -414,6 +415,19 @@ export function MobileAppSettingsPanel(_props: { section?: string }) {
         description="How the app fills the screen and reacts to the device shell."
       >
         <div className="flex flex-col divide-y divide-white/5">
+          <SettingRow
+            title="Mobile layout"
+            description="Use the consistent poster grid and labeled navigation, or keep the classic shell."
+            control={
+              <Select value={config.mobileLayout} onValueChange={(v) => updateConfig({ mobileLayout: v as MobileLayout })}>
+                <SelectTrigger className="h-9 w-36 rounded-lg text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="focused">Focused</SelectItem>
+                  <SelectItem value="classic">Classic</SelectItem>
+                </SelectContent>
+              </Select>
+            }
+          />
           <SettingRow
             title="Reduce motion"
             description="Minimize animations and transitions."

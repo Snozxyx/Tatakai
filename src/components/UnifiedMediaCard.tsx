@@ -149,7 +149,7 @@ export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant =
         style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 300px' }}
         {...longPress}
       >
-        <div className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.04] md:transition-all md:duration-300 md:group-hover:border-white/20 md:group-hover:shadow-xl md:group-hover:shadow-black/60 md:group-hover:-translate-y-1">
+        <div className="mobile-poster-frame relative aspect-[2/3] w-full overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.04] md:transition-all md:duration-300 md:group-hover:border-white/20 md:group-hover:shadow-xl md:group-hover:shadow-black/60 md:group-hover:-translate-y-1">
           <img
             src={getProxiedImageUrl(item.poster || '')}
             alt={item.name}

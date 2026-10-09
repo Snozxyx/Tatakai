@@ -42,6 +42,7 @@ import { toast } from 'sonner';
 import { getLocalTorrentSessionHistory, getLocalTorrentSessionHistoryEnabled } from '@/lib/localStorage';
 
 import { useMobileUpdateOrchestrator } from '@/core/update/mobile-update';
+import { useMobileConfig } from '@/hooks/ui/useMobileConfig';
 
 const getDevModeEnabled = (): boolean => {
   try {
@@ -77,6 +78,14 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
   const [titlebarHidden] = useTitlebarHidden();
   const isMobile = useIsPhone();
   const isMobileApp = useIsMobileApp();
+  const { config: mobileConfig } = useMobileConfig();
+
+  useEffect(() => {
+    document.documentElement.dataset.mobileLayout = mobileConfig.mobileLayout;
+    return () => {
+      delete document.documentElement.dataset.mobileLayout;
+    };
+  }, [mobileConfig.mobileLayout]);
 
   // No route-change haptic here: tab presses already buzz via MobileNav's
   // explicit user-gesture tick, and buzzing on *every* programmatic
