@@ -108,13 +108,7 @@ export default defineConfig(({ mode }) => {
       host: "::",
       port: isWebMode ? 8081 : 8090, // Standard port for Electron dev
       // Allow Discord Activity iframe to embed the app
-      allowedHosts: [
-        "*"
-        "tatakai.me",
-        "gabhasti.tech",
-        "recording-farm-narrow-end.trycloudflare.com",
-        ".gabhasti.tech" // The dot allows all subdomains like api.gabhasti.tech
-      ],
+      allowedHosts: true,
       hmr: {
         // In local development, let Vite infer the correct WS port.
         // Set VITE_HMR_CLIENT_PORT=443 only when reverse-proxied behind TLS.
