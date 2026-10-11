@@ -349,7 +349,7 @@ public final class TatakaiLocalProxyPlugin: CAPPlugin, CAPBridgedPlugin {
     /// untrusted embed is on screen no top-frame navigation may leave the app
     /// for an unknown third party. Returning nil means "no opinion" — normal
     /// Capacitor handling continues untouched.
-    @objc override func shouldOverrideLoad(_ navigationAction: WKNavigationAction) -> NSNumber? {
+    @objc public override func shouldOverrideLoad(_ navigationAction: WKNavigationAction) -> NSNumber? {
         let isTopLevel = navigationAction.targetFrame == nil || navigationAction.targetFrame?.isMainFrame == true
         guard isTopLevel, let url = navigationAction.request.url else { return nil }
         let urlString = url.absoluteString
@@ -1428,7 +1428,7 @@ private final class AdBlockContentRules {
             DispatchQueue.main.async { [weak controller] in
                 guard let controller = controller else { return }
                 if let previous = self.installed.removeValue(forKey: id) {
-                    controller.removeContentRuleList(previous)
+                    controller.remove(previous)
                 }
             }
         }
@@ -1442,7 +1442,7 @@ private final class AdBlockContentRules {
         onlyIf: (() -> Bool)? = nil
     ) {
         let json = Self.rulesJSON(hosts: hosts, unlessDomains: unlessDomains)
-        let store = WKContentRuleListStore.default()
+        guard let store = WKContentRuleListStore.default() else { return }
         store.lookUpContentRuleList(forIdentifier: ruleId) { [weak controller] existing, _ in
             let apply: (WKContentRuleList) -> Void = { list in
                 DispatchQueue.main.async { [weak controller] in
@@ -1451,7 +1451,7 @@ private final class AdBlockContentRules {
                     // before anything touches the controller.
                     if let check = onlyIf, !check() { return }
                     if let previous = self.installed[ruleId] {
-                        controller.removeContentRuleList(previous)
+                        controller.remove(previous)
                     }
                     controller.add(list)
                     self.installed[ruleId] = list

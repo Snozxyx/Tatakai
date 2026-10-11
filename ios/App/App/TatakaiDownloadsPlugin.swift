@@ -410,7 +410,17 @@ final class MobileDownloads: NSObject, URLSessionDownloadDelegate {
 public final class TatakaiDownloadsPlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "TatakaiDownloadsPlugin"
     public let jsName = "TatakaiDownloads"
-    public let pluginMethods = ["enqueue", "cancel", "retry", "snapshot", "reconcile", "remove", "configure", "resolvePlayback", "importLegacy"].map { CAPPluginMethod(name: $0, returnType: CAPPluginReturnPromise) }
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "enqueue", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "cancel", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "retry", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "snapshot", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "reconcile", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "remove", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "configure", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "resolvePlayback", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "importLegacy", returnType: CAPPluginReturnPromise)
+    ]
     private let downloads = MobileDownloads.shared
     public override func load() {
         downloads.queue.async { self.downloads.changed = { [weak self] jobs in self?.notifyListeners("downloadsChanged", data: ["jobs": jobs]) } }
