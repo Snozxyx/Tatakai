@@ -1,0 +1,12 @@
+version: 1
+type: web
+
+build:
+  framework: auto
+  root_dir: .
+  install: npm ci
+  command: npm run build -- --mode web
+
+run:
+  command: 'npm run preview -- --host 0.0.0.0 --port "${PORT:-3000}"'
+  port: 3000
