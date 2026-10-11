@@ -21,6 +21,7 @@ import { celebrate } from "@/components/effects/Celebrate";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSettingsModal } from "@/contexts/SettingsModalContext";
 import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from "@/hooks/ui/useIsNativeApp";
+import { useIsPhone } from "@/hooks/ui/use-mobile";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,6 +48,7 @@ export function Sidebar() {
   const isNative = useIsNativeApp();
   const isDesktopApp = useIsDesktopApp();
   const isMobileApp = useIsMobileApp();
+  const isPhoneWidth = useIsPhone();
   const domain = import.meta.env.VITE_PUBLIC_DOMAIN || "https://tatakai.me";
 
   const { data: customSources } = useCustomSources();
@@ -88,7 +90,12 @@ export function Sidebar() {
     }
   };
 
-  if (isMobileApp) return null;
+  // Narrow phones use the bottom nav (this rail is CSS-hidden below md
+  // anyway). Wide native viewports — tablets, foldables unfolded or in
+  // landscape — must keep the floating sidebar: MobileNav is `md:hidden`
+  // there, so returning null would leave those devices with no navigation
+  // at all (no Home/Search/Settings/Community access).
+  if (isMobileApp && isPhoneWidth) return null;
 
   const isActive = (path: string) => location.pathname === path;
   const isMangaActive = location.pathname === "/manga" || location.pathname.startsWith("/manga/");
@@ -98,7 +105,7 @@ export function Sidebar() {
     <nav
       data-sidebar
       className={cn(
-        "fixed z-[100] flex flex-col transition-all duration-500 ease-out",
+        "fixed z-40 flex flex-col transition-[color,background-color,opacity,transform] duration-500 ease-out",
         isDesktopApp
           ? "left-0 top-0 h-screen w-20 bg-background/80 backdrop-blur-xl border-r border-border/40 pt-14 pb-6 items-center shadow-2xl"
           // Floating pill design for web
@@ -120,7 +127,7 @@ export function Sidebar() {
           src={`${import.meta.env.BASE_URL}assets/logo/tatakai-logo-square.png`}
           alt="Tatakai Logo"
           className={cn(
-            "relative z-10 object-contain transition-all duration-300 group-hover:scale-110",
+            "relative z-10 object-contain transition-[color,background-color,opacity,transform] duration-150",
             isDesktopApp ? "w-11 h-11 rounded-2xl shadow-sm" : "w-10 h-10 rounded-xl shadow-sm"
           )}
           style={logoSpin ? { animation: "spin 0.7s cubic-bezier(0.34, 1.56, 0.64, 1)" } : undefined}
@@ -147,12 +154,12 @@ export function Sidebar() {
                 aria-label="Custom sources"
                 title="Custom sources"
                 className={cn(
-                  "group relative flex h-10 w-10 items-center justify-center rounded-xl outline-none transition-all duration-200",
+                  "group relative flex h-10 w-10 items-center justify-center rounded-xl outline-none transition-[color,background-color,opacity,transform] duration-200",
                   "hover:bg-accent/80 hover:text-accent-foreground",
                   location.pathname.startsWith("/x/") ? "bg-primary/10 text-primary" : "text-muted-foreground",
                 )}
               >
-                <Plus className="h-5 w-5 shrink-0 transition-transform duration-200 group-hover:scale-110" />
+                <Plus className="h-5 w-5 shrink-0" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
@@ -201,14 +208,14 @@ export function Sidebar() {
               aria-label="More"
               title="More"
               className={cn(
-                "group relative flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200 outline-none",
+                "group relative flex h-10 w-10 items-center justify-center rounded-xl transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 "hover:bg-accent/80 hover:text-accent-foreground",
                 overflowActive ? "bg-primary/10 text-primary" : "text-muted-foreground"
               )}
             >
               <MoreHorizontal className={cn(
                 "h-5 w-5 shrink-0 transition-transform duration-200",
-                overflowActive ? "scale-110" : "group-hover:scale-110"
+                ""
               )} />
             </button>
           </DropdownMenuTrigger>
@@ -256,7 +263,7 @@ export function Sidebar() {
           >
             <span
               className={cn(
-                "block h-10 w-10 overflow-hidden rounded-2xl transition-all duration-300",
+                "block h-10 w-10 overflow-hidden rounded-2xl transition-[color,background-color,opacity,transform] duration-300",
                 profile?.avatar_url ? "bg-muted" : "nav-icon-inactive"
               )}
             >

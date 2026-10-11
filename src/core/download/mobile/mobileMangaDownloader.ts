@@ -27,12 +27,17 @@ import {
   markMangaProgress,
   markMangaCompleted,
   markMangaError,
+  markMangaQueued,
+  rememberMangaJobMeta,
 } from '@/core/download/manga-download-monitor';
 import {
   downloadServiceFinish,
   downloadServiceProgress,
   downloadServiceStart,
 } from './mobileDownloadService';
+import { getInterruptedMangaJobs, saveInterruptedMangaJob, removeInterruptedMangaJob } from './mangaRecovery';
+import { getDownloadAutoResume } from '@/lib/downloadPreferences';
+const activeJobs = new Set<string>();
 
 function chapterLabelFor(chapter: MangaDownloadChapter): string {
   const numLabel = chapter.chapterNumber != null ? `Ch. ${chapter.chapterNumber}` : 'Chapter';
@@ -107,6 +112,9 @@ export async function downloadMangaChapterMobile(
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   if (!isCapacitor()) return { ok: false, reason: 'not_mobile' };
   const jobId = mangaJobId(series.anilistId, chapter.chapterKey);
+  if (activeJobs.has(jobId)) return { ok: false, reason: 'already_downloading' };
+  saveInterruptedMangaJob(series, chapter);
+  activeJobs.add(jobId);
   cancelled.delete(jobId);
   const svcLabel = `${series.title} · ${chapterLabelFor(chapter)}`;
   // Foreground service + status-bar progress so the chapter survives
@@ -114,7 +122,7 @@ export async function downloadMangaChapterMobile(
   downloadServiceStart(jobId, svcLabel);
 
   try {
-    const { Filesystem, Directory } = await import('@capacitor/filesystem');
+    const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
 
     // Desktop parity: resolve AND download per source. The primary source may
     // resolve pages whose CDN URLs are all dead (rotated/signed links → every
@@ -169,6 +177,21 @@ export async function downloadMangaChapterMobile(
       }
       attemptedProviders.push(attempt.provider);
 
+      const signature = JSON.stringify([attempt.provider, attempt.chapterKey, pages.map((page: DownloadablePage) => {
+        const raw = page.originalUrl || resolveMobileProxy(String(page.imageUrl || ''))?.url || page.imageUrl;
+        try {
+          const url = new URL(String(raw));
+          for (const key of [...url.searchParams.keys()]) if (/^(token|expires|expiry|signature|sig|auth|authorization|policy|key-pair-id|hdnts|hdnea|x-amz-.+)$/i.test(key)) url.searchParams.delete(key);
+          url.hash = ''; return url.toString();
+        } catch { return raw; }
+      })]);
+      let checkpoint: { signature: string; completed: Record<string, { file: string; size: number }> } = { signature, completed: {} };
+      try {
+        const saved = await Filesystem.readFile({ path: `${dir}/checkpoint.json`, directory: Directory.Documents, encoding: Encoding.UTF8 });
+        const parsed = JSON.parse(String(saved.data));
+        if (parsed.signature === signature) checkpoint = parsed;
+      } catch { /* First attempt or interrupted checkpoint write. */ }
+
       // Clean partials from a previous dead source so files never mix across
       // scanlators (same 0001.* names).
       if (usedProvider !== null || okPages > 0 || lastErrors.length > 0) {
@@ -195,6 +218,17 @@ export async function downloadMangaChapterMobile(
           break;
         }
         const page = pages[i] as DownloadablePage;
+        const previous = checkpoint.completed[String(i)];
+        if (previous) {
+          try {
+            const saved = await Filesystem.stat({ path: previous.file, directory: Directory.Documents });
+            if (saved.size === previous.size && saved.size > 0) {
+              attemptOk++; attemptBytes += saved.size;
+              markMangaProgress(jobId, { anilistId: series.anilistId, chapterKey: chapter.chapterKey, page: i + 1, totalPages: total, percent: Math.round((attemptOk / total) * 100) });
+              continue;
+            }
+          } catch { /* Missing partial resource must be downloaded again. */ }
+        }
         const candidates = pageCandidates(page);
         if (!candidates.length) {
           pageErrors.push(`page ${i + 1}: no URL`);
@@ -254,11 +288,15 @@ export async function downloadMangaChapterMobile(
 
         const filePath = `${dir}/${String(i + 1).padStart(4, '0')}.${extFromUrl(String(page.imageUrl || candidates[0]))}`;
         await Filesystem.writeFile({
-          path: filePath,
+          path: `${filePath}.part`,
           directory: Directory.Documents,
           data: toBase64(buf),
           recursive: true,
         });
+        await Filesystem.rename({ from: `${filePath}.part`, to: filePath, directory: Directory.Documents });
+        checkpoint.completed[String(i)] = { file: filePath, size: buf.byteLength };
+        await Filesystem.writeFile({ path: `${dir}/checkpoint.json.tmp`, directory: Directory.Documents, encoding: Encoding.UTF8, data: JSON.stringify(checkpoint) });
+        await Filesystem.rename({ from: `${dir}/checkpoint.json.tmp`, to: `${dir}/checkpoint.json`, directory: Directory.Documents });
 
         const pagePct = Math.round(((i + 1) / total) * 100);
         markMangaProgress(jobId, {
@@ -277,6 +315,7 @@ export async function downloadMangaChapterMobile(
         return { ok: false, reason: 'cancelled' };
       }
       if (attemptOk > 0) {
+        if (attemptOk !== total) throw new Error(`Downloaded ${attemptOk}/${total} pages. Resume to retry missing pages.`);
         usedProvider = attempt.provider;
         okPages = attemptOk;
         sizeBytes = attemptBytes;
@@ -309,17 +348,34 @@ export async function downloadMangaChapterMobile(
       sizeBytes,
     });
     downloadServiceFinish(jobId, { ok: true, label: svcLabel });
+    removeInterruptedMangaJob(jobId);
     return { ok: true };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     markMangaError(jobId, msg);
     downloadServiceFinish(jobId, { ok: false, label: svcLabel });
     return { ok: false, reason: msg };
+  } finally {
+    activeJobs.delete(jobId);
+    if (cancelled.has(jobId)) removeInterruptedMangaJob(jobId);
+  }
+}
+
+export async function resumeInterruptedMangaDownloads(): Promise<void> {
+  if (!isCapacitor() || !getDownloadAutoResume()) return;
+  const { initMobileExtensions } = await import('@/core/extensions/mobile/mobileExtensionInstaller');
+  await initMobileExtensions();
+  for (const [jobId, { series, chapter }] of Object.entries(getInterruptedMangaJobs())) {
+    if (activeJobs.has(jobId)) continue;
+    rememberMangaJobMeta(jobId, { title: series.title, posterUrl: series.posterUrl, chapterNumber: chapter.chapterNumber, volume: chapter.volume, provider: chapter.provider });
+    markMangaQueued(jobId, { anilistId: series.anilistId, chapterKey: chapter.chapterKey, title: series.title, posterUrl: series.posterUrl, kind: series.kind, chapterLabel: chapterLabelFor(chapter) });
+    await downloadMangaChapterMobile(series, chapter);
   }
 }
 
 export function cancelMangaChapterMobile(anilistId: number, chapterKey: string): void {
   cancelled.add(mangaJobId(anilistId, chapterKey));
+  removeInterruptedMangaJob(mangaJobId(anilistId, chapterKey));
 }
 
 /** Download many chapters sequentially (bounded — mobile bandwidth/battery). */
@@ -328,6 +384,7 @@ export async function downloadMangaChaptersMobile(
   chapters: MangaDownloadChapter[],
 ): Promise<{ ok: true; completed: number } | { ok: false; reason: string }> {
   if (!isCapacitor()) return { ok: false, reason: 'not_mobile' };
+  for (const chapter of chapters) saveInterruptedMangaJob(series, chapter);
   let completed = 0;
   for (const chapter of chapters) {
     const res = await downloadMangaChapterMobile(series, chapter);

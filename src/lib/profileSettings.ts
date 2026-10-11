@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
-import { Ban, Flower2, CloudRain, CircleDot, Moon, CloudSun } from 'lucide-react';
+import { Ban, Flower2, CloudRain, CircleDot, Moon, CloudSun, Stars, Sparkles, Snowflake, Waves, Gem, Flame, Shell } from 'lucide-react';
+import { readAvatarDecoration, readProfileCosmeticEffect, readProfileNameplate, type AvatarDecorationKey, type ProfileCosmeticEffectKey, type ProfileNameplateKey } from '@/lib/profileCosmetics';
 
 /**
  * Per-profile customization (ambient accent color + animated background effect).
@@ -12,13 +13,17 @@ import { Ban, Flower2, CloudRain, CircleDot, Moon, CloudSun } from 'lucide-react
  * users viewing the profile.
  */
 
-export type BackgroundEffectKey = 'none' | 'sakura' | 'rain' | 'blackhole' | 'pitch' | 'sky';
+export type BackgroundEffectKey = 'none' | 'sakura' | 'rain' | 'blackhole' | 'pitch' | 'sky' | 'stars' | 'fireflies' | 'snow' | 'aurora' | 'moonlit' | 'prism' | 'embers' | 'ocean';
+export const PREMIUM_BACKGROUND_EFFECTS: readonly BackgroundEffectKey[] = ['moonlit', 'prism', 'embers', 'ocean'];
 
 export interface ProfileAppSettings {
   profile?: {
     /** HSL triplet string, e.g. "262 83% 58%", consumed via hsl(var(--profile-accent)). */
     ambientColor?: string;
     backgroundEffect?: BackgroundEffectKey;
+    avatarDecoration?: AvatarDecorationKey;
+    profileEffect?: ProfileCosmeticEffectKey;
+    nameplate?: ProfileNameplateKey;
   };
   // Other feature areas may add their own keys under app_settings; we only own `profile`.
   [key: string]: unknown;
@@ -28,22 +33,26 @@ export interface ProfileCustomization {
   /** HSL triplet or null when the user hasn't picked one (falls back to --primary). */
   ambientColor: string | null;
   backgroundEffect: BackgroundEffectKey;
+  avatarDecoration: AvatarDecorationKey;
+  profileEffect: ProfileCosmeticEffectKey;
+  nameplate: ProfileNameplateKey;
 }
 
-const VALID_EFFECTS: BackgroundEffectKey[] = ['none', 'sakura', 'rain', 'blackhole', 'pitch', 'sky'];
+const VALID_EFFECTS: BackgroundEffectKey[] = ['none', 'sakura', 'rain', 'blackhole', 'pitch', 'sky', 'stars', 'fireflies', 'snow', 'aurora', ...PREMIUM_BACKGROUND_EFFECTS];
 
 /**
  * Parse customization from any profile row (own or public). Tolerant of missing
  * or malformed `app_settings`.
  */
-export function readProfileCustomization(profile: any): ProfileCustomization {
+export function readProfileCustomization(profile: any, premiumAccess = false): ProfileCustomization {
   const settings = (profile?.app_settings ?? {}) as ProfileAppSettings;
   const p = settings.profile ?? {};
   const ambient = typeof p.ambientColor === 'string' ? normalizeAccent(p.ambientColor) : null;
   const effect = VALID_EFFECTS.includes(p.backgroundEffect as BackgroundEffectKey)
+    && (premiumAccess || !PREMIUM_BACKGROUND_EFFECTS.includes(p.backgroundEffect as BackgroundEffectKey))
     ? (p.backgroundEffect as BackgroundEffectKey)
     : 'none';
-  return { ambientColor: ambient, backgroundEffect: effect };
+  return { ambientColor: ambient, backgroundEffect: effect, avatarDecoration: readAvatarDecoration(p.avatarDecoration, premiumAccess), profileEffect: readProfileCosmeticEffect(p.profileEffect, premiumAccess), nameplate: readProfileNameplate(p.nameplate, premiumAccess) };
 }
 
 /**
@@ -129,6 +138,7 @@ export interface EffectOption {
   label: string;
   icon: LucideIcon;
   description: string;
+  premium?: boolean;
 }
 
 export const EFFECT_OPTIONS: EffectOption[] = [
@@ -138,10 +148,23 @@ export const EFFECT_OPTIONS: EffectOption[] = [
   { key: 'blackhole', label: 'Blackhole', icon: CircleDot, description: 'Swirling void' },
   { key: 'pitch', label: 'Dark Pitch', icon: Moon, description: 'Deep OLED black' },
   { key: 'sky', label: 'Sky', icon: CloudSun, description: 'Drifting gradient' },
+  { key: 'stars', label: 'Stars', icon: Stars, description: 'Twinkling night sky' },
+  { key: 'fireflies', label: 'Fireflies', icon: Sparkles, description: 'Floating golden lights' },
+  { key: 'snow', label: 'Snow', icon: Snowflake, description: 'Soft drifting snowfall' },
+  { key: 'aurora', label: 'Aurora', icon: Waves, description: 'Northern light ribbons' },
+  { key: 'moonlit', label: 'Moonlit', icon: Moon, description: 'Silver moon and constellations', premium: true },
+  { key: 'prism', label: 'Prism', icon: Gem, description: 'Iridescent ribbons of light', premium: true },
+  { key: 'embers', label: 'Embers', icon: Flame, description: 'Floating amber sparks', premium: true },
+  { key: 'ocean', label: 'Deep Sea', icon: Shell, description: 'Pearl light beneath ocean waves', premium: true },
 ];
 
 /** Build the inline style that scopes --profile-accent to the profile subtree. */
 export function ambientAccentStyle(ambientColor: string | null): React.CSSProperties | undefined {
   if (!ambientColor) return undefined;
   return { ['--profile-accent' as any]: ambientColor };
+}
+
+/** Preserve the original theme; cosmetics never recolor cards or controls. */
+export function profileSurfaceStyle(custom: ProfileCustomization): React.CSSProperties | undefined {
+  return ambientAccentStyle(custom.ambientColor);
 }

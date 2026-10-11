@@ -62,11 +62,11 @@ export function useInfiniteMangaSearch(
     queryFn: ({ pageParam = 1 }) => searchManga(query, pageParam, limit, options),
     getNextPageParam: (lastPage: any, allPages: any[]) => {
       const lastResults = getResultRows(lastPage);
-      if (lastResults.length === 0) {
+      if (lastResults.length === 0 && lastPage?.hasNextPage !== true) {
         return undefined;
       }
 
-      if (allPages.length > 1) {
+      if (lastResults.length > 0 && allPages.length > 1) {
         const seenIds = new Set<string>();
         allPages.slice(0, -1).forEach((page) => {
           getResultRows(page).forEach((row: any) => {

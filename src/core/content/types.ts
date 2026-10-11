@@ -89,6 +89,8 @@ export interface TatakaiMedia {
   coverImageLarge?: string;
   coverImageMedium?: string;
   bannerImage?: string;
+  logo?: string;
+  titleLogo?: string;
   color?: string;
 
   // Classification
@@ -384,6 +386,8 @@ export function toSpotlightAnime(m: TatakaiMedia, rank: number): SpotlightAnime 
     jname: m.titleNative ?? m.titleRomaji,
     poster: m.coverImageLarge ?? m.coverImageMedium ?? m.bannerImage ?? '',
     banner: m.bannerImage,
+    logo: (m as TatakaiMedia & { logo?: string }).logo,
+    titleLogo: (m as TatakaiMedia & { titleLogo?: string }).titleLogo,
     description: m.description ?? '',
     rank,
     otherInfo,

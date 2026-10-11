@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { motion } from 'framer-motion';
 import {
   TrendingUp, Users, Eye, Play, Clock, Globe, MapPin,
   BarChart3, PieChart, Activity, ArrowUpRight,
-  Download, Star, GitFork, Github, Smartphone, Monitor
+  Download, Star, GitFork, Github, Smartphone, Monitor, ExternalLink, Target
 } from 'lucide-react';
 import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -14,6 +14,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { fetchAllReleases, fetchRepoStats, platformForAsset, formatCompact, GITHUB_REPO_URL } from '@/lib/github';
+import { classifyChannel } from '@/hooks/api/useAnalytics';
+import { WorldMap } from '@/components/admin/WorldMap';
+
+const GA4_ACQUISITION_URL = 'https://analytics.google.com/analytics/web/#/reports/acquisition-overview';
+const GA4_FUNNEL_URL = 'https://analytics.google.com/analytics/web/#/analysis';
 
 export function AnalyticsDashboard() {
   const [timeRange, setTimeRange] = useState<'day' | 'week' | 'month'>('week');
@@ -30,316 +35,331 @@ export function AnalyticsDashboard() {
     },
   });
 
-  // Total visitors (unique sessions)
-  const { data: totalVisitors } = useQuery({
-    queryKey: ['analytics_total_visitors', timeRange],
-    queryFn: async () => {
-      const startDate = subDays(new Date(), days).toISOString();
-      const { data } = await supabase
-        .from('page_visits')
-        .select('session_id')
-        .gte('created_at', startDate);
+  // ---- Shared range fetches ------------------------------------------------
+  // The dashboard used to run ~10 separate full-table scans of page_visits
+  // (plus a per-day × 4 query fan-out) on every range change. On a busy site
+  // that saturates the connection pool and blocks the renderer main thread
+  // parsing megabytes of JSON — on desktop the 'unresponsive' guard then
+  // reloads the whole page. Three scans now feed every metric below via
+  // useMemo, with a 60s stale window and no refetch on window focus.
+  const rangeStart = useMemo(() => subDays(new Date(), days).toISOString(), [days]);
 
-      const uniqueSessions = new Set(data?.map(v => v.session_id) || []);
-      return uniqueSessions.size;
+  const { data: visits } = useQuery({
+    queryKey: ['analytics_visits', timeRange],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('page_visits')
+        .select('session_id, user_id, created_at, country, referrer, channel, utm_medium, referrer_host, page_path')
+        .gte('created_at', rangeStart)
+        .limit(20000);
+      if (error) throw error;
+      return data || [];
     },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
+
+  const { data: watchRows } = useQuery({
+    queryKey: ['analytics_watch_rows', timeRange],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('watch_sessions')
+        .select('session_id, user_id, watch_duration_seconds, genres, created_at')
+        .gte('created_at', rangeStart);
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+
+  const { data: signupRows } = useQuery({
+    queryKey: ['analytics_signups', timeRange],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('user_id, created_at')
+        .gte('created_at', rangeStart);
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+
+  // Total visitors (unique sessions)
+  const totalVisitors = useMemo(() => {
+    const uniqueSessions = new Set((visits || []).map(v => v.session_id).filter(Boolean));
+    return uniqueSessions.size;
+  }, [visits]);
 
   // Guest vs logged in visitors
-  const { data: visitorBreakdown } = useQuery({
-    queryKey: ['analytics_visitor_breakdown', timeRange],
-    queryFn: async () => {
-      const startDate = subDays(new Date(), days).toISOString();
-      const { data } = await supabase
-        .from('page_visits')
-        .select('user_id, session_id')
-        .gte('created_at', startDate);
+  const visitorBreakdown = useMemo(() => {
+    const sessions = new Map<string, boolean>();
+    (visits || []).forEach(v => {
+      if (v.session_id && !sessions.has(v.session_id)) {
+        sessions.set(v.session_id, !!v.user_id);
+      }
+    });
 
-      const sessions = new Map<string, boolean>();
-      data?.forEach(v => {
-        if (!sessions.has(v.session_id)) {
-          sessions.set(v.session_id, !!v.user_id);
-        }
-      });
+    let guests = 0, loggedIn = 0;
+    sessions.forEach(isLoggedIn => isLoggedIn ? loggedIn++ : guests++);
 
-      let guests = 0, loggedIn = 0;
-      sessions.forEach(isLoggedIn => isLoggedIn ? loggedIn++ : guests++);
-
-      return { guests, loggedIn };
-    },
-  });
+    return { guests, loggedIn };
+  }, [visits]);
 
   // Total watch time
-  const { data: totalWatchTime } = useQuery({
-    queryKey: ['analytics_total_watch_time', timeRange],
-    queryFn: async () => {
-      const startDate = subDays(new Date(), days).toISOString();
-      const { data } = await supabase
-        .from('watch_sessions')
-        .select('watch_duration_seconds')
-        .gte('created_at', startDate);
+  const totalWatchTime = useMemo(() => {
+    return (watchRows || []).reduce((acc, s) => acc + (s.watch_duration_seconds || 0), 0);
+  }, [watchRows]);
 
-      const totalSeconds = data?.reduce((acc, s) => acc + (s.watch_duration_seconds || 0), 0) || 0;
-      return totalSeconds;
-    },
-  });
-
-  // Top countries
-  const { data: topCountries } = useQuery({
-    queryKey: ['analytics_top_countries', timeRange],
-    queryFn: async () => {
-      const startDate = subDays(new Date(), days).toISOString();
-      const { data } = await supabase
-        .from('page_visits')
-        .select('country, session_id')
-        .gte('created_at', startDate)
-        .not('country', 'is', null);
-
-      const countryCount = new Map<string, Set<string>>();
-      data?.forEach(v => {
-        if (v.country) {
-          if (!countryCount.has(v.country)) {
-            countryCount.set(v.country, new Set());
-          }
-          countryCount.get(v.country)!.add(v.session_id);
+  // All countries by unique session — fed to the world map (no more top-5 cut).
+  const topCountries = useMemo(() => {
+    const countryCount = new Map<string, Set<string>>();
+    (visits || []).forEach(v => {
+      const name = (v.country ?? '').trim();
+      if (name && v.session_id) {
+        if (!countryCount.has(name)) {
+          countryCount.set(name, new Set());
         }
-      });
+        countryCount.get(name)!.add(v.session_id);
+      }
+    });
 
-      return Array.from(countryCount.entries())
-        .map(([name, sessions]) => ({ name, value: sessions.size }))
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 5);
-    },
-  });
+    return Array.from(countryCount.entries())
+      .map(([name, sessions]) => ({ name, value: sessions.size }))
+      .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
+  }, [visits]);
+
+  const unknownCountrySessions = useMemo(() => {
+    const s = new Set<string>();
+    (visits || []).forEach(v => {
+      if (!(v.country ?? '').trim() && v.session_id) s.add(v.session_id);
+    });
+    return s.size;
+  }, [visits]);
 
   // Top genres watched
-  const { data: topGenres } = useQuery({
-    queryKey: ['analytics_top_genres', timeRange],
-    queryFn: async () => {
-      const startDate = subDays(new Date(), days).toISOString();
-      const { data } = await supabase
-        .from('watch_sessions')
-        .select('genres, watch_duration_seconds')
-        .gte('created_at', startDate);
-
-      const genreTime = new Map<string, number>();
-      data?.forEach(s => {
-        if (s.genres && Array.isArray(s.genres)) {
-          s.genres.forEach((genre: string) => {
-            genreTime.set(genre, (genreTime.get(genre) || 0) + (s.watch_duration_seconds || 0));
-          });
-        }
-      });
-
-      const colors = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
-      return Array.from(genreTime.entries())
-        .map(([name, value], i) => ({ name, value: Math.round(value / 60), color: colors[i % colors.length] }))
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 6);
-    },
-  });
-
-  // Daily visitor stats
-  const { data: dailyStats } = useQuery({
-    queryKey: ['analytics_daily_stats', timeRange],
-    queryFn: async () => {
-      const stats = [];
-
-      for (let i = days - 1; i >= 0; i--) {
-        const date = subDays(new Date(), i);
-        const dayStart = startOfDay(date).toISOString();
-        const dayEnd = endOfDay(date).toISOString();
-
-        const [visitsResult, watchResult, usersResult, loggedInResult] = await Promise.all([
-          supabase
-            .from('page_visits')
-            .select('session_id, user_id')
-            .gte('created_at', dayStart)
-            .lte('created_at', dayEnd),
-          supabase
-            .from('watch_sessions')
-            .select('watch_duration_seconds')
-            .gte('created_at', dayStart)
-            .lte('created_at', dayEnd),
-          supabase
-            .from('profiles')
-            .select('*', { count: 'exact', head: true })
-            .gte('created_at', dayStart)
-            .lte('created_at', dayEnd),
-          supabase
-            .from('page_visits')
-            .select('user_id')
-            .not('user_id', 'is', null)
-            .gte('created_at', dayStart)
-            .lte('created_at', dayEnd),
-        ]);
-
-        const uniqueSessions = new Set(visitsResult.data?.map(v => v.session_id) || []);
-        const uniqueLoggedIn = new Set(loggedInResult.data?.map(v => v.user_id) || []);
-        const watchMinutes = (watchResult.data?.reduce((acc, s) => acc + (s.watch_duration_seconds || 0), 0) || 0) / 60;
-
-        stats.push({
-          date: format(date, timeRange === 'day' ? 'HH:mm' : 'MMM dd'),
-          visitors: uniqueSessions.size,
-          dau: uniqueLoggedIn.size,
-          watchTime: Math.round(watchMinutes),
-          newUsers: usersResult.count || 0,
-          retention: uniqueSessions.size > 0 ? Math.round((uniqueLoggedIn.size / (uniqueSessions.size)) * 100) : 0
+  const topGenres = useMemo(() => {
+    const genreTime = new Map<string, number>();
+    (watchRows || []).forEach(s => {
+      if (s.genres && Array.isArray(s.genres)) {
+        s.genres.forEach((genre: string) => {
+          genreTime.set(genre, (genreTime.get(genre) || 0) + (s.watch_duration_seconds || 0));
         });
       }
+    });
 
-      return stats;
-    },
-  });
+    const colors = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
+    return Array.from(genreTime.entries())
+      .map(([name, value], i) => ({ name, value: Math.round(value / 60), color: colors[i % colors.length] }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 6);
+  }, [watchRows]);
+
+  // Daily visitor stats — bucketed in memory from the shared fetches (used to
+  // be up to 120 sequential day-scoped requests).
+  const dailyStats = useMemo(() => {
+    const stats = [];
+    const now = new Date();
+
+    for (let i = days - 1; i >= 0; i--) {
+      const date = subDays(now, i);
+      const dayStart = startOfDay(date).getTime();
+      const dayEnd = endOfDay(date).getTime();
+
+      const daySessions = new Set<string>();
+      // DAU identity: logged-in user id, else guest session id. The old code
+      // only counted logged-in user_ids, so a mostly logged-out day read 0.
+      const dayActives = new Set<string>();
+      (visits || []).forEach(v => {
+        const t = new Date(v.created_at).getTime();
+        if (t < dayStart || t > dayEnd || !v.session_id) return;
+        daySessions.add(v.session_id);
+        dayActives.add(v.user_id ? `u:${v.user_id}` : `s:${v.session_id}`);
+      });
+
+      let watchMinutes = 0;
+      (watchRows || []).forEach(s => {
+        const t = new Date(s.created_at).getTime();
+        if (t >= dayStart && t <= dayEnd) watchMinutes += (s.watch_duration_seconds || 0);
+      });
+      watchMinutes = watchMinutes / 60;
+
+      let newUsers = 0;
+      (signupRows || []).forEach(p => {
+        const t = new Date(p.created_at).getTime();
+        if (t >= dayStart && t <= dayEnd) newUsers++;
+      });
+
+      stats.push({
+        date: format(date, timeRange === 'day' ? 'HH:mm' : 'MMM dd'),
+        visitors: daySessions.size,
+        dau: dayActives.size,
+        watchTime: Math.round(watchMinutes),
+        newUsers,
+        retention: daySessions.size > 0 ? Math.round((dayActives.size / daySessions.size) * 100) : 0
+      });
+    }
+
+    return stats;
+  }, [visits, watchRows, signupRows, days, timeRange]);
 
   // Hourly activity
-  const { data: hourlyActivity } = useQuery({
-    queryKey: ['analytics_hourly'],
-    queryFn: async () => {
-      const today = startOfDay(new Date()).toISOString();
-      const { data } = await supabase
-        .from('page_visits')
-        .select('created_at')
-        .gte('created_at', today);
+  const hourlyActivity = useMemo(() => {
+    const todayStart = startOfDay(new Date()).getTime();
+    const hourCounts = new Array(24).fill(0);
+    (visits || []).forEach(v => {
+      const t = new Date(v.created_at).getTime();
+      if (t < todayStart) return;
+      hourCounts[new Date(t).getHours()]++;
+    });
 
-      const hourCounts = new Array(24).fill(0);
-      data?.forEach(v => {
-        const hour = new Date(v.created_at).getHours();
-        hourCounts[hour]++;
-      });
+    return hourCounts.map((count, i) => ({
+      hour: `${i.toString().padStart(2, '0')}:00`,
+      visits: count,
+    }));
+  }, [visits]);
 
-      return hourCounts.map((count, i) => ({
-        hour: `${i.toString().padStart(2, '0')}:00`,
-        visits: count,
-      }));
-    },
-  });
+  // Referrer channels — prefers the stored `channel` column (written by
+  // trackPageVisit), falling back to the shared classifier for older rows.
+  const referrerChannels = useMemo(() => {
+    const channels = new Map<string, Set<string>>();
+    (visits || []).forEach(v => {
+      const channel = v.channel || classifyChannel(v.referrer, v.utm_medium);
+      if (!channels.has(channel)) {
+        channels.set(channel, new Set());
+      }
+      channels.get(channel)!.add(v.session_id);
+    });
 
-  // Referrer channels
-  const { data: referrerChannels } = useQuery({
-    queryKey: ['analytics_referrer_channels', timeRange],
-    queryFn: async () => {
-      const startDate = subDays(new Date(), days).toISOString();
-      const { data } = await supabase
-        .from('page_visits')
-        .select('referrer, session_id')
-        .gte('created_at', startDate);
+    const colors = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
+    return Array.from(channels.entries())
+      .map(([name, sessions], i) => ({
+        name,
+        value: sessions.size,
+        color: colors[i % colors.length]
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [visits]);
 
-      const channels = new Map<string, Set<string>>();
-      data?.forEach(v => {
-        let channel = 'Direct';
-        if (v.referrer) {
-          try {
-            const url = new URL(v.referrer);
-            if (url.hostname.includes('google') || url.hostname.includes('bing') || url.hostname.includes('yahoo')) {
-              channel = 'Search';
-            } else if (url.hostname.includes('facebook') || url.hostname.includes('twitter') || url.hostname.includes('t.co') || url.hostname.includes('instagram') || url.hostname.includes('reddit')) {
-              channel = 'Social';
-            } else {
-              channel = 'Referral';
-            }
-          } catch (e) {
-            channel = 'Direct';
-          }
+  // Top referring hosts (where the traffic actually comes from).
+  const topReferrers = useMemo(() => {
+    const hostSessions = new Map<string, Set<string>>();
+    (visits || []).forEach((v) => {
+      let host = (v.referrer_host || '').toLowerCase();
+      if (!host && v.referrer) {
+        try {
+          host = new URL(v.referrer).hostname.toLowerCase();
+        } catch {
+          host = '';
         }
+      }
+      if (!host || !v.session_id) return;
+      if (!hostSessions.has(host)) hostSessions.set(host, new Set());
+      hostSessions.get(host)!.add(v.session_id);
+    });
 
-        if (!channels.has(channel)) {
-          channels.set(channel, new Set());
-        }
-        channels.get(channel)!.add(v.session_id);
-      });
-
-      const colors = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'];
-      return Array.from(channels.entries())
-        .map(([name, sessions], i) => ({
-          name,
-          value: sessions.size,
-          color: colors[i % colors.length]
-        }))
-        .sort((a, b) => b.value - a.value);
-    },
-  });
+    return Array.from(hostSessions.entries())
+      .map(([host, sessions]) => ({ host, sessions: sessions.size }))
+      .sort((a, b) => b.sessions - a.sessions)
+      .slice(0, 8);
+  }, [visits]);
 
   // Session quality metrics
-  const { data: sessionQuality } = useQuery({
-    queryKey: ['analytics_session_quality', timeRange],
-    queryFn: async () => {
-      const startDate = subDays(new Date(), days).toISOString();
-      const [visitsResult, watchResult] = await Promise.all([
-        supabase
-          .from('page_visits')
-          .select('session_id')
-          .gte('created_at', startDate),
-        supabase
-          .from('watch_sessions')
-          .select('session_id, watch_duration_seconds')
-          .gte('created_at', startDate),
-      ]);
+  const sessionQuality = useMemo(() => {
+    const sessionPageCounts = new Map<string, number>();
+    let totalPageViews = 0;
+    (visits || []).forEach((visit) => {
+      const sessionId = String(visit.session_id || '').trim();
+      if (!sessionId) return;
+      totalPageViews++;
+      sessionPageCounts.set(sessionId, (sessionPageCounts.get(sessionId) || 0) + 1);
+    });
 
-      const sessionPageCounts = new Map<string, number>();
-      visitsResult.data?.forEach((visit) => {
-        const sessionId = String(visit.session_id || '').trim();
-        if (!sessionId) return;
-        sessionPageCounts.set(sessionId, (sessionPageCounts.get(sessionId) || 0) + 1);
-      });
+    const totalSessions = sessionPageCounts.size;
+    const returningSessions = Array.from(sessionPageCounts.values()).filter((count) => count > 1).length;
+    const returningRate = totalSessions > 0 ? Math.round((returningSessions / totalSessions) * 100) : 0;
+    const avgPagesPerSession = totalSessions > 0
+      ? Number((totalPageViews / totalSessions).toFixed(2))
+      : 0;
 
-      const totalSessions = sessionPageCounts.size;
-      const totalPageViews = visitsResult.data?.length || 0;
-      const returningSessions = Array.from(sessionPageCounts.values()).filter((count) => count > 1).length;
-      const returningRate = totalSessions > 0 ? Math.round((returningSessions / totalSessions) * 100) : 0;
-      const avgPagesPerSession = totalSessions > 0
-        ? Number((totalPageViews / totalSessions).toFixed(2))
-        : 0;
+    const totalWatchSeconds =
+      (watchRows || []).reduce((acc, session) => acc + (session.watch_duration_seconds || 0), 0);
+    const watchSessionCount = (watchRows || []).length;
+    const avgWatchMinutes = watchSessionCount > 0
+      ? Math.round((totalWatchSeconds / watchSessionCount) / 60)
+      : 0;
 
-      const totalWatchSeconds =
-        watchResult.data?.reduce((acc, session) => acc + (session.watch_duration_seconds || 0), 0) || 0;
-      const watchSessionCount = watchResult.data?.length || 0;
-      const avgWatchMinutes = watchSessionCount > 0
-        ? Math.round((totalWatchSeconds / watchSessionCount) / 60)
-        : 0;
-
-      return {
-        totalSessions,
-        totalPageViews,
-        returningSessions,
-        returningRate,
-        avgPagesPerSession,
-        avgWatchMinutes,
-      };
-    },
-  });
+    return {
+      totalSessions,
+      totalPageViews,
+      returningSessions,
+      returningRate,
+      avgPagesPerSession,
+      avgWatchMinutes,
+    };
+  }, [visits, watchRows]);
 
   // Top page paths by unique sessions
-  const { data: topPages } = useQuery({
-    queryKey: ['analytics_top_pages', timeRange],
-    queryFn: async () => {
-      const startDate = subDays(new Date(), days).toISOString();
-      const { data } = await supabase
-        .from('page_visits')
-        .select('page_path, session_id')
-        .gte('created_at', startDate);
+  const topPages = useMemo(() => {
+    const pathSessions = new Map<string, Set<string>>();
+    (visits || []).forEach((visit) => {
+      const sessionId = String(visit.session_id || '').trim();
+      if (!sessionId) return;
 
-      const pathSessions = new Map<string, Set<string>>();
-      data?.forEach((visit) => {
-        const sessionId = String(visit.session_id || '').trim();
-        if (!sessionId) return;
+      const rawPath = String(visit.page_path || '/').trim() || '/';
+      const normalizedPath = rawPath.replace(/\?.*$/, '') || '/';
 
-        const rawPath = String(visit.page_path || '/').trim() || '/';
-        const normalizedPath = rawPath.replace(/\?.*$/, '') || '/';
+      if (!pathSessions.has(normalizedPath)) {
+        pathSessions.set(normalizedPath, new Set());
+      }
+      pathSessions.get(normalizedPath)!.add(sessionId);
+    });
 
-        if (!pathSessions.has(normalizedPath)) {
-          pathSessions.set(normalizedPath, new Set());
-        }
-        pathSessions.get(normalizedPath)!.add(sessionId);
-      });
+    return Array.from(pathSessions.entries())
+      .map(([path, sessions]) => ({ path, sessions: sessions.size }))
+      .sort((a, b) => b.sessions - a.sessions)
+      .slice(0, 8);
+  }, [visits]);
 
-      return Array.from(pathSessions.entries())
-        .map(([path, sessions]) => ({ path, sessions: sessions.size }))
-        .sort((a, b) => b.sessions - a.sessions)
-        .slice(0, 8);
-    },
-  });
+  // Success funnel: Visit → Signup → Activation (first watch) → Retention
+  // (active on 2+ distinct days). All rates computed over the selected window.
+  const funnel = useMemo(() => {
+    const sessionCounts = new Map<string, number>();
+    const userDays = new Map<string, Set<string>>();
+    (visits || []).forEach((v) => {
+      const sid = String(v.session_id || '').trim();
+      if (sid) sessionCounts.set(sid, (sessionCounts.get(sid) || 0) + 1);
+      if (v.user_id) {
+        const day = String(v.created_at || '').slice(0, 10);
+        if (!userDays.has(v.user_id)) userDays.set(v.user_id, new Set());
+        userDays.get(v.user_id)!.add(day);
+      }
+    });
 
+    const visitors = sessionCounts.size;
+    const bounced = Array.from(sessionCounts.values()).filter((c) => c <= 1).length;
+    const newUserIds = ((signupRows || []).map((p) => p.user_id).filter(Boolean)) as string[];
+    const signups = newUserIds.length;
+    const watchers = new Set((watchRows || []).map((w) => w.user_id).filter(Boolean));
+    const activated = newUserIds.filter((id) => watchers.has(id)).length;
+    const loggedInUsers = userDays.size;
+    const retained = Array.from(userDays.values()).filter((d) => d.size >= 2).length;
+
+    const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
+    return {
+      visitors,
+      signups,
+      activated,
+      retained,
+      loggedInUsers,
+      signupRate: pct(signups, visitors),
+      activationRate: pct(activated, signups),
+      retentionRate: pct(retained, loggedInUsers),
+      bounceRate: pct(bounced, visitors),
+    };
+  }, [visits, watchRows, signupRows]);
 
   // GitHub releases & downloads (snozxyx/tatakai) — real download counts per release/platform
   const { data: githubData } = useQuery({
@@ -391,6 +411,20 @@ export function AnalyticsDashboard() {
     },
   });
 
+  // Today breakdown for the DAU card subtitle (members vs guests).
+  const todayBreakdown = useMemo(() => {
+    const todayStart = startOfDay(new Date()).getTime();
+    const members = new Set<string>();
+    const guests = new Set<string>();
+    (visits || []).forEach(v => {
+      const t = new Date(v.created_at).getTime();
+      if (t < todayStart || !v.session_id) return;
+      if (v.user_id) members.add(v.user_id);
+      else guests.add(v.session_id);
+    });
+    return { members: members.size, guests: guests.size, total: members.size + guests.size };
+  }, [visits]);
+
   const formatWatchTime = (seconds: number) => {    const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     if (hours > 0) return `${hours}h ${minutes}m`;
@@ -421,8 +455,8 @@ export function AnalyticsDashboard() {
     },
     {
       title: 'DAU (Today)',
-      value: (dailyStats?.[dailyStats.length - 1]?.dau || 0).toLocaleString(),
-      subtitle: 'Daily Active Users',
+      value: (todayBreakdown.total || dailyStats?.[dailyStats.length - 1]?.dau || 0).toLocaleString(),
+      subtitle: `${todayBreakdown.members} members · ${todayBreakdown.guests} guests`,
       icon: <Activity className="w-5 h-5" />,
       color: 'from-pink-500 to-rose-700',
     },
@@ -459,11 +493,28 @@ export function AnalyticsDashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="font-display text-xl font-semibold flex items-center gap-2">
           <BarChart3 className="w-5 h-5 text-primary" />
           Analytics Overview
         </h2>
+        <div className="flex items-center gap-3 flex-wrap">
+          <a
+            href={GA4_ACQUISITION_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs font-semibold text-muted-foreground hover:text-primary flex items-center gap-1"
+          >
+            GA4 Acquisition <ExternalLink className="w-3 h-3" />
+          </a>
+          <a
+            href={GA4_FUNNEL_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs font-semibold text-muted-foreground hover:text-primary flex items-center gap-1"
+          >
+            GA4 Funnels <ExternalLink className="w-3 h-3" />
+          </a>
         <div className="flex gap-2 bg-muted/50 p-1 rounded-xl">
           {(['day', 'week', 'month'] as const).map((range) => (
             <button
@@ -477,8 +528,46 @@ export function AnalyticsDashboard() {
               {range.charAt(0).toUpperCase() + range.slice(1)}
             </button>
           ))}
+          </div>
         </div>
       </div>
+
+      {/* Success funnel: Visit → Signup → Activation → Retention */}
+      <GlassPanel className="p-6">
+        <h3 className="font-medium mb-1 flex items-center gap-2">
+          <Target className="w-4 h-4 text-primary" />
+          Success Funnel
+        </h3>
+        <p className="text-xs text-muted-foreground mb-5">
+          Signup = new account · Activation = watched within the window · Retention = active on 2+ days · Bounce = single-page sessions
+        </p>
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          {[
+            { label: 'Visitors', value: funnel?.visitors ?? 0, rate: null as number | null },
+            { label: 'Signups', value: funnel?.signups ?? 0, rate: funnel?.signupRate ?? 0 },
+            { label: 'Activated', value: funnel?.activated ?? 0, rate: funnel?.activationRate ?? 0 },
+            { label: 'Retained', value: funnel?.retained ?? 0, rate: funnel?.retentionRate ?? 0 },
+            { label: 'Bounce rate', value: `${funnel?.bounceRate ?? 0}%`, rate: null },
+          ].map((step) => (
+            <div key={step.label} className="rounded-2xl bg-white/5 border border-white/10 p-4">
+              <p className="text-2xl font-bold">{typeof step.value === 'number' ? step.value.toLocaleString() : step.value}</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mt-1">{step.label}</p>
+              {step.rate !== null && (
+                <div className="mt-2">
+                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${Math.min(100, step.rate)}%` }}
+                      className="h-full bg-primary rounded-full"
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1">{step.rate}% conversion</p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </GlassPanel>
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -590,37 +679,19 @@ export function AnalyticsDashboard() {
         </GlassPanel>
       </div>
 
-      {/* Bottom Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Top Countries */}
+      {/* World map + acquisition */}
+      <div className="grid grid-cols-1 gap-6">
+        {/* World map — every country, not just top 5 */}
         <GlassPanel className="p-6">
-          <h3 className="font-medium mb-4 flex items-center gap-2">
+          <h3 className="font-medium mb-1 flex items-center gap-2">
             <MapPin className="w-4 h-4 text-primary" />
-            Top Countries
+            World Map — Where Visitors Come From
           </h3>
+          <p className="text-xs text-muted-foreground mb-4">
+            Bubbles sized by unique visitors in range. Hover for share detail.
+          </p>
           {topCountries && topCountries.length > 0 ? (
-            <div className="space-y-3">
-              {topCountries.map((country, index) => (
-                <div key={country.name} className="flex items-center gap-3">
-                  <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
-                    {index + 1}
-                  </div>
-                  <span className="flex-1 font-medium">{country.name}</span>
-                  <div className="flex-1">
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${(country.value / (topCountries[0]?.value || 1)) * 100}%` }}
-                        className="h-full bg-primary rounded-full"
-                      />
-                    </div>
-                  </div>
-                  <span className="text-sm text-muted-foreground w-20 text-right">
-                    {country.value} visitors
-                  </span>
-                </div>
-              ))}
-            </div>
+            <WorldMap data={topCountries} unknownCount={unknownCountrySessions} />
           ) : (
             <div className="text-center py-8 text-muted-foreground">No country data yet</div>
           )}
@@ -667,6 +738,33 @@ export function AnalyticsDashboard() {
               <div className="text-center w-full text-muted-foreground">No acquisition data yet</div>
             )}
           </div>
+          {topReferrers && topReferrers.length > 0 && (
+            <div className="mt-5 pt-4 border-t border-white/10">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
+                Top referring sites
+              </p>
+              <div className="space-y-2">
+                {topReferrers.map((r) => (
+                  <div key={r.host} className="flex items-center gap-3">
+                    <span className="text-xs font-mono truncate flex-1">{r.host}</span>
+                    <div className="flex-1 max-w-32">
+                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${(r.sessions / (topReferrers[0]?.sessions || 1)) * 100}%` }}
+                          className="h-full bg-primary rounded-full"
+                        />
+                      </div>
+                    </div>
+                    <span className="text-xs text-muted-foreground w-16 text-right">{r.sessions}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-3">
+                Tip: tag campaigns with ?utm_source=&amp;utm_medium=&amp;utm_campaign= — they are stored per visit and cross-checked in GA4 Acquisition.
+              </p>
+            </div>
+          )}
         </GlassPanel>
       </div>
 

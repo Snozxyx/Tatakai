@@ -18,6 +18,10 @@ import {
   Puzzle,
   List,
   Search,
+  ZoomIn,
+  ZoomOut,
+  Play,
+  Pause,
 } from "lucide-react";
 import { getMangaReadByKey, storeMangaTotalChapters } from "@/core/content/manga-client";
 import { useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
@@ -25,6 +29,9 @@ import { useReaderSettings, DEFAULT_READER_SETTINGS } from "@/hooks/media/useRea
 import { getProfileKnobs } from "@/lib/memoryProfile";
 import { useReaderKeybinds } from "@/hooks/media/useReaderKeybinds";
 import { useReaderKeyboard } from "@/pages/manga/hooks/useReaderKeyboard";
+import { useIsMobile } from '@/hooks/ui/use-mobile';
+import { useMotionPreference } from '@/hooks/ui/useMotionPreference';
+import { clampReaderPageIndex, useReaderResume } from '@/pages/manga/hooks/useReaderResume';
 import { useContinuousReader } from "@/pages/manga/hooks/useContinuousReader";
 import type { ReaderSegment } from "@/pages/manga/hooks/useContinuousReader";
 import { useMangaChapters, useMangaDetail } from "@/hooks/api/useMangaData";
@@ -62,8 +69,9 @@ function ToolBtn({ label, onClick, active, children }: {
       onClick={onClick}
       title={label}
       aria-label={label}
-      className={`flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl border border-white/10 backdrop-blur transition-colors active:scale-95 ${
-        active ? "bg-primary text-primary-foreground" : "bg-black/40 text-foreground hover:bg-white/10"
+      aria-pressed={active}
+      className={`ui-button flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border backdrop-blur transition-colors duration-150 motion-safe:active:scale-[0.98] ${
+        active ? "bg-primary text-primary-foreground" : "bg-card/95 text-foreground hover:bg-muted"
       }`}
     >
       {children}
@@ -91,7 +99,7 @@ function ProviderFallbackNotice({
   onChange: () => void;
 }) {
   return (
-    <div className="mx-auto mb-4 flex w-[calc(100%-1rem)] max-w-3xl items-center justify-between gap-3 rounded-xl border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">
+    <div className="mx-auto mb-4 flex w-[calc(100%-1rem)] max-w-3xl items-center justify-between gap-3 rounded-xl border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-xs text-foreground">
       <span>
         {requested} was unavailable for this chapter. Using {active} instead.
       </span>
@@ -110,6 +118,8 @@ export default function MangaReaderPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const isNative = useIsNativeApp();
+  const reducedMotion = useMotionPreference();
+  const compactReader = useIsMobile();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { mangaId } = useParams<{ mangaId: string }>();
@@ -467,6 +477,9 @@ export default function MangaReaderPage() {
   const prependAnchorRef = useRef<{ height: number; top: number } | null>(null);
   const beforeLenRef = useRef(0);
   const [pageIndex, setPageIndex] = useState(0);
+  const restoringPage = useReaderResume({ rootRef: scrollRef,
+    identity: [mangaId, chapterKey, provider, providerChapterId].join('|'),
+    page: pageParam, currentPage: pageIndex, total, vertical: settings.readingMode === 'vertical', onPage: setPageIndex });
   // The reader is a full-window takeover, but MainLayout pushes it down 32px for
   // the desktop titlebar (pt-8). The inner scroll area used to be hard-coded to
   // calc(100vh - 49px) — 32px too tall — so the page overflowed and the *window*
@@ -483,14 +496,14 @@ export default function MangaReaderPage() {
   // Deps include the full chapter identity — chapterKey alone misses
   // provider switches on the same chapter.
   useEffect(() => {
-    setPageIndex(Number.isFinite(pageParam) ? Math.max(0, pageParam) : 0);
-    scrollRef.current?.scrollTo({ top: 0 });
+    setPageIndex(clampReaderPageIndex(pageParam, total));
+    if (!Number.isFinite(pageParam) || pageParam <= 0) scrollRef.current?.scrollTo({ top: 0 });
     retriedForRef.current = "";
     savedRef.current = "";
     setReloadNonce(0);
     setActiveIndex(-1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mangaId, chapterKey, provider, providerChapterId]);
+  }, [mangaId, chapterKey, provider, providerChapterId, pageParam]);
 
   // Prefetch the next chapter's pages when the user is near the end (last 3
   // pages) so navigating forward is instant. Uses the same query key shape as
@@ -542,11 +555,11 @@ export default function MangaReaderPage() {
         .map((e) => Number(e.target.getAttribute("data-page")))
         .filter((n) => Number.isFinite(n))
         .sort((a, b) => a - b);
-      if (vis.length) setPageIndex(Math.max(0, vis[0] - 1));
+      if (vis.length && !restoringPage.current) setPageIndex(Math.max(0, vis[0] - 1));
     }, { root, threshold: 0.4 });
     els.forEach((el) => io.observe(el));
     return () => io.disconnect();
-  }, [continuous, settings.readingMode, total, chapterKey]);
+  }, [continuous, settings.readingMode, total, chapterKey, restoringPage]);
 
   // Continuous mode: track the top-most visible page across ALL streamed chapters
   // (each page's chapter is read from its `[data-ch]` wrapper) to drive the active
@@ -567,13 +580,13 @@ export default function MangaReaderPage() {
         }))
         .filter((v) => Number.isFinite(v.ch) && Number.isFinite(v.pg))
         .sort((a, b) => a.top - b.top);
-      if (!vis.length) return;
+      if (!vis.length || restoringPage.current) return;
       setActiveIndex(vis[0].ch);
       setPageIndex(Math.max(0, vis[0].pg - 1));
     }, { root, threshold: 0.2 });
     els.forEach((el) => io.observe(el));
     return () => io.disconnect();
-  }, [continuous, total, chapterKey, before.length, after.length]);
+  }, [continuous, total, chapterKey, before.length, after.length, restoringPage]);
 
   // Bottom sentinel → load the next chapter as it comes into range.
   useEffect(() => {
@@ -620,6 +633,12 @@ export default function MangaReaderPage() {
 
   // ── Reading-progress persistence (Supabase; auto-syncs to AniList/MAL). ──
   const saveProgress = useSaveMangaReadingProgress();
+  const pendingProgress = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    const flush = () => { const pending = pendingProgress.current; pendingProgress.current = null; pending?.(); };
+    window.addEventListener('pagehide', flush);
+    return () => { flush(); window.removeEventListener('pagehide', flush); };
+  }, [mangaId, chapterKey, provider, providerChapterId]);
 
   useEffect(() => {
     if (!user || !mangaId || total === 0) return;
@@ -630,8 +649,8 @@ export default function MangaReaderPage() {
       mangaId, mangaTitle, mangaPoster, format: mangaFormat,
       lastChapterKey: chapterKey, lastChapterNumber: resolvedNumber, lastChapterTitle: title,
       lastProvider: resolvedProvider || null, lastLanguage: data?.data?.chapter?.language ?? null,
-      lastPageIndex: 0, totalPages: total,
-      lastExtensionId: entryExtensionId, lastScanlator: entryScanlator, lastPageId: "1",
+      lastPageIndex: clampReaderPageIndex(pageParam, total), totalPages: total,
+      lastExtensionId: entryExtensionId, lastScanlator: entryScanlator, lastPageId: String(clampReaderPageIndex(pageParam, total) + 1),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, mangaId, total, chapterKey, provider, providerChapterId]);
@@ -642,7 +661,7 @@ export default function MangaReaderPage() {
   useEffect(() => {
     if (!user || !mangaId || total === 0) return;
     if (savedRef.current !== `${chapterKey}|${provider}|${providerChapterId}`) return;
-    const t = setTimeout(() => {
+    pendingProgress.current = () => {
       saveProgress.mutate({
         mangaId, mangaTitle, mangaPoster, format: mangaFormat,
         lastChapterKey: activeMeta ? activeMeta.key : chapterKey,
@@ -655,7 +674,8 @@ export default function MangaReaderPage() {
         lastPageId: String(pageIndex + 1),
         totalPages: activeMeta ? activeMeta.total : total,
       });
-    }, 1500);
+    };
+    const t = setTimeout(() => { const pending = pendingProgress.current; pendingProgress.current = null; pending?.(); }, 1500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageIndex, navIndex]);
@@ -688,14 +708,20 @@ export default function MangaReaderPage() {
       onFullscreenChanged?: (cb: (v: boolean) => void) => (() => void) | void;
     } }).electron;
 
-  const enterFullscreen = useCallback(() => {
+  const enterFullscreen = useCallback(async () => {
     const bridge = electronBridge();
-    setIsFs(true);
-    if (bridge?.setFullscreen) {
-      document.documentElement.classList.add("app-fullscreen");
-      void bridge.setFullscreen(true).catch(() => {});
-    } else {
-      containerRef.current?.requestFullscreen?.().catch(() => {});
+    try {
+      if (bridge?.setFullscreen) {
+        await bridge.setFullscreen(true);
+        document.documentElement.classList.add("app-fullscreen");
+      } else {
+        if (!containerRef.current?.requestFullscreen) return;
+        await containerRef.current.requestFullscreen();
+      }
+      setIsFs(true);
+    } catch {
+      document.documentElement.classList.remove("app-fullscreen");
+      setIsFs(false);
     }
   }, []);
 
@@ -719,7 +745,7 @@ export default function MangaReaderPage() {
   // always drop the CSS class on unmount so the app never gets stranded fullscreen.
   useEffect(() => {
     const onFsChange = () => {
-      if (!document.fullscreenElement && !electronBridge()?.setFullscreen) setIsFs(false);
+      if (!electronBridge()?.setFullscreen) setIsFs(document.fullscreenElement === containerRef.current);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") exitFullscreen();
@@ -748,27 +774,28 @@ export default function MangaReaderPage() {
     }
   }, [settings.autoFullscreen, total, enterFullscreen]);
 
-  // Auto-hide reader chrome (top nav / toolbar / progress) in fullscreen; reveal
-  // on mouse move for a short window. Off when not fullscreen or the pref is off.
-  const [chromeVisible, setChromeVisible] = useState(true);
+  // Fullscreen is a reading surface: only its exit control stays visible.
+  const chromeVisible = !isFs;
+  const [fullscreenExitVisible, setFullscreenExitVisible] = useState(true);
   useEffect(() => {
-    if (!isFs || !settings.hideChromeInFullscreen) {
-      setChromeVisible(true);
-      return;
-    }
-    setChromeVisible(false);
-    let timer: number | undefined;
-    const onMove = () => {
-      setChromeVisible(true);
-      window.clearTimeout(timer);
-      timer = window.setTimeout(() => setChromeVisible(false), 2500);
+    if (!isFs) { setFullscreenExitVisible(true); return; }
+    let timer: ReturnType<typeof setTimeout>;
+    const reveal = () => {
+      setFullscreenExitVisible(true);
+      clearTimeout(timer);
+      timer = setTimeout(() => setFullscreenExitVisible(false), 2500);
     };
-    window.addEventListener("mousemove", onMove);
+    reveal();
+    window.addEventListener('pointermove', reveal);
+    window.addEventListener('pointerdown', reveal);
+    window.addEventListener('keydown', reveal);
     return () => {
-      window.removeEventListener("mousemove", onMove);
-      window.clearTimeout(timer);
+      clearTimeout(timer);
+      window.removeEventListener('pointermove', reveal);
+      window.removeEventListener('pointerdown', reveal);
+      window.removeEventListener('keydown', reveal);
     };
-  }, [isFs, settings.hideChromeInFullscreen]);
+  }, [isFs]);
 
   // ── Keep the screen awake while reading. Native shells use the KeepAwake
   // plugin (the Web Wake Lock API doesn't exist in the Capacitor WebView);
@@ -807,9 +834,11 @@ export default function MangaReaderPage() {
   useEffect(() => {
     const html = document.documentElement;
     const prev = html.style.overflow;
+    document.body.classList.add("manga-reader-open");
     html.style.overflow = "hidden";
     return () => {
       html.style.overflow = prev;
+      document.body.classList.remove("manga-reader-open");
     };
   }, []);
 
@@ -834,6 +863,13 @@ export default function MangaReaderPage() {
   const [showInlineComments, setShowInlineComments] = useState(false);
   const [showReaderNavigator, setShowReaderNavigator] = useState(false);
   const [chapterSearch, setChapterSearch] = useState("");
+  useEffect(() => {
+    if (!isFs) return;
+    setShowSettings(false);
+    setShowCommentsDrawer(false);
+    setShowReaderNavigator(false);
+    setShowInlineComments(false);
+  }, [isFs]);
   const filteredChapters = useMemo(() => {
     const query = chapterSearch.trim().toLowerCase();
     if (!query) return chapters;
@@ -861,6 +897,7 @@ export default function MangaReaderPage() {
 
   const handleReaderPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.pointerType !== 'touch') return;
+    if (settingsRef.current.autoScroll) updateRef.current('autoScroll', false);
     activePointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (activePointersRef.current.size === 2) {
       const [a, b] = [...activePointersRef.current.values()];
@@ -898,11 +935,12 @@ export default function MangaReaderPage() {
     if (closeInTime && closeInSpace) {
       // Familiar reader gesture: double-tap toggles between edge-to-edge and
       // a comfortably enlarged view. Pinch remains continuous from 50–300%.
-      updateRef.current('zoom', settingsRef.current.zoom > 115 ? 100 : 175);
+      if (isFs) exitFullscreen();
+      else updateRef.current('zoom', settingsRef.current.zoom > 115 ? 100 : 175);
       void triggerHaptic('light');
       lastReaderTapRef.current = null;
     }
-  }, []);
+  }, [isFs, exitFullscreen]);
 
   const handleReaderPointerCancel = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     activePointersRef.current.delete(event.pointerId);
@@ -934,6 +972,20 @@ export default function MangaReaderPage() {
     [settings.zoom, updateSetting],
   );
 
+  const jumpToPage = useCallback((index: number) => {
+    const next = clampReaderPageIndex(index, activeMeta?.total || total);
+    interactedRef.current = true;
+    setPageIndex(next);
+    if (settings.readingMode === 'vertical') {
+      const entry = scrollRef.current?.querySelector(`[data-ch="${currentIndex}"]`) ?? scrollRef.current;
+      const page = entry?.querySelectorAll<HTMLElement>('[data-page]')[next];
+      if (page && scrollRef.current) {
+        const root = scrollRef.current;
+        root.scrollTo({ top: root.scrollTop + page.getBoundingClientRect().top - root.getBoundingClientRect().top, behavior: 'auto' });
+      }
+    }
+  }, [total, activeMeta?.total, currentIndex, settings.readingMode]);
+
   // Ctrl + wheel and trackpad pinch (which the browser reports as ctrl-wheel) zoom
   // the pages. Needs a non-passive native listener to cancel the browser's own
   // page-zoom. Gated by the `zoomWithWheel` setting; keyboard zoom stays separate.
@@ -955,14 +1007,19 @@ export default function MangaReaderPage() {
 
   // Auto-scroll (vertical mode): advance the scroll position continuously.
   useEffect(() => {
-    if (!settings.autoScroll || settings.readingMode !== "vertical" || total === 0) return;
+    if (!settings.autoScroll || settings.readingMode !== "vertical" || total === 0 || showSettings || showReaderNavigator || showCommentsDrawer) return;
     const el = scrollRef.current;
     if (!el) return;
-    const id = window.setInterval(() => {
-      el.scrollBy({ top: settings.autoScrollSpeed, behavior: "auto" });
-    }, 16);
-    return () => window.clearInterval(id);
-  }, [settings.autoScroll, settings.autoScrollSpeed, settings.readingMode, total]);
+    let frame = 0;
+    let previous = 0;
+    const advance = (time: number) => {
+      if (previous && !document.hidden) el.scrollBy({ top: settings.autoScrollSpeed * Math.min(32, time - previous) / 16, behavior: 'auto' });
+      previous = time;
+      frame = requestAnimationFrame(advance);
+    };
+    frame = requestAnimationFrame(advance);
+    return () => cancelAnimationFrame(frame);
+  }, [settings.autoScroll, settings.autoScrollSpeed, settings.readingMode, total, showSettings, showReaderNavigator, showCommentsDrawer]);
   const toggleDirection = useCallback(
     () => updateSetting("readingMode", settings.readingMode === "vertical" ? "paged" : "vertical"),
     [settings.readingMode, updateSetting],
@@ -1005,7 +1062,7 @@ export default function MangaReaderPage() {
   useReaderKeyboard(keybinds, {
     nextPage: goNextPage, prevPage: goPrevPage,
     nextChapter: () => navToChapter(nextChapter), prevChapter: () => navToChapter(prevChapter),
-    toggleFullscreen, toggleDirection, zoomIn, zoomOut, toggleComments, reload,
+    toggleFullscreen, toggleDirection, zoomIn, zoomOut, toggleComments: isFs ? undefined : toggleComments, reload,
   }, !showSettings && !showCommentsDrawer);
 
   const isCoarsePointer = useMemo(
@@ -1129,7 +1186,7 @@ export default function MangaReaderPage() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
         <Background />
-        <GlassPanel className="w-full max-w-2xl p-8 border border-white/10">
+        <GlassPanel className="w-full max-w-2xl p-8 border border-border">
           <div className="flex items-start gap-3">
             <Puzzle className="w-6 h-6 text-primary mt-1" />
             <div>
@@ -1149,7 +1206,7 @@ export default function MangaReaderPage() {
             </a>
             <button
               onClick={() => navigate(mangaId ? `/manga/${mangaId}` : "/manga")}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-white/20 font-bold"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border font-bold"
             >
               <ArrowLeft className="w-4 h-4" /> Back
             </button>
@@ -1160,16 +1217,16 @@ export default function MangaReaderPage() {
   }
 
   return (
-    <div ref={containerRef} className="relative min-h-screen text-foreground" style={{ backgroundColor: settings.backgroundColor }}>
+    <div ref={containerRef} data-reader-fullscreen={isFs || undefined} className="relative min-h-screen text-foreground" style={{ backgroundColor: settings.backgroundColor }}>
       {/* Top nav — comick layout: Prev · Manga Info · Next (compact on mobile) */}
-      <div
-        className={`z-40 flex items-center gap-1.5 sm:gap-2 border-b border-white/10 bg-black/50 px-2 sm:px-3 py-2 backdrop-blur transition-transform duration-300 pt-[max(0.5rem,env(safe-area-inset-top))] ${
+      {!isFs && <div
+        className={`reader-topbar z-40 flex items-center gap-1.5 sm:gap-2 border-b border-border bg-background/95 px-2 sm:px-3 py-2 backdrop-blur transition-[transform,opacity] duration-200 pt-[max(0.5rem,env(safe-area-inset-top))] ${
           isFs ? "fixed inset-x-0 top-0" : "sticky top-0"
-        } ${chromeVisible ? "" : "-translate-y-full"}`}
+        } ${chromeVisible ? "" : reducedMotion ? "opacity-0 pointer-events-none" : "-translate-y-full"}`}
       >
         <button
           onClick={() => navigate(mangaId ? `/manga/${mangaId}` : "/manga")}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-white/15 px-2 sm:px-2.5 py-1.5 text-xs sm:text-sm font-semibold hover:bg-white/10 active:scale-95"
+          className="ui-button inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg border border-border px-2 sm:px-2.5 py-1.5 text-xs sm:text-sm font-semibold hover:bg-muted active:scale-95"
           aria-label="Back to manga"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -1177,13 +1234,13 @@ export default function MangaReaderPage() {
         <button
           disabled={!prevChapter}
           onClick={() => navToChapter(prevChapter)}
-          className="inline-flex shrink-0 items-center gap-0.5 sm:gap-1 rounded-lg border border-white/15 px-2 sm:px-2.5 py-1.5 text-xs sm:text-sm font-semibold hover:bg-white/10 active:scale-95 disabled:opacity-40"
+          className="ui-button inline-flex min-h-11 shrink-0 items-center gap-0.5 sm:gap-1 rounded-lg border border-border px-2 sm:px-2.5 py-1.5 text-xs sm:text-sm font-semibold hover:bg-muted active:scale-95 disabled:opacity-40"
         >
           <ChevronLeft className="h-4 w-4" /><span className="hidden min-[380px]:inline">Prev</span>
         </button>
         <button
           onClick={() => navigate(`/manga/${mangaId}`)}
-          className="flex min-w-0 flex-1 flex-col items-center px-1 sm:px-2 text-center"
+          className="flex min-h-11 min-w-0 flex-1 flex-col items-center px-1 sm:px-2 text-center"
           title="Manga info"
         >
           <span className="w-full truncate text-xs sm:text-sm font-bold">
@@ -1195,50 +1252,61 @@ export default function MangaReaderPage() {
             ) : null}
           </span>
           <span className="w-full truncate text-[11px] sm:text-xs text-muted-foreground">
-            {displayTitle}{displayProvider ? ` · ${displayProvider}` : ""}
+            {displayTitle}{displayProvider ? ` · ${displayProvider}` : ""}{total > 0 ? ` · Page ${pageIndex + 1} / ${activeMeta?.total || total}` : ""}
           </span>
         </button>
         <button
           onClick={() => { setShowReaderNavigator(true); void triggerHaptic('open'); }}
-          className="inline-flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 hover:bg-white/10 active:scale-95"
+          className="ui-button inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border hover:bg-muted active:scale-95"
           aria-label="Open chapter and provider navigator"
         >
-          <List className="h-4 w-4" />
+          <span className="sr-only">Chapter navigation</span><List className="h-4 w-4" />
         </button>
         <button
           disabled={!nextChapter}
           onClick={() => navToChapter(nextChapter)}
-          className="inline-flex shrink-0 items-center gap-0.5 sm:gap-1 rounded-lg border border-white/15 px-2 sm:px-2.5 py-1.5 text-xs sm:text-sm font-semibold hover:bg-white/10 active:scale-95 disabled:opacity-40"
+          className="ui-button inline-flex min-h-11 shrink-0 items-center gap-0.5 sm:gap-1 rounded-lg border border-border px-2 sm:px-2.5 py-1.5 text-xs sm:text-sm font-semibold hover:bg-muted active:scale-95 disabled:opacity-40"
         >
           <span className="hidden min-[380px]:inline">Next</span> <ChevronRight className="h-4 w-4" />
         </button>
-      </div>
+      </div>}
 
       {/* Right vertical toolbar — slimmer + lower on mobile so it never covers pages */}
       <div
-        className={`fixed right-2 sm:right-3 top-1/2 z-40 flex -translate-y-1/2 flex-col gap-1.5 sm:gap-2 transition-opacity duration-300 ${
-          chromeVisible ? "opacity-100" : "pointer-events-none opacity-0"
+        className={`reader-tools fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 z-40 flex max-w-[calc(100vw-1rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-2xl border border-border bg-background/95 p-1.5 shadow-lg backdrop-blur-xl transition-opacity duration-200 sm:bottom-auto sm:left-auto sm:right-3 sm:top-1/2 sm:-translate-x-0 sm:-translate-y-1/2 sm:flex-col sm:gap-2 ${
+          !isFs || fullscreenExitVisible ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
       >
-        <ToolBtn label="Settings" onClick={() => setShowSettings(true)}><Settings2 className="h-5 w-5" /></ToolBtn>
-        <ToolBtn label="Fullscreen" onClick={toggleFullscreen} active={isFs}>
+        {!isFs && <ToolBtn label="Settings" onClick={() => setShowSettings(true)}><Settings2 className="h-5 w-5" /></ToolBtn>}
+        <ToolBtn label={isFs ? "Exit fullscreen" : "Fullscreen"} onClick={toggleFullscreen} active={isFs}>
           {isFs ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
         </ToolBtn>
+        {!isFs && <>
+        <ToolBtn label="Reading tools" onClick={() => setShowReaderNavigator(true)}><List className="h-5 w-5" /></ToolBtn>
         <ToolBtn label="Manga info" onClick={() => navigate(`/manga/${mangaId}`)}><Info className="h-5 w-5" /></ToolBtn>
         <ToolBtn label="Home" onClick={() => navigate("/")}><Home className="h-5 w-5" /></ToolBtn>
         {settings.showCaptureButton && <ToolBtn label="Capture page" onClick={capture}><Camera className="h-5 w-5" /></ToolBtn>}
         {settings.showComments && <ToolBtn label="Comments" onClick={toggleComments} active={showCommentsDrawer}><MessageSquare className="h-5 w-5" /></ToolBtn>}
         {settings.showReloadButton && <ToolBtn label="Reload" onClick={reload}><RefreshCw className={`h-5 w-5 ${isFetching ? "animate-spin" : ""}`} /></ToolBtn>}
+        </>}
       </div>
 
       <div
         ref={scrollRef}
+        data-reader-scroll
         onScroll={() => { interactedRef.current = true; }}
-        onDoubleClick={() => { updateRef.current('zoom', settingsRef.current.zoom > 115 ? 100 : 175); void triggerHaptic('light'); }}
+        onDoubleClick={(event) => {
+          const capabilities = (event.nativeEvent as MouseEvent & { sourceCapabilities?: { firesTouchEvents?: boolean } }).sourceCapabilities;
+          if (capabilities?.firesTouchEvents) return;
+          if (isFs) exitFullscreen();
+          else updateRef.current('zoom', settingsRef.current.zoom > 115 ? 100 : 175);
+          void triggerHaptic('light');
+        }}
         onPointerDown={handleReaderPointerDown}
         onPointerMove={handleReaderPointerMove}
         onPointerUp={handleReaderPointerUp}
         onPointerCancel={handleReaderPointerCancel}
+        onWheel={() => { if (settingsRef.current.autoScroll) updateRef.current('autoScroll', false); }}
         className={`mx-auto overflow-y-auto overscroll-contain px-0 py-0 sm:px-4 sm:py-6 ${settings.zoom > 100 ? 'overflow-x-auto' : 'overflow-x-hidden'}`}
         style={{
           height: `${scrollH}px`,
@@ -1247,13 +1315,13 @@ export default function MangaReaderPage() {
         }}
       >
         {isLoading ? (
-          <div className="flex items-center justify-center gap-2 py-24 text-muted-foreground">
+          <div role="status" className="flex min-h-[50vh] items-center justify-center gap-2 py-24 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" /> Loading pages…
           </div>
         ) : null}
 
         {!isLoading && (!data?.success || total === 0) ? (
-          <GlassPanel className="mx-auto max-w-xl border border-white/10 p-6">
+          <GlassPanel className="mx-auto max-w-xl border border-border p-6">
             <h2 className="text-xl font-bold">Unable to load chapter</h2>
             <p className="mt-2 text-muted-foreground">
               {data?.guidance?.message || data?.message ||
@@ -1262,6 +1330,7 @@ export default function MangaReaderPage() {
             <p className="mt-3 text-sm text-muted-foreground">
               Pick an extension provider from the chapter list on the manga page.
             </p>
+            <div className="mt-5 flex flex-wrap gap-3"><button type="button" onClick={reload} className="ui-button inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground"><RefreshCw className="h-4 w-4" />Retry chapter</button><button type="button" onClick={() => setShowReaderNavigator(true)} className="ui-button min-h-11 rounded-xl border border-border px-4 text-sm font-semibold">Choose provider</button></div>
           </GlassPanel>
         ) : null}
 
@@ -1301,7 +1370,7 @@ export default function MangaReaderPage() {
                 ))
               : null}
 
-            <div data-ch={currentIndex}>
+            <div data-ch={currentIndex} data-reader-entry>
               {continuous && before.length ? (
                 <ChapterDivider label={resolvedNumber != null ? `Chapter ${resolvedNumber}` : "Chapter"} sub={resolvedProvider} />
               ) : null}
@@ -1405,11 +1474,11 @@ export default function MangaReaderPage() {
         {/* End-of-chapter comments — rendered for BOTH vertical and paged modes so
             downloaded/offline reading surfaces the same threads as online reading.
             In continuous vertical mode it only appears once the final chapter loads. */}
-        {total > 0 && settings.showComments && mangaId && (!continuous || !hasNext) ? (
+        {!isFs && total > 0 && settings.showComments && mangaId && (!continuous || !hasNext) ? (
           <div className="mx-auto mt-10 w-full max-w-3xl">
             <button
               onClick={() => setShowInlineComments((v) => !v)}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm font-semibold hover:bg-white/10"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-white/5 px-4 py-3 text-sm font-semibold hover:bg-muted"
             >
               <MessageSquare className="h-4 w-4" />
               {showInlineComments ? "Hide comments" : "Show comments"}
@@ -1432,16 +1501,46 @@ export default function MangaReaderPage() {
       </div>
 
       <Sheet open={showReaderNavigator} onOpenChange={setShowReaderNavigator}>
-        <SheetContent side="bottom" className="max-h-[82dvh] rounded-t-3xl border-white/10 bg-background/95 px-0 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-xl sm:mx-auto sm:max-w-xl">
+        <SheetContent side="bottom" className="max-h-[82dvh] rounded-t-3xl border-border bg-background/95 px-0 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-xl sm:mx-auto sm:max-w-xl">
           <SheetHeader className="px-5 text-left"><SheetTitle>Reader navigation</SheetTitle></SheetHeader>
           <div className="mt-5 space-y-5 overflow-y-auto px-5 scrollbar-thin">
+            <section className="space-y-3 rounded-xl border border-border p-4">
+              <div className="flex items-center justify-between text-sm font-medium">
+                <label htmlFor="reader-page-seek">Page</label>
+                <span className="tabular-nums">{pageIndex + 1} / {activeMeta?.total || total}</span>
+              </div>
+              <input id="reader-page-seek" aria-label="Jump to page" type="range" min={0} max={Math.max(0, (activeMeta?.total || total) - 1)} value={pageIndex} disabled={total === 0} onChange={event => jumpToPage(Number(event.target.value))} className="h-8 w-full accent-primary" />
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm">Zoom</span>
+                <div className="flex items-center gap-2">
+                  <ToolBtn label="Zoom out" onClick={zoomOut}><ZoomOut className="h-5 w-5" /></ToolBtn>
+                  <button onClick={() => updateSetting('zoom', 100)} aria-label="Reset reader zoom" className="min-h-11 min-w-14 rounded-lg border border-border px-2 text-sm tabular-nums hover:bg-muted">{settings.zoom}%</button>
+                  <ToolBtn label="Zoom in" onClick={zoomIn}><ZoomIn className="h-5 w-5" /></ToolBtn>
+                </div>
+              </div>
+              <div className="flex gap-2" role="group" aria-label="Reading mode">
+                {(['vertical', 'paged'] as const).map(mode => <button key={mode} aria-pressed={settings.readingMode === mode} onClick={() => updateSetting('readingMode', mode)} className={`min-h-11 flex-1 rounded-lg border px-3 text-sm font-medium ${settings.readingMode === mode ? 'border-primary/50 bg-primary/10 text-primary' : 'border-border hover:bg-muted'}`}>{mode === 'vertical' ? 'Webtoon scroll' : 'Page by page'}</button>)}
+              </div>
+              {settings.readingMode === 'vertical' && <div className="flex items-center justify-between gap-3">
+                <button onClick={() => updateSetting('autoScroll', !settings.autoScroll)} aria-pressed={settings.autoScroll} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-3 text-sm hover:bg-muted">
+                  {settings.autoScroll ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                  {settings.autoScroll ? 'Pause auto-scroll' : 'Auto-scroll'}
+                </button>
+                <label className="flex items-center gap-2 text-sm">Speed
+                  <select aria-label="Auto-scroll speed" value={settings.autoScrollSpeed} onChange={event => updateSetting('autoScrollSpeed', Number(event.target.value))} className="min-h-11 rounded-lg border border-border bg-background px-2">
+                    {[1, 2, 4, 6, 8, 10].map(speed => <option key={speed} value={speed}>{speed}</option>)}
+                  </select>
+                </label>
+              </div>}
+            </section>
             <label className="relative block">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 value={chapterSearch}
                 onChange={(event) => setChapterSearch(event.target.value)}
+                aria-label="Search chapters and providers"
                 placeholder="Search chapter, title, or provider"
-                className="h-11 w-full rounded-xl border border-white/10 bg-white/[0.05] pl-10 pr-3 text-sm placeholder:text-muted-foreground focus:border-primary/50 focus:ring-2 focus:ring-primary/20"
+                className="h-11 w-full rounded-xl border border-border bg-muted/50 pl-10 pr-3 text-sm placeholder:text-muted-foreground focus:border-primary/50 focus:ring-2 focus:ring-primary/20"
               />
             </label>
             <section>
@@ -1449,17 +1548,17 @@ export default function MangaReaderPage() {
               <div className="max-h-48 space-y-2 overflow-y-auto pr-1 scrollbar-thin">
                 {navigatorSources.map((source) => {
                   const active = source.provider === displayProvider && source.chapterKey === (activeMeta?.key || chapterKey);
-                  return <button key={`${source.provider}:${source.chapterKey}:${source.providerChapterId || ''}`} onClick={() => { switchProvider(source, navigatorChapter); setShowReaderNavigator(false); }} className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left ${active ? 'border-primary/50 bg-primary/10' : 'border-white/10 bg-white/[0.03] hover:bg-white/[0.06]'}`}>
+                  return <button key={`${source.provider}:${source.chapterKey}:${source.providerChapterId || ''}`} onClick={() => { switchProvider(source, navigatorChapter); setShowReaderNavigator(false); }} className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left ${active ? 'border-primary/50 bg-primary/10' : 'border-border bg-muted/30 hover:bg-muted/60'}`}>
                     <span className="font-medium">{source.provider}</span><span className="text-xs text-muted-foreground">{source.scanlator || 'Chapter source'}</span>
                   </button>;
                 })}
-                {!navigatorSources.length && <p className="rounded-xl border border-dashed border-white/10 p-4 text-sm text-muted-foreground">No alternative providers are available for this chapter.</p>}
+                {!navigatorSources.length && <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">No alternative providers are available for this chapter.</p>}
               </div>
             </section>
             <section>
               <h3 className="mb-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">Chapter</h3>
               <div className="max-h-64 space-y-1 overflow-y-auto pr-1 scrollbar-thin">
-                {filteredChapters.map((chapter) => <button key={chapter.canonicalOrder} onClick={() => { navToChapter(chapter); setShowReaderNavigator(false); void triggerHaptic('select'); }} className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm ${chapter.canonicalOrder === currentIndex ? 'bg-primary/10 text-primary' : 'hover:bg-white/[0.06]'}`}>
+                {filteredChapters.map((chapter) => <button key={chapter.canonicalOrder} onClick={() => { navToChapter(chapter); setShowReaderNavigator(false); void triggerHaptic('select'); }} className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm ${chapter.canonicalOrder === currentIndex ? 'bg-primary/10 text-primary' : 'hover:bg-muted/60'}`}>
                   <span>Chapter {chapter.chapterNumber ?? chapter.canonicalOrder + 1}</span><span className="max-w-[55%] truncate text-xs text-muted-foreground">{chapter.chapterTitle || ''}</span>
                 </button>)}
                 {!filteredChapters.length && <p className="py-8 text-center text-sm text-muted-foreground">No chapters match “{chapterSearch}”.</p>}
@@ -1473,11 +1572,11 @@ export default function MangaReaderPage() {
           Right-side sheet on desktop, thumb-friendly bottom sheet on mobile. */}
       <Sheet open={showSettings} onOpenChange={setShowSettings}>
         <SheetContent
-          side="right"
-          className="flex flex-col gap-0 overflow-hidden border-white/10 bg-background/95 p-0 backdrop-blur-xl md:w-[400px] md:max-w-[400px] max-md:inset-x-2 max-md:bottom-2 max-md:top-auto max-md:h-auto max-md:max-h-[85dvh] max-md:w-auto max-md:rounded-3xl max-md:border max-md:shadow-2xl"
+          side={compactReader ? "bottom" : "right"}
+          className="flex flex-col gap-0 overflow-hidden border-border bg-background/95 p-0 backdrop-blur-xl md:w-[400px] md:max-w-[400px] max-md:inset-x-2 max-md:bottom-2 max-md:top-auto max-md:h-auto max-md:max-h-[85dvh] max-md:w-auto max-md:rounded-3xl max-md:border max-md:shadow-2xl"
         >
           <div className="shrink-0 pt-2.5 md:hidden" aria-hidden>
-            <div className="mx-auto h-1 w-10 rounded-full bg-white/20" />
+            <div className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/40" />
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-6">
             <SheetHeader>
@@ -1494,7 +1593,7 @@ export default function MangaReaderPage() {
       <Sheet open={showCommentsDrawer} onOpenChange={setShowCommentsDrawer}>
         <SheetContent side="right" className="flex w-full flex-col overflow-hidden p-0 sm:max-w-lg">
           <Tabs defaultValue="chapter" className="flex h-full flex-col">
-            <div className="border-b border-white/10 px-4 pt-4">
+            <div className="border-b border-border px-4 pt-4">
               <SheetHeader className="mb-3">
                 <SheetTitle>Comments</SheetTitle>
               </SheetHeader>

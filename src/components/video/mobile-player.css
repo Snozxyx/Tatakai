@@ -1,0 +1,65 @@
+.tatakai-mobile-player {
+  min-height: 344px;
+  isolation: isolate;
+  border-radius: inherit;
+}
+
+.mobile-player-ambient {
+  position: absolute;
+  inset: -8%;
+  width: 116%;
+  height: 116%;
+  filter: blur(32px) saturate(1.5);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.mobile-player-controls button {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.mobile-player-controls button:focus-visible {
+  outline: 2px solid white;
+  outline-offset: 3px;
+}
+
+.mobile-player-center { top: 46%; gap: 28px; }
+.mobile-player-seek { appearance: none; background: transparent; cursor: pointer; }
+.mobile-player-seek::-webkit-slider-runnable-track {
+  height: 5px;
+  border-radius: 999px;
+  background: linear-gradient(to right, hsl(var(--primary)) 0 var(--seek-progress), #ffffff70 var(--seek-progress) var(--seek-buffered), #ffffff35 var(--seek-buffered) 100%);
+}
+.mobile-player-seek::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -5.5px;
+  border-radius: 50%;
+  border: 2px solid hsl(var(--primary));
+  background: white;
+}
+.mobile-player-seek::-moz-range-track { height: 5px; background: #ffffff35; border-radius: 999px; }
+.mobile-player-seek::-moz-range-progress { height: 5px; background: hsl(var(--primary)); }
+.mobile-player-seek::-moz-range-thumb { width: 16px; height: 16px; border: 2px solid hsl(var(--primary)); border-radius: 50%; background: white; }
+.mobile-player-seek:focus-visible { outline: 2px solid white; outline-offset: 2px; }
+.mobile-player-center button { padding: 12px; }
+.mobile-player-center button:nth-child(2) { padding: 16px; }
+.mobile-player-center button:nth-child(2) svg { width: 32px; height: 32px; }
+.mobile-player-bottom > div:last-child { flex-direction: column; align-items: stretch; gap: 12px; }
+.mobile-player-bottom > div:last-child > span { font-variant-numeric: tabular-nums; }
+.mobile-player-bottom > div:last-child > div { flex-wrap: nowrap; justify-content: space-between; gap: 8px; }
+.mobile-player-skip { top: 70px; bottom: auto; }
+.mobile-player-controls + .mobile-player-server { top: 72px; left: 16px; right: auto; }
+
+.tatakai-mobile-player.is-player-fullscreen { min-height: 0; }
+.is-player-fullscreen .mobile-player-bottom > div:last-child { flex-direction: row; align-items: center; }
+.is-player-fullscreen .mobile-player-bottom > div:last-child > div { justify-content: flex-end; gap: 12px; }
+.is-player-fullscreen .mobile-player-center { gap: 48px; }
+
+@media (max-width: 480px) {
+  .is-player-fullscreen .mobile-player-bottom > div:last-child { flex-direction: column; align-items: stretch; }
+  .is-player-fullscreen .mobile-player-bottom > div:last-child > div { justify-content: space-between; gap: 8px; }
+  .is-player-fullscreen .mobile-player-center { gap: 28px; }
+}

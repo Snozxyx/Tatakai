@@ -1,22 +1,39 @@
-import { Star, Play } from "lucide-react";
+import { Star, Play, Pause } from "lucide-react";
 import { memo, useRef, useState, useEffect } from "react";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import { SpotlightAnime, getProxiedImageUrl, getHighQualityImage } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 import { AddToPlaylistButton } from '@/components/playlist/AddToPlaylistButton';
 import { buildPreferredAnimeRouteId } from "@/lib/animeIdMapping";
+import { useMobileAppearance } from '@/hooks/ui/useMobileAppearance';
+import { useMotionPreference } from '@/hooks/ui/useMotionPreference';
+import { useVisibleAutoplay } from '@/hooks/ui/useVisibleAutoplay';
+import { CinematicHero } from './CinematicHero';
 
 interface HeroSectionProps {
   spotlight: SpotlightAnime;
   spotlights?: SpotlightAnime[];
+  onActiveSpotlightChange?: (anime: SpotlightAnime) => void;
 }
 
-export const HeroSection = memo(function HeroSection({ spotlight, spotlights = [] }: HeroSectionProps) {
+export const HeroSection = memo(function HeroSection({ spotlight, spotlights = [], onActiveSpotlightChange }: HeroSectionProps) {
+  const refreshed = useMobileAppearance();
+  return refreshed
+    ? <CinematicHero spotlights={spotlights.length ? spotlights : [spotlight]} onActiveSpotlightChange={onActiveSpotlightChange} />
+    : <ClassicHeroSection spotlight={spotlight} spotlights={spotlights} />;
+});
+
+const ClassicHeroSection = memo(function ClassicHeroSection({ spotlight, spotlights = [] }: HeroSectionProps) {
   const navigate = useNavigate();
   const [currentIndex, setCurrentIndex] = useState(0);
+  const reduced = useMotionPreference();
+  const { ref: sectionRef, visible: inView } = useVisibleAutoplay();
+  const [paused, setPaused] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const transitionTimer = useRef<ReturnType<typeof setTimeout>>();
   const [isTransitioning, setIsTransitioning] = useState(false);
   const touchXRef = useRef<number | null>(null);
-  
+
   const allSpotlights = spotlights.length > 0 ? spotlights.slice(0, 5) : [spotlight];
   const activeSpotlight = allSpotlights[currentIndex] || spotlight;
   const heroImage = activeSpotlight.banner || activeSpotlight.poster;
@@ -29,18 +46,18 @@ export const HeroSection = memo(function HeroSection({ spotlight, spotlights = [
 
   // Auto-rotate spotlights
   useEffect(() => {
-    if (allSpotlights.length <= 1) return;
-    
+    if (allSpotlights.length <= 1 || paused || focused || reduced || !inView) return;
+
     const interval = setInterval(() => {
       setIsTransitioning(true);
-      setTimeout(() => {
+      transitionTimer.current = setTimeout(() => {
         setCurrentIndex((prev) => (prev + 1) % allSpotlights.length);
         setIsTransitioning(false);
       }, 400);
     }, 6000);
 
-    return () => clearInterval(interval);
-  }, [allSpotlights.length]);
+    return () => { clearInterval(interval); clearTimeout(transitionTimer.current); setIsTransitioning(false); };
+  }, [allSpotlights.length, paused, focused, reduced, inView]);
 
   const handleWatch = () => {
     navigate(`/anime/${routeAnimeId || activeSpotlight.id}`);
@@ -48,12 +65,22 @@ export const HeroSection = memo(function HeroSection({ spotlight, spotlights = [
 
   const goTo = (idx: number) => {
     if (idx === currentIndex) return;
+    clearTimeout(transitionTimer.current);
+    if (reduced) { setCurrentIndex(idx); setIsTransitioning(false); return; }
     setIsTransitioning(true);
-    setTimeout(() => {
+    transitionTimer.current = setTimeout(() => {
       setCurrentIndex(idx);
       setIsTransitioning(false);
     }, 250);
   };
+
+  useEffect(() => () => clearTimeout(transitionTimer.current), []);
+
+  const rotationControl = allSpotlights.length > 1 && !reduced ? (
+    <button type="button" onClick={() => setPaused(value => !value)} aria-label={paused ? "Resume spotlight rotation" : "Pause spotlight rotation"} aria-pressed={paused} className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-muted">
+      {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+    </button>
+  ) : null;
 
   // Swipe between spotlights on touch.
   const onTouchStart = (e: React.TouchEvent) => {
@@ -69,10 +96,10 @@ export const HeroSection = memo(function HeroSection({ spotlight, spotlights = [
   };
 
   return (
-    <section className="relative mb-12 md:mb-24" style={{ contentVisibility: 'auto' }}>
+    <section ref={sectionRef} onFocusCapture={() => setFocused(true)} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setFocused(false); }} className="balanced-spotlight relative mb-12 md:mb-16">
       {/* Mobile Layout — immersive banner, swipeable */}
       <div
-        className="lg:hidden relative overflow-hidden rounded-3xl border border-white/[0.08] bg-background/40 shadow-2xl shadow-black/50"
+        className="classic-spotlight-mobile lg:hidden relative overflow-hidden rounded-3xl border border-white/[0.08] bg-black/80 shadow-2xl shadow-black/50"
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
@@ -86,8 +113,8 @@ export const HeroSection = memo(function HeroSection({ spotlight, spotlights = [
             decoding="async"
             className="w-full h-full object-cover scale-105 brightness-[0.55]"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-primary/15 via-background/80 to-background" />
-          <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-background to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-b from-primary/15 via-black/70 to-black/90" />
+          <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/90 to-transparent" />
           {/* Ambient glow — same token language as the desktop hero */}
           <div className="absolute -top-16 left-1/2 h-40 w-3/4 -translate-x-1/2 rounded-full bg-primary/25 blur-[80px]" aria-hidden />
         </div>
@@ -154,22 +181,24 @@ export const HeroSection = memo(function HeroSection({ spotlight, spotlights = [
               animeName={activeSpotlight.name}
               animePoster={activeSpotlight.poster}
               variant="icon"
-              className="h-[52px] w-[52px] shrink-0 rounded-2xl border border-white/15 bg-black/50 backdrop-blur-md ring-1 ring-white/10 flex items-center justify-center active:scale-95 transition-transform"
+              className="h-[52px] w-[52px] shrink-0 rounded-2xl border border-white/15 bg-black/50 text-white hover:text-white hover:bg-white/10 backdrop-blur-md ring-1 ring-white/10 flex items-center justify-center active:scale-95 transition-transform"
             />
           </div>
 
           {/* Navigation dots — 28px hit targets */}
           {allSpotlights.length > 1 && (
             <div className="flex items-center justify-center gap-1 pt-4">
+              {rotationControl}
               {allSpotlights.map((_, idx) => (
                 <button
                   key={idx}
                   onClick={() => goTo(idx)}
                   aria-label={`Show spotlight ${idx + 1}`}
-                  className="flex h-7 w-7 items-center justify-center"
+                  aria-pressed={idx === currentIndex}
+                  className="flex h-11 w-11 items-center justify-center"
                 >
                   <span
-                    className={`transition-all duration-300 rounded-full ${
+                    className={`transition-[opacity,transform,background-color] duration-300 rounded-full ${
                       idx === currentIndex
                         ? 'w-6 h-1.5 bg-white'
                         : 'w-1.5 h-1.5 bg-white/35'
@@ -185,15 +214,15 @@ export const HeroSection = memo(function HeroSection({ spotlight, spotlights = [
       {/* Desktop Layout - Side by side */}
       <div className="hidden lg:grid grid-cols-12 gap-8 items-center">
         {/* Typography & Info (Left) */}
-        <div className={`col-span-5 space-y-8 z-20 transition-all duration-500 ${
-          isTransitioning ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0 animate-fade-in'
+        <div className={`col-span-5 space-y-8 z-20 transition-opacity duration-300 ${
+          isTransitioning ? 'opacity-0' : 'opacity-100'
         }`}>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-amber/30 bg-amber/10 text-amber text-xs font-bold tracking-wider uppercase">
             <Star className="w-3 h-3 fill-amber" />
             #{activeSpotlight.rank} Spotlight
           </div>
-          
-          <h1 className="font-display text-5xl md:text-7xl font-black tracking-tighter leading-[0.9] gradient-text">
+
+          <h1 data-long-title={activeSpotlight.name.length > 60} className="spotlight-heading font-display text-5xl font-bold tracking-tight leading-[1.04] text-foreground">
             {activeSpotlight.name.split(" ").slice(0, 2).join(" ")}
             {activeSpotlight.name.split(" ").length > 2 && (
               <>
@@ -202,15 +231,15 @@ export const HeroSection = memo(function HeroSection({ spotlight, spotlights = [
               </>
             )}
           </h1>
-          
-          <p className="text-lg text-muted-foreground max-w-md leading-relaxed border-l-2 border-border pl-6 line-clamp-3">
+
+          <p className="text-lg text-muted-foreground max-w-[42ch] leading-relaxed line-clamp-3">
             {activeSpotlight.description}
           </p>
 
           <div className="flex flex-wrap gap-3">
             {activeSpotlight.otherInfo.slice(0, 4).map((info, idx) => (
-              <span 
-                key={idx} 
+              <span
+                key={idx}
                 className="px-4 py-1.5 rounded-lg border border-border bg-muted/50 text-sm font-medium hover:bg-muted cursor-default transition-colors"
               >
                 {info}
@@ -219,9 +248,9 @@ export const HeroSection = memo(function HeroSection({ spotlight, spotlights = [
           </div>
 
           <div className="flex items-center gap-4 pt-4">
-            <button 
+            <button
               onClick={handleWatch}
-              className="h-14 px-8 rounded-full bg-foreground text-background font-bold text-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-2 glow-primary"
+              className="h-14 px-8 rounded-full bg-foreground text-background font-bold text-lg hover:scale-105 active:scale-95 transition-[opacity,transform,background-color] flex items-center gap-2 glow-primary"
             >
               <Play className="w-5 h-5 fill-background" />
               Watch Now
@@ -231,50 +260,45 @@ export const HeroSection = memo(function HeroSection({ spotlight, spotlights = [
               animeName={activeSpotlight.name}
               animePoster={activeSpotlight.poster}
               variant="icon"
-              className="h-14 w-14 rounded-full border border-border bg-muted/50 flex items-center justify-center hover:bg-muted hover:border-foreground/30 transition-all"
+              className="h-14 w-14 rounded-full border border-border bg-muted/50 flex items-center justify-center hover:bg-muted hover:border-foreground/30 transition-[opacity,transform,background-color]"
             />
           </div>
 
           {/* Navigation dots */}
           {allSpotlights.length > 1 && (
             <div className="flex items-center gap-2 pt-4">
+              {rotationControl}
               {allSpotlights.map((_, idx) => (
                 <button
                   key={idx}
-                  onClick={() => {
-                    setIsTransitioning(true);
-                    setTimeout(() => {
-                      setCurrentIndex(idx);
-                      setIsTransitioning(false);
-                    }, 300);
-                  }}
-                  className={`transition-all duration-300 rounded-full ${
-                    idx === currentIndex 
-                      ? 'w-8 h-2 bg-foreground' 
-                      : 'w-2 h-2 bg-muted-foreground/50 hover:bg-muted-foreground'
-                  }`}
-                />
+                  onClick={() => goTo(idx)}
+                  aria-label={`Show spotlight ${idx + 1}`}
+                  aria-pressed={idx === currentIndex}
+                  className="flex h-11 w-11 items-center justify-center rounded-full"
+                >
+                  <span className={`h-2 rounded-full ${idx === currentIndex ? 'w-8 bg-foreground' : 'w-2 bg-muted-foreground/50'}`} />
+                </button>
               ))}
             </div>
           )}
         </div>
 
         {/* Graphic/Image (Right) */}
-        <div className={`col-span-7 relative h-[650px] transition-all duration-500 ${
-          isTransitioning ? 'opacity-0 scale-95' : 'opacity-100 scale-100 animate-fade-in animation-delay-200'
+        <div className={`col-span-7 relative h-[650px] transition-opacity duration-300 ${
+          isTransitioning ? 'opacity-0' : 'opacity-100'
         }`}>
           {/* Background Glow behind image */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[70%] h-[70%] bg-gradient-to-br from-primary/40 to-secondary/40 rounded-full blur-[100px] opacity-40 animate-pulse-slow" />
-          
-          <GlassPanel className="w-full h-full p-2 rotate-[-2deg] hover:rotate-0 transition-transform duration-700 ease-out group">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[70%] h-[70%] bg-gradient-to-br from-primary/40 to-secondary/40 rounded-full blur-[100px] opacity-30" />
+
+          <GlassPanel className="w-full h-full p-2 rotate-[-2deg] ease-out group">
             <div className="relative w-full h-full rounded-2xl overflow-hidden">
-              <img 
-                src={getHighQualityImage(heroImage)} 
-                alt={activeSpotlight.name} 
-                className="w-full h-full object-cover filter brightness-90 contrast-110 transition-transform duration-700 group-hover:scale-105" 
+              <img
+                src={getHighQualityImage(heroImage)}
+                alt={activeSpotlight.name}
+                className="w-full h-full object-cover filter brightness-90 contrast-110 transition-transform duration-200 group-hover:scale-[1.025]"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-transparent" />
-              
+
               {/* Embedded Metadata in Image */}
               <div className="absolute bottom-8 left-8 right-8 flex justify-between items-end">
                 <div>
@@ -291,7 +315,7 @@ export const HeroSection = memo(function HeroSection({ spotlight, spotlights = [
           </GlassPanel>
 
           {/* Floating Element */}
-          <GlassPanel className="absolute -bottom-10 -left-10 p-6 w-64 rotate-[3deg] z-30 animate-float">
+          <GlassPanel className="absolute -bottom-10 -left-10 p-6 w-64 rotate-[3deg] z-30">
             <div className="flex justify-between items-center mb-2">
               <span className="text-xs font-bold text-muted-foreground">JAPANESE</span>
               <Star className="w-4 h-4 text-amber fill-amber" />

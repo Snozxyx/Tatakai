@@ -13,7 +13,7 @@ import { MobileNav } from '@/components/layout/MobileNav';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
-import { useIsNativeApp } from '@/hooks/ui/useIsNativeApp';
+import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 import { useFollowList } from '@/hooks/community/useFollow';
 import { cn } from '@/lib/utils';
 
@@ -23,7 +23,7 @@ export default function FollowConnectionsPage() {
   const { username } = useParams<{ username: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const isNative = useIsNativeApp();
+  const isDesktopApp = useIsDesktopApp();
 
   const tab: Tab = searchParams.get('tab') === 'following' ? 'following' : 'followers';
 
@@ -50,9 +50,9 @@ export default function FollowConnectionsPage() {
     () =>
       cn(
         'relative z-10 mx-auto max-w-2xl py-4 pb-24 pr-4 md:py-6 md:pb-6 md:pr-6',
-        isNative ? 'pl-4' : 'pl-4 md:pl-32',
+        isDesktopApp ? 'pl-4' : 'pl-4 md:pl-32',
       ),
-    [isNative],
+    [isDesktopApp],
   );
 
   const setTab = (t: Tab) => setSearchParams(t === 'followers' ? {} : { tab: 'following' });

@@ -1,4 +1,5 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { applyEpisodeAvailability } from '@/lib/episodeAvailability';
 import { contentGraph, toAnimeCard, toHomeData } from "@/core";
 import { trackEvent } from "@/core/analytics/AnalyticsService";
 import type { MediaFormat, MediaSeason, MediaStatus, SearchFilters, TatakaiMedia } from "@/core";
@@ -634,7 +635,7 @@ export function useEpisodes(animeId: string | undefined) {
       }
 
       // Whichever tier produced the list, ani.zip fills in what it lacks.
-      episodes = mergeAniZipEpisodes(episodes, mapping);
+      episodes = applyEpisodeAvailability(mergeAniZipEpisodes(episodes, mapping), media.nextAiringEpisode);
 
       if (import.meta.env.DEV) {
         console.debug("[useEpisodes] Episodes loaded", {

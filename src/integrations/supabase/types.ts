@@ -3172,6 +3172,12 @@ export type Database = {
           page_path: string;
           referrer: string | null;
           created_at: string;
+          utm_source: string | null;
+          utm_medium: string | null;
+          utm_campaign: string | null;
+          referrer_host: string | null;
+          channel: string | null;
+          page_title: string | null;
         };
         Insert: {
           id?: string;
@@ -3184,6 +3190,12 @@ export type Database = {
           page_path: string;
           referrer?: string | null;
           created_at?: string;
+          utm_source?: string | null;
+          utm_medium?: string | null;
+          utm_campaign?: string | null;
+          referrer_host?: string | null;
+          channel?: string | null;
+          page_title?: string | null;
         };
         Update: {
           id?: string;
@@ -3196,6 +3208,12 @@ export type Database = {
           page_path?: string;
           referrer?: string | null;
           created_at?: string;
+          utm_source?: string | null;
+          utm_medium?: string | null;
+          utm_campaign?: string | null;
+          referrer_host?: string | null;
+          channel?: string | null;
+          page_title?: string | null;
         };
         Relationships: [
           {

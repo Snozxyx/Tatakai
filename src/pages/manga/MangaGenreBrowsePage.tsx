@@ -19,7 +19,7 @@
  * is exactly the per-widget palette the v6 pass removed; the genre pills do its
  * job against real facet counts. It still renders on the manga home page.
  */
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useSettingsModal } from '@/contexts/SettingsModalContext';
@@ -28,8 +28,8 @@ import {
   ArrowRight,
   BookOpen,
   CalendarRange,
+  ChevronDown,
   Clock,
-  Compass,
   Globe,
   Layers,
   ListOrdered,
@@ -41,6 +41,7 @@ import {
   Star,
   Tag,
   TriangleAlert,
+  X,
 } from 'lucide-react';
 import { Background } from '@/components/layout/Background';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -59,16 +60,17 @@ import {
   type PosterItem,
 } from '@/components/anime/discover/types';
 import { mangaSearchItemToPosterItem } from '@/components/manga/mangaPosterItem';
+import { TagGroupCloud, type TagCloudGroup } from '@/components/manga/TagGroupCloud';
+import { Input } from '@/components/ui/input';
+import { getMangaTagOptions } from '@/core/content/manga-tag-search';
 import { cn } from '@/lib/utils';
 import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 import { useContentSafetySettings } from '@/hooks/user/useContentSafetySettings';
 import { discoverYears } from '@/hooks/api/useDiscover';
 import {
   getMangaFilterCounts,
-  parseMangaSearchProvider,
   searchManga,
   type MangaFeedTimeWindow,
-  type MangaSearchProvider,
   type MangaSortOption,
 } from '@/core/content/manga-client';
 import type { MangaSearchResult } from '@/types/manga';
@@ -91,11 +93,6 @@ const BASE_GENRE_PRESETS = [
 ];
 
 const HENTAI_GENRE = 'hentai';
-
-const PROVIDER_OPTIONS = [
-  { value: 'all', label: 'All providers' },
-  { value: 'mapped', label: 'Mapped only' },
-] as const satisfies ReadonlyArray<ControlOption<MangaSearchProvider>>;
 
 const TYPE_OPTIONS = [
   { value: 'all', label: 'All types' },
@@ -149,6 +146,8 @@ const SORT_LABELS: Record<MangaSortOption, string> = {
   rating: 'Highest rating',
   popularity: 'Popularity',
   chapterCount: 'Chapter count',
+  follows: 'Most followed',
+  newest: 'Newest',
 };
 
 /** Presets replace the old free-entry number inputs. See the file docblock. */
@@ -181,10 +180,6 @@ type MangaStatusFilter = (typeof STATUS_OPTIONS)[number]['value'];
 type MangaSortFilter = 'default' | MangaSortOption;
 type MangaDiscoverFeedMode = (typeof FEED_MODE_OPTIONS)[number]['value'];
 type MangaOriginFilter = (typeof ORIGIN_OPTIONS)[number]['value'];
-
-function normalizeProvider(value: string | null): MangaSearchProvider {
-  return parseMangaSearchProvider(value, 'all');
-}
 
 function normalizeType(value: string | null): MangaTypeFilter {
   const lowered = String(value || 'all').trim().toLowerCase();
@@ -230,6 +225,20 @@ function normalizeOrigin(value: string | null): MangaOriginFilter {
   return 'all';
 }
 
+type MangaTagSource = 'anilist' | 'mangabaka';
+
+function normalizeTagSource(value: string | null): MangaTagSource {
+  return String(value || '').trim().toLowerCase() === 'mangabaka' ? 'mangabaka' : 'anilist';
+}
+
+function normalizeTags(value: string | null): string[] {
+  const tags = String(value || '')
+    .split(',')
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+  return [...new Set(tags)].slice(0, 10);
+}
+
 function parsePositiveNumberParam(value: string | null): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return 0;
@@ -261,13 +270,14 @@ function formatGenreLabel(genre: string): string {
 interface CatalogPageArgs {
   page: number;
   genre: string;
-  provider: MangaSearchProvider;
   mangaType: MangaTypeFilter;
   mangaStatus: MangaStatusFilter;
   sort: MangaSortFilter;
   feedMode: MangaDiscoverFeedMode;
   feedWindow: MangaFeedTimeWindow;
   feedOrigin: MangaOriginFilter;
+  tags: string[];
+  tagSource: MangaTagSource;
   minYear: number;
   minScore: number;
   minChapters: number;
@@ -280,22 +290,35 @@ async function fetchGenreCatalogPage(args: CatalogPageArgs): Promise<MangaSearch
   const {
     page,
     genre,
-    provider,
     mangaType,
     mangaStatus,
     sort,
     feedMode,
     feedWindow,
     feedOrigin,
+    tags,
+    tagSource,
     minYear,
     minScore,
     minChapters,
     canShowAdult,
   } = args;
+  // Tag search runs its own AniList/MangaBaka path (mode is ignored there,
+  // but genre/type/origin/adult still scope it).
+  const tagOptions = tags.length > 0 ? { tags, tagSource } : {};
 
   const isAdultGenre = genre === HENTAI_GENRE;
   const statuses = mangaStatus !== 'all' ? [mangaStatus] : undefined;
-  const sortValue = sort !== 'default' ? sort : undefined;
+  // 'follows'/'newest' are catalogue labels — the backend keys them by their
+  // AniList enum names, so translate before sending.
+  const sortValue =
+    sort === 'follows'
+      ? 'FAVOURITES_DESC'
+      : sort === 'newest'
+        ? 'START_DATE_DESC'
+        : sort !== 'default'
+          ? sort
+          : undefined;
 
   if (isAdultGenre && !canShowAdult) {
     return {
@@ -315,7 +338,6 @@ async function fetchGenreCatalogPage(args: CatalogPageArgs): Promise<MangaSearch
   if (feedMode !== 'auto') {
     return searchManga('', page, PAGE_LIMIT, {
       mode: feedMode,
-      provider,
       mangaType,
       adult: isAdultGenre,
       statuses,
@@ -329,39 +351,14 @@ async function fetchGenreCatalogPage(args: CatalogPageArgs): Promise<MangaSearch
       minScore,
       minChapters,
       requiresQuery: false,
+      ...tagOptions,
     });
   }
 
   if (genre) {
-    // Only some providers expose a genre lane; the rest need the genre as a query.
-    const supportsGenreMode =
-      (provider as string) === 'all' ||
-      (provider as string) === 'mangafire' ||
-      (provider as string) === 'allmanga';
-
-    if (supportsGenreMode) {
-      const genreMode = await searchManga('', page, PAGE_LIMIT, {
-        mode: 'genre',
-        provider,
-        genre,
-        mangaType,
-        adult: isAdultGenre,
-        statuses,
-        sort: sortValue,
-        minYear,
-        minScore,
-        minChapters,
-        requiresQuery: false,
-      });
-
-      if (Array.isArray(genreMode?.results) && genreMode.results.length > 0) {
-        return genreMode;
-      }
-    }
-
-    return searchManga(`${genre} manga`, page, PAGE_LIMIT, {
-      mode: 'search',
-      provider,
+    const genreMode = await searchManga('', page, PAGE_LIMIT, {
+      mode: 'genre',
+      genre,
       mangaType,
       adult: isAdultGenre,
       statuses,
@@ -369,26 +366,29 @@ async function fetchGenreCatalogPage(args: CatalogPageArgs): Promise<MangaSearch
       minYear,
       minScore,
       minChapters,
+      requiresQuery: false,
+      ...tagOptions,
     });
-  }
 
-  if (provider !== 'all') {
-    return searchManga('', page, PAGE_LIMIT, {
-      mode: 'latest',
-      provider,
+    if (Array.isArray(genreMode?.results) && genreMode.results.length > 0) {
+      return genreMode;
+    }
+
+    return searchManga(`${genre} manga`, page, PAGE_LIMIT, {
+      mode: 'search',
       mangaType,
+      adult: isAdultGenre,
       statuses,
       sort: sortValue,
       minYear,
       minScore,
       minChapters,
-      requiresQuery: false,
+      ...tagOptions,
     });
   }
 
   return searchManga('', page, PAGE_LIMIT, {
     mode: 'explore',
-    provider,
     mangaType,
     statuses,
     sort: sortValue,
@@ -396,6 +396,7 @@ async function fetchGenreCatalogPage(args: CatalogPageArgs): Promise<MangaSearch
     minScore,
     minChapters,
     requiresQuery: false,
+    ...tagOptions,
   });
 }
 
@@ -419,7 +420,6 @@ export default function MangaGenreBrowsePage() {
   const isAdultGenreLocked = isAdultGenre && !canShowAdultEverywhere;
   const hasRouteGenre = Boolean(normalizedRouteGenre);
 
-  const provider = normalizeProvider(searchParams.get('provider'));
   const feedMode = normalizeFeedMode(searchParams.get('feed'));
   const feedWindow = normalizeFeedWindow(searchParams.get('window'));
   const feedOrigin = normalizeOrigin(searchParams.get('origin'));
@@ -429,16 +429,69 @@ export default function MangaGenreBrowsePage() {
   const minYear = parsePositiveNumberParam(searchParams.get('minYear'));
   const minScore = parsePositiveNumberParam(searchParams.get('minScore'));
   const minChapters = parsePositiveNumberParam(searchParams.get('minChapters'));
+  const selectedTags = normalizeTags(searchParams.get('tags'));
+  const tagSource = normalizeTagSource(searchParams.get('tagSource'));
+  const [tagsOpen, setTagsOpen] = useState(selectedTags.length > 0);
+  const [tagSearch, setTagSearch] = useState('');
+
+  // Tag catalog for the picker (AniList or MangaBaka). Cached indefinitely —
+  // taxonomies barely move — and only fetched once the picker opens.
+  const { data: tagOptions = [], isLoading: tagsLoading } = useQuery({
+    queryKey: ['manga-tag-options', tagSource],
+    queryFn: () => getMangaTagOptions(tagSource),
+    enabled: tagsOpen || selectedTags.length > 0,
+    staleTime: 24 * 60 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
+    retry: false,
+  });
+
+  const filteredTagOptions = useMemo(() => {
+    const needle = tagSearch.trim().toLowerCase();
+    return tagOptions
+      .filter((tag) => {
+        if (tag.isAdult && !canShowAdultEverywhere) return false;
+        if (!needle) return true;
+        return (
+          tag.name.toLowerCase().includes(needle) ||
+          (tag.category || '').toLowerCase().includes(needle)
+        );
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [tagOptions, tagSearch, canShowAdultEverywhere]);
+
+  const toggleTag = (name: string) => {
+    const next = selectedTags.includes(name)
+      ? selectedTags.filter((tag) => tag !== name)
+      : [...selectedTags, name];
+    setParamAndNavigate({ tags: next.length > 0 ? next.join(',') : null });
+  };
+
+  // Group the picker cloud by taxonomy category for context. Uncategorized
+  // tags sink to a trailing "General" group; the rest sort alphabetically.
+  const tagGroups = useMemo<TagCloudGroup[]>(() => {
+    const byCategory = new Map<string, TagCloudGroup>();
+    for (const tag of filteredTagOptions) {
+      const category = (tag.category || '').trim() || 'General';
+      const group = byCategory.get(category) ?? { category, tags: [] };
+      group.tags.push(tag);
+      byCategory.set(category, group);
+    }
+    return [...byCategory.values()].sort((a, b) => {
+      if (a.category === 'General') return 1;
+      if (b.category === 'General') return -1;
+      return a.category.localeCompare(b.category);
+    });
+  }, [filteredTagOptions]);
 
   const hasActiveFilters =
-    provider !== 'all' ||
     feedMode !== 'auto' ||
     mangaType !== 'all' ||
     mangaStatus !== 'all' ||
     sortMode !== 'default' ||
     minYear > 0 ||
     minScore > 0 ||
-    minChapters > 0;
+    minChapters > 0 ||
+    selectedTags.length > 0;
 
   const facetQueryText = useMemo(() => {
     if (activeGenre) return `${activeGenre} manga`;
@@ -545,7 +598,7 @@ export default function MangaGenreBrowsePage() {
     const nextParams = new URLSearchParams(searchParams);
 
     Object.entries(updates).forEach(([key, value]) => {
-      if (!value || value === 'all' || value === 'default' || value === 'auto' || value === 'day') {
+      if (!value || value === 'all' || value === 'default' || value === 'auto' || value === 'day' || value === 'anilist') {
         nextParams.delete(key);
       } else {
         nextParams.set(key, value);
@@ -572,7 +625,8 @@ export default function MangaGenreBrowsePage() {
 
   const resetFilters = () =>
     setParamAndNavigate({
-      provider: null,
+      tags: null,
+      tagSource: null,
       feed: null,
       window: null,
       origin: null,
@@ -588,13 +642,14 @@ export default function MangaGenreBrowsePage() {
     queryKey: [
       'manga-discover-catalog',
       activeGenre,
-      provider,
       feedMode,
       feedWindow,
       feedOrigin,
       mangaType,
       mangaStatus,
       sortMode,
+      selectedTags.join(','),
+      tagSource,
       minYear,
       minScore,
       minChapters,
@@ -604,13 +659,14 @@ export default function MangaGenreBrowsePage() {
       fetchGenreCatalogPage({
         page: pageParam,
         genre: activeGenre,
-        provider,
         mangaType,
         mangaStatus,
         sort: sortMode,
         feedMode,
         feedWindow,
         feedOrigin,
+        tags: selectedTags,
+        tagSource,
         minYear,
         minScore,
         minChapters,
@@ -686,6 +742,10 @@ export default function MangaGenreBrowsePage() {
               if (yearGap !== 0) return yearGap;
               return Number(right?.chapters || 0) - Number(left?.chapters || 0);
             }
+            if (sortMode === 'newest') {
+              return Number(right?.year || 0) - Number(left?.year || 0);
+            }
+            // 'follows' keeps the backend FAVOURITES_DESC order.
             return 0;
           });
 
@@ -850,15 +910,6 @@ export default function MangaGenreBrowsePage() {
                 onChange={(next) => setParamAndNavigate({ origin: next })}
               />
             )}
-            <ControlSelect
-              label="Provider"
-              icon={Compass}
-              value={provider}
-              options={PROVIDER_OPTIONS}
-              neutral={['all']}
-              onChange={(next) => setParamAndNavigate({ provider: next })}
-            />
-
             {/* Facet counts ride along as hints where the schema reports them —
                 the providers disagree on the group's name, hence the key lists. */}
             <ControlSelect
@@ -935,6 +986,101 @@ export default function MangaGenreBrowsePage() {
                 <RotateCcw className="h-3.5 w-3.5 opacity-60" />
                 Reset
               </button>
+            )}
+          </div>
+
+          {/* Tags — AniList or MangaBaka catalog. Tag search runs its own
+              backend path, so tags compose with genre/type/status/year. */}
+          <div className="mt-3 rounded-2xl border border-white/[0.07] bg-white/[0.015] p-3 md:p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setTagsOpen((open) => !open)}
+                aria-expanded={tagsOpen}
+                className={cn(
+                  controlTriggerClass,
+                  selectedTags.length > 0 && 'border-primary/50 text-primary',
+                )}
+              >
+                <Tag className="h-3.5 w-3.5 opacity-60" />
+                Tags
+                {selectedTags.length > 0 && (
+                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-black text-primary-foreground">
+                    {selectedTags.length}
+                  </span>
+                )}
+                <ChevronDown className={cn('h-3.5 w-3.5 opacity-60 transition-transform', tagsOpen && 'rotate-180')} />
+              </button>
+
+              <div className="flex rounded-full border border-white/10 bg-white/[0.02] p-0.5">
+                {(['anilist', 'mangabaka'] as const).map((source) => (
+                  <button
+                    key={source}
+                    type="button"
+                    onClick={() => {
+                      if (source === tagSource) return;
+                      // Catalogs don't share tag names — reselect on switch.
+                      setParamAndNavigate({
+                        tagSource: source === 'anilist' ? null : source,
+                        tags: null,
+                      });
+                    }}
+                    className={cn(
+                      'rounded-full px-3 py-1 text-[11px] font-bold transition-all active:scale-95',
+                      tagSource === source
+                        ? 'bg-primary text-primary-foreground shadow'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {source === 'anilist' ? 'AniList' : 'MangaBaka'}
+                  </button>
+                ))}
+              </div>
+
+              {selectedTags.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  title="Remove tag"
+                  onClick={() => toggleTag(tag)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-primary/50 bg-primary/15 px-2.5 py-1 text-[11px] font-bold text-primary transition-colors hover:bg-primary/25"
+                >
+                  {tag}
+                  <X className="h-3 w-3" />
+                </button>
+              ))}
+            </div>
+
+            {tagsOpen && (
+              <div className="mt-3 space-y-2">
+                <Input
+                  value={tagSearch}
+                  onChange={(event) => setTagSearch(event.target.value)}
+                  placeholder={`Search ${tagSource === 'anilist' ? 'AniList' : 'MangaBaka'} tags...`}
+                  className="h-9 rounded-xl border-white/10 bg-background/80 text-xs focus:border-primary/50"
+                />
+                {tagsLoading ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {Array.from({ length: 12 }).map((_, i) => (
+                      <div key={i} className="h-7 w-20 animate-pulse rounded-lg bg-white/[0.05]" />
+                    ))}
+                  </div>
+                ) : filteredTagOptions.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    {tagOptions.length === 0
+                      ? 'The tag catalog did not load. Check your connection and reopen this panel.'
+                      : 'No tags match that search.'}
+                  </p>
+                ) : (
+                  <TagGroupCloud
+                    groups={tagGroups}
+                    selected={selectedTags}
+                    onToggle={toggleTag}
+                    maxHeightClass="max-h-56"
+                    emptyText="No tags match that search."
+                  />
+                )}
+              </div>
             )}
           </div>
           {failedProviders.length > 0 && (

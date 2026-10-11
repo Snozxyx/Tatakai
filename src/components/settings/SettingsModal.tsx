@@ -85,20 +85,20 @@ export function SettingsModal() {
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) closeSettings(); }}>
-      <DialogContent className="z-[80] flex flex-col w-[95vw] max-w-6xl h-[88vh] max-h-[88vh] max-md:w-[calc(100vw-1rem)] max-md:h-[94dvh] max-md:max-h-[94dvh] p-0 gap-0 overflow-hidden bg-background/80 backdrop-blur-[40px] border-white/[0.08] rounded-2xl max-md:rounded-3xl shadow-2xl">
+      <DialogContent overlayClassName="z-[70]" aria-describedby={undefined} className="z-[80] flex flex-col w-[95vw] max-w-6xl h-[88vh] max-h-[88vh] max-md:w-[calc(100vw-1rem)] max-md:h-[94dvh] max-md:max-h-[94dvh] p-0 gap-0 overflow-hidden bg-background/95 backdrop-blur-xl border-border rounded-2xl max-md:rounded-3xl shadow-2xl">
         <DialogTitle className="sr-only">Settings — {active.label}</DialogTitle>
         <div className="flex flex-1 min-h-0 min-w-0">
           {/* Left rail */}
           <aside
             className={cn(
-              'w-full md:w-64 md:shrink-0 flex-col border-r border-white/[0.06] bg-black/20 min-h-0',
+              'w-full md:w-64 md:shrink-0 flex-col border-r border-border bg-muted/30 min-h-0',
               mobilePanelOpen ? 'hidden md:flex' : 'flex',
             )}
           >
             {/* Profile mini-header */}
-            <div className="p-4 border-b border-white/[0.06]">
+            <div className="p-4 border-b border-border">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full overflow-hidden bg-background/50 border border-white/10 flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 rounded-full overflow-hidden bg-background/50 border border-input flex items-center justify-center shrink-0">
                   {avatarUrl ? (
                     <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
                   ) : (
@@ -107,11 +107,13 @@ export function SettingsModal() {
                 </div>
                 <div className="min-w-0">
                   <p className="font-medium truncate">{displayName}</p>
-                  {username && <p className="text-xs text-muted-foreground truncate">@{username}</p>}
+                  {username && <p className="text-xs leading-relaxed text-muted-foreground">@{username}</p>}
                 </div>
               </div>
               {user && (
                 <ProfileSettingsSheet
+                  overlayClassName="z-[90]"
+                  contentClassName="z-[100]"
                   trigger={
                     <Button variant="outline" size="sm" className="w-full mt-3">
                       Edit Profile
@@ -128,14 +130,15 @@ export function SettingsModal() {
                 <Input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
+                  aria-label="Search settings"
                   placeholder="Search settings"
-                  className="pl-9 h-9 bg-background/50 border-white/10"
+                  className="pl-9 h-9 bg-background/50 border-input"
                 />
               </div>
             </div>
 
             {/* Grouped nav */}
-            <nav className="flex-1 overflow-y-auto custom-scrollbar px-2 pb-3 space-y-4">
+            <nav aria-label="Settings categories" className="flex-1 overflow-y-auto custom-scrollbar px-2 pb-3 space-y-4">
               {SETTINGS_GROUP_ORDER.map((group) => {
                 const items = filtered.filter((r) => r.category.group === group);
                 if (items.length === 0) return null;
@@ -152,18 +155,19 @@ export function SettingsModal() {
                           <button
                             key={c.id}
                             onClick={() => selectCategory(c.id)}
+                            aria-current={isActive ? "page" : undefined}
                             className={cn(
-                              'w-full flex items-center gap-3 px-2 py-2 rounded-lg text-sm text-left transition-colors',
+                              'w-full flex items-center gap-3 px-2 py-2 min-h-11 rounded-lg text-sm text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
                               isActive
                                 ? 'bg-primary/15 text-primary'
-                                : 'text-foreground/80 hover:bg-white/5 hover:text-foreground',
+                                : 'text-foreground/80 hover:bg-muted hover:text-foreground',
                             )}
                           >
                             <Icon className="w-4 h-4 shrink-0" />
                             <span className="min-w-0 flex-1">
                               <span className="block truncate">{c.label}</span>
                               {hint && (
-                                <span className="block truncate text-[11px] capitalize text-muted-foreground/70">
+                                <span className="block truncate text-[11px] capitalize text-muted-foreground">
                                   {hint}
                                 </span>
                               )}
@@ -178,14 +182,14 @@ export function SettingsModal() {
               {filtered.length === 0 && (
                 <div className="px-2 py-8 text-center">
                   <p className="text-sm text-muted-foreground">No settings match “{query.trim()}”.</p>
-                  <p className="mt-1 text-xs text-muted-foreground/60">Try “torrent”, “theme”, “language”, or “discord”.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Try “torrent”, “theme”, “language”, or “discord”.</p>
                 </div>
               )}
             </nav>
 
             {/* Log out */}
             {user && (
-              <div className="p-3 border-t border-white/[0.06]">
+              <div className="p-3 border-t border-border">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -206,10 +210,10 @@ export function SettingsModal() {
             )}
           >
             {/* Sticky header */}
-            <header className="flex items-center gap-2 px-4 py-3.5 border-b border-white/[0.06] shrink-0">
+            <header className="flex items-center gap-2 pl-4 pr-14 py-3.5 border-b border-border shrink-0">
               <button
                 onClick={() => setMobilePanelOpen(false)}
-                className="md:hidden flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-white/[0.06] active:scale-95"
+                className="md:hidden flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted"
                 aria-label="Back to categories"
               >
                 <ChevronLeft className="w-5 h-5" />
@@ -222,7 +226,7 @@ export function SettingsModal() {
             </header>
 
             {/* Scrollable body */}
-            <div className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto custom-scrollbar p-5">
+            <div className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain custom-scrollbar p-4 sm:p-6">
               <ActiveComponent section={section} />
 
               {/* Extension mount point — bottom of every settings panel (scoped by category). */}

@@ -85,12 +85,12 @@ export function SettingsSection({
   children?: ReactNode;
 }) {
   return (
-    <section id={id} className={cn("scroll-mt-6", className)}>
+    <section id={id} className={cn("settings-section scroll-mt-6", className)}>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 space-y-1">
-          <h2 className="text-sm font-semibold text-muted-foreground">{title}</h2>
+          <h2 className="font-display text-lg font-semibold text-foreground">{title}</h2>
           {description && (
-            <p className="max-w-2xl text-[13px] leading-relaxed text-muted-foreground/60">
+            <p className="max-w-2xl text-[13px] leading-relaxed text-muted-foreground">
               {description}
             </p>
           )}
@@ -138,13 +138,13 @@ export function SettingRow({
   return (
     <div
       className={cn(
-        "py-3.5",
-        tone === "accent" && "border-l-2 border-l-primary pl-3",
+        "settings-row py-3.5",
+        tone === "accent" && "rounded-xl bg-primary/5 px-3",
         className,
       )}
     >
-      <div className="flex items-center justify-between gap-4">
-        <div className="min-w-0 space-y-0.5">
+      <div className="settings-row-main flex flex-wrap items-center justify-between gap-4">
+        <div className="settings-row-label min-w-0 flex-1 space-y-0.5">
           <p id={labelId} className="flex flex-wrap items-center gap-2 font-medium text-foreground">
             {Icon && <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />}
             {title}
@@ -157,7 +157,7 @@ export function SettingRow({
           )}
         </div>
         {control && (
-          <div className="shrink-0">
+          <div className="settings-row-control max-w-full shrink-0">
             {typeof control === "function" ? control({ labelId, descriptionId }) : control}
           </div>
         )}

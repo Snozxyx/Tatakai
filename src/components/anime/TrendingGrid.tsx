@@ -218,7 +218,7 @@ const TrendingCard = memo(function TrendingCard({ anime, spanClass }: { anime: T
         setIsHovering(false);
         cancelHover();
       }}
-      className={`relative group rounded-3xl overflow-hidden cursor-pointer ${spanClass} border border-border/30 min-h-[200px] md:min-h-0 active:scale-[0.99]`}
+      data-mobile-trending-card className={`relative group rounded-3xl overflow-hidden cursor-pointer ${spanClass} border border-border/30 min-h-[200px] md:min-h-0 active:scale-[0.99]`}
       style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 300px' }}
     >
       <img
@@ -261,9 +261,8 @@ const TrendingCard = memo(function TrendingCard({ anime, spanClass }: { anime: T
       </div>
 
       <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 z-10">
-        <h4 className="font-display text-lg md:text-2xl font-bold mb-1 leading-tight line-clamp-2">{anime.name}</h4>
-        <div className="flex items-center justify-between">
-          <p className="text-xs md:text-sm font-medium text-primary">Rank #{anime.rank}</p>
+        <h4 data-mobile-poster-title className="font-display text-lg md:text-2xl font-bold mb-1 leading-tight line-clamp-2">{anime.name}</h4>
+        <div className="hidden md:flex items-center justify-end">
           <span className="hidden w-10 h-10 rounded-full bg-foreground text-background md:flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
             <Play className="w-4 h-4 fill-background" />
           </span>
@@ -289,7 +288,7 @@ export const TrendingGrid = memo(function TrendingGrid({ animes }: TrendingGridP
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 md:grid-rows-2 gap-3 md:gap-4 h-auto md:h-[600px]">
+      <div data-mobile-trending-grid className="grid grid-cols-2 md:grid-cols-4 md:grid-rows-2 gap-3 md:gap-4 h-auto md:h-[600px]">
         {displayAnimes.map((anime, idx) => (
           <TrendingCard key={anime.id} anime={anime} spanClass={SPAN_CLASSES[idx]} />
         ))}

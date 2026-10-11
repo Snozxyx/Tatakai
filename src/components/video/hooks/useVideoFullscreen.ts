@@ -1,8 +1,24 @@
-import { useState, useCallback, useEffect } from "react";
+import { useDesktopPlayerFullscreen } from "./useDesktopPlayerFullscreen";
+import { useState, useCallback, useEffect, useRef } from "react";
 import type { UseVideoFullscreenParams } from "../VideoPlayer.types";
+import { lockFullscreenAncestors } from "../fullscreenAncestors";
 
 export function useVideoFullscreen({ containerRef, isMobile }: UseVideoFullscreenParams) {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const desktop = useDesktopPlayerFullscreen(containerRef, setIsFullscreen);
+  const fullscreenRef = useRef(false);
+  const pendingRef = useRef(false);
+  fullscreenRef.current = isFullscreen;
+  const unlockAncestorsRef = useRef<(() => void) | null>(null);
+
+  const releaseAncestors = useCallback(() => {
+    try {
+      unlockAncestorsRef.current?.();
+    } catch {
+      /* ignore */
+    }
+    unlockAncestorsRef.current = null;
+  }, []);
 
   const lockLandscapeOnMobile = useCallback(async () => {
     if (!isMobile) return;
@@ -31,74 +47,61 @@ export function useVideoFullscreen({ containerRef, isMobile }: UseVideoFullscree
     const container = containerRef.current;
     if (!container) return;
 
-    const isElectron =
-      typeof window !== "undefined" && !!(window as any).electron?.setFullscreen;
-
-    if (!isFullscreen) {
-      if (isElectron) {
-        container.classList.add("is-player-fullscreen");
-        setIsFullscreen(true);
-        try {
-          await (window as any).electron.setFullscreen(true);
-          document.documentElement.classList.add("app-fullscreen");
-        } catch {
-          // CSS fullscreen still works even if IPC fails
-        }
-      } else {
+    if (desktop.isDesktop) return desktop.toggle();
+    if (pendingRef.current) return;
+    pendingRef.current = true;
+    try {
+      if (!fullscreenRef.current) {
         try {
           if (container.requestFullscreen) {
             await container.requestFullscreen();
           } else if ((container as any).webkitRequestFullscreen) {
             await Promise.resolve((container as any).webkitRequestFullscreen());
           } else {
-            container.classList.add("is-player-fullscreen");
-            setIsFullscreen(true);
+            throw new Error("Fullscreen API unavailable");
           }
+          fullscreenRef.current = true;
+          setIsFullscreen(true);
         } catch {
+          releaseAncestors();
+          unlockAncestorsRef.current = lockFullscreenAncestors(container);
           container.classList.add("is-player-fullscreen");
+          fullscreenRef.current = true;
           setIsFullscreen(true);
         }
-      }
-
-      await lockLandscapeOnMobile();
-    } else {
-      container.classList.remove("is-player-fullscreen");
-      setIsFullscreen(false);
-
-      if (isElectron) {
-        document.documentElement.classList.remove("app-fullscreen");
-        try {
-          await (window as any).electron.setFullscreen(false);
-        } catch {
-          // Ignore
-        }
+        await lockLandscapeOnMobile();
       } else {
+        container.classList.remove("is-player-fullscreen");
+        releaseAncestors();
+        fullscreenRef.current = false;
+        setIsFullscreen(false);
         try {
           if (document.fullscreenElement && document.exitFullscreen) {
             await document.exitFullscreen();
-          } else if (
-            (document as any).webkitFullscreenElement &&
-            (document as any).webkitExitFullscreen
-          ) {
+          } else if ((document as any).webkitFullscreenElement && (document as any).webkitExitFullscreen) {
             await Promise.resolve((document as any).webkitExitFullscreen());
           }
         } catch {
-          // Ignore exit errors
+          // Ignore exit errors.
         }
+        unlockOrientationOnMobile();
       }
-
-      unlockOrientationOnMobile();
+    } finally {
+      pendingRef.current = false;
     }
-  }, [containerRef, isFullscreen, isMobile, lockLandscapeOnMobile, unlockOrientationOnMobile]);
+  }, [containerRef, desktop.isDesktop, desktop.toggle, lockLandscapeOnMobile, unlockOrientationOnMobile, releaseAncestors]);
 
   // Listen for fullscreen API changes
   useEffect(() => {
+    if (desktop.isDesktop) return;
     const handleFullscreenChange = () => {
       const activeFullscreen =
         !!document.fullscreenElement || !!(document as any).webkitFullscreenElement;
+      fullscreenRef.current = activeFullscreen;
       setIsFullscreen(activeFullscreen);
       if (!activeFullscreen) {
         containerRef.current?.classList.remove("is-player-fullscreen");
+        releaseAncestors();
         unlockOrientationOnMobile();
       }
     };
@@ -109,28 +112,13 @@ export function useVideoFullscreen({ containerRef, isMobile }: UseVideoFullscree
         containerRef.current?.classList.contains("is-player-fullscreen")
       ) {
         containerRef.current.classList.remove("is-player-fullscreen");
+        releaseAncestors();
+        fullscreenRef.current = false;
         setIsFullscreen(false);
         document.documentElement.classList.remove("app-fullscreen");
-        const bridge = (window as any).electron;
-        if (bridge?.setFullscreen) {
-          void bridge.setFullscreen(false);
-        }
         unlockOrientationOnMobile();
       }
     };
-
-    const handleElectronFullscreenChange = (isFull: boolean) => {
-      if (!isFull && containerRef.current?.classList.contains("is-player-fullscreen")) {
-        containerRef.current.classList.remove("is-player-fullscreen");
-        document.documentElement.classList.remove("app-fullscreen");
-        setIsFullscreen(false);
-        unlockOrientationOnMobile();
-      }
-    };
-
-    const unsubFullscreen = (window as any).electron?.onFullscreenChanged?.(
-      handleElectronFullscreenChange,
-    );
 
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
@@ -140,9 +128,10 @@ export function useVideoFullscreen({ containerRef, isMobile }: UseVideoFullscree
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
       document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
       document.removeEventListener("keydown", handleKeyEscape);
-      unsubFullscreen?.();
+      releaseAncestors();
+      containerRef.current?.classList.remove("is-player-fullscreen");
     };
-  }, [containerRef, unlockOrientationOnMobile]);
+  }, [containerRef, desktop.isDesktop, unlockOrientationOnMobile, releaseAncestors]);
 
   return { isFullscreen, toggleFullscreen };
 }

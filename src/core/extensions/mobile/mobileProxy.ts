@@ -295,8 +295,12 @@ export function reregisterMobileSource(input: {
   originalUrl?: string;
   headers?: unknown;
 }): string {
+  const existing = String(input?.url || '');
+  const live = resolveMobileProxy(existing);
+  if (live && (!isNativeProxyUrl(existing) || existing.startsWith(`${nativeProxyBaseUrl}/stream/`))) return existing;
   const raw = String(input?.originalUrl || input?.url || '').trim();
   if (!raw) return String(input?.url || '');
+  if (isAnyProxyUrl(raw)) return '';
   if (!/^https?:\/\//i.test(raw)) return raw;
   return registerMobileSource({ url: raw, headers: input?.headers });
 }
@@ -470,35 +474,47 @@ export async function fetchViaMobileProxy(
   // manga images, subtitles and HLS playlists on the fast path.
   if (target.nativeDirect) {
     const wantTextEarly = (options.responseType ?? 'arraybuffer') === 'text';
-    try {
+    // The loopback proxy's first upstream fetch can fail transiently (cold
+    // DNS/TLS → 502) and succeed moments later once warm. Retry once, fast,
+    // on transient proxy statuses only — 403/404/410/416 are real answers.
+    const isTransientProxyStatus = (status: number) =>
+      status === 502 || status === 503 || status === 504;
+    const fetchOnce = async () => {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), timeoutMs);
       try {
         const init: RequestInit = { signal: ctrl.signal };
         if (options.range) init.headers = { Range: options.range };
-        const r = await fetch(target.url, init);
-        const contentType = r.headers.get('content-type') || '';
-        if (!r.ok) {
-          return {
-            ok: false, status: r.status, url: target.url, contentType,
-            headers: {}, data: null, text: null,
-          };
-        }
-        if (wantTextEarly) {
-          const text = await r.text();
-          return {
-            ok: true, status: r.status, url: target.url, contentType,
-            headers: {}, data: null, text,
-          };
-        }
-        const data = await r.arrayBuffer();
-        return {
-          ok: true, status: r.status, url: target.url, contentType,
-          headers: {}, data, text: null,
-        };
+        return await fetch(target.url, init);
       } finally {
         clearTimeout(timer);
       }
+    };
+    try {
+      let r = await fetchOnce();
+      if (!r.ok && isTransientProxyStatus(r.status)) {
+        await proxyDelay(1200);
+        r = await fetchOnce();
+      }
+      const contentType = r.headers.get('content-type') || '';
+      if (!r.ok) {
+        return {
+          ok: false, status: r.status, url: target.url, contentType,
+          headers: {}, data: null, text: null,
+        };
+      }
+      if (wantTextEarly) {
+        const text = await r.text();
+        return {
+          ok: true, status: r.status, url: target.url, contentType,
+          headers: {}, data: null, text,
+        };
+      }
+      const data = await r.arrayBuffer();
+      return {
+        ok: true, status: r.status, url: target.url, contentType,
+        headers: {}, data, text: null,
+      };
     } catch {
       return {
         ok: false, status: 0, url: target.url, contentType: '',
@@ -894,14 +910,36 @@ export function applyMobileProxyToSource<T>(source: T, opts?: { tokenize?: boole
   if (!tokenize) return source;
   const s = source as Record<string, any>;
   const rawHeaders = normalizeMobileHeaders(s.headers);
+  const referer = s.referer || s.referrer || s.refererCandidates?.[0];
+  if (referer && !Object.keys(rawHeaders).some((key) => key.toLowerCase() === 'referer')) rawHeaders.Referer = String(referer);
   const out: Record<string, any> = { ...s };
+  // Migrate saved hosted-proxy wrappers to a device-local upstream registration.
+  try {
+    let target = new URL(String(isAnyProxyUrl(out.url) && !resolveMobileProxy(out.url) ? out.originalUrl || '' : out.url || ''));
+    for (let depth = 0; depth < 3 && /streamingProxy|\/proxy\//i.test(target.pathname); depth++) {
+      const nested = target.searchParams.get('url');
+      if (!nested || !/^https?:\/\//i.test(nested)) break;
+      const wrappedReferer = target.searchParams.get('referer');
+      const wrappedAgent = target.searchParams.get('userAgent');
+      if (wrappedReferer && !Object.keys(rawHeaders).some((key) => key.toLowerCase() === 'referer')) rawHeaders.Referer = wrappedReferer;
+      if (wrappedAgent && !Object.keys(rawHeaders).some((key) => key.toLowerCase() === 'user-agent')) rawHeaders['User-Agent'] = wrappedAgent;
+      target = new URL(nested);
+      out.url = target.href;
+      out.originalUrl = target.href;
+    }
+  } catch { /* opaque token or raw provider URL */ }
+  out.headers = rawHeaders;
   const tracks = Array.isArray(s.subtitles) ? s.subtitles : null;
   if (tracks && tracks.length) {
     out.subtitles = tracks.map((track: any) => {
       const raw = String(track?.url || track?.file || '');
+      const trackHeaders = { ...rawHeaders, ...normalizeMobileHeaders(track?.headers) };
+      if (isAnyProxyUrl(raw)) {
+        return { ...track, url: reregisterMobileSource({ ...track, url: raw, headers: trackHeaders }) };
+      }
       if (!/^https?:\/\//i.test(raw)) return track;
       try {
-        return { ...track, url: registerMobileSource({ url: raw, headers: rawHeaders }), originalUrl: raw };
+        return { ...track, url: registerMobileSource({ url: raw, headers: trackHeaders }), originalUrl: raw, headers: trackHeaders };
       } catch {
         return track;
       }
@@ -910,6 +948,10 @@ export function applyMobileProxyToSource<T>(source: T, opts?: { tokenize?: boole
 
   const kind = resolveStreamKind(out);
   const url = String(out.url || '');
+  if ((kind === 'hls' || kind === 'mp4') && isAnyProxyUrl(url)) {
+    out.url = reregisterMobileSource({ ...out, url, headers: rawHeaders });
+    return out as T;
+  }
   if (
     (kind === 'hls' || kind === 'mp4') &&
     /^https?:\/\//i.test(url) &&

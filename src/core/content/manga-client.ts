@@ -127,6 +127,7 @@ export type MangaSearchOptions = {
   provider?: MangaSearchProvider;
   genre?: string;
   tags?: string[];
+  tagSource?: 'anilist' | 'mangabaka';
   types?: string[];
   mangaType?: string;
   statuses?: string[];
@@ -142,7 +143,7 @@ export type MangaSearchOptions = {
 export type MangaSearchProvider = "all" | "mapped" | "atsu";
 export type MangaSearchMode = "search" | "latest" | "added" | "new-chap" | "recent" | "popular" | "foryou" | "recommendation" | "origin" | "random" | "genre" | "category" | "explore";
 export type MangaFeedTimeWindow = "day" | "week" | "month" | "all";
-export type MangaSortOption = "relevance" | "trending" | "latestUpdate" | "rating" | "popularity" | "chapterCount";
+export type MangaSortOption = "relevance" | "trending" | "latestUpdate" | "rating" | "popularity" | "chapterCount" | "follows" | "newest";
 
 /**
  * Normalize manga search provider string to valid MangaSearchProvider
@@ -180,7 +181,7 @@ export function getMangaFilterSchema(): Record<string, any> {
     provider: { type: "select", options: ["all", "mapped", "atsu"] },
     type: { type: "select", options: ["all", "manga", "manhwa", "manhua", "comics"] },
     status: { type: "select", options: ["all", "ongoing", "completed", "hiatus", "cancelled", "unreleased"] },
-    sort: { type: "select", options: ["relevance", "trending", "latestUpdate", "rating", "popularity", "chapterCount"] },
+    sort: { type: "select", options: ["relevance", "trending", "latestUpdate", "rating", "popularity", "chapterCount", "follows", "newest"] },
   };
 }
 
@@ -222,7 +223,7 @@ function resolveApiOrigin(): string {
   return 'https://api.tatakai.me';
 }
 
-async function apiGet<T>(path: string, params?: Record<string, string | number | boolean | undefined>): Promise<T> {
+async function apiGet<T>(path: string, params?: Record<string, string | number | boolean | undefined>, onMeta?: (meta: { total?: number; hasNextPage?: boolean; lastPage?: number; source?: string }) => void): Promise<T> {
   const url = new URL(path, resolveApiOrigin());
   if (params) {
     for (const [k, v] of Object.entries(params)) {
@@ -232,6 +233,7 @@ async function apiGet<T>(path: string, params?: Record<string, string | number |
   const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const json = await res.json();
+  if (json?.meta) onMeta?.(json.meta);
   return (json?.data ?? json) as T;
 }
 
@@ -274,6 +276,11 @@ export async function searchManga(
   limit = 20,
   options: MangaSearchOptions = {},
 ): Promise<MangaSearchResult> {
+  if (options.tags?.length) {
+    const { searchMangaTags } = await import('./manga-tag-search');
+    return searchMangaTags(query, page, limit, options);
+  }
+  let metadata: { total?: number; hasNextPage?: boolean; lastPage?: number; source?: string } = {};
   const rows = await apiGet<any[]>("/api/v3/manga/search", {
     q: query || undefined,
     page,
@@ -288,7 +295,7 @@ export async function searchManga(
     type: options.mangaType || options.types?.[0],
     minYear: options.minYear,
     minScore: options.minScore,
-  });
+  }, meta => { metadata = meta; });
   const getMangaType = (media: any) => {
     const fmt = String(media?.format || "").toUpperCase();
     if (fmt === "NOVEL" || fmt === "LIGHT_NOVEL") return "novel";
@@ -339,9 +346,11 @@ export async function searchManga(
     failedProviders: [],
     results,
     currentPage: page,
-    totalPages: results.length < limit ? page : page + 1,
-    hasNextPage: results.length >= limit,
-    source: "api-v3",
+    totalPages: metadata.lastPage ?? (results.length < limit ? page : page + 1),
+    total: metadata.total,
+    totalIsApproximate: true,
+    hasNextPage: metadata.hasNextPage ?? results.length >= limit,
+    source: metadata.source || "api-v3",
   };
 }
 
@@ -820,6 +829,10 @@ export function mediaToMangaSearchItem(m: TatakaiMedia): MangaSearchItem {
     canonicalTitle: m.titleEnglish || m.titleRomaji || m.titleNative || "Untitled",
     title: { romaji: m.titleRomaji, english: m.titleEnglish, native: m.titleNative },
     poster: m.coverImageLarge || m.coverImageMedium || null,
+    banner: m.bannerImage,
+    logo: m.logo,
+    titleLogo: m.titleLogo,
+    description: m.description,
     status: m.status || "unknown",
     year: m.startDate?.year ?? null,
     score: m.averageScore ?? null,

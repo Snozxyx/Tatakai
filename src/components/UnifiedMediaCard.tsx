@@ -8,24 +8,30 @@
  * ctrl/middle-clicked into a new tab. The badges and the rating split are shared
  * with `AnimeCardWithPreview` so the two agree.
  */
-import { Play, BookOpen, Star, Film } from "lucide-react";
+import { Star, BookOpen, Film, Play } from "lucide-react";
 import { memo } from "react";
 
-import { GlassPanel } from "@/components/ui/GlassPanel";
-import { Link } from "react-router-dom";
+import { MediaCardFrame } from "@/components/MediaCardFrame";
 import { getProxiedImageUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { splitRating } from "@/lib/mediaRating";
-import { AdultBadge, MetaBadge, ScoreBadge } from "@/components/MediaCardBadges";
-import { useIsMobile } from "@/hooks/ui/use-mobile";
+import { AdultBadge, ScoreBadge, MetaBadge } from "@/components/MediaCardBadges";
+import { useMediaCardStyle } from '@/hooks/ui/useMediaCardStyle';
 import { useLongPress } from "@/hooks/ui/useLongPress";
 import { openMediaQuickPeek, type QuickPeekMedia } from "@/components/media/quickPeekStore";
+import { useHoverPreview } from '@/hooks/useHoverPreview';
+import { useIsMobile } from '@/hooks/ui/use-mobile';
+import { Loader2 } from 'lucide-react';
 
 export interface UnifiedMediaCardProps {
   item: {
     id: string; // The specific ID used for routing (malId, anilistId, or pure string id)
     name: string;
     poster: string;
+    banner?: string;
+    logo?: string;
+    titleLogo?: string;
+    description?: string;
     type?: string;
     status?: string;
     rating?: string | number;
@@ -40,38 +46,51 @@ export interface UnifiedMediaCardProps {
     blurAdult?: boolean;
   };
   variant?: 'poster' | 'overlay';
+  rank?: number;
   className?: string;
+  /**
+   * `'none'` suppresses the card's own corner badges (overlay media-type pill
+   * + status pill). Used when a wrapper paints its own coordinated badge row
+   * in the same corners — rendering both stacks the pills on top of each
+   * other. Everything else (poster, metadata, score) stays identical.
+   */
+  topBadges?: 'auto' | 'none';
 }
 
-export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant = 'overlay', className = "" }: UnifiedMediaCardProps) {
-  const isMobile = useIsMobile();
+/** Normalize a manga `type` into its display label ("manhwa", "comics", …). */
+function mangaFormatLabel(type?: string | null, mediaType = 'manga'): string {
+  if (mediaType !== 'manga') return mediaType;
+  const normalized = String(type || mediaType || 'manga').trim().toLowerCase();
+  if (normalized === 'manwha' || normalized === 'manwah') return 'manhwa';
+  if (normalized === 'comic' || normalized === 'oel') return 'comics';
+  if (!normalized) return 'manga';
+  return normalized;
+}
+
+export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant, rank, className = "", topBadges = 'auto' }: UnifiedMediaCardProps) {
   const isAnime = item.mediaType === 'anime';
   const isManga = item.mediaType === 'manga';
   const isCharacter = item.mediaType === 'character';
   const isAdultItem = Boolean(item.isAdult);
   const shouldBlurAdult = Boolean(isAdultItem && item.blurAdult);
   const { score, label } = splitRating(item.rating);
+  const { style } = useMediaCardStyle();
+  const overlay = (variant || style) === 'overlay';
+  const mobile = useIsMobile();
+  const previewEnabled = isAnime && !mobile;
+  const preview = useHoverPreview({ anilistId: item.anilistId, malId: item.malId, title: item.name, enabled: previewEnabled && !shouldBlurAdult });
   // Phones: no hover states exist, so drop the GPU-heavy hover overlays,
   // backdrop-blurs and transitions entirely (big scroll win on long grids).
 
-  const getMangaFormatLabel = () => {
-    if (!isManga) return item.mediaType;
-
-    const normalized = String(item.type || item.mediaType || "manga").trim().toLowerCase();
-    if (normalized === "manwha" || normalized === "manwah") return "manhwa";
-    if (normalized === "comic" || normalized === "oel") return "comics";
-    if (!normalized) return "manga";
-    return normalized;
-  };
-
-  const mediaBadgeLabel = getMangaFormatLabel();
+  const mediaBadgeLabel = isManga
+    ? mangaFormatLabel(item.type, item.mediaType)
+    : item.mediaType;
 
   /**
    * An off-site `href` stays an external anchor; everything else routes. A card
    * with no id at all gets no link rather than a dead one that navigates to the
    * current page.
    */
-  const isExternal = Boolean(item.href && /^https?:\/\//i.test(item.href));
   const routeTo = (() => {
     if (item.href) return item.href;
     if (isAnime) return `/anime/${encodeURIComponent(item.id)}`;
@@ -82,13 +101,6 @@ export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant =
     }
     return null;
   })();
-
-  const getBadgeIcon = () => {
-    if (isAnime) return <Film className="w-3 h-3" />;
-    if (isManga) return <BookOpen className="w-3 h-3" />;
-    if (isCharacter) return <Star className="w-3 h-3" />;
-    return null;
-  };
 
   // Long-press quick peek — card fields paint instantly, genres/synopsis
   // enrich lazily inside the sheet. Characters have no peek target.
@@ -117,262 +129,47 @@ export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant =
     disabled: !peekMedia,
   });
 
-  const renderMetadata = () => {
-    if (isCharacter) return null;
-
-    return (
-      <div className="flex flex-wrap items-center gap-2 mt-2">
-        {score && <ScoreBadge score={score} />}
-        {label && <MetaBadge>{label}</MetaBadge>}
-
-        {isAnime && !!item.episodes?.sub && (
-          <MetaBadge>
-            {item.episodes.sub} sub {item.episodes.dub ? `• ${item.episodes.dub} dub` : ''}
-          </MetaBadge>
-        )}
-
-        {isManga && item.chapters != null && item.chapters > 0 && (
-          <MetaBadge>{item.chapters} ch</MetaBadge>
-        )}
-      </div>
-    );
-  };
-
-  if (variant === 'poster') {
-    return (
-      <div
-        className={cn(
-          'group relative flex flex-col md:transition-all md:duration-300',
-          routeTo && 'cursor-pointer',
-          className
-        )}
-        style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 300px' }}
-        {...longPress}
-      >
-        <div className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.04] md:transition-all md:duration-300 md:group-hover:border-white/20 md:group-hover:shadow-xl md:group-hover:shadow-black/60 md:group-hover:-translate-y-1">
-          <img
-            src={getProxiedImageUrl(item.poster || '')}
-            alt={item.name}
-            className={cn(
-              "w-full h-full object-cover object-top md:transition-transform md:duration-500 md:group-hover:scale-105",
-              shouldBlurAdult && "blur-md scale-105"
-            )}
-            loading="lazy"
-            decoding="async"
-            fetchPriority="low"
-            onError={(event) => {
-              const image = event.currentTarget;
-              const directPoster = item.poster || '';
-              const stage = image.dataset.fallbackStage || 'proxy';
-
-              if (stage === 'proxy' && directPoster && image.currentSrc !== directPoster) {
-                image.dataset.fallbackStage = 'direct';
-                image.src = directPoster;
-                return;
-              }
-
-              if (stage !== 'placeholder') {
-                image.dataset.fallbackStage = 'placeholder';
-                image.src = '/placeholder.svg';
-              }
-            }}
-          />
-
-          {isAdultItem && <AdultBadge className="absolute top-2 right-2 z-20" />}
-
-          {shouldBlurAdult && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50">
-              <span className="rounded-full border border-destructive/40 bg-black/70 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.15em] text-destructive backdrop-blur-sm">
-                Sensitive
-              </span>
-            </div>
-          )}
-
-          {item.status && !isCharacter && !isAdultItem && (
-            <div className="absolute top-2 right-2 z-10">
-              <div className="px-2 py-0.5 rounded-full bg-black/60 border border-white/10 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
-                {item.status}
-              </div>
-            </div>
-          )}
-
-          {score && (
-            <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-bold text-white">
-              <Star className="h-2.5 w-2.5 fill-amber text-amber" />
-              {score}
-            </div>
-          )}
-
-          {!isMobile && <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />}
-
-          {!isMobile && (
-          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
-            <div className="w-11 h-11 rounded-full bg-primary/90 text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/30 transform scale-75 group-hover:scale-100 transition-transform duration-300 ease-out">
-              {isManga ? <BookOpen className="w-5 h-5 ml-0.5" /> : (isCharacter ? <Star className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />)}
-            </div>
-          </div>
-          )}
-
-          {routeTo &&
-            (isExternal ? (
-              <a
-                href={routeTo}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={item.name}
-                className="absolute inset-0 z-30 focus-visible:outline-none"
-              />
-            ) : (
-              <Link
-                to={routeTo}
-                aria-label={item.name}
-                className="absolute inset-0 z-30 focus-visible:outline-none"
-              />
-            ))}
-        </div>
-
-        <div className="mt-2.5 px-0.5 space-y-0.5">
-          <h3 className="font-display font-bold text-sm leading-snug line-clamp-1 text-white/90 group-hover:text-white transition-colors">
-            {item.name}
-          </h3>
-          <p className="flex items-center gap-1.5 text-xs font-medium text-white/45">
-            <span className="capitalize">{mediaBadgeLabel}</span>
-            {item.year && <span>· {item.year}</span>}
-            {item.chapters && item.chapters > 0 && <span>· {item.chapters} ch</span>}
-            {isAnime && !!item.episodes?.sub && <span>· {item.episodes.sub} sub</span>}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // Overlay variant — GlassPanel (backdrop-blur) is desktop-only; phones get
-  // a plain card with solid overlays so long recommendation grids stay fluid.
-  const overlayInner = (
-      <div className="relative aspect-[2/3] overflow-hidden" style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 300px' }}>
-        <img
-          src={getProxiedImageUrl(item.poster || '')}
-          alt={item.name}
-          className={cn(
-            "w-full h-full object-cover object-top md:transition-transform md:duration-500 md:group-hover:scale-110",
-            shouldBlurAdult && "blur-md scale-110"
-          )}
-          loading="lazy"
-          decoding="async"
-          fetchPriority="low"
-          onError={(event) => {
-            const image = event.currentTarget;
-            const directPoster = item.poster || '';
-            const stage = image.dataset.fallbackStage || 'proxy';
-
-            if (stage === 'proxy' && directPoster && image.currentSrc !== directPoster) {
-              image.dataset.fallbackStage = 'direct';
-              image.src = directPoster;
-              return;
-            }
-
-            if (stage !== 'placeholder') {
-              image.dataset.fallbackStage = 'placeholder';
-              image.src = '/placeholder.svg';
-            }
-          }}
-        />
-
-        {isAdultItem && <AdultBadge className="absolute top-2 right-2 z-20" />}
-
-        {shouldBlurAdult && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50">
-            <span className="rounded-full border border-destructive/40 bg-black/70 px-3 py-1 text-[10px] font-black uppercase tracking-[0.15em] text-destructive backdrop-blur-sm">
-              Sensitive Preview
-            </span>
-          </div>
-        )}
-
-        {/* Media Type Badge */}
-        {item.mediaType && (
-          <div className="absolute top-2 left-2 z-10">
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-black/60 border border-white/10 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm">
-              {getBadgeIcon()}
-              {mediaBadgeLabel}
-            </div>
-          </div>
-        )}
-
-        {/* Status Badge */}
-        {item.status && !isCharacter && !isAdultItem && (
-          <div className="absolute top-2 right-2 z-10">
-            <div className="px-2 py-1 rounded-full bg-black/60 border border-white/10 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              {item.status}
-            </div>
-          </div>
-        )}
-
-        <div className="absolute inset-0 bg-gradient-to-t from-background/95 via-background/20 to-transparent opacity-80 md:group-hover:opacity-90 md:transition-opacity" />
-
-        {/* Hover Action Overlay — desktop only */}
-        {!isMobile && (
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
-          <div className="w-12 h-12 rounded-full bg-primary/90 text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/30 transform scale-50 group-hover:scale-100 transition-transform duration-300 ease-out">
-            {isManga ? <BookOpen className="w-6 h-6 ml-0.5" /> : (isCharacter ? <Star className="w-6 h-6" /> : <Play className="w-6 h-6 ml-1" />)}
-          </div>
-        </div>
-        )}
-
-        <div className="absolute bottom-0 w-full p-4 min-h-[80px] flex flex-col justify-end">
-          <h3 className="font-display font-bold text-base md:text-lg leading-tight line-clamp-2 text-white">
-            {item.name}
-          </h3>
-          {renderMetadata()}
-        </div>
-
-        {/* The link overlays the whole card so the poster is one hit target.
-            It has to sit here rather than wrap the title: the title's own
-            container is absolutely positioned, so a stretched pseudo-element
-            inside it would only cover the bottom bar. */}
-        {routeTo &&
-          (isExternal ? (
-            <a
-              href={routeTo}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={item.name}
-              className="absolute inset-0 z-30 focus-visible:outline-none"
-            />
-          ) : (
-            <Link
-              to={routeTo}
-              aria-label={item.name}
-              className="absolute inset-0 z-30 focus-visible:outline-none"
-            />
-          ))}
-      </div>
-  );
-
-  if (isMobile) {
-    return (
-      <div
-        className={cn(
-          'group relative overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03] active:scale-[0.99]',
-          routeTo && 'cursor-pointer',
-          className,
-        )}
-        {...longPress}
-      >
-        {overlayInner}
-      </div>
-    );
-  }
-
-  return (
-    <GlassPanel
-      className={cn(
-        'group relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary/20 focus-within:ring-2 focus-within:ring-ring',
-        routeTo && 'cursor-pointer',
-        className,
-      )}
-      {...longPress}
-    >
-      {overlayInner}
-    </GlassPanel>
-  );
-})
+  return <MediaCardFrame title={item.name} href={routeTo} variant={variant} className={className} {...longPress}
+    onMouseEnter={previewEnabled ? preview.onEnter : undefined} onMouseLeave={previewEnabled ? preview.onLeave : undefined}
+    poster={<><img src={getProxiedImageUrl(item.poster || '')} alt="" aria-hidden loading="lazy" decoding="async" fetchPriority="low"
+      className={cn('media-card-image h-full w-full object-cover object-top', preview.isActive && !shouldBlurAdult && 'opacity-0', shouldBlurAdult && 'blur-md scale-105')}
+      onError={event => {
+        const image = event.currentTarget;
+        const stage = image.dataset.fallbackStage || 'proxy';
+        if (stage === 'proxy' && item.poster && image.currentSrc !== item.poster) {
+          image.dataset.fallbackStage = 'direct'; image.src = item.poster; return;
+        }
+        if (stage !== 'placeholder') { image.dataset.fallbackStage = 'placeholder'; image.src = '/placeholder.svg'; }
+      }} />
+      {previewEnabled && !shouldBlurAdult && <video ref={preview.videoRef} preload="none" muted loop playsInline crossOrigin="anonymous" onError={preview.onError}
+        className={cn('absolute inset-0 h-full w-full object-cover transition-opacity duration-150', preview.isActive ? 'opacity-100' : 'opacity-0')} />}
+      {preview.isLoading && <div aria-hidden className="pointer-events-none absolute inset-0 flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-white" /></div>}
+      {preview.unavailable && <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center"><span className="rounded-lg bg-black/75 px-3 py-2 text-xs text-white">Preview unavailable</span></div>}
+      {!preview.isLoading && !preview.unavailable && !preview.isActive && <div aria-hidden className="media-card-preview media-card-open pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/90 text-primary-foreground">{isManga ? <BookOpen className="h-6 w-6" /> : isCharacter ? <Star className="h-6 w-6" /> : <Play className="ml-1 h-6 w-6" />}</span>
+      </div>}
+    </>}
+    badges={<>
+      {rank !== undefined && <span className="absolute left-2 top-2 z-20 rounded-lg bg-black/75 px-2 py-1 text-xs font-semibold tabular-nums text-white" aria-label={`Rank ${rank}`}>#{rank}</span>}
+      {isAdultItem && <AdultBadge className={cn('absolute left-2 z-20', rank !== undefined ? 'top-10' : 'top-2')} />}
+      {shouldBlurAdult && <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50"><span className="rounded-full bg-black/80 px-3 py-1 text-xs font-semibold text-white">Sensitive preview</span></div>}
+      {overlay && topBadges !== 'none' && <span className={cn('absolute left-2 z-20 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/60 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white', rank !== undefined || isAdultItem ? 'top-10' : 'top-2')}>
+        {isManga ? <BookOpen aria-hidden className="h-3 w-3" /> : isAnime ? <Film aria-hidden className="h-3 w-3" /> : <Star aria-hidden className="h-3 w-3" />}{mediaBadgeLabel}
+      </span>}
+      {overlay && topBadges !== 'none' && item.status && !isCharacter && !isAdultItem && <span className="absolute right-2 top-2 z-20 max-w-[60%] truncate rounded-full border border-white/10 bg-black/60 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white/85">{item.status}</span>}
+      {!overlay && score && <span className="media-card-score absolute right-2 top-2 z-20 inline-flex items-center gap-1 rounded-lg bg-black/75 px-2 py-1 text-xs font-semibold text-white"><Star aria-hidden className="h-3 w-3 fill-amber text-amber" />{score}</span>}
+    </>}
+    metadata={overlay ? <div className="flex flex-wrap items-center gap-2">
+      {score && <ScoreBadge score={score} />}{label && <MetaBadge className="text-white/85">{label}</MetaBadge>}
+      {isAnime && !!item.episodes?.sub && <MetaBadge className="text-white/85">{item.episodes.sub} sub {item.episodes.dub ? `· ${item.episodes.dub} dub` : ''}</MetaBadge>}
+      {isManga && !!item.chapters && <MetaBadge className="text-white/85">{item.chapters} ch</MetaBadge>}
+    </div> : <div className="flex flex-wrap items-center gap-x-1.5">
+      <span className="capitalize">{isAnime ? item.type || 'Anime' : mediaBadgeLabel}</span>
+      {item.year && <span>· {item.year}</span>}
+      {isManga && !!item.chapters && <span>· {item.chapters} ch</span>}
+      {isAnime && !!item.episodes?.sub && <span>· {item.episodes.sub} sub</span>}
+      {isAnime && !!item.episodes?.dub && <span>· {item.episodes.dub} dub</span>}
+      {label && <span>· {label}</span>}
+      {item.status && !isCharacter && <span>· {item.status}</span>}
+    </div>} />;
+});

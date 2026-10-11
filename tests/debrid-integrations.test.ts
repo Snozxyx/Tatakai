@@ -27,6 +27,23 @@ function response(status: number, body = ''): DebridHttpResponse {
 }
 
 describe('debrid provider flows', () => {
+  test('TorBox verifies a long dashed dashboard key without truncating or rewriting it', async () => {
+    const key = 'abcd0123-'.repeat(32) + 'abcd0123';
+    const request: DebridHttpRequest = async (url, init) => {
+      expect(url).toBe('https://api.torbox.app/v1/api/user/me?settings=false');
+      expect(init?.headers?.Authorization).toBe(`Bearer ${key}`);
+      return response(200, JSON.stringify({ success: true, data: { id: 17 } }));
+    };
+    expect(await new TorboxClient(`  ${key}\n`, request).verifyToken()).toEqual({ id: 17 });
+  });
+
+  test('TorBox preserves provider validation errors even in a 200 response', async () => {
+    const request: DebridHttpRequest = async () => response(200, JSON.stringify({
+      success: false, error: 'BAD_TOKEN', detail: 'The API token is invalid',
+    }));
+    await expect(new TorboxClient('invalid', request).verifyToken()).rejects.toThrow('The API token is invalid');
+  });
+
   test('Real-Debrid selects the matching API file id and accepts selectFiles 204', async () => {
     const requests: Array<{ url: string; body?: string }> = [];
     let infoCalls = 0;

@@ -37,6 +37,12 @@ interface DownloadButtonProps {
   posterUrl?: string;
   /** The playing HLS/http source URL (used for non-torrent downloads). */
   sourceUrl?: string;
+  /**
+   * The provider's original (pre-proxy) URL for the playing source. The
+   * proxied `sourceUrl` carries a short-lived token (15 min / cleared on
+   * restart) — without this, the native enqueue rejects with "source expired".
+   */
+  originalUrl?: string;
   sourceType?: string;
   /** Magnet/torrent URL (torrentStats.rawUrl) — preferred for torrent sources. */
   torrentUrl?: string;
@@ -66,6 +72,7 @@ export function DownloadButton({
   episodeNumber,
   posterUrl,
   sourceUrl,
+  originalUrl,
   sourceType,
   torrentUrl,
   headers,
@@ -135,6 +142,9 @@ export function DownloadButton({
       animeName: animeName || "Anime",
       episodeNumber: episodeNumber ?? 0,
       url: dl.url,
+      // The live (possibly proxied) URL plus its pre-proxy original: the
+      // native side re-resolves from `originalUrl` when the token has expired.
+      originalUrl: isTorrent ? undefined : originalUrl,
       headers: dl.headers,
       posterUrl,
       animeId: numericAnimeId,
@@ -168,7 +178,7 @@ export function DownloadButton({
       default:
         toast.error("Downloads are only available on desktop");
     }
-  }, [busy, episodeId, effectiveUrl, isTorrent, headers, startDownload, animeName, episodeNumber, posterUrl, numericAnimeId, downloadableSubtitles]);
+  }, [busy, episodeId, effectiveUrl, isTorrent, headers, startDownload, animeName, episodeNumber, posterUrl, numericAnimeId, downloadableSubtitles, originalUrl]);
 
   const handleClick = () => {
     void startNow();

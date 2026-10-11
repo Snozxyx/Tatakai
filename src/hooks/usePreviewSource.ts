@@ -21,7 +21,8 @@ interface PreviewSource {
 interface UsePreviewSourceReturn {
   source: PreviewSource | null;
   loading: boolean;
-  startHover: (anilistId: number, titles: string[], episode?: number) => void;
+  unavailable: boolean;
+  startHover: (anilistId: number | null, titles: string[], episode?: number, malId?: number | null) => void;
   cancelHover: () => void;
 }
 
@@ -31,7 +32,8 @@ interface PreviewResolutionResponse {
 }
 
 const HOVER_DELAY_MS = 200;
-const TIMEOUT_MS = 5_000;
+const TIMEOUT_MS = 12_000;
+const titleIds = new Map<string, number>();
 
 /**
  * Register the resolved stream with the desktop in-app loopback proxy so hover
@@ -64,7 +66,8 @@ function toProxyStreamUrl(source: PreviewSource | null): PreviewSource | null {
   if (!source?.streamUrl) return source;
 
   const referer = source.streamHeaders?.Referer || source.streamHeaders?.referer;
-  const cloudUrl = getProxiedVideoUrl(source.streamUrl, referer);
+  const userAgent = source.streamHeaders?.['User-Agent'] || source.streamHeaders?.['user-agent'];
+  const cloudUrl = getProxiedVideoUrl(source.streamUrl, referer, userAgent);
 
   // Desktop registers the resolved stream with the in-app loopback proxy and
   // hands back a 127.0.0.1 URL. Play that first (no cloud round-trip) and keep
@@ -86,14 +89,16 @@ function toProxyStreamUrl(source: PreviewSource | null): PreviewSource | null {
 export function usePreviewSource(): UsePreviewSourceReturn {
   const [source, setSource] = useState<PreviewSource | null>(null);
   const [loading, setLoading] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
   const cacheRef = useRef<Map<number, PreviewSource>>(new Map());
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
+    const cache = cacheRef.current;
     return () => {
       // Clear cache and cancel on unmount
-      cacheRef.current.clear();
+      cache.clear();
       if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
       abortRef.current?.abort();
     };
@@ -109,27 +114,35 @@ export function usePreviewSource(): UsePreviewSourceReturn {
     setLoading(false);
   }, []);
 
-  const resolve = useCallback(async (anilistId: number, titles: string[], episode?: number) => {
-    // Check cache first
-    const cached = cacheRef.current.get(anilistId);
-    if (cached) {
-      setSource(toProxyStreamUrl(cached));
-      setLoading(false);
-      return;
-    }
-
+  const resolve = useCallback(async (anilistId: number | null, titles: string[], episode?: number, malId?: number | null) => {
     const abort = new AbortController();
     abortRef.current = abort;
     setLoading(true);
-
-    const withTimeout = <T>(promise: Promise<T>): Promise<T> => {
-      return Promise.race([
-        promise,
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('timeout')), TIMEOUT_MS)
-        ),
-      ]);
+    const withTimeout = async <T,>(promise: Promise<T>): Promise<T> => {
+      let timer: ReturnType<typeof setTimeout>;
+      try {
+        return await Promise.race([promise, new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('timeout')), TIMEOUT_MS);
+        })]);
+      } finally { clearTimeout(timer!); }
     };
+    if (!anilistId) {
+      const identity = `${malId || ''}:${titles[0] || ''}`;
+      anilistId = titleIds.get(identity) || null;
+      if (!anilistId && titles[0]) {
+        try {
+          const { searchAniListAnime } = await import('@/lib/externalIntegrations');
+          const matches = await withTimeout(searchAniListAnime(titles[0], { perPage: 5 }));
+          const normalize = (value: string) => value.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+          const match = matches.find(item => malId ? item.idMal === malId : Object.values(item.title).some(value => value && titles.some(title => normalize(value) === normalize(title)))) || (matches.length === 1 && !malId ? matches[0] : null);
+          if (match) { anilistId = match.id; titleIds.set(identity, match.id); }
+        } catch { /* Keep the poster when identity or the provider is unavailable. */ }
+      }
+    }
+    if (abort.signal.aborted) return;
+    if (!anilistId) { setSource(null); setLoading(false); setUnavailable(true); return; }
+    const cached = cacheRef.current.get(anilistId);
+    if (cached) { setSource(toProxyStreamUrl(cached)); setLoading(false); return; }
 
     let result: PreviewSource | null = null;
 
@@ -165,6 +178,24 @@ export function usePreviewSource(): UsePreviewSourceReturn {
       } catch { /* both tiers failed */ }
     }
 
+    // The lightweight preview provider may be unavailable while the normal
+    // multi-provider stream service still has a playable source.
+    if (!result && !abort.signal.aborted) {
+      try {
+        const params = new URLSearchParams({ anilistId: String(anilistId), episode: String(episode ?? 1) });
+        titles.forEach(title => params.append('titles[]', title));
+        const res = await withTimeout(fetch(`${resolveApiV3Base()}/toko/stream?${params}`, { signal: abort.signal }));
+        if (res.ok) {
+          const data = await res.json() as { sources?: Array<{ url?: string; provider?: string; isHls?: boolean; sourceType?: string; headers?: Record<string, string> }> };
+          const stream = data.sources?.find(item => item.url && /^https?:\/\//i.test(item.url) &&
+            (item.isHls || item.sourceType === 'hls' || item.sourceType === 'mp4' || /\.(mp4|m3u8)(?:\?|$)/i.test(item.url)));
+          if (stream?.url) result = { provider: stream.provider || null, streamUrl: stream.url,
+            isHls: Boolean(stream.isHls || stream.sourceType === 'hls' || /\.m3u8(?:\?|$)/i.test(stream.url)),
+            streamHeaders: stream.headers, previewTimestampSec: 0 };
+        }
+      } catch { /* The static poster remains useful when both services fail. */ }
+    }
+
     if (!abort.signal.aborted) {
       if (result) {
         // Prefer the in-app loopback proxy for playback. Mint its URL now (the
@@ -185,6 +216,7 @@ export function usePreviewSource(): UsePreviewSourceReturn {
       } else {
         setSource(null);
       }
+      setUnavailable(!result);
       setLoading(false);
     }
   }, []);
@@ -193,7 +225,8 @@ export function usePreviewSource(): UsePreviewSourceReturn {
    * Start the 200 ms hover guard (req 9.3). Delays resolution fetch so that
    * quick mouse-overs do not trigger unnecessary network requests.
    */
-  const startHover = useCallback((anilistId: number, titles: string[], episode?: number) => {
+  const startHover = useCallback((anilistId: number | null, titles: string[], episode?: number, malId?: number | null) => {
+    setUnavailable(false);
     // Cancel any existing hover timer and in-flight request
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
     abortRef.current?.abort();
@@ -201,9 +234,9 @@ export function usePreviewSource(): UsePreviewSourceReturn {
     // 200ms guard before firing the resolution fetch
     hoverTimerRef.current = setTimeout(() => {
       hoverTimerRef.current = null;
-      resolve(anilistId, titles, episode);
+      resolve(anilistId, titles, episode, malId);
     }, HOVER_DELAY_MS);
   }, [resolve]);
 
-  return { source, loading, startHover, cancelHover };
+  return { source, loading, unavailable, startHover, cancelHover };
 }

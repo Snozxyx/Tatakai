@@ -6,19 +6,19 @@ import { MobileNav } from '@/components/layout/MobileNav';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useIsNativeApp } from '@/hooks/ui/useIsNativeApp';
+import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 import { useBookmarkedPosts } from '@/hooks/community/usePostSocial';
 import { PostCard } from '@/components/community/feed/PostCard';
 
 export default function BookmarksPage() {
-  const isNative = useIsNativeApp();
+  const isDesktopApp = useIsDesktopApp();
   const navigate = useNavigate();
   const { data: posts = [], isLoading } = useBookmarkedPosts();
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Sidebar />
-      <main className={cn('relative z-10 w-full', isNative ? 'pl-0' : 'pl-0 md:pl-20 lg:pl-24')}>
+      <main className={cn('relative z-10 w-full', isDesktopApp ? 'pl-0' : 'pl-0 md:pl-20 lg:pl-24')}>
         <div className="mx-auto max-w-2xl px-4 py-6 md:px-6 md:py-8">
           <Button variant="ghost" onClick={() => navigate('/community')} className="mb-4 gap-2">
             <ArrowLeft className="h-4 w-4" /> Community

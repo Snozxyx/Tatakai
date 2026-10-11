@@ -9,16 +9,16 @@
  * this and `UnifiedMediaCard` stay in step, and the preview itself is
  * `useHoverPreview` — the same hook the v6 `PosterCard` uses.
  */
-import { Play, Plus, Check, Loader2 } from "lucide-react";
-import { GlassPanel } from "@/components/ui/GlassPanel";
+import { Play, Plus, Check, Loader2, Star, RefreshCw } from "lucide-react";
+import { MediaCardFrame } from "@/components/MediaCardFrame";
 import { BlurhashImage } from "@/components/ui/blurhash-image";
 import { AnimeCard as AnimeCardType, getHighQualityPoster } from "@/lib/api";
 import { FeatureFlag, useFeatureFlag } from '@/core/feature-flags';
 import { inferAnimeAdultFlag } from "@/lib/contentSafety";
 import { splitRating } from "@/lib/mediaRating";
-import { AdultBadge, MetaBadge, ScoreBadge } from "@/components/MediaCardBadges";
-import { Link, useNavigate } from "react-router-dom";
-import { useState, useEffect, useMemo, memo } from "react";
+import { AdultBadge } from "@/components/MediaCardBadges";
+import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useMemo, useRef, memo } from "react";
 import { useHoverPreview } from "@/hooks/useHoverPreview";
 import { buildPreferredAnimeRouteId } from "@/lib/animeIdMapping";
 import { useAuth } from "@/contexts/AuthContext";
@@ -63,7 +63,7 @@ function AnimeCardWithPreviewInner({ anime, showPreview = true, disableClick = f
     anime.anilistId ??
     (anime as any)?.anilistID ??
     (anime as any)?.anilist_id ??
-    resolveAniListId(anime.id) ??
+    (String(anime.malId || '') === anime.id ? null : resolveAniListId(anime.id)) ??
     null;
 
   const isAdult = inferAnimeAdultFlag(anime);
@@ -75,6 +75,7 @@ function AnimeCardWithPreviewInner({ anime, showPreview = true, disableClick = f
 
   const preview = useHoverPreview({
     anilistId: previewAniListId,
+    malId: anime.malId,
     title: anime.name,
     enabled: showPreview,
   });
@@ -82,6 +83,9 @@ function AnimeCardWithPreviewInner({ anime, showPreview = true, disableClick = f
   const { data: watchlistItem, isLoading: isWatchlistLoading } = useWatchlistItem(anime.id);
   const addToWatchlist = useAddToWatchlist();
   const removeFromWatchlist = useRemoveFromWatchlist();
+  const saving = useRef(false);
+  const [saveFailed, setSaveFailed] = useState(false);
+  useEffect(() => { setSaveFailed(false); }, [anime.id]);
 
   const posterCandidates = useMemo(() => {
     const directPoster = anime.poster?.trim() || "";
@@ -111,23 +115,27 @@ function AnimeCardWithPreviewInner({ anime, showPreview = true, disableClick = f
   const handleWatchlistClick = async (e: React.MouseEvent) => {
     e.preventDefault(); 
     e.stopPropagation();
+    if (saving.current || isWatchlistLoading || addToWatchlist.isPending || removeFromWatchlist.isPending) return;
 
     if (!user) {
       navigate('/auth');
       return;
     }
 
-    if (watchlistItem) {
-      await removeFromWatchlist.mutateAsync(anime.id);
-      return;
-    }
-
-    await addToWatchlist.mutateAsync({
+    saving.current = true;
+    setSaveFailed(false);
+    try {
+      if (watchlistItem) await removeFromWatchlist.mutateAsync(anime.id);
+      else await addToWatchlist.mutateAsync({
       animeId: anime.id,
       animeName: anime.name,
       animePoster: anime.poster,
       status: 'plan_to_watch',
     });
+    } catch {
+      // Mutation hooks retain their existing toast; the control offers a retry.
+      setSaveFailed(true);
+    } finally { saving.current = false; }
   };
 
   const isBusy = isWatchlistLoading || addToWatchlist.isPending || removeFromWatchlist.isPending;
@@ -153,147 +161,38 @@ function AnimeCardWithPreviewInner({ anime, showPreview = true, disableClick = f
     disabled: disableClick,
   });
 
-  // Optimized class: absolute inset-0 guarantees it stretches to the container's bounds
-  const posterClass = `absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-[0.33,1,0.68,1] ${
-    preview.isActive ? 'opacity-0 scale-105' : 'opacity-100 group-hover:scale-110'
-  }`;
-
-  return (
-    <GlassPanel
-      hoverEffect={false}
-      // Fixed layout: w-full h-full aspect-[2/3] p-0
-      // Optimized: removed transition-all, removed heavy shadows on hover
-      className="tk-pressable group relative overflow-hidden rounded-xl border border-white/5 bg-neutral-900 transition-[border-color] duration-300 hover:border-white/20 focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 focus-within:ring-offset-background w-full h-full aspect-[2/3] p-0"
-      onMouseEnter={preview.onEnter}
-      onMouseLeave={preview.onLeave}
-      {...longPress}
-    >
-      {/* Layer 1: Media Container - Absolutely positioned to guarantee edge-to-edge coverage */}
-      <div className="absolute inset-0 z-0 bg-neutral-900/50">
-        {blurhashEnabled ? (
-          <BlurhashImage
-            src={posterCandidates[posterIndex] || '/placeholder.svg'}
-            alt={anime.name}
-            loading="lazy"
-            decoding="async"
-            blurhash={(anime as any).blurhash ?? undefined}
-            className="absolute inset-0 w-full h-full"
-            imgClassName={posterClass}
-            onError={handlePosterError}
-            style={{ imageRendering: 'high-quality' as any }}
-          />
-        ) : (
-          <img
-            src={posterCandidates[posterIndex] || '/placeholder.svg'}
-            alt={anime.name}
-            loading="lazy"
-            decoding="async"
-            fetchPriority="low"
-            className={posterClass}
-            onError={handlePosterError}
-            style={{ imageRendering: 'high-quality' as any }}
-          />
-        )}
-
-        {/* Optimized: Only mount the video element if the user actually hovers */}
-        {showPreview && (preview.isActive || preview.isLoading) && (
-          <video
-            ref={preview.videoRef}
-            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ease-out ${preview.isActive ? 'opacity-100' : 'opacity-0'}`}
-            muted
-            loop
-            playsInline
-            crossOrigin="anonymous"
-            onError={preview.onError}
-          />
-        )}
-      </div>
-
-      {/* Layer 2: Gradient Overlay (Solid to transparent, no blurs) */}
-      <div className="absolute inset-0 z-10 bg-gradient-to-t from-black/95 via-black/40 to-transparent opacity-90 transition-opacity duration-300 group-hover:opacity-100 pointer-events-none" />
-
-      {/* Layer 3: Top Left Badges - Replaced backdrop-blur with fast solid fills */}
-      {isAdult && <AdultBadge className="absolute top-2.5 left-2.5 z-20 shadow-sm" />}
-      {anime.type && !isAdult && (
-        <div className="absolute top-2.5 left-2.5 z-20 px-2 py-0.5 rounded-sm bg-black/60 border border-white/10 text-white text-[10px] font-bold tracking-wider uppercase shadow-sm">
-          {anime.type}
-        </div>
-      )}
-
-      {/* Layer 4: Top Right Score - Fast solid fill */}
-      {score && (
-        <ScoreBadge
-          score={score}
-          className="absolute top-2.5 right-2.5 z-20 rounded-sm border border-white/10 bg-black/60 px-2 py-1 text-xs font-bold text-white shadow-sm"
-        />
-      )}
-
-      {/* Layer 5: Watchlist Button - Specific transitions instead of transition-all */}
-      <button
-        onClick={handleWatchlistClick}
-        disabled={isBusy}
-        className={`absolute right-2.5 z-40 ${
-          score ? 'top-11' : 'top-2.5'
-        } flex h-8 w-8 items-center justify-center rounded-full transition-[opacity,transform,background-color,border-color] duration-300 ease-out opacity-0 -translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 focus-visible:opacity-100 focus-visible:translate-y-0 ${
-          watchlistItem
-            ? 'bg-primary border border-primary text-primary-foreground shadow-lg shadow-primary/20'
-            : 'bg-black/60 text-white border border-white/20 hover:bg-white hover:text-black shadow-sm'
-        }`}
-        title={watchlistItem ? 'Remove from watchlist' : 'Add to watchlist'}
-        aria-label={watchlistItem ? `Remove ${anime.name} from watchlist` : `Add ${anime.name} to watchlist`}
-      >
-        {isBusy ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-        ) : watchlistItem ? (
-          <Check className="w-4 h-4" />
-        ) : (
-          <Plus className="w-4 h-4" />
-        )}
-      </button>
-
-      {/* Layer 6: Center Play Indicator - Removed heavy blur, replaced with semi-transparent solid */}
-      {preview.showFallback && (
-        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-          {preview.isLoading ? (
-            <Loader2 className="w-10 h-10 animate-spin text-white drop-shadow-md" />
-          ) : (
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-black/50 border border-white/20 text-white transition-transform duration-300 transform scale-90 group-hover:scale-100 shadow-2xl">
-              <Play className="h-6 w-6 fill-white ml-1" />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Layer 7: Bottom Text & Meta Info - Fast solid fills */}
-      <div className="absolute bottom-0 inset-x-0 z-20 flex flex-col justify-end p-3.5 pt-12 pointer-events-none">
-        <h3 className="text-sm font-semibold leading-tight text-white transition-colors duration-200 group-hover:text-white line-clamp-2 mb-2 drop-shadow-md antialiased">
-          {anime.name}
-        </h3>
-        <div className="flex flex-wrap gap-1.5">
-          {(anime.episodes?.dub || 0) > 0 && (
-            <MetaBadge className="bg-primary/60 text-primary-foreground border border-primary/30 text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-sm shadow-sm">
-              Mic {anime.episodes?.dub}
-            </MetaBadge>
-          )}
-          {label && (
-            <MetaBadge className="bg-black/60 text-white/90 border border-white/10 text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-sm shadow-sm">
-              {label}
-            </MetaBadge>
-          )}
-        </div>
-      </div>
-
-      {/* Layer 8: Semantic Link Overlay */}
-      {!disableClick && (
-        <Link
-          to={routeTo}
-          aria-label={anime.name}
-          className="absolute inset-0 z-30 focus-visible:outline-none"
-        />
-      )}
-    </GlassPanel>
-  );
+  const posterClass = `media-card-image absolute inset-0 w-full h-full object-cover ${preview.isActive ? 'opacity-0' : 'opacity-100'}`;
+  return <MediaCardFrame title={anime.name} href={disableClick ? null : routeTo}
+    onMouseEnter={preview.onEnter} onMouseLeave={preview.onLeave} {...longPress}
+    poster={<>
+      {blurhashEnabled ? <BlurhashImage src={posterCandidates[posterIndex] || '/placeholder.svg'} alt="" loading="lazy" decoding="async"
+        blurhash={(anime as any).blurhash ?? undefined} className="absolute inset-0 w-full h-full" imgClassName={posterClass} onError={handlePosterError} />
+        : <img src={posterCandidates[posterIndex] || '/placeholder.svg'} alt="" aria-hidden loading="lazy" decoding="async" fetchPriority="low" className={posterClass} onError={handlePosterError} />}
+      {showPreview && <video ref={preview.videoRef} preload="none"
+        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-150 ${preview.isActive ? 'opacity-100' : 'opacity-0'}`}
+        muted loop playsInline crossOrigin="anonymous" onError={preview.onError} />}
+      {preview.showFallback && <div aria-hidden className="media-card-preview pointer-events-none absolute inset-0 z-20 flex items-center justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+        <span className={`flex items-center justify-center bg-black/75 text-white ${preview.unavailable ? 'rounded-lg px-3 py-2 text-xs' : 'h-11 w-11 rounded-full'}`}>
+          {preview.unavailable ? 'Preview unavailable' : preview.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Play className="ml-0.5 h-5 w-5" />}
+        </span>
+      </div>}
+    </>}
+    badges={<>
+      {isAdult && <AdultBadge className="absolute left-2 top-2 z-20" />}
+      {score && <span className="media-card-score absolute right-2 top-2 z-20 rounded-lg bg-black/75 px-2 py-1 text-xs font-semibold text-white"><Star aria-hidden className="inline h-3 w-3 fill-amber text-amber mr-1" />{score}</span>}
+    </>}
+    actions={<button type="button" onClick={handleWatchlistClick} onPointerDown={event => event.stopPropagation()} disabled={isBusy} aria-busy={isBusy} aria-pressed={Boolean(watchlistItem)}
+      className={`media-card-action absolute right-1 top-10 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 transition-[opacity,background-color] duration-150 ${watchlistItem ? 'bg-primary text-primary-foreground' : 'bg-black/70 text-white hover:bg-black/90'}`}
+      title={saveFailed ? 'Couldn’t update watchlist. Try again.' : undefined}
+      aria-label={saveFailed ? `Retry updating ${anime.name} in watchlist` : watchlistItem ? `Remove ${anime.name} from watchlist` : `Add ${anime.name} to watchlist`}>
+      {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : saveFailed ? <RefreshCw className="h-4 w-4" /> : watchlistItem ? <Check className="ui-save-check h-4 w-4" /> : <Plus className="h-4 w-4" />}
+    </button>}
+    metadata={<div className="flex flex-wrap items-center gap-x-1.5">
+      <span>{anime.type || 'Anime'}</span>{anime.year && <span>· {anime.year}</span>}
+      {!!anime.episodes?.sub && <span>· {anime.episodes.sub} sub</span>}
+      {!!anime.episodes?.dub && <span>· {anime.episodes.dub} dub</span>}
+      {label && <span>· {label}</span>}
+    </div>} />;
 }
 
-// Memoized to prevent re-renders of off-screen cards during feed updates
 export const AnimeCardWithPreview = memo(AnimeCardWithPreviewInner);

@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useIsMobile } from '@/hooks/ui/use-mobile';
 import {
   ResponsiveContainer,
   PieChart,
@@ -56,6 +57,9 @@ export function OverviewInteractiveCharts({
   history = [],
 }: OverviewInteractiveChartsProps) {
   const [activeView, setActiveView] = useState<ChartView>('distribution');
+  // Recharts entrance animations (~1s of JS-driven SVG churn per chart) jank
+  // phones — render the final frame immediately on mobile.
+  const isMobile = useIsMobile();
 
   // Distribution data
   const distributionData = useMemo(() => {
@@ -218,6 +222,7 @@ export function OverviewInteractiveCharts({
                       stroke="none"
                       cornerRadius={6}
                       animationDuration={800}
+                      isAnimationActive={!isMobile}
                     >
                       {distributionData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
@@ -295,6 +300,7 @@ export function OverviewInteractiveCharts({
                     fillOpacity={1}
                     fill="url(#watchTimeGradient)"
                     animationDuration={1000}
+                    isAnimationActive={!isMobile}
                   />
                   <Area
                     type="monotone"
@@ -305,6 +311,7 @@ export function OverviewInteractiveCharts({
                     fillOpacity={1}
                     fill="url(#chaptersGradient)"
                     animationDuration={1000}
+                    isAnimationActive={!isMobile}
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -330,6 +337,7 @@ export function OverviewInteractiveCharts({
                     dataKey="count"
                     radius={[6, 6, 0, 0]}
                     animationDuration={800}
+                    isAnimationActive={!isMobile}
                     barSize={32}
                   >
                     {engagementData.map((entry, index) => (

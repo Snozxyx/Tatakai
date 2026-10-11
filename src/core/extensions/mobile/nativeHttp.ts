@@ -16,6 +16,8 @@
  */
 
 import { CapacitorHttp } from '@capacitor/core';
+import { registerNativeSource } from '@/core/mobile/localProxyNative';
+import { loadMobileConfig } from '@/hooks/ui/useMobileConfig';
 
 const unhealthyHosts = new Map<string, number>();
 const HOST_COOLDOWN_MS = 90_000;
@@ -168,7 +170,8 @@ export function createNativeFetch(allowedDomains: string[]) {
     // Shorter than the old 30s/30s: scrape requests that stall this long are
     // dead weight on mobile radio, and the bundle's own (now honored) signal
     // still governs providers that set tighter timeouts.
-    const request = CapacitorHttp.request({
+    const request = (async () => {
+      const initial = await CapacitorHttp.request({
       url,
       method: (init.method || 'GET').toUpperCase(),
       headers,
@@ -178,7 +181,22 @@ export function createNativeFetch(allowedDomains: string[]) {
       responseType: 'text',
       connectTimeout: 6_000,
       readTimeout: 10_000,
-    } as any);
+      } as any);
+      // Provider searches use CapacitorHttp too. Hand a detected GET challenge
+      // to the native proxy so metadata and playback share the same solver.
+      const text = typeof initial.data === 'string' ? initial.data.slice(0, 65536).toLowerCase() : '';
+      if ((init.method || 'GET').toUpperCase() === 'GET' && loadMobileConfig().cloudflareBypass
+          && [403, 503, 429].includes(initial.status)
+          && ['cf-browser-verification', 'cf_chl_', 'cf-chl-', 'challenge-platform', 'turnstile', 'just a moment', '__cf_chl_tk'].some((marker) => text.includes(marker))) {
+        if (signal?.aborted) throw abortError();
+        const proxyUrl = await registerNativeSource(url, headers);
+        if (proxyUrl) {
+          const result = await CapacitorHttp.request({ url: proxyUrl, method: 'GET', responseType: 'text', connectTimeout: 6000, readTimeout: 65000 });
+          return { ...result, url };
+        }
+      }
+      return initial;
+    })();
 
     let res: Awaited<typeof request>;
     try {

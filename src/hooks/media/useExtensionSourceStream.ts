@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { applyMobileProxyToSource } from '@/core/extensions/mobile/mobileProxy';
 import {
   readCachedItemsSync,
   hydrateCachedItems,
@@ -72,6 +73,15 @@ export interface ExtensionSourceStreamParams {
   preferredLanguage?: string;
   route?: "sources" | "stream" | "torrent";
   enabled?: boolean;
+}
+
+export function extensionStreamCacheKey(namespace: string, params: ExtensionSourceStreamParams): string {
+  return JSON.stringify({
+    scope: 'ext-stream', namespace, anilistId: params.anilistId ?? null,
+    titlesKey: (params.titles || []).join('|'), episode: params.episode ?? null,
+    resolution: params.resolution ?? '1080p', preferredLanguage: params.preferredLanguage ?? null,
+    route: params.route || 'sources',
+  });
 }
 
 export interface ExtensionSourceStreamResult<T = any> {
@@ -400,16 +410,7 @@ export function useExtensionSourceStream<T = any>(
   // so a manual "fetch more" (reloadKey++) and a plain revisit merge into the
   // SAME cache bucket instead of forking a fresh one. Used to seed the source
   // list instantly on revisit and to union-merge live arrivals write-through.
-  const streamCacheKey = JSON.stringify({
-    scope: "ext-stream",
-    namespace,
-    anilistId: anilistId ?? null,
-    titlesKey,
-    episode: episode ?? null,
-    resolution,
-    preferredLanguage: preferredLanguage ?? null,
-    route,
-  });
+  const streamCacheKey = extensionStreamCacheKey(namespace, params);
 
   // Read latest params without retriggering the effect for object identity churn.
   const paramsRef = useRef(params);
@@ -465,7 +466,12 @@ export function useExtensionSourceStream<T = any>(
     // `isFetching:true`. When the cache is empty this is a no-op and behavior is
     // exactly as before.
     const seed = readCachedItemsSync<any>(streamCacheKey) || [];
-    for (const s of seed) {
+    const restoreCachedSource = (source: any) =>
+      typeof window !== 'undefined' && (window as any).tatakaiMobileExtensions
+        ? applyMobileProxyToSource(source) : source;
+    for (const cachedSource of seed) {
+      const s = restoreCachedSource(cachedSource);
+      if (!s?.url) continue;
       if (!canSeedSource(s)) continue;
       const k = `${s?.providerKey || ""}::${s?.url || ""}`;
       if (k !== "::" && seen.has(k)) continue;
@@ -483,7 +489,9 @@ export function useExtensionSourceStream<T = any>(
         try {
           const hydrated = await hydrateCachedItems<any>(streamCacheKey);
           if (!cancelled && hydrated && hydrated.length) {
-            for (const s of hydrated) {
+            for (const cachedSource of hydrated) {
+              const s = restoreCachedSource(cachedSource);
+              if (!s?.url) continue;
               if (!canSeedSource(s)) continue;
               const k = `${s?.providerKey || ""}::${s?.url || ""}`;
               if (k !== "::" && seen.has(k)) continue;
@@ -582,7 +590,7 @@ export function useExtensionSourceStream<T = any>(
           await host.resolveSources(
             namespace,
             route,
-            { anilistId, titles, episode, resolution, preferredLanguage },
+            { anilistId, titles, episode, resolution, preferredLanguage, refresh: reloadKey > 0 },
             onChunk,
           );
           if (cancelled) return;
@@ -981,6 +989,7 @@ export function streamExtensionSources<T = any>(
   namespace: string,
   params: ExtensionSourceStreamParams,
   timeoutMs = 15000,
+  onSources?: (sources: T[]) => void,
 ): Promise<T[]> {
   return new Promise<T[]>((resolve) => {
     let settled = false;
@@ -989,15 +998,24 @@ export function streamExtensionSources<T = any>(
     let quietTimer: ReturnType<typeof setTimeout> | null = null;
     const seen = new Set<string>();
     const sources: T[] = [];
+    const cacheKey = extensionStreamCacheKey(namespace, params);
+    const seed = readCachedItemsSync<T>(cacheKey) || [];
+    if (seed.length) onSources?.(seed);
     const finish = () => {
       if (settled) return;
       settled = true;
       if (timer) clearTimeout(timer);
       if (quietTimer) clearTimeout(quietTimer);
       try { es?.close(); } catch { /* noop */ }
+      if (sources.length) writeCachedItems(cacheKey, sources, STREAM_TTL_MS);
       resolve(sources);
     };
     (async () => {
+      if (!seed.length) {
+        void hydrateCachedItems<T>(cacheKey).then(items => {
+          if (!settled && sources.length === 0 && items?.length) onSources?.(items);
+        });
+      }
       let base: ResolvedBase;
       try {
         base = await resolveExtensionApiBase();
@@ -1012,12 +1030,14 @@ export function streamExtensionSources<T = any>(
       // Mobile in-WebView runtime: resolve in-process, no SSE.
       if (base.baseUrl === MOBILE_EXT_BASE) {
         // A mobile provider batch can contain a few unreachable hosts. Waiting
-        // for every 15-second provider timeout made the download sheet report
-        // "No sources" long after playable servers had already resolved. Use
-        // the bundle's progressive callback and return after a short quiet
-        // window once at least one source arrives, while the underlying batch
-        // is free to finish for the live player/cache.
-        timer = setTimeout(finish, Math.min(timeoutMs, 8000));
+        // for every provider timeout made callers report "No sources" long
+        // after playable servers had already resolved — but cutting the batch
+        // off too early (the old 8s cap) hid slow providers entirely, so the
+        // download sheet only ever listed the two fastest servers. Use the
+        // bundle's progressive callback: return after a quiet window once at
+        // least one source arrives, while the underlying batch is free to
+        // finish for the live player/cache.
+        timer = setTimeout(finish, Math.min(timeoutMs, 15000));
         try {
           const host = (window as any).tatakaiMobileExtensions;
           const accept = (src: T) => {
@@ -1027,13 +1047,16 @@ export function streamExtensionSources<T = any>(
             if (key !== "::" && seen.has(key)) return;
             seen.add(key);
             sources.push(src);
+            onSources?.([...sources]);
           };
           const onChunk = (chunk: { results?: T[] }) => {
             if (settled) return;
             for (const src of chunk?.results || []) accept(src);
             if (sources.length > 0) {
               if (quietTimer) clearTimeout(quietTimer);
-              quietTimer = setTimeout(finish, 900);
+              // Generous quiet window: slow providers often arrive in drips,
+              // and each new chunk restarts the wait (capped by the timer above).
+              quietTimer = setTimeout(finish, 2000);
             }
           };
           const resolved = (await host.resolveSources(
@@ -1070,6 +1093,7 @@ export function streamExtensionSources<T = any>(
           if (key !== "::" && seen.has(key)) return;
           seen.add(key);
           sources.push(src);
+          onSources?.([...sources]);
         } catch { /* ignore malformed event */ }
       });
       es.addEventListener("done", finish);

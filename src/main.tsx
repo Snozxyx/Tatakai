@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { HelmetProvider } from "react-helmet-async";
+import { MotionPreferences } from '@/components/ui/MotionPreferences';
 import App from "./App.tsx";
 import "./index.css";
 import "./utils/debug-extension"; // Extension debugger for console
@@ -11,6 +12,9 @@ import { initSentryClient } from '@/lib/sentry';
 import { initDiscordActivity } from '@/lib/discordActivity';
 import { installGlobalAdminSecretFetchPatch } from '@/lib/api/adminSecret';
 import '@/lib/production'; // Suppress console in production
+import { installMobileLayout } from '@/lib/mobile/layout';
+
+installMobileLayout();
 
 // Initialize Sentry (client) if configured
 try {
@@ -101,7 +105,7 @@ async function renderApp() {
     <HelmetProvider>
       <ErrorBoundary>
         <WebappWrapper>
-          <App />
+          <MotionPreferences><App /></MotionPreferences>
         </WebappWrapper>
       </ErrorBoundary>
     </HelmetProvider>

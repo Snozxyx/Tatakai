@@ -4,6 +4,7 @@ import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsDesktopApp, useIsMacOS, useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
 import { useTitlebarHidden } from "@/hooks/ui/useTitlebarHidden";
+import { useMobileAppearance } from '@/hooks/ui/useMobileAppearance';
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { NotificationBell } from "@/components/ui/NotificationBell";
@@ -25,6 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { ANILIST_GRAPHQL_ENDPOINT } from "@/lib/api/backendOrigin";
+import { triggerHaptic } from "@/lib/haptics";
 
 // ── Image search helpers ──────────────────────────────────────────────────────
 
@@ -85,6 +87,7 @@ function formatTs(secs: number) {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function Header() {
+  const refreshed = useMobileAppearance();
   const [searchQuery, setSearchQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [systemStatus, setSystemStatus] = useState<"operational" | "degraded" | "checking">("checking");
@@ -159,6 +162,18 @@ export function Header() {
     commitSearch(searchQuery);
   };
 
+  // Mobile Anime ↔ Manga catalog switch: haptic tick + icon pop (the icon
+  // remounts on `key` change and plays `animate-catalog-switch`, gated behind
+  // `motion-safe` so reduced-motion users just get the instant swap) + reset
+  // scroll so the new catalog starts at the top. `triggerHaptic` already
+  // honors the user's haptic toggle, reduced-motion and tap throttle.
+  const isMangaCatalog = location.pathname.startsWith('/manga');
+  const handleCatalogSwitch = useCallback(() => {
+    void triggerHaptic('toggle');
+    navigate(isMangaCatalog ? '/' : '/manga');
+    requestAnimationFrame(() => window.scrollTo({ top: 0 }));
+  }, [navigate, isMangaCatalog]);
+
   const handleSignOut = async () => {
     await signOut();
     navigate("/");
@@ -197,19 +212,43 @@ export function Header() {
 
   return (
     <>
-      <header className={cn("md:hidden sticky z-50 border-b border-white/[0.06] bg-background/85 backdrop-blur-xl", hasSolidTitlebar ? "top-8" : "top-0")}>
-        <div className="relative flex h-14 items-center justify-between px-3 pt-[env(safe-area-inset-top)]">
-          <div className="relative z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] shadow-sm">
-            <NotificationBell />
-          </div>
+      <header data-mobile-header className={cn(refreshed ? 'block' : 'md:hidden', "sticky z-50 border-b border-white/[0.06] bg-background/85 backdrop-blur-xl", hasSolidTitlebar ? "top-8" : "top-0")}>
+        <div className="pt-[env(safe-area-inset-top)]">
+        <div className="relative flex h-14 items-center justify-between px-3">
+          {/* Left slot: notifications when signed in, otherwise a home shortcut.
+              Never render a dead empty box here — it reads as a blank button
+              over scrolled content and swallows no action. */}
+          {user && !isBanned ? (
+            <div className="relative z-10 h-11 w-11">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] shadow-sm"><NotificationBell /></div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              aria-label="Go home"
+              title="Home"
+              className="relative z-10 flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] shadow-sm transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 hover:border-primary/40 hover:bg-white/[0.1] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+            >
+              <img
+                src={`${import.meta.env.BASE_URL}assets/logo/tatakai-logo-square.png`}
+                alt=""
+                aria-hidden
+                className="h-6 w-6 rounded-md object-contain"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => navigate(location.pathname.startsWith('/manga') ? '/' : '/manga')}
-            className="absolute left-1/2 top-1/2 z-10 inline-flex h-9 -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3.5 text-xs font-bold tracking-wide text-foreground shadow-sm transition-all hover:border-primary/40 hover:bg-white/[0.1] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-            aria-label={location.pathname.startsWith('/manga') ? 'Switch to Anime' : 'Switch to Manga'}
+            onClick={handleCatalogSwitch}
+            className="absolute left-1/2 top-1/2 z-10 inline-flex h-9 -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3.5 text-xs font-bold tracking-wide text-foreground shadow-sm transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 hover:border-primary/40 hover:bg-white/[0.1] active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+            aria-label={isMangaCatalog ? 'Switch to Anime' : 'Switch to Manga'}
           >
-            {location.pathname.startsWith('/manga') ? <BookOpen className="h-3.5 w-3.5 text-primary" /> : <Play className="h-3.5 w-3.5 fill-primary text-primary" />}
-            {location.pathname.startsWith('/manga') ? 'Manga' : 'Anime'}
+            <span key={isMangaCatalog ? 'manga' : 'anime'} className="inline-flex motion-safe:animate-catalog-switch">
+              {isMangaCatalog ? <BookOpen className="h-3.5 w-3.5 text-primary" /> : <Play className="h-3.5 w-3.5 fill-primary text-primary" />}
+            </span>
+            {isMangaCatalog ? 'Manga' : 'Anime'}
           </button>
           <div className="relative z-10">
             {isLoading ? (
@@ -217,7 +256,7 @@ export function Header() {
             ) : user && !isBanned ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button aria-label="Open profile menu" className="rounded-full outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary/60">
+                  <button aria-label="Open profile menu" className="flex h-11 w-11 items-center justify-center rounded-full outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary/60">
                     <Avatar className="h-9 w-9 ring-1 ring-white/20 transition-shadow hover:ring-primary/40">
                       <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || 'User'} />
                       <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-xs font-bold text-primary-foreground">{profile?.display_name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
@@ -232,39 +271,40 @@ export function Header() {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Link to="/auth" className="inline-flex h-9 items-center rounded-full bg-primary px-4 text-xs font-bold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:brightness-110 active:scale-95">Sign in</Link>
+              <Link to="/auth" className="inline-flex h-9 items-center rounded-full bg-primary px-4 text-xs font-bold text-primary-foreground shadow-lg shadow-primary/25 transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 hover:brightness-110 active:scale-95">Sign in</Link>
             )}
           </div>
         </div>
+        </div>
       </header>
 
-      <header className={cn("hidden md:flex items-center mb-4 px-1 sticky z-50 py-2", hasSolidTitlebar ? "top-8" : "top-0")}>
-        <div className="flex w-full items-center justify-between gap-8 rounded-2xl border border-white/[0.08] bg-background/70 px-5 py-2.5 shadow-[0_8px_32px_-12px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+      <header data-desktop-header className={cn(refreshed ? 'hidden' : 'hidden md:flex', "relative items-center mb-4 px-6 z-50 backdrop-blur-md py-2")}>
+        <div className="flex items-center justify-between w-full gap-8">
         {/* Left: welcome + status */}
-        <div className="flex items-center gap-3 min-w-0">
-          <h2 className="truncate text-muted-foreground text-[13px] font-medium tracking-wide">
-            Welcome back, <span className="font-semibold text-foreground">{profile?.display_name || "Traveler"}</span>
+        <div className="flex items-center gap-3">
+          <h2 className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
+            Welcome back, <span className="text-foreground">{profile?.display_name || "Traveler"}</span>
           </h2>
           {isBanned && (
-            <span className="shrink-0 px-2 py-0.5 rounded-full bg-destructive/20 text-destructive text-xs font-medium animate-pulse">BANNED</span>
+            <span className="px-2 py-0.5 rounded-full bg-destructive/20 text-destructive text-xs font-medium animate-pulse">BANNED</span>
           )}
           <Link
             to="/status"
-            className="flex shrink-0 items-center gap-2 rounded-full border border-white/[0.06] bg-muted/30 px-3 py-1 hover:bg-muted/50 transition-all"
+            className="flex items-center gap-2 px-3 py-1 rounded-full bg-muted/30 hover:bg-muted/50 transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 group"
             title={systemStatus === "operational" ? "All systems operational" : "Some services degraded"}
           >
-            <span className={cn("h-2 w-2 rounded-full", statusColor, systemStatus === "operational" && "animate-pulse")} />
+            <span className={cn("w-2 h-2 rounded-full", statusColor, systemStatus === "operational" && "animate-pulse")} />
             <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">Status</span>
           </Link>
         </div>
 
         {/* Right: search + user */}
-        <div className="flex items-center gap-3 md:gap-4">
+        <div className="flex items-center gap-4 md:gap-6">
           {/* Search form with live suggestions */}
           <div ref={searchWrapperRef} className="relative">
             <form
               onSubmit={handleSearch}
-              className="flex items-center gap-2.5 rounded-full border border-white/[0.08] bg-muted/40 px-4 py-2 transition-all hover:bg-muted/60 hover:border-white/[0.12] focus-within:border-primary/40 focus-within:bg-muted/60 cursor-text group"
+              className="flex items-center gap-3 bg-muted/50 border border-border/30 rounded-full px-4 py-2 hover:bg-muted transition-colors cursor-pointer group"
             >
               <Search className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
               <input
@@ -280,7 +320,7 @@ export function Header() {
                   if (e.key === "Escape") setShowSuggestions(false);
                 }}
                 placeholder="Search anime..."
-                className="w-24 bg-transparent text-sm text-muted-foreground placeholder:text-muted-foreground/70 focus:text-foreground focus:outline-none sm:w-32 lg:w-48"
+                className="bg-transparent text-sm text-muted-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus:text-foreground w-24 sm:w-32 lg:w-48"
                 aria-label="Search anime"
                 autoComplete="off"
               />
@@ -288,7 +328,7 @@ export function Header() {
                 <button
                   type="button"
                   onClick={() => { setSearchQuery(""); setShowSuggestions(false); }}
-                  className="rounded-full p-0.5 hover:bg-white/10"
+                  className="p-0.5 hover:bg-muted/50 rounded-full"
                   aria-label="Clear search"
                 >
                   <X className="w-3.5 h-3.5 text-muted-foreground" />
@@ -297,14 +337,14 @@ export function Header() {
               <button
                 type="button"
                 onClick={(e) => { e.preventDefault(); setShowImageSearch(true); }}
-                className="rounded-lg p-1 transition-colors hover:bg-white/10"
+                className="p-1 hover:bg-muted/50 rounded-lg transition-colors"
                 title="Search by image"
               >
                 <Camera className="w-4 h-4 text-muted-foreground hover:text-foreground transition-colors" />
               </button>
-              <div className="hidden lg:flex gap-1 ml-1">
-                <span className="rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] text-muted-foreground">⌘</span>
-                <span className="rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] text-muted-foreground">K</span>
+              <div className="hidden lg:flex gap-1 ml-2">
+                <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">⌘</span>
+                <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">K</span>
               </div>
             </form>
 
@@ -321,12 +361,12 @@ export function Header() {
           </div>
 
           {isLoading ? (
-            <div className="w-10 h-10 rounded-full bg-muted animate-pulse ring-1 ring-white/10" />
+            <div className="w-10 h-10 rounded-full bg-muted animate-pulse" />
           ) : user && !isBanned ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="rounded-full outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background">
-                  <Avatar className="w-10 h-10 cursor-pointer ring-1 ring-white/20 transition-all hover:ring-2 hover:ring-primary/50">
+                <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus:ring-offset-2 focus:ring-offset-background rounded-full active:scale-95 transition-transform">
+                  <Avatar className="w-10 h-10 cursor-pointer hover:ring-2 hover:ring-primary/50 transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150">
                     <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || "User"} />
                     <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-primary-foreground font-bold">
                       {profile?.display_name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || "U"}
@@ -334,25 +374,25 @@ export function Header() {
                   </Avatar>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52 rounded-2xl border-white/10 bg-background/90 p-1.5 shadow-2xl backdrop-blur-xl">
-                <DropdownMenuItem onClick={() => navigate(profile?.username ? `/@${profile.username}` : "/profile")} className="gap-2 rounded-xl px-3 py-2.5 font-medium">
-                  <User className="w-4 h-4 mr-1 text-muted-foreground" /> Profile
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => navigate(profile?.username ? `/@${profile.username}` : "/profile")}>
+                  <User className="w-4 h-4 mr-2" /> Profile
                 </DropdownMenuItem>
                 {(isAdmin || isModerator) && (
-                  <DropdownMenuItem onClick={() => navigate("/admin")} className="gap-2 rounded-xl px-3 py-2.5 font-medium">
-                    <Shield className="w-4 h-4 mr-1 text-muted-foreground" /> Admin Panel
+                  <DropdownMenuItem onClick={() => navigate("/admin")}>
+                    <Shield className="w-4 h-4 mr-2" /> Admin Panel
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuSeparator className="bg-white/[0.06]" />
-                <DropdownMenuItem onClick={handleSignOut} className="gap-2 rounded-xl px-3 py-2.5 font-medium text-destructive focus:text-destructive">
-                  <LogOut className="w-4 h-4 mr-1" /> Sign Out
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
+                  <LogOut className="w-4 h-4 mr-2" /> Sign Out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
             <Link
               to="/auth"
-              className="h-10 px-4 rounded-full bg-primary text-primary-foreground font-semibold text-sm shadow-lg shadow-primary/25 hover:brightness-110 active:scale-95 transition-all flex items-center gap-2"
+              className="h-10 px-4 rounded-full bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 transition-colors flex items-center gap-2"
             >
               <User className="w-4 h-4" />
               <span className="hidden sm:inline">Sign In</span>
@@ -398,7 +438,7 @@ export function Header() {
               <button
                 onClick={handleImageSearch}
                 disabled={!selectedFile || isSearchingImage}
-                className="px-6 h-12 rounded-xl bg-primary text-primary-foreground font-semibold hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-w-[110px] gap-2"
+                className="px-6 h-12 rounded-xl bg-primary text-primary-foreground font-semibold hover:brightness-110 active:scale-95 transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-w-[110px] gap-2"
               >
                 {isSearchingImage ? (
                   <><Loader2 className="w-4 h-4 animate-spin" /> Scanning…</>
@@ -516,7 +556,7 @@ export function Header() {
                                 setShowImageSearch(false);
                                 navigate(`/anime/${result.anilist}`);
                               }}
-                              className="flex-1 py-1.5 rounded-lg bg-primary/15 hover:bg-primary/30 text-[11px] font-bold text-primary transition-all border border-primary/20 hover:border-primary/40"
+                              className="flex-1 py-1.5 rounded-lg bg-primary/15 hover:bg-primary/30 text-[11px] font-bold text-primary transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 border border-primary/20 hover:border-primary/40"
                             >
                               View Anime
                             </button>
@@ -525,7 +565,7 @@ export function Header() {
                                 setShowImageSearch(false);
                                 navigate(`/search?q=${encodeURIComponent(title)}`);
                               }}
-                              className="flex-1 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[11px] font-bold text-muted-foreground hover:text-foreground transition-all border border-white/5"
+                              className="flex-1 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[11px] font-bold text-muted-foreground hover:text-foreground transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 border border-white/5"
                             >
                               Search
                             </button>

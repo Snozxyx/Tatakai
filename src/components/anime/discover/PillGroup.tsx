@@ -8,7 +8,7 @@
  * and a wrapped row moves the content below it on every render. When the row
  * overflows, the edges fade to signal there is more to scroll to.
  */
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface PillOption<T extends string> {
@@ -26,11 +26,6 @@ interface PillGroupProps<T extends string> {
   className?: string;
 }
 
-// Fade the scroll edges so an overflowing row reads as scrollable rather than
-// clipped. Transparent for the first/last 1.25rem, opaque between.
-const SCROLL_FADE_MASK =
-  'linear-gradient(to right, transparent, black 1.25rem, black calc(100% - 1.25rem), transparent)';
-
 export function PillGroup<T extends string>({
   options,
   value,
@@ -38,15 +33,30 @@ export function PillGroup<T extends string>({
   label,
   className,
 }: PillGroupProps<T>) {
+  const group = useRef<HTMLDivElement>(null);
+  const handleKey = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const keys = ["ArrowLeft", "ArrowRight", "Home", "End"];
+    if (!keys.includes(event.key)) return;
+    event.preventDefault();
+    const buttons = Array.from(group.current?.querySelectorAll<HTMLButtonElement>("[role=tab]") ?? []);
+    const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    const rtl = getComputedStyle(event.currentTarget).direction === "rtl";
+    const step = (event.key === "ArrowRight" ? 1 : -1) * (rtl ? -1 : 1);
+    const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : (index + step + buttons.length) % buttons.length;
+    buttons[next]?.focus();
+    buttons[next]?.click();
+  };
   return (
     <div
+      ref={group}
+      onKeyDown={handleKey}
       role="tablist"
       aria-label={label}
       className={cn(
-        'flex max-w-full items-center gap-1.5 overflow-x-auto rounded-full border border-white/10 bg-black/30 p-1.5 backdrop-blur-md scrollbar-hide no-scrollbar [-webkit-overflow-scrolling:touch] [touch-action:pan-x_pan-y] overscroll-x-contain',
+        'flex w-full min-w-0 max-w-full items-center gap-1.5 overflow-x-auto rounded-full border border-border bg-muted/50 p-1.5 backdrop-blur-md scrollbar-hide no-scrollbar [-webkit-overflow-scrolling:touch] [touch-action:pan-x_pan-y] overscroll-x-contain',
         className,
       )}
-      style={{ WebkitMaskImage: SCROLL_FADE_MASK, maskImage: SCROLL_FADE_MASK }}
+
     >
       {options.map((option) => {
         const active = value === option.id;
@@ -57,11 +67,12 @@ export function PillGroup<T extends string>({
             role="tab"
             onClick={() => onChange(option.id)}
             aria-selected={active}
+            tabIndex={active ? 0 : -1}
             className={cn(
-              'group inline-flex flex-shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+              'group inline-flex flex-shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
               active
                 ? 'bg-primary text-primary-foreground shadow-md shadow-primary/30'
-                : 'text-white/55 hover:bg-white/[0.06] hover:text-white',
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
             )}
           >
             {option.icon && (

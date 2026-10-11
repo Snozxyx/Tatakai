@@ -15,7 +15,7 @@ import { CommunitySidebar } from '@/components/community/feed/CommunitySidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useIsNativeApp, useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
+import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 import { type FeedTab, type FeedPostType } from '@/hooks/community/useFeed';
 import { useFeedRealtime } from '@/hooks/community/useFeedRealtime';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,7 +32,6 @@ import { CommunityRightRail } from '@/components/community/feed/CommunityRightRa
 import { useCommunityPresence } from '@/hooks/community/useCommunityPresence';
 
 export default function CommunityFeedPage() {
-  const isNative = useIsNativeApp();
   const isDesktopApp = useIsDesktopApp();
   const { isAdmin } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -62,7 +61,7 @@ export default function CommunityFeedPage() {
   return (
     <div className="relative min-h-screen bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary">
       {/* ── Ambient Background Mesh ── */}
-      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden transform-gpu">
         <div className="community-aurora-primary absolute -top-[12%] left-1/2 h-[640px] w-[1280px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,hsl(var(--primary)/0.14),hsl(var(--secondary)/0.08),transparent)] blur-3xl" />
         <div className="community-aurora-secondary absolute top-[24%] -left-[12%] h-[520px] w-[520px] rounded-full bg-[radial-gradient(closest-side,hsl(var(--secondary)/0.12),transparent)] blur-3xl" />
         <div className="community-aurora-secondary absolute -right-[8%] bottom-[8%] h-[460px] w-[460px] rounded-full bg-[radial-gradient(closest-side,hsl(347_100%_65%/0.08),transparent)] blur-3xl" />
@@ -75,8 +74,8 @@ export default function CommunityFeedPage() {
           content needs a fixed left clearance at every width (window minWidth is
           1000px, below the lg breakpoint). Mobile app hides the rail (pl-0);
           web uses the floating pill offset. */}
-      <main className={cn('relative z-10 w-full transition-all duration-300', isDesktopApp ? 'pl-24 lg:pl-28' : isNative ? 'pl-0' : 'pl-0 md:pl-24 lg:pl-28')}>
-        <div className="mx-auto max-w-[1536px] px-4 pt-6 md:px-8 md:pt-10">
+      <main className={cn('relative z-10 w-full transition-[color,background-color,border-color,opacity,transform] duration-300', isDesktopApp ? 'pl-24 lg:pl-28' : 'pl-0 md:pl-24 lg:pl-28')}>
+        <div className="community-page mx-auto max-w-[1536px] px-4 pt-6 md:px-8 md:pt-10">
 
           {/* ── HEADER & DISCOVERY SECTION ── */}
           <div className="mb-8 space-y-8">
@@ -85,12 +84,12 @@ export default function CommunityFeedPage() {
             <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
               <div className="space-y-2.5">
                 <div className="flex items-center gap-3">
-                  <h1 className="hero-gradient-text font-display text-3xl font-black tracking-tight sm:text-5xl drop-shadow-sm">
+                  <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl text-foreground">
                     Community
                   </h1>
 
                   {/* Live online-count pill (Item 9 presence) */}
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-bold text-emerald-400 backdrop-blur-md shadow-[0_0_15px_rgba(16,185,129,0.15)]">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-bold text-foreground backdrop-blur-md ">
                     <span className="relative flex h-2 w-2">
                       <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
                       <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
@@ -99,7 +98,7 @@ export default function CommunityFeedPage() {
                   </span>
                 </div>
 
-                <p className="text-sm text-muted-foreground/80 max-w-2xl leading-relaxed">
+                <p className="text-sm text-muted-foreground max-w-2xl leading-relaxed">
                   Join discussions, host watchrooms, create tier lists, and explore curated playlists from Tatakai fans worldwide.
                 </p>
               </div>
@@ -113,9 +112,9 @@ export default function CommunityFeedPage() {
       suppressDropdown
       expandOnFocus
       className="
-        w-[220px]
-        transition-all duration-300
-        focus-within:w-[300px]
+        w-[min(28vw,300px)]
+        transition-[color,background-color,border-color,opacity,transform] duration-300
+
       "
     />
   </div>
@@ -134,7 +133,7 @@ export default function CommunityFeedPage() {
         text-foreground
         backdrop-blur-xl
         shadow-[0_8px_30px_rgba(0,0,0,0.15)]
-        transition-all duration-300
+        transition-[color,background-color,border-color,opacity,transform] duration-300
 
         hover:bg-primary
         hover:text-primary-foreground
@@ -172,28 +171,28 @@ export default function CommunityFeedPage() {
                   <button
                     type="button"
                     onClick={() => setLeaderboardOpen(true)}
-                    className="flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm font-bold text-amber-300 backdrop-blur-md shrink-0 transition-all hover:bg-amber-500/20 active:scale-95 shadow-[0_4px_20px_rgba(245,158,11,0.1)]"
+                    className="flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm font-bold text-foreground backdrop-blur-md shrink-0 transition-[color,background-color,border-color,opacity,transform] hover:bg-amber-500/20 duration-150 active:scale-[0.98]"
                   >
-                    <Trophy className="h-4 w-4 text-amber-400" /> Leaderboard
+                    <Trophy className="h-4 w-4 text-foreground" /> Leaderboard
                   </button>
 
                   <Link
                     to="/isshoni"
-                    className="flex items-center gap-2 rounded-full border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-sm font-bold text-rose-300 backdrop-blur-md shrink-0 transition-all hover:bg-rose-500/20 active:scale-95 shadow-[0_4px_20px_rgba(244,63,94,0.1)]"
+                    className="flex items-center gap-2 rounded-full border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-sm font-bold text-foreground backdrop-blur-md shrink-0 transition-[color,background-color,border-color,opacity,transform] hover:bg-rose-500/20 duration-150 active:scale-[0.98]"
                   >
-                    <Radio className="h-4 w-4 text-rose-400" /> Watch Together
+                    <Radio className="h-4 w-4 text-foreground" /> Watch Together
                   </Link>
 
                   <Link
                     to="/tierlists"
-                    className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-bold text-white/90 backdrop-blur-md shrink-0 transition-all hover:border-amber-500/40 hover:bg-white/[0.08] active:scale-95 hover:text-amber-400"
+                    className="flex items-center gap-2 rounded-full border border-border bg-muted/40 px-4 py-2 text-sm font-bold text-foreground backdrop-blur-md shrink-0 transition-[color,background-color,border-color,opacity,transform] hover:border-amber-500/40 hover:bg-muted/60 active:scale-95 hover:text-foreground"
                   >
                     <Layers className="h-4 w-4" /> Tier Lists
                   </Link>
 
                   <Link
                     to="/playlists"
-                    className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-bold text-white/90 backdrop-blur-md shrink-0 transition-all hover:border-violet-500/40 hover:bg-white/[0.08] active:scale-95 hover:text-violet-400"
+                    className="flex items-center gap-2 rounded-full border border-border bg-muted/40 px-4 py-2 text-sm font-bold text-foreground backdrop-blur-md shrink-0 transition-[color,background-color,border-color,opacity,transform] hover:border-violet-500/40 hover:bg-muted/60 active:scale-95 hover:text-foreground"
                   >
                     <Music2 className="h-4 w-4" /> Playlists
                   </Link>
@@ -213,15 +212,15 @@ export default function CommunityFeedPage() {
 
             {/* Main Feed Column */}
             <div className="w-full min-w-0 flex-1 max-w-[960px]">
-              
+
               {/* Active Filter Pill */}
               {filtering && (
-                <div className="mb-6 flex items-center justify-between rounded-2xl border border-primary/25 bg-primary/10 px-5 py-3 backdrop-blur-xl shadow-lg transition-all animate-in fade-in slide-in-from-top-2">
+                <div className="mb-6 flex items-center justify-between rounded-2xl border border-primary/25 bg-primary/10 px-5 py-3 backdrop-blur-xl shadow-lg transition-[color,background-color,border-color,opacity,transform] animate-in fade-in slide-in-from-top-2">
                   <div className="flex items-center gap-3">
                     <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/20">
                       <Hash className="h-4 w-4 text-primary" />
                     </div>
-                    <span className="text-sm font-bold text-white">
+                    <span className="text-sm font-bold text-foreground">
                       Filtering by <span className="text-primary">#{tag}</span>
                     </span>
                   </div>
@@ -229,7 +228,7 @@ export default function CommunityFeedPage() {
                   <button
                     type="button"
                     onClick={clearFilters}
-                    className="flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-all hover:bg-white/10 hover:text-white"
+                    className="flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-[color,background-color,border-color,opacity,transform] hover:bg-white/10 hover:text-foreground"
                   >
                     Clear <X className="h-3.5 w-3.5" />
                   </button>
@@ -249,13 +248,14 @@ export default function CommunityFeedPage() {
                     return (
                       <button
                         key={label}
+                        aria-pressed={active}
                         type="button"
                         onClick={() => setPostType(value)}
                         className={cn(
-                          'inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all',
+                          'inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-[color,background-color,border-color,opacity,transform]',
                           active
                             ? 'border-primary/40 bg-primary/15 text-primary'
-                            : 'border-white/10 bg-white/[0.03] text-muted-foreground hover:border-white/20 hover:text-white',
+                            : 'border-border bg-white/[0.03] text-muted-foreground hover:border-white/20 hover:text-foreground',
                         )}
                       >
                         <Icon className="h-3.5 w-3.5" />

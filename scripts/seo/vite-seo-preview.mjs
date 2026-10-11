@@ -62,20 +62,48 @@ export function seoPreviewPlugin() {
           const pathname = rawUrl.split('?')[0];
 
           // ---- Sitemap: stream from the backend generator (with local dist fallback) ----
+          // CRITICAL: this branch must NEVER call next() / fall through to the
+          // SPA fallback. A sitemap URL served as index.html (text/html) is
+          // exactly what Google reports as "Sitemap is HTML". Every exit path
+          // below ends with valid XML + an XML content type; when neither
+          // upstream nor disk has usable XML we answer 503+XML (crawlers retry
+          // instead of indexing an HTML error page).
           if (SITEMAP_RE.test(pathname)) {
             const isXsl = pathname.endsWith('.xsl');
+            const isIndex = pathname === '/sitemap.xml';
             const expectedType = isXsl ? 'text/xsl; charset=utf-8' : 'application/xml; charset=utf-8';
+            const looksXml = (t) => {
+              const s = String(t || '').trimStart();
+              return s.startsWith('<?xml') || s.startsWith('<urlset') || s.startsWith('<sitemapindex') || s.startsWith('<xsl:stylesheet') || s.startsWith('<xsl:transform');
+            };
+            const degradedBody = isXsl
+              ? `<?xml version="1.0" encoding="UTF-8"?>\n<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"><xsl:template match="/"><html><body>temporarily unavailable</body></html></xsl:template></xsl:stylesheet>\n`
+              : isIndex
+                ? `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <sitemap>\n    <loc>${SITE_ORIGIN}/sitemap-static.xml</loc>\n  </sitemap>\n</sitemapindex>\n`
+                : `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n</urlset>\n`;
             try {
               const upstream = `${SHARE_API_ORIGIN}/api/public${pathname}`;
-              const r = await fetch(upstream, {
-                headers: { accept: isXsl ? 'text/xsl, text/xml, application/xml, */*' : 'application/xml' },
-              });
-              if (r.ok) {
+              const ctrl = new AbortController();
+              const timer = setTimeout(() => ctrl.abort(), 8000);
+              let r;
+              try {
+                r = await fetch(upstream, {
+                  headers: { accept: isXsl ? 'text/xsl, text/xml, application/xml, */*' : 'application/xml' },
+                  signal: ctrl.signal,
+                });
+              } finally {
+                clearTimeout(timer);
+              }
+              if (r && r.ok) {
                 const text = await r.text();
-                res.setHeader('Content-Type', expectedType);
-                res.setHeader('Cache-Control', 'public, max-age=3600');
-                res.end(text);
-                return;
+                // Guard against an upstream HTML error page (proxy/CDN 404 page).
+                if (looksXml(text)) {
+                  res.statusCode = 200;
+                  res.setHeader('Content-Type', expectedType);
+                  res.setHeader('Cache-Control', 'public, max-age=3600');
+                  res.end(text);
+                  return;
+                }
               }
             } catch {
               // Proceed to local disk fallback below
@@ -86,15 +114,24 @@ export function seoPreviewPlugin() {
             if (existsSync(localFile)) {
               try {
                 const diskContent = readFileSync(localFile, 'utf8');
-                res.setHeader('Content-Type', expectedType);
-                res.setHeader('Cache-Control', 'public, max-age=3600');
-                res.end(diskContent);
-                return;
+                if (looksXml(diskContent)) {
+                  res.statusCode = 200;
+                  res.setHeader('Content-Type', expectedType);
+                  res.setHeader('Cache-Control', 'public, max-age=3600');
+                  res.end(diskContent);
+                  return;
+                }
               } catch {
-                return next();
+                // Fall through to the degraded XML response below
               }
             }
-            return next();
+            // Degraded but still valid XML — never HTML, never next().
+            res.statusCode = 503;
+            res.setHeader('Content-Type', expectedType);
+            res.setHeader('Cache-Control', 'no-store');
+            res.setHeader('Retry-After', '300');
+            res.end(degradedBody);
+            return;
           }
 
           // ---- Per-entity meta injection ----

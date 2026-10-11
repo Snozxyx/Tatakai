@@ -1,4 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
+import { liveQuery } from 'dexie';
+import { useMangaDownload } from '@/hooks/media/useMangaDownload';
+import { MobileOfflineLibrary } from '@/components/mobile/MobileOfflineLibrary';
+import { isMobileNative } from '@/lib/platform/platform';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Download, Play, Trash2, FolderOpen, Info, Search, RefreshCw,
@@ -266,6 +270,8 @@ export default function OfflineLibraryPage() {
   const [search, setSearch] = useState('');
   const [downloadPath, setDownloadPath] = useState<string | null>(null);
   const [mangaSeries, setMangaSeries] = useState<OfflineMangaSeries[]>([]);
+  const [recoveryState, setRecoveryState] = useState<{ autoResume: boolean; jobs: { id: string; type: string; title: string }[] }>({ autoResume: false, jobs: [] });
+  const [resuming, setResuming] = useState(false);
 
   // ── History state ──────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState('library');
@@ -280,7 +286,17 @@ export default function OfflineLibraryPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { downloadStates = {}, cancelDownload } = useDownload();
+  const { downloadStates: mangaDownloadStates, cancelChapter, enqueueChapter } = useMangaDownload();
   const confirm = useConfirm();
+  useEffect(() => {
+    const bridge = (window as any).electron;
+    if (!isDesktopApp || !bridge?.getDownloadRecovery) return;
+    let cancelled = false;
+    const refresh = () => bridge.getDownloadRecovery().then((value: typeof recoveryState) => { if (!cancelled) setRecoveryState(value); }).catch(() => {});
+    void refresh();
+    const timer = window.setInterval(refresh, 5000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [isDesktopApp]);
 
   // Read tab from URL on mount
   useEffect(() => {
@@ -295,12 +311,27 @@ export default function OfflineLibraryPage() {
   const activeDownloads = Object.entries(downloadStates).filter(
     ([_, state]) => state.status === 'downloading' || state.status === 'queued'
   );
+  const activeMangaDownloads = Object.values(mangaDownloadStates).filter(
+    state => state.status === 'downloading' || state.status === 'queued',
+  );
+
+  useEffect(() => {
+    if (activeTab !== 'history') return;
+    const subscription = liveQuery(async () => {
+      const { getHistory, getDownloadStats } = await import('@/core/download/download-history-service');
+      return Promise.all([getHistory(200), getDownloadStats()]);
+    }).subscribe(([entries, stats]) => {
+      setHistory(entries); setHistoryStats(stats); setHistoryLoading(false);
+    });
+    return () => subscription.unsubscribe();
+  }, [activeTab]);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
   const getDownloadPath = () => localStorage.getItem('tatakai_download_path') || null;
 
   // ── Library loaders ────────────────────────────────────────────────────────
   const loadOfflineLibrary = async () => {
+    if (isMobileNative()) { setLoading(false); return; }
     if (!isNative) { setLoading(false); return; }
     try {
       const customPath = getDownloadPath();
@@ -360,6 +391,11 @@ export default function OfflineLibraryPage() {
   };
 
   // ── History loaders ────────────────────────────────────────────────────────
+  useEffect(() => {
+    const onMangaUpdated = () => { void loadMangaLibrary(); };
+    window.addEventListener('tatakai:offline-manga-updated', onMangaUpdated);
+    return () => window.removeEventListener('tatakai:offline-manga-updated', onMangaUpdated);
+  }, []);
   const loadHistoryData = async () => {
     setHistoryLoading(true);
     try {
@@ -512,6 +548,7 @@ export default function OfflineLibraryPage() {
   };
 
   // ── Not-native gate ────────────────────────────────────────────────────────
+  if (isMobileNative()) return <MobileOfflineLibrary />;
   if (!isNative) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-foreground p-6 text-center">
@@ -579,6 +616,23 @@ export default function OfflineLibraryPage() {
         </div>
 
         {/* Search bar */}
+        {isDesktopApp && (window as any).electron?.getDownloadRecovery && (
+          <GlassPanel className="p-4 flex flex-wrap items-center justify-between gap-4">
+            <p className="text-sm text-muted-foreground">Continue interrupted anime and manga downloads from saved progress.</p>
+            <Button variant="outline" size="sm" disabled={resuming || recoveryState.jobs.length === 0} onClick={async () => {
+              setResuming(true);
+              try {
+                const result = await (window as any).electron.resumeInterruptedDownloads();
+                setRecoveryState(await (window as any).electron.getDownloadRecovery());
+                if (!result.success) toast.error('Some downloads could not resume. Try again after reconnecting.');
+                else toast.success('Interrupted downloads resumed');
+              } catch { toast.error('Could not resume downloads'); }
+              finally { setResuming(false); }
+            }} className="gap-2">
+              <Play className="h-4 w-4" /> {resuming ? 'Resuming…' : `Resume interrupted (${recoveryState.jobs.length})`}
+            </Button>
+          </GlassPanel>
+        )}
         <div className="flex flex-col md:flex-row md:items-center gap-4">
           <div className="relative group flex-1 max-w-md">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
@@ -610,7 +664,8 @@ export default function OfflineLibraryPage() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="h-11 bg-white/5 border border-white/10 rounded-xl p-1">
+          <div className="max-w-full overflow-x-auto pb-1">
+          <TabsList className="h-11 w-max bg-muted/50 border border-border rounded-xl p-1">
             <TabsTrigger value="library" className="gap-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-white px-5">
               <HardDrive className="w-4 h-4" />
               Library
@@ -629,17 +684,35 @@ export default function OfflineLibraryPage() {
               )}
             </TabsTrigger>
           </TabsList>
+          </div>
 
           {/* ── Library Tab ── */}
           <TabsContent value="library" className="space-y-6 mt-0">
             {/* Active Downloads */}
-            {activeDownloads.length > 0 && (
+            {activeDownloads.length + activeMangaDownloads.length > 0 && (
               <div className="space-y-4">
                 <h2 className="text-lg font-bold flex items-center gap-2">
                   <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                  Active Downloads ({activeDownloads.length})
+                  Active Downloads ({activeDownloads.length + activeMangaDownloads.length})
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {activeMangaDownloads.map(state => (
+                    <GlassPanel key={state.jobId} className="p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <h3 className="truncate text-sm font-semibold">{state.title || 'Downloading manga…'}</h3>
+                          <p className="text-xs text-muted-foreground">{state.chapterLabel || `Chapter ${state.chapterKey}`}</p>
+                        </div>
+                        <button onClick={() => void cancelChapter(state.anilistId, state.chapterKey)} title="Cancel chapter download" className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/20 hover:text-destructive">
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-white/5" role="progressbar" aria-valuenow={state.progress} aria-valuemin={0} aria-valuemax={100} aria-label="Chapter download progress">
+                        <div className="h-full bg-primary transition-all duration-300" style={{ width: `${state.progress}%` }} />
+                      </div>
+                      <p className="text-xs text-muted-foreground">{state.status === 'queued' ? 'Queued' : `${Math.round(state.progress)}% · ${state.page || 0}/${state.totalPages || 0} pages`}</p>
+                    </GlassPanel>
+                  ))}
                   {activeDownloads.map(([episodeId, state]) => (
                     <GlassPanel key={episodeId} className="p-4 space-y-3">
                       <div className="flex items-start justify-between gap-3">
@@ -707,7 +780,7 @@ export default function OfflineLibraryPage() {
                         </div>
                       )}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-60 group-hover:opacity-100 transition-opacity" />
-                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
                         <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center shadow-xl shadow-primary/40 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
                           <Play className="w-6 h-6 text-white fill-current ml-1" />
                         </div>
@@ -717,14 +790,14 @@ export default function OfflineLibraryPage() {
                       </div>
                       <button
                         onClick={(e) => handleRepairAnime(anime, e)}
-                        className="absolute top-3 left-3 p-2 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-primary/20 hover:border-primary/50"
+                        className="absolute top-3 left-3 min-h-11 min-w-11 p-2 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity hover:bg-primary/20 hover:border-primary/50"
                         title="Repair — re-download missing poster & subtitles"
                       >
                         <Wrench className="w-3.5 h-3.5 text-white" />
                       </button>
                       <button
                         onClick={(e) => handleDeleteAnime(anime, e)}
-                        className="absolute bottom-3 left-3 p-2 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/20 hover:border-destructive/50"
+                        className="absolute bottom-3 left-3 min-h-11 min-w-11 p-2 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity hover:bg-destructive/20 hover:border-destructive/50"
                         title="Delete anime and all episodes"
                       >
                         <Trash2 className="w-3.5 h-3.5 text-red-400" />
@@ -814,7 +887,7 @@ export default function OfflineLibraryPage() {
                             </div>
                           )}
                           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-60 group-hover:opacity-100 transition-opacity" />
-                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
                             <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center shadow-xl shadow-primary/40 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
                               <BookOpen className="w-6 h-6 text-white" />
                             </div>
@@ -827,14 +900,16 @@ export default function OfflineLibraryPage() {
                           </div>
                           <button
                             onClick={(e) => handleOpenMangaFolder(series, e)}
-                            className="absolute bottom-3 right-3 p-2 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-primary/20 hover:border-primary/50"
+                            className="absolute bottom-3 right-3 min-h-11 min-w-11 p-2 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity hover:bg-primary/20 hover:border-primary/50"
+                            aria-label="Open folder"
                             title="Open folder"
                           >
                             <FolderOpen className="w-3.5 h-3.5 text-white" />
                           </button>
                           <button
                             onClick={(e) => handleDeleteMangaSeries(series, e)}
-                            className="absolute bottom-3 left-3 p-2 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/20 hover:border-destructive/50"
+                            className="absolute bottom-3 left-3 min-h-11 min-w-11 p-2 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity hover:bg-destructive/20 hover:border-destructive/50"
+                            aria-label="Delete series and all chapters"
                             title="Delete series and all chapters"
                           >
                             <Trash2 className="w-3.5 h-3.5 text-red-400" />
@@ -956,7 +1031,7 @@ export default function OfflineLibraryPage() {
                             {entry.episodeName ? ` — ${entry.episodeName}` : ''}
                           </h4>
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                            <span>Ep {entry.episodeNumber}</span>
+                            <span>{entry.mediaType === 'manga' ? entry.chapterLabel || `Chapter ${entry.chapterNumber ?? entry.chapterKey}` : `Ep ${entry.episodeNumber}`}</span>
                             {entry.quality && <span>· {entry.quality}</span>}
                             {entry.resolvedLanguage && (
                               <span className="uppercase">· {entry.resolvedLanguage}</span>
@@ -993,6 +1068,15 @@ export default function OfflineLibraryPage() {
                             onClick={async () => {
                               const toastId = toast.loading('Triggering retry…');
                               try {
+                                if (entry.mediaType === 'manga') {
+                                  const snapshot = localStorage.getItem(`tatakai:manga:retry:${entry.episodeId}`);
+                                  if (!snapshot) throw new Error('Chapter retry details are unavailable. Retry from the manga page.');
+                                  const { series, chapter } = JSON.parse(snapshot);
+                                  const result = await enqueueChapter(series, chapter);
+                                  if (!result.ok) throw new Error('Chapter download could not start');
+                                  toast.success('Chapter retry queued', { id: toastId });
+                                  return;
+                                }
                                 const { db } = await import('@/core/db/tatakai-db');
                                 const { checkAndRunAutomation } = await import('@/core/download/automation-engine');
                                 const rule = await db.downloadRules.where('animeId').equals(entry.animeId).first();

@@ -64,8 +64,6 @@ module.exports = function registerSystemHandlers(ipcMain, app, dialog, autoUpdat
             const win = getMainWindow();
             if (!win) return { success: false, error: 'no-window' };
             win.setFullScreen(Boolean(enabled));
-            // Notify renderer of fullscreen state change
-            win.webContents.send('window:fullscreen-changed', Boolean(enabled));
             return { success: true, fullscreen: win.isFullScreen() };
         } catch (err) {
             return { success: false, error: err?.message || String(err) };

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 
 interface SkipTime {
   interval: {
@@ -22,6 +22,15 @@ export function useAniskip(initialSkipTimes: SkipTime[] = []) {
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestRef = useRef<AbortController | null>(null);
+  const resetSkipTimes = useCallback(() => {
+    requestRef.current?.abort();
+    requestRef.current = null;
+    setSkipTimes([]);
+    setError(null);
+    setIsLoading(false);
+  }, []);
+  useEffect(() => () => requestRef.current?.abort(), []);
 
   const fetchSkipTimes = useCallback(async (
     malId: number | null,
@@ -33,6 +42,9 @@ export function useAniskip(initialSkipTimes: SkipTime[] = []) {
       return [];
     }
 
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
     setIsLoading(true);
     setError(null);
 
@@ -52,6 +64,7 @@ export function useAniskip(initialSkipTimes: SkipTime[] = []) {
       console.log('Fetching skip times from v2:', v2Url);
 
       let response = await fetch(v2Url, {
+        signal: controller.signal,
         headers: { 'Accept': 'application/json' },
       });
 
@@ -64,12 +77,13 @@ export function useAniskip(initialSkipTimes: SkipTime[] = []) {
         console.log('Fetching skip times from v1:', v1Url);
 
         response = await fetch(v1Url, {
+          signal: controller.signal,
           headers: { 'Accept': 'application/json' },
         });
 
         if (response.status === 404 || !response.ok) {
           console.log(`No skip times found (v1 returned ${response.status})`);
-          setSkipTimes([]);
+          if (requestRef.current === controller) setSkipTimes([]);
           return [];
         }
       }
@@ -79,24 +93,27 @@ export function useAniskip(initialSkipTimes: SkipTime[] = []) {
       }
 
       const data: AniskipResponse = await response.json();
+      if (controller.signal.aborted || requestRef.current !== controller) return [];
 
       if (data.found && data.results) {
         console.log('Found skip times:', data.results);
-        setSkipTimes(data.results);
-        return data.results;
+        const valid = data.results.filter(skip => Number.isFinite(skip.interval?.startTime) && Number.isFinite(skip.interval?.endTime) && skip.interval.startTime >= 0 && skip.interval.endTime > skip.interval.startTime);
+        setSkipTimes(valid);
+        return valid;
       } else {
         console.log('No skip times found for this episode');
         setSkipTimes([]);
         return [];
       }
     } catch (err) {
+      if (controller.signal.aborted || requestRef.current !== controller) return [];
       const message = err instanceof Error ? err.message : 'Failed to fetch skip times';
       console.error('Aniskip fetch error:', message);
       setError(message);
       setSkipTimes([]);
       return [];
     } finally {
-      setIsLoading(false);
+      if (requestRef.current === controller) setIsLoading(false);
     }
   }, []);
 
@@ -129,6 +146,7 @@ export function useAniskip(initialSkipTimes: SkipTime[] = []) {
     isLoading,
     error,
     fetchSkipTimes,
+    resetSkipTimes,
     getActiveSkip,
     getSkipLabel,
   };

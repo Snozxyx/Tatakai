@@ -1,6 +1,10 @@
 package app.tatakai.me.proxy;
 
+import android.content.Context;
 import android.util.Log;
+
+import app.tatakai.me.security.AdHosts;
+import app.tatakai.me.security.CloudflareBypass;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -15,6 +19,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.File;
+import java.io.RandomAccessFile;
 import java.net.HttpURLConnection;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -84,6 +90,14 @@ public class TatakaiLocalProxyPlugin extends Plugin {
     private final Object tokenRegistrationSignal = new Object();
     private final ExecutorService apiExecutor = Executors.newFixedThreadPool(2);
     private final SecureRandom secureRandom = new SecureRandom();
+    private MobileMediaCache mediaCache;
+    @Override public void load() { mediaCache = new MobileMediaCache(getContext()); }
+
+    @PluginMethod public void configurePlayback(PluginCall call) {
+        mediaCache.configure(call.getString("source", ""), call.getBoolean("dataSaver", false));
+        call.resolve(new JSObject().put("metered", mediaCache.metered()));
+    }
+    @PluginMethod public void cancelPrefetch(PluginCall call) { mediaCache.cancel(); call.resolve(); }
 
     // ── Plugin API ──────────────────────────────────────────────────────
 
@@ -150,6 +164,7 @@ public class TatakaiLocalProxyPlugin extends Plugin {
                 tokenRegistrationSignal.notifyAll();
             }
             sweepTokens();
+            prewarmUpstream(url, headers);
             try {
                 String base = requireServer().baseUrl();
                 JSObject result = new JSObject();
@@ -197,14 +212,48 @@ public class TatakaiLocalProxyPlugin extends Plugin {
     @PluginMethod
     public void setWatchActive(PluginCall call) {
         SecurityState.setWatchActive(call.getBoolean("active", false));
+        app.tatakai.me.download.MobileDownloadStore.playbackActive = call.getBoolean("active", false);
         JSObject result = new JSObject();
         result.put("success", true);
         result.put("watchActive", SecurityState.isWatchActive());
         call.resolve(result);
     }
 
+    /** Cloudflare-bypass settings (settings UI): master toggle + optional
+     * external FlareSolverr server URL. Persisted; absent keys keep stored
+     * values so callers can update one field at a time. */
+    @PluginMethod
+    public void setCloudflareConfig(PluginCall call) {
+        try {
+            Context ctx = getContext();
+            android.content.SharedPreferences prefs =
+                ctx.getSharedPreferences("tatakai-security", 0);
+            boolean enabled = prefs.getBoolean("cf_bypass_enabled", true);
+            String url = prefs.getString("flaresolverr_url", "");
+            if (url == null) url = "";
+            JSObject data = call.getData();
+            if (data != null && data.has("enabled")) {
+                try {
+                    enabled = call.getBoolean("enabled", enabled);
+                } catch (Exception ignored) {}
+            }
+            if (data != null && data.has("flaresolverrUrl")) {
+                String next = call.getString("flaresolverrUrl", url);
+                url = next != null ? next : url;
+            }
+            CloudflareBypass.setConfig(ctx, enabled, url);
+        } catch (Exception e) {
+            call.reject("Failed to save Cloudflare settings: " + e.getMessage());
+            return;
+        }
+        JSObject result = new JSObject();
+        result.put("success", true);
+        call.resolve(result);
+    }
+
     @Override
     protected void handleOnDestroy() {
+        if (mediaCache != null) mediaCache.close();
         ProxyServer active;
         synchronized (serverLock) {
             active = server;
@@ -243,6 +292,59 @@ public class TatakaiLocalProxyPlugin extends Plugin {
             ProxyEntry v = e.getValue();
             if (v == null || v.createdAt < cutoff) tokenMap.remove(e.getKey());
         }
+    }
+
+    /**
+     * Cold-start warmer: the first on-demand upstream fetch often fails
+     * transiently (cold DNS/TLS on mobile data and emulator NAT), surfacing as
+     * a 502 on `/stream/<token>` while the player/download waits — then
+     * succeeding once warm. Fire a tiny ranged GET at registration so the
+     * connection, TLS session and CDN edge are warm before first play.
+     * Best-effort and off the resolve path: failures are swallowed.
+     */
+    private void prewarmUpstream(String url, Map<String, String> headers) {
+        if (url == null) return;
+        String lower = url.toLowerCase(Locale.US);
+        int cut = lower.indexOf('?');
+        if (cut < 0) cut = lower.indexOf('#');
+        String path = cut >= 0 ? lower.substring(0, cut) : lower;
+        // Only playlists benefit: segments resolve relative to a warm entry,
+        // and prewarming every segment would multiply upstream traffic.
+        if (!path.contains(".m3u8")) return;
+        final Map<String, String> warmHeaders = new HashMap<>(headers);
+        apiExecutor.execute(() -> {
+            HttpURLConnection conn = null;
+            try {
+                conn = (HttpURLConnection) new URL(url).openConnection();
+                conn.setConnectTimeout(UPSTREAM_TIMEOUT_MS);
+                conn.setReadTimeout(UPSTREAM_TIMEOUT_MS);
+                conn.setInstanceFollowRedirects(true);
+                conn.setRequestMethod("GET");
+                for (Map.Entry<String, String> h : warmHeaders.entrySet()) {
+                    try {
+                        if (h.getKey() == null || h.getKey().equalsIgnoreCase("Range")) continue;
+                        conn.setRequestProperty(h.getKey(), h.getValue());
+                    } catch (Exception ignored) {}
+                }
+                conn.setRequestProperty("Range", "bytes=0-1023");
+                int status = conn.getResponseCode();
+                if (status == HttpURLConnection.HTTP_PARTIAL || status == HttpURLConnection.HTTP_OK) {
+                    InputStream in = conn.getInputStream();
+                    try {
+                        // Single small read only: a server that ignores Range
+                        // and answers 200 must not trick us into pulling a
+                        // whole media file in the background.
+                        in.read(new byte[4096]);
+                    } finally {
+                        try { in.close(); } catch (IOException ignored) {}
+                    }
+                }
+            } catch (Exception ignored) {
+                // Best-effort only — the on-demand path retries anyway.
+            } finally {
+                if (conn != null) conn.disconnect();
+            }
+        });
     }
 
     private static boolean hasHeader(Map<String, String> headers, String name) {
@@ -380,6 +482,10 @@ public class TatakaiLocalProxyPlugin extends Plugin {
                     handleStream(output, method, token, reqHeaders);
                     return;
                 }
+                if (path.startsWith("/offline/")) {
+                    handleOffline(output, method, path, reqHeaders.get("range"));
+                    return;
+                }
                 writeText(output, 404, "not found");
             } catch (IOException ignored) {
                 // Client (seek cancel) went away mid-copy.
@@ -411,6 +517,33 @@ public class TatakaiLocalProxyPlugin extends Plugin {
             }
         }
 
+        private void handleOffline(OutputStream output, String method, String path, String range) throws IOException {
+            String relative = path.substring("/offline/".length()).split("[?#]", 2)[0];
+            if (!relative.matches("[a-f0-9]{64}/[a-zA-Z0-9._-]+")) { writeText(output, 404, "not found"); return; }
+            File root = app.tatakai.me.download.MobileDownloadStore.get(getContext()).root;
+            File file = new File(root, relative);
+            if (!file.getCanonicalPath().startsWith(root.getCanonicalPath() + File.separator) || !file.isFile()) { writeText(output, 404, "offline file missing"); return; }
+            long size = file.length(), start = 0, end = size - 1;
+            if (range != null) {
+                try {
+                    if (!range.matches("bytes=\\d*-\\d*")) throw new IllegalArgumentException();
+                    String[] bounds = range.substring(6).split("-", -1);
+                    if (bounds[0].isEmpty()) start = Math.max(0, size - Long.parseLong(bounds[1]));
+                    else { start = Long.parseLong(bounds[0]); if (!bounds[1].isEmpty()) end = Math.min(end, Long.parseLong(bounds[1])); }
+                    if (start > end || start >= size || start < 0) throw new IllegalArgumentException();
+                } catch (Exception e) { writeHead(output, 416, "Content-Range: bytes */" + size + "\r\nContent-Length: 0\r\n" + CORS_HEADERS + "Connection: close\r\n\r\n", null); return; }
+            }
+            long length = end - start + 1;
+            writeHead(output, range == null ? 200 : 206, "Content-Type: " + guessContentType(file.getName()) + "\r\n"
+                + "Content-Length: " + length + "\r\nAccept-Ranges: bytes\r\n"
+                + (range == null ? "" : "Content-Range: bytes " + start + "-" + end + "/" + size + "\r\n")
+                + CORS_HEADERS + "Connection: close\r\n\r\n", null);
+            if (!"HEAD".equals(method)) try (RandomAccessFile in = new RandomAccessFile(file, "r")) {
+                in.seek(start); byte[] buffer = new byte[64 * 1024]; long remaining = length;
+                while (remaining > 0) { int n = in.read(buffer, 0, (int) Math.min(buffer.length, remaining)); if (n < 0) break; output.write(buffer, 0, n); remaining -= n; }
+            }
+        }
+
         private void handleStream(OutputStream output, String method, String token,
                                   Map<String, String> reqHeaders) throws IOException {
             ProxyEntry entry = awaitProxyEntry(token);
@@ -428,24 +561,39 @@ public class TatakaiLocalProxyPlugin extends Plugin {
             if (!hasHeader(outbound, "Accept-Encoding")) outbound.put("Accept-Encoding", "identity");
             String range = reqHeaders.get("range");
             if (range != null && !range.isEmpty()) outbound.put("Range", range);
+            if (mediaCache.direct(output, method, entry.url, outbound, range, CORS_HEADERS)) return;
 
-            try (UpstreamResponse upstream = upstreamFetchResponse(entry.url, outbound)) {
+            try (MobileMediaCache.Hit hit = mediaCache.hit(entry.url, outbound, range)) {
+                if (hit != null) {
+                    writeHead(output, hit.status, "Content-Type: " + hit.type + "\r\nContent-Length: " + hit.length + "\r\n"
+                        + (hit.contentRange.isEmpty() ? "" : "Content-Range: " + hit.contentRange + "\r\n")
+                        + CORS_HEADERS + "Accept-Ranges: bytes\r\nConnection: close\r\n\r\n", null);
+                    if (!"HEAD".equals(method)) copyStream(hit.body, output);
+                    mediaCache.requested(entry.url, outbound); return;
+                }
+            }
+
+            boolean permit = false;
+            try {
+              try { MediaRequestBudget.acquire(getContext(), 0); permit = true; } catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new IOException("Playback cancelled", e); }
+              try (UpstreamResponse upstream = upstreamFetchResponse(entry.url, outbound)) {
                 String contentType = upstream.contentType != null ? upstream.contentType : "";
-                boolean isPlaylist = entry.url.toLowerCase(Locale.US).contains(".m3u8")
+                boolean isPlaylist = upstream.status < 400 && (entry.url.toLowerCase(Locale.US).contains(".m3u8")
                     || contentType.toLowerCase(Locale.US).contains("mpegurl")
-                    || looksLikeHlsPlaylist(upstream.body);
+                    || looksLikeHlsPlaylist(upstream.body));
                 if (isPlaylist) {
                     // Playlists are the only stream payload we buffer: their child
                     // references must be rewritten before Content-Length is known.
                     byte[] upstreamBody = readAll(upstream.body);
                     upstream.markConsumed();
                     String text = new String(upstreamBody, StandardCharsets.UTF_8);
+                    mediaCache.playlist(text, upstream.connection.getURL().toString(), outbound);
                     // One cleanup pass per playlist is enough. Doing it from
                     // registerChildUrl made a VOD manifest with N fragments
                     // scan an ever-growing token map N times (quadratic work on
                     // the UI's critical startup path).
                     sweepTokens();
-                    String rewritten = rewritePlaylist(text, entry.url, entry.headers);
+                    String rewritten = rewritePlaylist(text, upstream.connection.getURL().toString(), entry.headers);
                     byte[] body = rewritten.getBytes(StandardCharsets.UTF_8);
                     writeHead(output, upstream.status,
                         "Content-Type: application/vnd.apple.mpegurl\r\n"
@@ -474,13 +622,23 @@ public class TatakaiLocalProxyPlugin extends Plugin {
                 // HttpURLConnection follows redirects; preserve 206 for Range hits.
                 writeHead(output, upstream.status, head.toString(), null);
                 if (!"HEAD".equals(method)) {
-                    copyStream(upstream.body, output);
+                    try (MobileMediaCache.Writer cached = mediaCache.writer(entry.url, outbound, range, contentType, upstream.contentRange, upstream.status, upstream.contentLength)) {
+                        byte[] buffer = new byte[STREAM_BUFFER_SIZE]; int count;
+                        while ((count = upstream.body.read(buffer)) >= 0) {
+                            output.write(buffer, 0, count);
+                            if (cached != null) cached.append(buffer, count);
+                        }
+                        if (cached != null) cached.finish();
+                    }
                     upstream.markConsumed();
+                    mediaCache.requested(entry.url, outbound);
+                    mediaCache.ranges(entry.url, outbound, range, upstream.contentRange, upstream.status);
                 }
                 output.flush();
             } catch (UpstreamException e) {
                 writeText(output, e.status, e.getMessage());
-            }
+              }
+            } finally { if (permit) MediaRequestBudget.release(); }
         }
 
         private String rewritePlaylist(String playlist, String playlistUrl, Map<String, String> headers) {
@@ -556,6 +714,8 @@ public class TatakaiLocalProxyPlugin extends Plugin {
 
         private UpstreamResponse upstreamFetchResponse(String target,
                                                        Map<String, String> headers) throws UpstreamException {
+            // Non-blocking replay of a cached clearance session, if any.
+            if (CloudflareBypass.isEnabled(getContext())) CloudflareBypass.prepare(target, headers);
             IOException lastError = null;
             for (int attempt = 0; attempt < 2; attempt++) {
                 HttpURLConnection conn = null;
@@ -571,15 +731,26 @@ public class TatakaiLocalProxyPlugin extends Plugin {
                             conn.setRequestProperty(h.getKey(), h.getValue());
                         } catch (Exception ignored) {}
                     }
+                    conn = MediaHttp.follow(conn, headers);
                     int status = conn.getResponseCode();
                     if (status >= 400) {
-                        // Relay origin errors as-is (403/404 are real answers, not retries).
-                        InputStream err = conn.getErrorStream();
-                        if (err != null) {
-                            try { err.close(); } catch (IOException ignored) {}
+                        InputStream errorBody = conn.getErrorStream();
+                        BufferedInputStream errorStream = new BufferedInputStream(
+                            errorBody != null ? errorBody : new java.io.ByteArrayInputStream(new byte[0]), 65536);
+                        // Cloudflare stale-clearance parity (desktop): a
+                        // 403/503/429 carrying challenge markers is solved
+                        // once and the fetch retried — plain origin errors
+                        // still relay as-is below.
+                        if ((status == 403 || status == 503 || status == 429)
+                            && attempt == 0
+                            && tryCloudflareChallenge(conn, errorStream, target, headers)) {
+                            errorStream.close();
+                            continue;
                         }
-                        throw new UpstreamException(status >= 500 ? 502 : status,
-                            "upstream HTTP " + status);
+                        UpstreamResponse origin = new UpstreamResponse(conn, status, conn.getContentType(),
+                            conn.getHeaderField("Content-Range"), conn.getHeaderFieldLong("Content-Length", -1L), errorStream);
+                        conn = null;
+                        return origin;
                     }
                     String contentType = conn.getContentType();
                     String contentRange = conn.getHeaderField("Content-Range");
@@ -617,9 +788,63 @@ public class TatakaiLocalProxyPlugin extends Plugin {
                 "proxy error: " + (lastError != null ? lastError.getMessage() : "fetch failed"));
         }
 
+        /**
+         * Challenge verdict + solve for one error response. Bounded-peeks the
+         * error body for challenge markers; on a hit, clears the domain
+         * session, solves (FlareSolverr first when configured, else the hidden
+         * WebView — up to ~45s on a proxy worker thread), merges the solved
+         * session into {@code headers} and returns true so the caller retries
+         * the fetch once. Anything else returns false (relay as-is).
+         */
+        private boolean tryCloudflareChallenge(HttpURLConnection conn, BufferedInputStream err, String target,
+                                               Map<String, String> headers) {
+            try {
+                String snippet = "";
+                if (!CloudflareBypass.isEnabled(getContext()) || !CloudflareBypass.appliesTo(AdHosts.hostnameOf(target))) return false;
+                err.mark(65537);
+                if (err != null) {
+                    ByteArrayOutputStream bos = new ByteArrayOutputStream(4096);
+                    byte[] buf = new byte[4096];
+                    int total = 0, n;
+                    try {
+                        while (total < 65536
+                            && (n = err.read(buf, 0, Math.min(buf.length, 65536 - total))) >= 0) {
+                            bos.write(buf, 0, n);
+                            total += n;
+                        }
+                    } finally { err.reset(); }
+                    try {
+                        snippet = bos.toString("UTF-8");
+                    } catch (Exception ignored) {}
+                }
+                int status;
+                try {
+                    status = conn.getResponseCode();
+                } catch (IOException e) {
+                    return false;
+                }
+                if (!CloudflareBypass.isChallengeResponse(status, snippet)) return false;
+                Context ctx = null;
+                try {
+                    ctx = getContext();
+                } catch (Exception ignored) {}
+                if (ctx == null) return false;
+                CloudflareBypass.clearSession(AdHosts.hostnameOf(target));
+                if (CloudflareBypass.solveBlocking(getActivity(), target) == null) return false;
+                CloudflareBypass.prepare(target, headers);
+                return true;
+            } catch (Exception e) {
+                return false;
+            }
+        }
+
         private byte[] readAll(InputStream in) throws IOException {
             ByteArrayOutputStream bos = new ByteArrayOutputStream(32 * 1024);
-            copyStream(in, bos);
+            byte[] chunk = new byte[STREAM_BUFFER_SIZE]; int count;
+            while ((count = in.read(chunk)) >= 0) {
+                if (bos.size() + count > 16 * 1024 * 1024) throw new IOException("Playlist or API response is too large");
+                bos.write(chunk, 0, count);
+            }
             return bos.toByteArray();
         }
 

@@ -1,11 +1,26 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  classifyTier,
+  computeAccuracy,
   computeAffinity,
   cosineSimilarity,
+  formatGroup,
   rankCandidates,
   scoreCandidate,
+  toRelevanceVector,
 } from '../src/core/recommendations/scoring';
 import { buildTasteProfile } from '../src/core/recommendations/tasteProfile';
+import {
+  buildRatingProfile,
+  dedupeFranchiseSignals,
+  fitTrend,
+  prunePreferences,
+} from '../src/core/recommendations/ratingProfile';
+import {
+  mangabakaTagGroup,
+  mangabakaTagWeight,
+  mergeMangaBakaMeta,
+} from '../src/core/recommendations/mangaBakaEnrich';
 import type { AnimeMeta, UserAnimeSignal } from '../src/core/recommendations/types';
 
 function meta(id: string, partial: Partial<AnimeMeta>): AnimeMeta {
@@ -120,5 +135,249 @@ describe('scoreCandidate + rankCandidates', () => {
     const mainstream = scoreCandidate(popular, profile, { maxPopularity: 5000, nicheBoost: 0 });
     const niche = scoreCandidate(popular, profile, { maxPopularity: 5000, nicheBoost: 1 });
     expect(mainstream.factors.popularityBoost).toBeGreaterThan(niche.factors.popularityBoost);
+  });
+
+  test('rankCandidates assigns strong/possible/weak tiers', () => {
+    const candidates = [
+      meta('c1', { genres: ['Action'], year: 2021, averageScore: 85, popularity: 4000 }),
+      meta('c2', { genres: ['Action'], year: 2021, averageScore: 40, popularity: 10 }),
+    ];
+    const ranked = rankCandidates(candidates, profile, {
+      excludeIds: new Set(),
+      limit: 5,
+      userScoredMean: 8.5,
+    });
+    expect(ranked[0].tier).toBeDefined();
+    expect(['strong', 'possible', 'weak']).toContain(ranked[1].tier);
+    // The on-taste, highly-rated candidate should tier at least as well.
+    const order = { strong: 0, possible: 1, weak: 2 } as const;
+    expect(order[ranked[0].tier!]).toBeLessThanOrEqual(order[ranked[1].tier!]);
+  });
+
+  test('obscure titles are penalized proportionally (Step 6)', () => {
+    const mk = (pop: number) => meta(`p${pop}`, { genres: ['Action'], year: 2021, averageScore: 80, popularity: pop });
+    const cands = [mk(10000), mk(8000), mk(9000), mk(50)];
+    const ranked = rankCandidates(cands, profile, { excludeIds: new Set() });
+    const obscure = ranked.find((r) => r.animeId === 'p50')!;
+    const popular = ranked.find((r) => r.animeId === 'p10000')!;
+    expect(obscure.score).toBeLessThan(popular.score);
+  });
+
+  test('below-format-average community scores are penalized (Step 6)', () => {
+    const good = meta('good', { genres: ['Action'], year: 2021, averageScore: 85, popularity: 5000, format: 'TV' });
+    const bad = meta('bad', { genres: ['Action'], year: 2021, averageScore: 40, popularity: 5000, format: 'TV' });
+    const mid = meta('mid', { genres: ['Action'], year: 2021, averageScore: 70, popularity: 5000, format: 'TV' });
+    const ranked = rankCandidates([good, bad, mid], profile, { excludeIds: new Set() });
+    const badRank = ranked.find((r) => r.animeId === 'bad')!;
+    const goodRank = ranked.find((r) => r.animeId === 'good')!;
+    expect(badRank.score).toBeLessThan(goodRank.score);
+  });
+});
+
+describe('ratingProfile (Steps 2–4)', () => {
+  test('tags accumulate rating × relevance: 95% tag beats 40% tag', () => {
+    const metaById = new Map<string, AnimeMeta>([
+      ['1', meta('1', {
+        genres: ['Action'],
+        tags: ['Time Skip', 'Harem'],
+        tagsDetailed: [
+          { name: 'Time Skip', relevance: 0.95, group: 'Story' },
+          { name: 'Harem', relevance: 0.4, group: 'Cast' },
+        ],
+        year: 2020,
+      })],
+    ]);
+    const profile = buildRatingProfile(
+      [{ animeId: '1', userRating: 9 }],
+      metaById,
+    );
+    expect(profile.tags['Time Skip']).toBeGreaterThan(profile.tags['Harem'] ?? 0);
+    expect(profile.tagGroups['Story']).toBeGreaterThan(profile.tagGroups['Cast'] ?? 0);
+  });
+
+  test('uncertain preferences are pruned (Step 3)', () => {
+    // 'Mecha' appears once with a low rating; 'Action' appears often and high.
+    const metaById = new Map<string, AnimeMeta>([
+      ['1', meta('1', { genres: ['Action'] })],
+      ['2', meta('2', { genres: ['Action'] })],
+      ['3', meta('3', { genres: ['Action'] })],
+      ['4', meta('4', { genres: ['Mecha'] })],
+    ]);
+    const profile = buildRatingProfile(
+      [
+        { animeId: '1', userRating: 9 },
+        { animeId: '2', userRating: 9 },
+        { animeId: '3', userRating: 8 },
+        { animeId: '4', userRating: 3 },
+      ],
+      metaById,
+    );
+    expect(profile.genres['Action']).toBeGreaterThan(0);
+    expect(profile.genres['Mecha'] ?? 0).toBeLessThan(profile.genres['Action']);
+  });
+
+  test('prunePreferences keeps both-threshold winners, drops the rest', () => {
+    const out = prunePreferences(
+      { Action: 27, Mecha: 3 },
+      { Action: 3, Mecha: 1 },
+    );
+    expect(out['Action']).toBeGreaterThan(0);
+    expect(out['Mecha']).toBeUndefined();
+  });
+
+  test('fitTrend needs 8 samples and captures direction', () => {
+    expect(fitTrend([2020, 2021], [8, 9])).toBeNull();
+    const years = [2000, 2002, 2005, 2008, 2012, 2016, 2020, 2023];
+    const rising = [4, 5, 5, 6, 7, 7, 8, 9];
+    const line = fitTrend(years, rising);
+    expect(line).not.toBeNull();
+    expect(line!.slope).toBeGreaterThan(0);
+    expect(line!.samples).toBe(8);
+  });
+
+  test('userScoredMean reflects personal ratings', () => {
+    const metaById = new Map<string, AnimeMeta>([
+      ['1', meta('1', { genres: ['Action'] })],
+      ['2', meta('2', { genres: ['Drama'] })],
+    ]);
+    const profile = buildRatingProfile(
+      [
+        { animeId: '1', userRating: 8 },
+        { animeId: '2', userRating: 6 },
+      ],
+      metaById,
+    );
+    expect(profile.userScoredMean).toBeCloseTo(7, 5);
+  });
+});
+
+describe('dedupeFranchiseSignals (Step 1)', () => {
+  test('keeps the highest-rated entry per franchise component', () => {
+    const metaById = new Map<string, AnimeMeta>([
+      ['series', meta('series', { genres: ['Action'], relationIds: ['spinoff'] })],
+      ['spinoff', meta('spinoff', { genres: ['Action'], relationIds: ['series'] })],
+      ['other', meta('other', { genres: ['Drama'] })],
+    ]);
+    const signals: UserAnimeSignal[] = [
+      { animeId: 'series', userRating: 6 },
+      { animeId: 'spinoff', userRating: 9 },
+      { animeId: 'other', userRating: 7 },
+    ];
+    const out = dedupeFranchiseSignals(signals, metaById);
+    expect(out.map((s) => s.animeId).sort()).toEqual(['other', 'spinoff']);
+  });
+
+  test('unrelated titles all survive', () => {
+    const metaById = new Map<string, AnimeMeta>([
+      ['a', meta('a', { genres: ['Action'] })],
+      ['b', meta('b', { genres: ['Drama'] })],
+    ]);
+    const out = dedupeFranchiseSignals(
+      [{ animeId: 'a', userRating: 8 }, { animeId: 'b', userRating: 7 }],
+      metaById,
+    );
+    expect(out).toHaveLength(2);
+  });
+});
+
+describe('tiers + accuracy (Steps 7–8)', () => {
+  test('classifyTier thresholds', () => {
+    expect(classifyTier(90, 8, 50, 7)).toBe('strong');
+    expect(classifyTier(60, 8, 50, 7)).toBe('possible');
+    expect(classifyTier(30, 8, 50, 7)).toBe('weak');
+  });
+
+  test('computeAccuracy is MAE as % of the 10-point scale', () => {
+    // Off by 1.0 on average on a 10-point scale -> 10%.
+    expect(computeAccuracy([80, 60], [9, 5])).toBeCloseTo(10, 5);
+    expect(computeAccuracy([80, 60], [8, 6])).toBeCloseTo(0, 5);
+    expect(computeAccuracy([80], [8, 6])).toBeNull();
+  });
+});
+
+describe('tag helpers + format groups', () => {
+  test('toRelevanceVector prefers detailed relevance', () => {
+    const vec = toRelevanceVector(
+      [{ name: 'Time Skip', relevance: 0.95 }],
+      ['Time Skip'],
+    );
+    expect(vec['Time Skip']).toBeCloseTo(0.95, 5);
+    expect(toRelevanceVector(undefined, ['Action'])['Action']).toBe(1);
+  });
+
+  test('formatGroup splits manga from anime', () => {
+    expect(formatGroup('MANHWA')).toBe('manga');
+    expect(formatGroup('NOVEL')).toBe('manga');
+    expect(formatGroup('TV')).toBe('anime');
+    expect(formatGroup('manhua')).toBe('manga');
+  });
+});
+
+describe('mangaBakaEnrich', () => {
+  test('weight mapping core > defining > incidental', () => {
+    expect(mangabakaTagWeight('core')).toBe(1);
+    expect(mangabakaTagWeight('defining')).toBeGreaterThan(mangabakaTagWeight('incidental'));
+    expect(mangabakaTagGroup('Activities > Conflict > Duels')).toBe('Activities');
+    expect(mangabakaTagGroup(null)).toBeNull();
+  });
+
+  test('merge layers MangaBaka tags/groups/creators over AniList meta', () => {
+    const base = meta('m1', {
+      genres: ['Action'],
+      tags: ['Rescue'],
+      tagsDetailed: [{ name: 'Rescue', relevance: 1, group: null }],
+      studios: ['Existing Author'],
+      averageScore: null,
+      year: null,
+    });
+    const merged = mergeMangaBakaMeta(base, {
+      mangaBakaId: 1,
+      title: 'T',
+      nativeTitle: null,
+      romanizedTitle: null,
+      aliases: [],
+      localizedTitles: [],
+      description: null,
+      cover: { original: null, small: null, medium: null, large: null, width: null, height: null, blurhash: null },
+      authors: ['Existing Author', 'New Writer'],
+      artists: [],
+      publishers: [{ name: 'Shueisha', type: 'Original', note: null }],
+      genres: ['Adventure'],
+      tags: [
+        { id: 1, name: 'Duels', path: 'Activities > Conflict > Duels', weight: 'core', isSpoiler: false },
+        { id: 2, name: 'Rescue', path: null, weight: 'core', isSpoiler: false },
+        { id: 3, name: 'Spoiler Tag', path: null, weight: 'core', isSpoiler: true },
+      ],
+      status: 'ongoing',
+      contentRating: null,
+      type: 'manga',
+      year: 2019,
+      publishedStart: null,
+      publishedEnd: null,
+      rating: 82,
+      popularityRank: 5,
+      totalChapters: 100,
+      totalVolumes: 12,
+      isLicensed: false,
+      hasAnime: false,
+      animeCoverage: null,
+      links: [],
+      sources: {},
+      kitsuId: null,
+      malId: null,
+      anilistId: 1,
+      lastUpdatedAt: null,
+    });
+    expect(merged.tags).toContain('Duels');
+    expect(merged.tags).not.toContain('Spoiler Tag');
+    // No duplicate for the tag present in both catalogs.
+    expect(merged.tags.filter((t) => t === 'Rescue')).toHaveLength(1);
+    expect(merged.tagGroups).toContain('Activities');
+    expect(merged.studios).toContain('New Writer');
+    expect(merged.genres).toContain('Adventure');
+    expect(merged.averageScore).toBe(82);
+    expect(merged.year).toBe(2019);
+    expect(merged.status).toBe('RELEASING');
+    expect(merged.totalChapters).toBe(100);
   });
 });

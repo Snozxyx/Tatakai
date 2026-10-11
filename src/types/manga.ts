@@ -12,6 +12,7 @@ export interface MangaCard {
 }
 
 export interface MangaSearchItem {
+  href?: string;
   id?: string;
   mediaType: "manga" | "manhwa" | "manhua" | "comics";
   anilistId?: number;
@@ -23,6 +24,10 @@ export interface MangaSearchItem {
     native?: string;
   };
   poster: string | null;
+  banner?: string;
+  logo?: string;
+  titleLogo?: string;
+  description?: string;
   status: string;
   year: number | null;
   score: number | null;
@@ -38,6 +43,9 @@ export interface MangaSearchItem {
 }
 
 export interface MangaSearchResult {
+  total?: number;
+  totalIsApproximate?: boolean;
+  resultWindow?: number;
   success?: true;
   query: string;
   page: number;

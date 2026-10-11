@@ -1,7 +1,9 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Layers, BookOpen, Flame, Clock3, Sparkles, ArrowRight } from "lucide-react";
 import { HomeSectionHeading } from "@/components/home/HomeSectionHeading";
+import { useMobileAppearance } from '@/hooks/ui/useMobileAppearance';
+import { dealCovers, type CoverPoolKey } from "./mangaCoverPools";
 
 interface FilterConfig {
   key: string;
@@ -10,6 +12,8 @@ interface FilterConfig {
   to: string;
   icon: React.ElementType;
   poster: string;
+  /** Cover pool matching this card's accent/glow family — dealt randomly per visit. */
+  pool: CoverPoolKey;
   accent: string;
   glowColor: string;
   textColor: string;
@@ -26,6 +30,7 @@ const ALL_CARDS: FilterConfig[] = [
     to: "/manga/discover?feed=popular&window=day",
     icon: Flame,
     poster: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx173020-vqe5J7U1cizO.png",
+    pool: "red",
     accent: "from-rose-600/65 via-red-800/30 to-black/85",
     glowColor: "shadow-rose-500/30",
     textColor: "text-rose-300",
@@ -39,6 +44,7 @@ const ALL_CARDS: FilterConfig[] = [
     to: "/manga/discover?type=manhwa",
     icon: Layers,
     poster: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx119257-Pi21aq3ey9GG.jpg",
+    pool: "blue",
     accent: "from-sky-600/60 via-blue-800/30 to-black/85",
     glowColor: "shadow-sky-500/25",
     textColor: "text-sky-300",
@@ -51,6 +57,7 @@ const ALL_CARDS: FilterConfig[] = [
     to: "/manga/discover?type=comics",
     icon: BookOpen,
     poster: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx100805-3DCHMdZ5blWl.jpg",
+    pool: "warm",
     accent: "from-amber-500/60 via-orange-800/30 to-black/85",
     glowColor: "shadow-amber-500/25",
     textColor: "text-amber-300",
@@ -63,6 +70,7 @@ const ALL_CARDS: FilterConfig[] = [
     to: "/manga/discover?feed=foryou&window=week",
     icon: Sparkles,
     poster: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx169904-6gvkXMNpq66N.jpg",
+    pool: "purple",
     accent: "from-violet-600/60 via-purple-800/30 to-black/85",
     glowColor: "shadow-violet-500/25",
     textColor: "text-violet-300",
@@ -75,6 +83,7 @@ const ALL_CARDS: FilterConfig[] = [
     to: "/manga/discover?feed=recent&window=month",
     icon: Clock3,
     poster: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx144946-cscic3n2SwdY.jpg",
+    pool: "green",
     accent: "from-emerald-600/60 via-teal-800/30 to-black/85",
     glowColor: "shadow-emerald-500/25",
     textColor: "text-emerald-300",
@@ -84,10 +93,12 @@ const ALL_CARDS: FilterConfig[] = [
 
 function TiltGlassFilterCard({
   item,
+  poster,
   onClick,
   isLarge = false,
 }: {
   item: FilterConfig;
+  poster: string;
   onClick: () => void;
   isLarge?: boolean;
 }) {
@@ -96,6 +107,8 @@ function TiltGlassFilterCard({
   const [isHovered, setIsHovered] = useState(false);
 
   function handleMouseMove(e: React.MouseEvent<HTMLButtonElement>) {
+    if (!window.matchMedia('(min-width: 1024px) and (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)').matches
+      || document.querySelector('.reduce-motion')) return;
     const el = cardRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
@@ -119,25 +132,38 @@ function TiltGlassFilterCard({
       type="button"
       onClick={onClick}
       onMouseMove={handleMouseMove}
-      onMouseEnter={() => setIsHovered(true)}
+      onMouseEnter={() => {
+        if (window.matchMedia('(min-width: 1024px) and (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)').matches
+          && !document.querySelector('.reduce-motion')) setIsHovered(true);
+      }}
       onMouseLeave={handleMouseLeave}
       style={{
-        transform: `perspective(800px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) scale(${isHovered ? 1.025 : 1})`,
+        transform: isHovered || tilt.x || tilt.y
+          ? `perspective(800px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) scale(${isHovered ? 1.025 : 1})`
+          : undefined,
         transition: isHovered
           ? "transform 0.1s ease-out"
           : "transform 0.45s cubic-bezier(0.23, 1, 0.32, 1)",
       }}
+      data-mobile-browse-card
       className={`relative w-full rounded-2xl overflow-hidden text-left
         border border-white/10 shadow-xl
         focus:outline-none focus:ring-2 focus:ring-white/30
         ${isLarge ? "row-span-2" : ""}`}
     >
-      {/* Background Poster */}
+      {/* Background Poster — random cover from this card's color family */}
       <img
-        src={item.poster}
+        src={poster}
         alt={item.title}
         className="absolute inset-0 w-full h-full object-cover"
         loading="lazy"
+        decoding="async"
+        onError={(e) => {
+          const img = e.currentTarget;
+          if (img.dataset.fallback === "1") return;
+          img.dataset.fallback = "1";
+          img.src = item.poster;
+        }}
       />
 
       {/* Gradient overlay */}
@@ -191,6 +217,7 @@ function TiltGlassFilterCard({
             )}
           </div>
           <div
+            data-browse-arrow
             className={`flex items-center justify-center w-8 h-8 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm flex-shrink-0 transition-all duration-300 ${isHovered ? "opacity-100 translate-x-0" : "opacity-0 translate-x-2"}`}
           >
             <ArrowRight className="w-3.5 h-3.5 text-white" />
@@ -202,10 +229,14 @@ function TiltGlassFilterCard({
 }
 
 export function MangaDiscoveryQuickFilters() {
+  const refreshed = useMobileAppearance();
   const navigate = useNavigate();
+  // One random cover per card from its accent family, dealt once per visit
+  // (no repeats within a family). Falls back to the curated poster.
+  const dealtPosters = useMemo(() => dealCovers(ALL_CARDS.map((c) => c.pool)), []);
 
   return (
-    <section className="relative mb-12">
+    <section data-mobile-browse-section className="relative mb-12">
       {/* Section header */}
       <HomeSectionHeading
         icon={<Flame className="w-5 h-5 text-primary" />}
@@ -224,9 +255,9 @@ export function MangaDiscoveryQuickFilters() {
 
       {/* Bento Grid */}
       <div
-        className="grid gap-3 md:gap-4"
+        data-mobile-home-rail="discovery"
+        className="grid grid-cols-2 sm:grid-cols-3 gap-3 md:gap-4"
         style={{
-          gridTemplateColumns: "repeat(3, 1fr)",
           gridAutoRows: "clamp(150px, 18vw, 220px)",
         }}
       >
@@ -234,7 +265,8 @@ export function MangaDiscoveryQuickFilters() {
           <TiltGlassFilterCard
             key={item.key}
             item={item}
-            isLarge={index === 0}
+            poster={dealtPosters[index] ?? item.poster}
+            isLarge={!refreshed && index === 0}
             onClick={() => navigate(item.to)}
           />
         ))}

@@ -143,6 +143,7 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose }: P
           </div>
           {history.slice(0, 5).map((term) => (
             <button
+              type="button"
               key={term}
               onClick={() => handleHistorySelect(term)}
               className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 transition-colors group text-left"
@@ -164,14 +165,14 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose }: P
 
       {showSuggestions && (
         <div className="p-2">
-          {isFetching && suggestions.length === 0 && (
+          {(isWaitingForQuery || (isFetching && suggestions.length === 0)) && (
             <div className="flex items-center gap-3 px-3 py-3">
               <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
               <span className="text-sm text-muted-foreground">Searching…</span>
             </div>
           )}
 
-          {suggestions.length > 0 && (
+          {!isWaitingForQuery && suggestions.length > 0 && (
             <>
               <div className="flex items-center gap-2 px-2 py-1.5">
                 <TrendingUp className="w-3 h-3 text-muted-foreground" />
@@ -179,6 +180,7 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose }: P
               </div>
               {suggestions.map((item) => (
                 <button
+                  type="button"
                   key={`${item.type}-${item.id}`}
                   onClick={() => handleSelect(item)}
                   className="w-full flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/5 transition-colors text-left group"
@@ -226,7 +228,7 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose }: P
             </>
           )}
 
-          {!isFetching && suggestions.length === 0 && query.trim().length >= 2 && (
+          {!isWaitingForQuery && !isFetching && suggestions.length === 0 && query.trim().length >= 2 && (
             <div className="px-3 py-3 text-sm text-muted-foreground">
               No results for "<span className="text-foreground">{query}</span>"
             </div>
@@ -234,6 +236,7 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose }: P
 
           {/* Search all results footer */}
           <button
+            type="button"
             onClick={() => {
               onSelect(query);
               navigate(`/search?q=${encodeURIComponent(query.trim())}`);

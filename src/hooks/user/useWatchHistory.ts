@@ -5,6 +5,7 @@ import { updateMalAnimeStatus } from '@/lib/mal';
 import { updateAniListAnimeStatus, mapTatakaiStatusToAniList } from '@/lib/externalIntegrations';
 import { db } from '@/core/db';
 import { getLocalContinueWatching } from '@/lib/localStorage';
+import { fetchWatchHistory } from '@/lib/watchHistoryQuery';
 
 interface WatchHistoryItem {
   id: string;
@@ -46,22 +47,7 @@ export function useWatchHistory(limit?: number) {
 
   return useQuery({
     queryKey: ['watch_history', user?.id, limit],
-    queryFn: async () => {
-      let query = supabase
-        .from('watch_history')
-        .select('*')
-        .eq('user_id', user!.id)
-        .order('watched_at', { ascending: false });
-
-      if (limit) {
-        query = query.limit(limit);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      return data as WatchHistoryItem[];
-    },
+    queryFn: ({ signal }) => fetchWatchHistory(supabase, user!.id, limit, signal),
     enabled: !!user,
   });
 }

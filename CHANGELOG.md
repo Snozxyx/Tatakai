@@ -4,6 +4,48 @@ All notable changes to Tatakai are documented here.
 
 ---
 
+## [6.0.7] - 2026-10-11
+
+**Reliability & personalization release.** Native mobile downloads move fully on-device with resume and offline playback, desktop downloads survive restarts and skip unaired episodes, profiles gain premium cosmetics, discovery gets follow-up rails and smarter recommendations, and the player, reader, analytics, and SEO all get hardened.
+
+### Added
+- **Native Mobile Downloads Engine** — Android (foreground service with progress notification) and iOS (background `URLSession`) now own transfers, disk, and progress via a new `TatakaiDownloads` bridge; includes a queue with progress/retry/cancel, a searchable completed poster grid playing through `native-offline://`, delete-with-confirm, legacy `tatakai/anime/*.mp4` import, and manga per-page checkpoints with auto-resume on relaunch.
+- **Mobile HLS Offline Packaging** — Offline HLS keeps init segments, AES-128 keys/IVs, byte ranges, discontinuities, and the selected variant/audio/subtitle tracks, validates every resource before completing, and serves them from the loopback proxy with Range/`416` support.
+- **Mobile Streaming Cache & Request Budget** — New temp streaming cache (256 MB total, 32 MB/object, complete-writes only) separate from downloads, plus a shared budget (6 slots on Wi-Fi / 2 on cellular, playback > prefetch > downloads), HLS prefetch (~30 s Wi-Fi / ~10 s cellular), and Data Saver tiers that disable speculation and cap buffers.
+- **Native Cloudflare Solver** — Shared native challenge solver for scrape, playback, and downloads with a master toggle and optional FlareSolverr URL in Mobile App Settings, synced at boot on Android and iOS.
+- **Cinematic Hero & Refreshed Mobile Layout** — New shared carousel (max 5, 6 s autorotate pausing on interact/focus/hidden/reduced-motion, logo artwork with fallback, 44 px accessible pagination) for anime and manga, plus a `refreshed | classic` mobile appearance with 2:3 portrait posters and stable two-line titles.
+- **Media Card Styles** — One shared `MediaCardFrame` (poster/badges/metadata/actions) behind anime, manga, and unified cards, with a global `poster | overlay` style selector, hover video previews on by default for anime, and normalized manga format labels.
+- **Premium Profile Cosmetics** — 8 SVG avatar frames, 4 nameplates, 4 edge effects with arrive animation, and a live-preview picker gated by `premium-go/pro/ultra` or admin; server triggers enforce keys, strip revoked entitlements, and reject unknown keys, with avatar gallery paging, 8 MB profile-media uploads, and AA-corrected theme contrast.
+- **Motion Preferences** — In-app reduced-motion control synced to `html[data-reduced-motion]`, OS `prefers-reduced-motion` live tracking, tiered CSS (fades kept, scale/slide killed), fade-only route transitions, and 44 px coarse-pointer targets.
+- **Smarter Recommendations** — Rating-weighted taste profile with pruning and trend fitting, obscure-title and below-format-average penalties, tiering against your scored mean, MangaBaka tag/group enrichment, franchise dedupe, and richer manga metadata (status, chapters, relations, detailed tags).
+- **Follow-Up Rails & Smart Discovery** — New followed-anime episode and followed-manga chapter rails (deep-link to the exact new episode/chapter with `N new` badges), `Best for you / Hidden gem / Trending` manga discover with format/status filters, recent-popular / most-follows / new / latest-update lanes, and a grouped manga tag picker with spoiler/adult markers.
+- **Reader Tools & Resume** — Bottom `Reading tools` sheet (jump-to-page slider, zoom + reset, webtoon/page mode preserving page, rAF auto-scroll with speed), fullscreen minimal chrome with auto-hiding exit, double-click zoom, anchored resume via `ResizeObserver`/`MutationObserver`, and `pagehide` progress flush.
+- **Desktop Download Resilience** — Crash-safe atomic writes, direct-file resume via `ETag`/`Range`/`If-Range`, per-segment HLS journals that reject live playlists and invalidate on host/path/sequence/key change, redirect-sniffing media resolver, and a `download-recovery.json` journal with auto-resume on by default plus a `Resume interrupted (n)` library button and a Downloads resume switch.
+- **Release-Aware Downloads** — Episode picker and auto-downloader hide unaired episodes (AniList airing gate, specials don't block), queue dedup, completion-gated cursor advance, HLS-first source resolution with language filtering, and expired-link retry that re-resolves the same origin/path instead of switching content.
+- **Admin Analytics Upgrade** — Page-visit attribution (`utm_*`, referrer host, channel, page title), realtime `tky-online` presence with live grid + 5-minute fallback, SVG world map with proportional bubbles and ranked list, DAU fixed for logged-out guests, and funnel/channel/referrer/session-quality views; trending counts cast to integer and the perf panel tolerates missing `app_version`.
+- **Player Polish** — Single-owner desktop fullscreen controller with ancestor `transform/filter` unlocking and exact restore, merged Tatakai + AniSkip segments (source wins per OP/ED family, validated/clamped), mobile outer-thirds double-tap seek, 1–4x pinch zoom with reset chip, lock overlay, safe-area 44 px controls, stall watchdog with shared recovery ladder, parallel subtitles with 8 s abort, and playback metrics.
+- **SEO Hardening** — JSON-LD (`TVSeries`/`Book`/`Article`/`ProfilePage`) on share pages and a sitemap branch that never serves HTML (XML-only responses, 8 s upstream timeout, XML validation, 503+XML fallback so crawlers retry instead of indexing an error page).
+- **Mobile Showcase & Search Chips** — Landing mobile showcase with device screenshots, applied-filter chips with focus-moving remove/clear, and refreshed search/genre-browse surfaces.
+
+### Changed
+- **Season Download Modal** — Released-episodes only, progressive SSE source fill with a shared request cache and dedup, 20 s/45 s start timeouts, server probing via query cache, prefetch cut to the `server` step, and retry that clears caches and invalidates `['servers']`.
+- **Offline Library** — Unified anime/manga offline rows with active cards, history retry, and manga rows fed by the download monitor's progress events.
+- **Mobile Playback Reliability** — One cold-start `502` retry after 1.2 s, playlist pre-warm (`bytes=0-1023`), redirect follower replaying provider headers + Range cross-host, 10-minute source cache with hydration wait and dedup, and quiet-window/cap tuning so slow servers still appear.
+- **Continue Watching/Reading Sync** — Local-first newest-wins merge kept, with clamped page/progress saves and theme-token cleanup in the reader.
+- **Settings Surfaces** — Downloads (auto-resume), card style, mobile appearance, and Cloudflare/FlareSolverr controls added to the relevant Settings panels; version surfaces stay on the single app-version source.
+
+### Fixed
+- **Fullscreen Clipping** — Fixed player shifted-right/clipped by transformed/filtered ancestors via lock/unlock with `visualViewport` sync; body overflow restored on exit and Android back exits fullscreen first.
+- **Skip Edge Cases** — Skip times reset on `malId`/episode change, stale AniSkip responses ignored, invalid intervals filtered, and the skip button kept clickable above fullscreen controls with `aria-disabled`.
+- **Download Integrity** — Short reads error instead of completing, mixed-scanlator partials invalidated by `resume-source.json` identity, partial manga sets throw `Downloaded x/y pages. Resume…` instead of marking complete, and cancelled vs failed states split.
+- **Watch Containment** — Main-frame navigation away from the app is blocked while watching; embed pop-under blocking only fires when an embed is active; deep links validate `*.tatakai.me` and close the browser on OAuth handoffs.
+- **Trending Empty State** — `get_trending_anime` / `get_anime_metrics` cast `COUNT(*)` to integer, fixing the `42804 bigint ≠ integer` failure that left `/trending` empty.
+- **Mobile Controls Overlap** — 44 px targets verified at 320/393/480 px, seek slider keyboard-operable with buffered fill, locked taps reveal controls without seeking, and opposite-side/center taps never seek.
+- **Auth & Onboarding** — MAL redirect, AniList redirect, auth, onboarding, and setup pages corrected for the deep-link OAuth bridge and offline states.
+- **Reader Styling** — Reader `transform: none` fix, section rhythm tokens, dialog/peek shadows, and overlay-variant card hover restricted to `hover:hover + fine` pointers.
+
+---
+
 ## [6.0.6] - 2026-10-06
 
 **Feature & Stability release.** Major mobile media pipeline upgrade with native loopback proxy and in-app APK updater, universal deep links and OAuth bridge, TorBox & Real-Debrid orchestrator hardening, auto-download next episode/chapter, and reader resilience.

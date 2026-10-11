@@ -41,7 +41,7 @@ export function HomeSectionHeading({
   className,
 }: HomeSectionHeadingProps) {
   return (
-    <div className={cn("flex items-center justify-between gap-3 px-2", size === "sub" ? "mb-4" : "mb-6", className)}>
+    <div className={cn("home-section-heading flex items-center justify-between gap-3", size === "sub" ? "mb-4" : "mb-6", className)}>
       <div className="min-w-0">
         <Heading
           className={cn(
@@ -61,7 +61,7 @@ export function HomeSectionHeading({
         (viewAllTo && (
           <Link
             to={viewAllTo}
-            className="flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground shrink-0"
+            className="ui-forward-link flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground shrink-0"
           >
             {viewAllLabel}
             <ArrowRight className="w-4 h-4" />

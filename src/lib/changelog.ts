@@ -14,6 +14,21 @@ export interface ChangelogRelease {
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '6.0.7',
+    date: '2026-10-11',
+    changes: [
+      'Native Mobile Downloads: Android and iOS now own transfers on-device with queue, retry/cancel, offline playback, legacy import, and manga per-page resume that survives app restarts',
+      'Download Resilience: Desktop downloads use crash-safe atomic writes, segment journals, and auto-resume on restart, with unaired episodes hidden and expired links re-resolved safely',
+      'Premium Profile Cosmetics: New avatar frames, nameplates, and edge effects with live preview picker, gated by premium/admin and enforced server-side',
+      'Smarter Discovery: Rating-weighted recommendations, MangaBaka enrichment, grouped tag search, smart discover lanes, and followed anime/manga rails that jump to the exact new episode or chapter',
+      'Cinematic Hero & Card Styles: Shared autoplay hero carousel, refreshed mobile layout, and global poster/overlay card style with hover previews',
+      'Player & Reader Polish: Single-owner desktop fullscreen without clipping, merged skip segments, mobile double-tap/pinch/lock gestures, and a reader tools sheet with jump, zoom, and auto-scroll',
+      'Motion Preferences: In-app reduced-motion control with tiered animations, fade-only transitions, and larger touch targets',
+      'Admin Analytics: Visit attribution, realtime presence grid, world map, guest-correct DAU, and trending/DB fixes',
+      'SEO & Reliability: JSON-LD share tags, never-HTML sitemap fallback, Cloudflare native solver, and streaming cache with request budgeting',
+    ],
+  },
+  {
     version: '6.0.6',
     date: '2026-10-06',
     changes: [

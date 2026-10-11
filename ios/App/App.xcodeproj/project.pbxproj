@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D17A00012F7C000100000001 /* TatakaiDownloadsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = D17A00022F7C000100000001 /* TatakaiDownloadsPlugin.swift */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
@@ -22,6 +23,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		D17A00022F7C000100000001 /* TatakaiDownloadsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TatakaiDownloadsPlugin.swift; sourceTree = "<group>"; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -74,6 +76,7 @@
 				A17A001B2F7C000100000001 /* TatakaiBridgeViewController.swift */,
 				A17A001D2F7C000100000001 /* TatakaiLocalProxyPlugin.swift */,
 				A17A00212F7C000100000001 /* TatakaiMuxPlugin.swift */,
+				D17A00022F7C000100000001 /* TatakaiDownloadsPlugin.swift */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
@@ -172,6 +175,7 @@
 				A17A001A2F7C000100000001 /* TatakaiBridgeViewController.swift in Sources */,
 				A17A001C2F7C000100000001 /* TatakaiLocalProxyPlugin.swift in Sources */,
 				A17A00202F7C000100000001 /* TatakaiMuxPlugin.swift in Sources */,
+				D17A00012F7C000100000001 /* TatakaiDownloadsPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -314,14 +318,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 606;
+				CURRENT_PROJECT_VERSION = 607;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 6.0.6;
+				MARKETING_VERSION = 6.0.7;
 				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
 				PRODUCT_BUNDLE_IDENTIFIER = app.tatakai.me;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -339,14 +343,14 @@
 				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 606;
+				CURRENT_PROJECT_VERSION = 607;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 6.0.6;
+				MARKETING_VERSION = 6.0.7;
 				PRODUCT_BUNDLE_IDENTIFIER = app.tatakai.me;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";

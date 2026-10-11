@@ -96,7 +96,10 @@ function ActionButton({ icon: Icon, count, active, activeClass, hoverClass, labe
 export function PostCard({ post, defaultShowComments = false, contextCommunityId = null }: { post: FeedPost; defaultShowComments?: boolean; contextCommunityId?: string | null }) {
   const navigate = useNavigate();
   const { user, isAdmin, isModerator } = useAuth();
-  const { data: reactions } = useReactions('forum_post', post.id);
+  // Seeded from the feed's batched tallies — first paint costs no per-post
+  // request; cards rendered without seed data (thread view, search) fetch
+  // exactly as before.
+  const { data: reactions } = useReactions('forum_post', post.id, post.reaction_counts ?? undefined);
   const react = useReact();
   const toggleRepost = useToggleRepost();
   const toggleBookmark = useToggleBookmark();
@@ -214,18 +217,21 @@ export function PostCard({ post, defaultShowComments = false, contextCommunityId
 
   if (post.is_deleted) {
     return (
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+      <div data-mobile-community-post>
         <GlassPanel className="p-4 border-dashed border-white/10">
           <p className="text-sm italic text-muted-foreground">{tombstoneLabel(post.deleted_by_role)}</p>
         </GlassPanel>
-      </motion.div>
+      </div>
     );
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+    <div data-mobile-community-post>
       {/* Removed the background hover effect, replaced with subtle border highlight and shadow */}
-      <GlassPanel className="relative flex flex-col gap-4 p-4 sm:p-5 transition-all duration-300 border border-white/5 hover:border-white/15 hover:shadow-[0_4px_24px_-8px_rgba(0,0,0,0.5)]">
+      <GlassPanel
+        className="relative flex flex-col gap-4 p-4 sm:p-5 transition-all duration-300 border border-white/5 hover:border-white/15 hover:shadow-[0_4px_24px_-8px_rgba(0,0,0,0.5)]"
+        style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 320px' }}
+      >
         
         {/* Header */}
         <div className="flex items-start gap-3">
@@ -288,7 +294,7 @@ export function PostCard({ post, defaultShowComments = false, contextCommunityId
                       className="inline-flex max-w-[160px] items-center gap-1.5 rounded-md border border-primary/20 bg-primary/5 py-0.5 pr-1.5 pl-0.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/15"
                     >
                       {post.community.icon_url && (
-                        <img src={getProxiedImageUrl(post.community.icon_url)} alt="" className="h-3.5 w-3.5 rounded-[4px] object-cover" />
+                        <img src={getProxiedImageUrl(post.community.icon_url)} alt="" loading="lazy" decoding="async" className="h-3.5 w-3.5 rounded-[4px] object-cover" />
                       )}
                       <span className="truncate">{post.community.name}</span>
                     </button>
@@ -315,7 +321,6 @@ export function PostCard({ post, defaultShowComments = false, contextCommunityId
           </div>
 
           {/* Options Menu */}
-          {(canDelete || canPin || true) && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button type="button" aria-label="More" onClick={(e) => e.stopPropagation()} className="shrink-0 rounded-full p-2 text-muted-foreground hover:bg-white/10 hover:text-foreground transition-colors mt-[-4px] mr-[-4px]">
@@ -355,7 +360,6 @@ export function PostCard({ post, defaultShowComments = false, contextCommunityId
                 />
               </DropdownMenuContent>
             </DropdownMenu>
-          )}
         </div>
 
         {/* Content Body */}
@@ -533,6 +537,6 @@ export function PostCard({ post, defaultShowComments = false, contextCommunityId
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </motion.div>
+    </div>
   );
 }

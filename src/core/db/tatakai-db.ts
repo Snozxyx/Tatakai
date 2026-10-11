@@ -152,6 +152,12 @@ export interface DownloadRule {
  * Written by the automation engine after every download attempt.
  */
 export interface DownloadHistoryEntry {
+  /** Absent on legacy anime rows. Manga shares the same terminal history table. */
+  mediaType?: 'anime' | 'manga';
+  chapterKey?: string;
+  chapterNumber?: number | null;
+  chapterLabel?: string;
+  volume?: number | string | null;
   /** Composite key: `${animeId}:${episodeNumber}:${startedAt}` */
   id: string;
   animeId: number;
@@ -168,7 +174,7 @@ export interface DownloadHistoryEntry {
   episodeId?: string;
   /** Final outcome of this attempt. */
   status: 'completed' | 'failed' | 'cancelled';
-  sourceType: 'hls' | 'torrent' | 'unknown';
+  sourceType: 'hls' | 'torrent' | 'unknown' | 'images';
   /** Canonical language code used (e.g. 'ja', 'en', 'hi'). */
   resolvedLanguage: string;
   /** Extension ID that served the content. */

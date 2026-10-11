@@ -24,7 +24,15 @@
  * redirect_uri.
  */
 
+import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
+
 type ElectronBridge = { openExternal?: (url: string) => Promise<unknown> };
+
+/** Packaged apps hand OAuth to a system browser, preserving the app WebView. */
+export function isNativeOAuthApp(): boolean {
+  return Capacitor.isNativePlatform() || isDesktopApp();
+}
 
 export function getElectronBridge(): ElectronBridge | undefined {
   return (window as any)?.electron;
@@ -45,11 +53,39 @@ export const DESKTOP_MAL_REDIRECT_URI =
 // `tatakai://` as an OAuth redirect_uri (AniList accepts only the single https
 // URI registered in its dashboard). Kept for backwards compatibility only.
 
+function usableWebRedirect(explicit: string): boolean {
+  if (!explicit) return false;
+  // A comma-joined pair is one literal (invalid) URL to MAL/AniList — never use it.
+  if (explicit.includes(',')) return false;
+  if (!isNativeOAuthApp()) return true;
+  try {
+    const url = new URL(explicit);
+    return url.protocol === 'https:' && !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+  } catch { return false; }
+}
+
+/**
+ * Takes the first URL of a possibly comma-separated env value (logs when the
+ * env is misconfigured) so callers never send MAL/AniList a literal pair that
+ * triggers their HTTP Basic `invalid_client` prompt.
+ */
+function firstRedirectUri(explicit: string): string {
+  const first = String(explicit || '').split(',')[0]?.trim() ?? '';
+  if (!first) return '';
+  if (String(explicit).includes(',')) {
+    console.warn(
+      '[OAuth] Redirect URI env contains a comma-separated pair; using only the first URL. ' +
+      'Register exactly one URL per provider — a pair triggers an HTTP login prompt that loops.',
+    );
+  }
+  return first;
+}
+
 /** Web redirect URI shared by web + desktop (the ONLY URI to register in provider dashboards). */
 export function getWebAnilistRedirectUri(): string {
-  const explicit = String(import.meta.env.VITE_ANILIST_REDIRECT_URI || '').trim();
-  if (explicit) return explicit;
-  if (typeof window !== 'undefined' && window.location.protocol.startsWith('http')) {
+  const explicit = firstRedirectUri(String(import.meta.env.VITE_ANILIST_REDIRECT_URI || '').trim());
+  if (usableWebRedirect(explicit)) return explicit;
+  if (!isNativeOAuthApp() && typeof window !== 'undefined' && window.location.protocol.startsWith('http')) {
     return `${window.location.origin}/integration/anilist/redirect`;
   }
   return 'https://tatakai.me/integration/anilist/redirect';
@@ -57,12 +93,12 @@ export function getWebAnilistRedirectUri(): string {
 
 /** Web redirect URI shared by web + desktop (the ONLY URI to register in provider dashboards). */
 export function getWebMalRedirectUri(): string {
-  const explicit = String(import.meta.env.VITE_MAL_REDIRECT_URI || '').trim();
-  if (explicit) return explicit;
-  if (typeof window !== 'undefined' && window.location.protocol.startsWith('http')) {
-    return `${window.location.origin}/integration/mal/redirect`;
+  const explicit = firstRedirectUri(String(import.meta.env.VITE_MAL_REDIRECT_URI || '').trim());
+  if (usableWebRedirect(explicit)) return explicit;
+  if (!isNativeOAuthApp() && typeof window !== 'undefined' && window.location.protocol.startsWith('http')) {
+    return `${window.location.origin}/api/mal/redirect`;
   }
-  return 'https://tatakai.me/integration/mal/redirect';
+  return 'https://tatakai.me/api/mal/redirect';
 }
 
 /** Prefix marking an OAuth flow as desktop-initiated (carried in `state`, echoed back by the provider). */
@@ -70,7 +106,7 @@ export const DESKTOP_OAUTH_STATE_PREFIX = 'tatakai-desktop-';
 
 /** Builds a desktop `state` marker. Safe chars only: must survive deep-link sanitization (`[^a-zA-Z0-9/\-_.?=&]` stripped). */
 export function buildDesktopOAuthState(): string {
-  const rand = Math.random().toString(16).slice(2, 10) + Date.now().toString(36).slice(-4);
+  const rand = Array.from(crypto.getRandomValues(new Uint8Array(24)), byte => byte.toString(16).padStart(2, '0')).join('');
   return `${DESKTOP_OAUTH_STATE_PREFIX}${rand}`;
 }
 
@@ -90,10 +126,14 @@ export function buildDesktopDeepLink(route: string): string {
  * Returns true if handed off to the desktop shell, false otherwise (caller
  * should fall back to same-window navigation).
  */
-export function openOAuthInBrowser(url: string): boolean {
+export async function openOAuthInBrowser(url: string): Promise<boolean> {
+  if (Capacitor.isNativePlatform()) {
+    await Browser.open({ url });
+    return true;
+  }
   const bridge = getElectronBridge();
   if (bridge?.openExternal) {
-    void bridge.openExternal(url);
+    await bridge.openExternal(url);
     return true;
   }
   return false;

@@ -161,7 +161,7 @@ export function MarketplaceModal({
                                 return (
                                     <div
                                         key={ext.id}
-                                        className="flex flex-col gap-3 p-4 rounded-2xl border border-white/5 bg-white/5 hover:bg-white/8 hover:border-primary/20 transition-all"
+                                        className="flex flex-col gap-3 p-4 rounded-2xl border border-white/5 bg-white/5 hover:bg-white/8 hover:border-primary/20 transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150"
                                     >
                                         <div className="flex items-start justify-between gap-2">
                                             <div className="flex items-center gap-2 min-w-0">
@@ -206,7 +206,7 @@ export function MarketplaceModal({
                                                 variant="outline"
                                                 disabled={isInstalling}
                                                 onClick={() => handleInstall(ext)}
-                                                className="h-7 px-3 rounded-lg text-[10px] font-black uppercase tracking-widest border-white/10 hover:border-primary/40 hover:bg-primary/10 hover:text-primary transition-all gap-1.5"
+                                                className="h-7 px-3 rounded-lg text-[10px] font-black uppercase tracking-widest border-white/10 hover:border-primary/40 hover:bg-primary/10 hover:text-primary transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 gap-1.5"
                                             >
                                                 {isInstalling ? (
                                                     <>

@@ -1,3 +1,4 @@
+import { usePersistentState } from '@/hooks/ui/usePersistentState';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -458,16 +459,17 @@ function openExternalUrl(url: string) {
 // --- Main Page ---
 
 export default function SetupPage() {
-  const [step, setStep] = useState(1);
+  const [savedStep, setStep] = usePersistentState('tatakai_setup_step', 1, 'local');
+  const step = Number.isInteger(savedStep) ? Math.min(7, Math.max(1, savedStep)) : 1;
   const [dir, setDir] = useState(1);
 
   // States
-  const [downloadPath, setDownloadPath] = useState('');
-  const [discordEnabled, setDiscordEnabled] = useState(true);
-  const [countryAck, setCountryAck] = useState(false);
-  const [enableWarp, setEnableWarp] = useState(false);
-  const [enableExtensions, setEnableExtensions] = useState(true);
-  const [tcAccepted, setTcAccepted] = useState(false);
+  const [downloadPath, setDownloadPath] = usePersistentState('tatakai_setup_draft:downloadPath', '', 'local');
+  const [discordEnabled, setDiscordEnabled] = usePersistentState('tatakai_setup_draft:discordEnabled', true, 'local');
+  const [countryAck, setCountryAck] = usePersistentState('tatakai_setup_draft:countryAck', false, 'local');
+  const [enableWarp, setEnableWarp] = usePersistentState('tatakai_setup_draft:enableWarp', false, 'local');
+  const [enableExtensions, setEnableExtensions] = usePersistentState('tatakai_setup_draft:enableExtensions', true, 'local');
+  const [tcAccepted, setTcAccepted] = usePersistentState('tatakai_setup_draft:tcAccepted', false, 'local');
 
   const tcAcceptedRef = useRef(false);
   tcAcceptedRef.current = tcAccepted;
@@ -498,7 +500,7 @@ export default function SetupPage() {
       if (isDesktop && (window as any).electron) {
         try {
           const path = await (window as any).electron.getDownloadsDir();
-          setDownloadPath(path);
+          setDownloadPath(previous => previous || path);
         } catch {}
       } else if (isMobile) {
         setDownloadPath('App Data (Internal)');
@@ -519,6 +521,7 @@ export default function SetupPage() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLElement && e.target.closest('input, textarea, button, [contenteditable=true]')) return;
       if (e.key === 'Enter' && step !== totalSteps) {
         handleContinue();
       } else if (e.key === 'Enter' && step === totalSteps && tcAcceptedRef.current) {
@@ -533,6 +536,10 @@ export default function SetupPage() {
     if (isDesktop && !tcAcceptedRef.current) return;
 
     localStorage.setItem('tatakai_setup_complete', 'true');
+    localStorage.removeItem('tatakai_setup_step');
+    for (const field of ['downloadPath', 'discordEnabled', 'countryAck', 'enableWarp', 'enableExtensions', 'tcAccepted']) {
+      localStorage.removeItem(`tatakai_setup_draft:${field}`);
+    }
     if (isDesktop) {
       localStorage.setItem('tatakai_download_path', downloadPath);
       localStorage.setItem('tatakai_discord_rpc', String(discordEnabled));

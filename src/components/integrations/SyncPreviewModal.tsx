@@ -119,9 +119,12 @@ export function SyncPreviewModal({
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      {/* Nested inside the Settings dialog (z-[80]): both layers must sit above
+          it or the sheet renders behind the settings panel. */}
       <SheetContent
         side="right"
-        className="flex w-full flex-col gap-0 overflow-hidden border-l border-white/[0.08] bg-background/60 p-0 backdrop-blur-[40px] sm:max-w-md md:max-w-lg shadow-[-20px_0_40px_rgba(0,0,0,0.5)]"
+        overlayClassName="z-[90]"
+        className="z-[100] flex w-full flex-col gap-0 overflow-hidden border-l border-white/[0.08] bg-background/60 p-0 backdrop-blur-[40px] sm:max-w-md md:max-w-lg shadow-[-20px_0_40px_rgba(0,0,0,0.5)]"
       >
         {/* ── Ambient Background Glow ── */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10">

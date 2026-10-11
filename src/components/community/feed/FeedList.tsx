@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
 import { Loader2, MessageSquare, Pin } from 'lucide-react';
 
 import { GlassPanel } from '@/components/ui/GlassPanel';
@@ -79,7 +78,7 @@ export function FeedList({
   ========================================================= */
   if (isLoading) {
     return (
-      <div className="w-full flex flex-col gap-4">
+      <div data-mobile-community className="w-full flex flex-col gap-4">
         {showComposer && user && (
           <div className="mb-2">
             <PostComposer onPosted={() => refetch()} defaultCommunityId={communityId} />
@@ -151,7 +150,7 @@ export function FeedList({
      MAIN FEED RENDER
   ========================================================= */
   return (
-    <div className="w-full flex flex-col gap-4">
+    <div data-mobile-community className="w-full flex flex-col gap-4">
       
       {showComposer && user && (
         <PostComposer onPosted={() => refetch()} defaultCommunityId={communityId} />
@@ -181,42 +180,31 @@ export function FeedList({
       {/* TIMELINE / MASONRY GRID */}
       {layout === 'masonry' ? (
         <div className="columns-1 gap-4 [column-fill:_balance] lg:columns-2">
-          {timelineItems.map((item, index) => {
+          {timelineItems.map((item) => {
             const key = item.kind === 'post' ? item.post.id : `room-${item.room.id}`;
             return (
-              <motion.article
-                key={key}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: Math.min(index * 0.025, 0.15), ease: 'easeOut' }}
-                className="break-inside-avoid mb-4"
-              >
+              <article key={key} className="break-inside-avoid mb-4">
                 {item.kind === 'post' ? (
                   <PostCard post={item.post} contextCommunityId={communityId ?? null} />
                 ) : (
                   <WatchroomFeedItem room={item.room} />
                 )}
-              </motion.article>
+              </article>
             );
           })}
         </div>
       ) : (
         <div className="flex flex-col gap-4">
-          {timelineItems.map((item, index) => {
+          {timelineItems.map((item) => {
             const key = item.kind === 'post' ? item.post.id : `room-${item.room.id}`;
             return (
-              <motion.article
-                key={key}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: Math.min(index * 0.025, 0.15), ease: 'easeOut' }}
-              >
+              <article key={key}>
                 {item.kind === 'post' ? (
                   <PostCard post={item.post} contextCommunityId={communityId ?? null} />
                 ) : (
                   <WatchroomFeedItem room={item.room} />
                 )}
-              </motion.article>
+              </article>
             );
           })}
         </div>

@@ -70,6 +70,8 @@
         </provider>
         
         <!-- Foreground Service for background downloads -->
+        <service android:name=".download.TatakaiDownloadService"
+            android:foregroundServiceType="dataSync" android:exported="false" />
         <service
             android:name="io.capawesome.capacitorjs.plugins.foregroundservice.AndroidForegroundService"
             android:foregroundServiceType="dataSync"

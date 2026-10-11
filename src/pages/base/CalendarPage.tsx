@@ -38,7 +38,7 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import { useAuth } from '@/contexts/AuthContext';
-import { useIsNativeApp } from '@/hooks/ui/useIsNativeApp';
+import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 import { useAiringSchedule, type AiringEntry } from '@/hooks/api/useAiringSchedule';
 import { useTrackedShows, useToggleTrackedShowByAnilist } from '@/hooks/user/useTrackedShows';
 import { cn } from '@/lib/utils';
@@ -232,7 +232,7 @@ function DaySkeleton({ rows }: { rows: number }) {
 export default function CalendarPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const isNative = useIsNativeApp();
+  const isDesktopApp = useIsDesktopApp();
 
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [mineOnly, setMineOnly] = useState(false);
@@ -318,7 +318,7 @@ export default function CalendarPage() {
 
   const shellClass = cn(
     'relative z-10 mx-auto max-w-[1800px] py-4 pb-24 pr-4 md:py-6 md:pb-6 md:pr-6',
-    isNative ? 'pl-4' : 'pl-4 md:pl-32',
+    isDesktopApp ? 'pl-4' : 'pl-4 md:pl-32',
   );
 
   const weekEnd = new Date(weekStart.getTime() + 6 * DAY_MS);

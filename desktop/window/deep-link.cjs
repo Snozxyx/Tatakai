@@ -1,14 +1,16 @@
 'use strict';
 
 function registerProtocolClient(app, pathModule) {
-    if (process.defaultApp) {
-        if (process.argv.length >= 2) {
-            app.setAsDefaultProtocolClient('tatakai', process.execPath, [pathModule.resolve(process.argv[1])]);
-            app.setAsDefaultProtocolClient('magnet', process.execPath, [pathModule.resolve(process.argv[1])]);
+    // An unpackaged Electron executable needs the app entry before the URL.
+    // process.defaultApp is not a reliable packaging check, and argv[1] can
+    // itself be a callback URL. Resolve our entry from this module instead.
+    for (const scheme of ['tatakai', 'magnet']) {
+        if (app.isPackaged) {
+            app.setAsDefaultProtocolClient(scheme);
+        } else {
+            const entry = pathModule.resolve(__dirname, '..', 'main.cjs');
+            app.setAsDefaultProtocolClient(scheme, process.execPath, [entry]);
         }
-    } else {
-        app.setAsDefaultProtocolClient('tatakai');
-        app.setAsDefaultProtocolClient('magnet');
     }
 }
 

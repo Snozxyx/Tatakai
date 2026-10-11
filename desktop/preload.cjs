@@ -26,6 +26,9 @@ contextBridge.exposeInMainWorld('electron', {
         return () => ipcRenderer.removeListener('torrent:open-file', handler);
     },
     startDownload: (payload) => ipcRenderer.invoke('start-download', payload),
+    getDownloadRecovery: () => ipcRenderer.invoke('download:recovery'),
+    setDownloadAutoResume: (enabled) => ipcRenderer.invoke('download:recovery-config', enabled),
+    resumeInterruptedDownloads: () => ipcRenderer.invoke('download:resume-interrupted'),
     cancelDownload: (params) => ipcRenderer.invoke('cancel-download', params),
     deleteAnime: (animePath) => ipcRenderer.invoke('delete-anime', animePath),
     getDownloadsDir: (customPath) => ipcRenderer.invoke('get-downloads-dir', customPath),
@@ -54,7 +57,7 @@ contextBridge.exposeInMainWorld('electron', {
     
     // Auto Downloader
     autoDownload: {
-        subscribe: (animeId, title, nextEpisode) => ipcRenderer.invoke('auto-download:subscribe', animeId, title, nextEpisode),
+        subscribe: (animeId, title, nextEpisode, anilistId) => ipcRenderer.invoke('auto-download:subscribe', animeId, title, nextEpisode, anilistId),
         unsubscribe: (animeId) => ipcRenderer.invoke('auto-download:unsubscribe', animeId),
         list: () => ipcRenderer.invoke('auto-download:list')
     },

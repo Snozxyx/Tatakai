@@ -1,3 +1,4 @@
+import { compareWatchHistory } from '@/lib/watchHistoryQuery';
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { History, Play, BookOpen, Clock, Search, LayoutGrid } from 'lucide-react';
@@ -148,7 +149,7 @@ export function HistoryTab({ history, mangaHistoryEntries, loading, isViewingOth
                           </div>
                           <div className="divide-y divide-white/[0.05]">
                             {episodes
-                              .sort((a, b) => new Date(b.watched_at).getTime() - new Date(a.watched_at).getTime())
+                              .sort(compareWatchHistory)
                               .map((item) => (
                                 <div
                                   key={item.id}

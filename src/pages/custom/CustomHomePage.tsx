@@ -14,7 +14,7 @@ import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { Header } from "@/components/layout/Header";
-import { useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
+import { useIsNativeApp, useIsDesktopApp } from "@/hooks/ui/useIsNativeApp";
 import { useIsMobile } from "@/hooks/ui/use-mobile";
 import { cn } from "@/lib/utils";
 import { UnifiedMediaCard, type UnifiedMediaCardProps } from "@/components/UnifiedMediaCard";
@@ -57,6 +57,7 @@ function CardGrid({ cards }: { cards: UnifiedMediaCardProps["item"][] }) {
 
 export default function CustomHomePage() {
   const isNative = useIsNativeApp();
+  const isDesktopApp = useIsDesktopApp();
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const { namespace, sourceId } = useParams<{ namespace: string; sourceId: string }>();
@@ -138,7 +139,7 @@ export default function CustomHomePage() {
       <main
         className={cn(
           "relative z-10 mx-auto max-w-[1800px] py-6 pr-6 pb-24 md:pb-6",
-          isNative ? "pl-6" : "pl-6 md:pl-32",
+          isDesktopApp ? "pl-6" : "pl-6 md:pl-32",
         )}
       >
         <Header />

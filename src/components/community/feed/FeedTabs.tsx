@@ -1,6 +1,6 @@
 
 import { cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 
 export type CommunityTab = 'foryou' | 'following' | 'news' | 'schedule';
 
@@ -22,6 +22,9 @@ export function FeedTabs({
   value: CommunityTab;
   onChange: (tab: CommunityTab) => void;
 }) {
+  // Spring-driven pill/line slides are skipped for reduced-motion users —
+  // the active state renders identically, without the animation.
+  const reduce = useReducedMotion();
   return (
     <div className="relative flex w-full items-stretch border-b border-white/[0.06] pt-2">
       {TABS.map((t) => {
@@ -41,12 +44,16 @@ export function FeedTabs({
               
               {/* Sliding Pill Background */}
               {active && (
-                <motion.div
-                  layoutId="activeTabPill"
-                  className="absolute inset-0 rounded-full bg-primary/10 shadow-[inset_0_1px_0_hsl(var(--primary)/0.2)]"
-                  initial={false}
-                  transition={{ type: 'spring', bounce: 0.2, duration: 0.5 }}
-                />
+                reduce ? (
+                  <div className="absolute inset-0 rounded-full bg-primary/10 shadow-[inset_0_1px_0_hsl(var(--primary)/0.2)]" />
+                ) : (
+                  <motion.div
+                    layoutId="activeTabPill"
+                    className="absolute inset-0 rounded-full bg-primary/10 shadow-[inset_0_1px_0_hsl(var(--primary)/0.2)]"
+                    initial={false}
+                    transition={{ type: 'spring', bounce: 0.2, duration: 0.5 }}
+                  />
+                )
               )}
               
               <span className="relative z-20">{t.label}</span>
@@ -54,14 +61,20 @@ export function FeedTabs({
 
             {/* Sliding Bottom Glow Line */}
             {active && (
-              <motion.div
-                layoutId="activeTabLine"
-                className="absolute -bottom-px left-0 right-0 z-20 flex justify-center"
-                initial={false}
-                transition={{ type: 'spring', bounce: 0.2, duration: 0.5 }}
-              >
-                <span className="h-[2px] w-[80%] max-w-[80px] rounded-t-full bg-gradient-to-r from-transparent via-primary to-transparent shadow-[0_-2px_12px_hsl(var(--primary)/0.6)]" />
-              </motion.div>
+              reduce ? (
+                <div className="absolute -bottom-px left-0 right-0 z-20 flex justify-center">
+                  <span className="h-[2px] w-[80%] max-w-[80px] rounded-t-full bg-gradient-to-r from-transparent via-primary to-transparent shadow-[0_-2px_12px_hsl(var(--primary)/0.6)]" />
+                </div>
+              ) : (
+                <motion.div
+                  layoutId="activeTabLine"
+                  className="absolute -bottom-px left-0 right-0 z-20 flex justify-center"
+                  initial={false}
+                  transition={{ type: 'spring', bounce: 0.2, duration: 0.5 }}
+                >
+                  <span className="h-[2px] w-[80%] max-w-[80px] rounded-t-full bg-gradient-to-r from-transparent via-primary to-transparent shadow-[0_-2px_12px_hsl(var(--primary)/0.6)]" />
+                </motion.div>
+              )
             )}
           </button>
         );

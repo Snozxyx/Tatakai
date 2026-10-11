@@ -10,11 +10,12 @@ import { useFeed, type FeedItem } from "@/hooks/community/useFeed";
 import { useDiscoverPlaylists } from "@/hooks/user/usePlaylist";
 import { usePublicWatchRooms } from "@/hooks/media/useWatchRoom";
 import { usePublicTierLists } from "@/hooks/user/useTierLists";
+import { cn } from "@/lib/utils";
 
-const SkeletonGrid = ({ count, className, tall }: { count: number; className: string; tall?: boolean }) => (
+const SkeletonGrid = ({ count, className, itemClassName, tall }: { count: number; className: string; itemClassName?: string; tall?: boolean }) => (
   <div className={className}>
     {Array.from({ length: count }).map((_, i) => (
-      <div key={i} className={`${tall ? "h-64" : "h-40"} rounded-3xl bg-muted/20 animate-pulse`} />
+      <div key={i} className={cn(`${tall ? "h-64" : "h-40"} rounded-3xl bg-muted/20 animate-pulse`, itemClassName)} />
     ))}
   </div>
 );
@@ -53,7 +54,7 @@ export function CommunitySection() {
   if (isEmpty) return null;
 
   return (
-    <section className="space-y-12">
+    <section data-mobile-community className="space-y-12">
       <HomeSectionHeading
         icon={<Users className="w-5 h-5 text-primary" />}
         title="Community"
@@ -72,11 +73,13 @@ export function CommunitySection() {
             viewAllTo="/tierlists"
           />
           {tlLoading ? (
-            <SkeletonGrid tall count={4} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" />
+            <SkeletonGrid tall count={4} className="flex overflow-x-auto no-scrollbar scrollbar-hide snap-x snap-mandatory gap-4 pb-2 md:grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 md:gap-6 md:overflow-visible md:snap-none md:pb-0" itemClassName="min-w-[260px] max-w-[320px] w-[78vw] shrink-0 snap-start md:w-auto md:min-w-0 md:max-w-none md:shrink" />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div data-mobile-home-rail="tierlists" className="flex overflow-x-auto no-scrollbar scrollbar-hide snap-x snap-mandatory gap-4 pb-2 md:grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 md:gap-6 md:overflow-visible md:snap-none md:pb-0">
               {tierlists.map((tl) => (
-                <TierListCard key={tl.id} tierList={tl} />
+                <div key={tl.id} className="min-w-[260px] max-w-[320px] w-[78vw] shrink-0 snap-start md:w-auto md:min-w-0 md:max-w-none md:shrink">
+                  <TierListCard tierList={tl} />
+                </div>
               ))}
             </div>
           )}
@@ -94,11 +97,13 @@ export function CommunitySection() {
             viewAllTo="/playlists"
           />
           {plLoading ? (
-            <SkeletonGrid count={4} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" />
+            <SkeletonGrid count={4} className="flex overflow-x-auto no-scrollbar scrollbar-hide snap-x snap-mandatory gap-4 pb-2 md:grid md:grid-cols-3 lg:grid-cols-4 md:overflow-visible md:snap-none md:pb-0" itemClassName="min-w-[170px] max-w-[210px] w-[50vw] shrink-0 snap-start md:w-auto md:min-w-0 md:max-w-none md:shrink" />
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div data-mobile-home-rail="playlists" className="flex overflow-x-auto no-scrollbar scrollbar-hide snap-x snap-mandatory gap-4 pb-2 md:grid md:grid-cols-3 lg:grid-cols-4 md:overflow-visible md:snap-none md:pb-0">
               {playlists.map((pl) => (
-                <PlaylistCard key={pl.id} playlist={pl} author={pl.author} showActions={false} />
+                <div key={pl.id} className="min-w-[170px] max-w-[210px] w-[50vw] shrink-0 snap-start md:w-auto md:min-w-0 md:max-w-none md:shrink">
+                  <PlaylistCard playlist={pl} author={pl.author} showActions={false} />
+                </div>
               ))}
             </div>
           )}
@@ -138,11 +143,13 @@ export function CommunitySection() {
             viewAllTo="/isshoni"
           />
           {roomLoading ? (
-            <SkeletonGrid count={3} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" />
+            <SkeletonGrid count={3} className="flex overflow-x-auto no-scrollbar scrollbar-hide snap-x snap-mandatory gap-4 pb-2 md:grid md:grid-cols-2 lg:grid-cols-3 md:overflow-visible md:snap-none md:pb-0" itemClassName="min-w-[240px] max-w-[300px] w-[72vw] shrink-0 snap-start md:w-auto md:min-w-0 md:max-w-none md:shrink" />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div data-mobile-home-rail="rooms" className="flex overflow-x-auto no-scrollbar scrollbar-hide snap-x snap-mandatory gap-4 pb-2 md:grid md:grid-cols-2 lg:grid-cols-3 md:overflow-visible md:snap-none md:pb-0">
               {topRooms.map((room) => (
-                <WatchRoomCard key={room.id} room={room} />
+                <div key={room.id} className="min-w-[240px] max-w-[300px] w-[72vw] shrink-0 snap-start md:w-auto md:min-w-0 md:max-w-none md:shrink">
+                  <WatchRoomCard room={room} />
+                </div>
               ))}
             </div>
           )}

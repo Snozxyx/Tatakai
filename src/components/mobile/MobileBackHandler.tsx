@@ -44,6 +44,11 @@ export function MobileBackHandler() {
               (lockBtn as HTMLElement).click();
               return;
             }
+            const fullscreenButton = document.querySelector<HTMLElement>('[data-player-fullscreen="active"]');
+            if (fullscreenButton) {
+              fullscreenButton.click();
+              return;
+            }
           } catch {
             /* fall through to router */
           }

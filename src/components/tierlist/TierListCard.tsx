@@ -63,6 +63,8 @@ export function TierListCard({ tierList, showAuthor = true, onShare }: TierListC
                         key={item.anime_id}
                         src={item.anime_image}
                         alt=""
+                        loading="lazy"
+                        decoding="async"
                         className="w-6 h-8 object-cover rounded-[3px] shrink-0 ring-1 ring-white/10"
                       />
                     ))}

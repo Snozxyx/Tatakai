@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Download, X, CheckCircle2, Circle, FolderOpen, AlertCircle,
@@ -21,11 +21,17 @@ import {
 import { hasTorrentService, isCapacitor } from '@/lib/platform/platform';
 import { toast } from 'sonner';
 import { triggerHaptic } from '@/lib/haptics';
+import { availableDownloadEpisodes } from '@/lib/episodeAvailability';
+import { createSourceRequestCache } from '@/lib/cache/sourceRequestCache';
+import { queryClient } from '@/lib/queryClient';
 
 interface Episode {
   episodeId: string;
   number: number;
   title?: string;
+  hasAired?: boolean;
+  airDateUtc?: string;
+  airDate?: string;
 }
 
 interface SeasonDownloadModalProps {
@@ -64,6 +70,10 @@ interface DlSource {
   headers?: Record<string, string>;
   originalUrl?: string;
 }
+
+type ResolvedDownloadSources = { sources: DlSource[]; headers?: Record<string, string> };
+const downloadSourceCache = createSourceRequestCache<ResolvedDownloadSources>();
+const downloadServerCache = createSourceRequestCache<{ sub: EpisodeServer[]; dub: EpisodeServer[] }>();
 
 /**
  * Pull caption tracks off a raw resolved source. Sources expose them as
@@ -179,7 +189,7 @@ function normalizeDlSources(resolved: any, fallbackCategory = 'sub', allowTorren
  * The stream resolves by AniList id / title + episode number (not the internal
  * episodeId), so it works even when a provider's id mapping is missing.
  */
-async function resolveEpisode(episodeId: string, animeName: string, episodeNumber: number, anilistId?: number | null, malId?: number | null, category = 'sub'): Promise<{ sources: DlSource[]; headers?: Record<string, string> }> {
+async function resolveEpisode(episodeId: string, animeName: string, episodeNumber: number, anilistId?: number | null, malId?: number | null, category = 'sub', onSources?: (value: ResolvedDownloadSources) => void): Promise<ResolvedDownloadSources> {
   const allowTorrent = hasTorrentService();
 
   // Register cached mobile extensions before probing. The app startup already
@@ -212,8 +222,14 @@ async function resolveEpisode(episodeId: string, animeName: string, episodeNumbe
       preferredLanguage: category,
       route: 'sources' as const,
     };
+    // 25s matches the probe's per-sample budget below, so slow providers
+    // survive the mobile batch cap instead of being truncated.
+    const progressive = new Map<string, any[]>();
     const settled = await Promise.allSettled(
-      [...new Set(namespaces)].map((namespace) => streamExtensionSources(namespace, params)),
+      [...new Set(namespaces)].map((namespace) => streamExtensionSources(namespace, params, 15000, sources => {
+        progressive.set(namespace, sources);
+        onSources?.({ sources: normalizeDlSources({ sources: [...progressive.values()].flat() }, category, allowTorrent) });
+      })),
     );
     const streamed = settled.flatMap((result) => result.status === 'fulfilled' ? result.value : []);
     const dl = normalizeDlSources({ sources: streamed }, category, allowTorrent);
@@ -243,6 +259,21 @@ async function resolveEpisode(episodeId: string, animeName: string, episodeNumbe
 }
 
 
+/**
+ * Outer timeout so one wedged resolution can never pin the Start button on
+ * "Starting downloads…" forever — expiry is treated like an empty result,
+ * which flows into the existing per-episode error toasts below.
+ */
+function withStartTimeout<T>(promise: Promise<T>, ms = 45000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('Source resolution timed out')), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  }) as Promise<T>;
+}
+
 /** Numbered step header used to walk the user through the download flow. */
 function StepHeader({ n, label, hint }: { n: number; label: string; hint?: string }) {
   return (
@@ -262,12 +293,15 @@ function StepHeader({ n, label, hint }: { n: number; label: string; hint?: strin
 function AutoDownloadTab({
   animeId,
   animeName,
-  episodes,
+  anilistId,
+  episodes: allEpisodes,
 }: {
   animeId?: string;
   animeName: string;
+  anilistId?: number | null;
   episodes: Episode[];
 }) {
+  const episodes = useMemo(() => availableDownloadEpisodes(allEpisodes), [allEpisodes]);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(false);
@@ -277,7 +311,7 @@ function AutoDownloadTab({
   useEffect(() => {
     if (!animeId || !electron?.autoDownload?.list) { setLoading(false); return; }
     electron.autoDownload.list().then((list: any[]) => {
-      const found = Array.isArray(list) && list.some((item: any) => item.animeId === animeId);
+      const found = Array.isArray(list) && list.some((item: any) => item.animeId === animeId || item.id === animeId);
       setIsSubscribed(found);
       setLoading(false);
     }).catch(() => setLoading(false));
@@ -297,7 +331,7 @@ function AutoDownloadTab({
           ? Math.max(...episodes.map(e => e.number))
           : 0;
         const nextEp = lastEp + 1;
-        await electron.autoDownload.subscribe(animeId, animeName, nextEp);
+        await electron.autoDownload.subscribe(animeId, animeName, nextEp, anilistId);
         setIsSubscribed(true);
         toast.success(`Auto-download enabled for "${animeName}" from episode ${nextEp}`);
       }
@@ -400,14 +434,19 @@ function AutoDownloadTab({
 export const SeasonDownloadModal = ({
   isOpen,
   onClose,
-  episodes,
+  episodes: allEpisodes,
   animeName,
   posterUrl,
   animeId,
   anilistId,
   malId,
 }: SeasonDownloadModalProps) => {
+  const episodes = useMemo(() => availableDownloadEpisodes(allEpisodes), [allEpisodes]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    const available = new Set(episodes.map(episode => episode.episodeId));
+    setSelectedIds(previous => new Set([...previous].filter(id => available.has(id))));
+  }, [episodes]);
   const [step, setStep] = useState<'series' | 'episodes' | 'server'>('series');
   const [isStarting, setIsStarting] = useState(false);
   const [downloadPath, setDownloadPath] = useState<string>('');
@@ -522,20 +561,20 @@ export const SeasonDownloadModal = ({
 
   // Cache resolved sources per episode so the probe's work is reused at download
   // time and repeated Start clicks don't re-scrape. Cleared when the anime changes.
-  const resolvedCacheRef = useRef<Map<string, { sources: DlSource[]; headers?: Record<string, string> }>>(new Map());
+  const sourceCacheKey = useCallback((ep: Episode, category = 'sub') => JSON.stringify([animeId, anilistId, malId, animeName, ep.episodeId, ep.number, category, hasTorrentService()]), [animeId, anilistId, malId, animeName]);
   const resolveEpisodeCached = useCallback(
-    async (ep: Episode, category = 'sub') => {
-      const key = `${ep.episodeId}:${category}`;
-      const hit = resolvedCacheRef.current.get(key);
-      if (hit) return hit;
-      const res = await resolveEpisode(ep.episodeId, animeName, ep.number, anilistId, malId, category);
-      if (res.sources.length > 0) resolvedCacheRef.current.set(key, res);
-      return res;
+    (ep: Episode, category = 'sub', onSources?: (value: ResolvedDownloadSources) => void, language?: string) => {
+      const key = sourceCacheKey(ep, category);
+      const known = downloadSourceCache.peek(key);
+      // Starting a download can use the first usable arrival while discovery
+      // continues filling the picker with slower providers.
+      if (!onSources && known?.sources.some(source => !language || source.langCode === language)) return Promise.resolve(known);
+      return downloadSourceCache.get(key, publish => withStartTimeout(resolveEpisode(ep.episodeId, animeName, ep.number, anilistId, malId, category, publish), 20000), value => value.sources.length > 0, onSources);
     },
-    [animeName, anilistId, malId],
+    [animeName, anilistId, malId, sourceCacheKey],
   );
 
-  useEffect(() => { resolvedCacheRef.current.clear(); setProbed(false); }, [representativeId]);
+  useEffect(() => { setProbed(false); setProbeSources([]); setDispatchServers([]); }, [representativeId, sourceCacheKey]);
 
 
   useEffect(() => {
@@ -589,7 +628,9 @@ export const SeasonDownloadModal = ({
     // 1. WatchPage-method server list (per-episode dispatch, sub+dub).
     void Promise.allSettled(
       sampleEpisodes.map((ep) =>
-        withProbeTimeout(fetchEpisodeServers(ep.episodeId), 12000, 'Server list').catch(() => ({ sub: [], dub: [] })),
+        downloadServerCache.get(ep.episodeId, () => withProbeTimeout(queryClient.fetchQuery({
+          queryKey: ['servers', ep.episodeId], queryFn: () => fetchEpisodeServers(ep.episodeId), staleTime: 5 * 60_000,
+        }), 12000, 'Server list'), value => value.sub.length + value.dub.length > 0).catch(() => ({ sub: [], dub: [] })),
       ),
     ).then((settled) => {
       if (cancelled) return;
@@ -621,16 +662,21 @@ export const SeasonDownloadModal = ({
       try {
         const merged: DlSource[] = [];
         const seenUrls = new Set<string>();
+        const publishSources = ({ sources }: ResolvedDownloadSources) => {
+          if (cancelled) return;
+          for (const source of sources) {
+            if (!seenUrls.has(source.url)) { seenUrls.add(source.url); merged.push(source); }
+          }
+          if (merged.length === 0) return;
+          setProbeSources([...merged]);
+          const savedLang = normalizeLanguage(localStorage.getItem('tatakai_default_language') || '');
+          setSelectedLangCode(prev => savedLang && merged.some(s => s.langCode === savedLang) ? savedLang
+            : prev && merged.some(s => s.langCode === prev) ? prev : merged[0].langCode);
+        };
         for (const rep of sampleEpisodes) {
           if (cancelled) break;
           try {
-            const { sources } = await withProbeTimeout(resolveEpisodeCached(rep), 25000, 'Source probe');
-            for (const s of sources) {
-              if (!seenUrls.has(s.url)) {
-                seenUrls.add(s.url);
-                merged.push(s);
-              }
-            }
+            publishSources(await withProbeTimeout(resolveEpisodeCached(rep, 'sub', publishSources), 18000, 'Source probe'));
           } catch {
             /* one dead sample must not kill discovery */
           }
@@ -671,11 +717,11 @@ export const SeasonDownloadModal = ({
     // overlapping provider batches and starves both the visible probe and the
     // video player. Resolve the representative episode only, then resolve each
     // selected episode on demand when Start is pressed.
-    if (!isOpen || !isNative || isMobile) return;
+    if (!isOpen || !isNative || isMobile || probing || step !== 'server') return;
     let cancelled = false;
     const pending = episodes
-      .filter(e => selectedIds.has(e.episodeId) && !resolvedCacheRef.current.has(`${e.episodeId}:sub`))
-      .slice(0, 24);
+      .filter(e => selectedIds.has(e.episodeId) && !downloadSourceCache.has(sourceCacheKey(e)))
+      .slice(0, 2);
     if (pending.length === 0) return;
     (async () => {
       let idx = 0;
@@ -688,7 +734,7 @@ export const SeasonDownloadModal = ({
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, isNative, isMobile, selectedIds, resolveEpisodeCached]);
+  }, [isOpen, isNative, isMobile, selectedIds, resolveEpisodeCached, probing, step, sourceCacheKey]);
 
   // Keep the chosen server valid as the language (and thus server list) changes.
   useEffect(() => {
@@ -729,7 +775,16 @@ export const SeasonDownloadModal = ({
     let startedCount = 0;
 
     for (const ep of episodesToDownload) {
-      const { sources, headers } = await resolveEpisodeCached(ep);
+      let sources: DlSource[] = [];
+      let headers: Record<string, string> | undefined;
+      try {
+        ({ sources, headers } = await withStartTimeout(resolveEpisodeCached(ep, 'sub', undefined, langCode)));
+      } catch {
+        toast.error(`Episode ${ep.number}: source lookup timed out`, {
+          description: 'The providers are slow right now — retry in a moment.',
+        });
+        continue;
+      }
 
       // Restrict to the chosen language (strict — never silently cross languages).
       let candidates = langCode ? sources.filter(s => s.langCode === langCode) : sources;
@@ -773,6 +828,7 @@ export const SeasonDownloadModal = ({
           const res = await startDownload({
             episodeId: ep.episodeId, animeName, episodeNumber: ep.number,
             posterUrl,
+            anilistId,
             url: src.url,
             originalUrl: src.originalUrl,
             headers: src.headers || headers,
@@ -942,6 +998,9 @@ export const SeasonDownloadModal = ({
 
                 <ScrollArea className="h-[32dvh] sm:h-[300px] min-h-[180px] rounded-xl border border-white/10 bg-white/[0.03]">
                   <div className="grid grid-cols-1 gap-1.5 p-1.5">
+                    {episodes.length === 0 && (
+                      <p className="py-12 px-4 text-center text-sm text-muted-foreground">No released episodes are available yet.</p>
+                    )}
                     {episodes.map((ep) => {
                       const state = downloadStates[ep.episodeId];
                       const isSelected = selectedIds.has(ep.episodeId);
@@ -998,7 +1057,7 @@ export const SeasonDownloadModal = ({
 
             {/* Auto-download tab */}
             <TabsContent value="auto" className="mt-4">
-              <AutoDownloadTab animeId={animeId} animeName={animeName} episodes={episodes} />
+              <AutoDownloadTab animeId={animeId} animeName={animeName} anilistId={anilistId} episodes={episodes} />
             </TabsContent>
           </Tabs>
           </>
@@ -1017,10 +1076,10 @@ export const SeasonDownloadModal = ({
                   <StepHeader
                     n={3}
                     label="Language & server"
-                    hint={probing ? 'Detecting…' : (languageOptions.length ? `${languageOptions.length} language${languageOptions.length > 1 ? 's' : ''}` : undefined)}
+                    hint={languageOptions.length ? `${languageOptions.length} language${languageOptions.length > 1 ? 's' : ''}` : probing ? 'Detecting…' : undefined}
                   />
 
-                  {probing ? (
+                  {probing && languageOptions.length === 0 ? (
                     <div className="flex items-center gap-2 rounded-xl bg-white/[0.03] border border-white/10 p-4 text-xs text-muted-foreground">
                       <Loader2 className="w-4 h-4 animate-spin text-primary" /> Detecting available sources…
                     </div>
@@ -1031,7 +1090,11 @@ export const SeasonDownloadModal = ({
                         <p className="text-sm font-medium">No sources detected</p>
                         <p className="text-xs text-muted-foreground mt-0.5">We'll still try every server when you start. Or probe again.</p>
                       </div>
-                      <Button variant="outline" size="sm" onClick={() => setProbeNonce(n => n + 1)} className="h-8 gap-1.5 text-xs">
+                      <Button variant="outline" size="sm" onClick={() => {
+                        downloadSourceCache.clear(); downloadServerCache.clear();
+                        for (const ep of sampleEpisodes) void queryClient.invalidateQueries({ queryKey: ['servers', ep.episodeId] });
+                        setProbeNonce(n => n + 1);
+                      }} className="h-8 gap-1.5 text-xs">
                         <RefreshCw className="w-3.5 h-3.5" /> Retry detection
                       </Button>
                     </div>

@@ -13,6 +13,18 @@ let started = false;
 export async function bootstrapMobile(): Promise<void> {
   if (started || !isCapacitor()) return;
   started = true;
+  const { loadMobileConfig } = await import('@/hooks/ui/useMobileConfig');
+  const { configureMobileCloudflare } = await import('@/core/mobile/localProxyNative');
+  const syncCloudflare = () => {
+    const config = loadMobileConfig();
+    void configureMobileCloudflare(config.cloudflareBypass, config.flaresolverrUrl)
+      .catch((error) => console.warn('Could not apply mobile Cloudflare settings', error));
+  };
+  syncCloudflare();
+  window.addEventListener('tatakai-mobile-config-updated', syncCloudflare);
+  const { installMobileLayout } = await import('./layout');
+  installMobileLayout();
+  void import('@/core/download/mobile/nativeDownloads').then(({ installNativeDownloads }) => installNativeDownloads());
 
   // Tag the document so mobile-only CSS (safe-area insets, input zoom guards)
   // applies. Mirrors the class MainLayout also toggles, set early so first paint

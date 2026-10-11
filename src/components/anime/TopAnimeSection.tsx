@@ -69,7 +69,7 @@ export const TopAnimeSection = memo(function TopAnimeSection({ today, week, mont
       </div>
 
       {/* Grid — plain cards on mobile (no backdrop-blur / hover scale) for 60fps scroll */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-5">
+      <div data-mobile-home-rail className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-5">
         {getAnimes().slice(0, 10).map((anime, idx) => (
           <Peekable key={anime.id} media={peekFromAnime(anime, `/anime/${anime.id}`)}>
           <button
@@ -78,7 +78,7 @@ export const TopAnimeSection = memo(function TopAnimeSection({ today, week, mont
             className="group overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03] text-left transition-transform duration-200 active:scale-[0.98] md:hover:border-white/[0.14]"
             style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 280px' }}
           >
-            <div className="relative aspect-[2/3]">
+            <div data-mobile-poster-image className="relative aspect-[2/3]">
               <img
                 src={getHighQualityPoster(anime.poster, anime.anilistId)}
                 alt={anime.name}
@@ -98,7 +98,7 @@ export const TopAnimeSection = memo(function TopAnimeSection({ today, week, mont
 
               {/* Content */}
               <div className="absolute bottom-0 left-0 right-0 p-3 md:p-4 pt-10">
-                <h4 className="font-bold text-[13px] md:text-sm leading-tight line-clamp-2 drop-shadow-md md:group-hover:text-amber md:transition-colors">
+                <h4 data-mobile-poster-title className="font-bold text-[13px] md:text-sm leading-tight line-clamp-2 drop-shadow-md md:group-hover:text-amber md:transition-colors">
                   {anime.name}
                 </h4>
                 <div className="mt-1.5 md:mt-2 flex items-center gap-2">

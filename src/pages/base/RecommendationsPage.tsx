@@ -37,6 +37,12 @@ const FACTOR_ITEMS: Array<{ key: keyof RecommendationFactors; label: string; col
   { key: 'popularityBoost', label: 'Popularity', color: 'bg-rose-500' },
 ];
 
+const TIER_STYLES: Record<string, { dot: string; label: string }> = {
+  strong: { dot: 'bg-green-500', label: 'Strong match' },
+  possible: { dot: 'bg-yellow-500', label: 'Possible match' },
+  weak: { dot: 'bg-gray-500', label: 'Weak match' },
+};
+
 function RecommendationCard({
   recommendation,
   feedback,
@@ -46,97 +52,107 @@ function RecommendationCard({
   feedback?: RecommendationFeedback;
   onFeedback: (animeId: string, feedback: RecommendationFeedback, rec: EngineRecommendation) => void;
 }) {
-  const { anime, score, confidence, reasons, factors } = recommendation;
+  const { anime, score, confidence, reasons, factors, tier } = recommendation;
   const [showExplain, setShowExplain] = useState(false);
+  const tierStyle = tier ? TIER_STYLES[tier] : undefined;
 
   return (
     <GlassPanel hoverEffect className="group overflow-hidden">
-      <div className="relative aspect-[2/3]">
-        <Link to={`/anime/${anime.id}`}>
+      <div className="flex gap-3 p-3 sm:gap-4 sm:p-4">
+        {/* Poster thumb — fixed width, badges live in-flow on the right so nothing can overlap */}
+        <Link
+          to={`/anime/${anime.id}`}
+          className="relative block aspect-[2/3] w-24 shrink-0 self-start overflow-hidden rounded-xl bg-muted/30 sm:w-28"
+        >
           <img
             src={getProxiedImageUrl(anime.poster ?? '')}
             alt={anime.title}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
             loading="lazy"
           />
         </Link>
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
 
-        <div className="absolute top-3 right-3 px-3 py-1.5 rounded-full bg-primary/90 backdrop-blur text-primary-foreground text-xs font-bold flex items-center gap-1">
-          <Star className="w-3 h-3 fill-current" />
-          {score}%
-        </div>
-
-        <div className="absolute top-3 left-3">
-          <div className={`px-2 py-1 rounded-md text-xs font-bold ${confidence > 0.7 ? 'bg-green-500/80 text-white' :
-            confidence > 0.4 ? 'bg-yellow-500/80 text-white' : 'bg-gray-500/80 text-white'}`}>
-            {confidence > 0.7 ? 'High' : confidence > 0.4 ? 'Medium' : 'Low'} Match
-          </div>
-        </div>
-      </div>
-
-      <div className="p-3 space-y-2">
-        <Link to={`/anime/${anime.id}`} className="block font-bold text-sm line-clamp-2 hover:text-primary transition-colors">
-          {anime.title}
-        </Link>
-
-        {reasons.length > 0 && (
-          <div className="space-y-1">
-            {reasons.slice(0, 2).map((reason, i) => (
-              <p key={i} className="text-xs text-muted-foreground line-clamp-1">• {reason}</p>
-            ))}
-          </div>
-        )}
-
-        {feedback && (
-          <div className="text-[10px] uppercase tracking-wide text-primary font-bold">
-            Feedback: {feedback.replace('_', ' ')}
-          </div>
-        )}
-
-        <div className="flex items-center gap-1.5">
-          <button type="button" onClick={() => onFeedback(anime.id, 'like', recommendation)}
-            className={`h-7 px-2 rounded-md border text-[10px] font-bold uppercase tracking-wide ${feedback === 'like' ? 'bg-green-500/20 text-green-400 border-green-500/40' : 'bg-white/5 border-white/10 hover:border-green-500/40'}`}
-            title="More like this">
-            <ThumbsUp className="w-3 h-3" />
-          </button>
-          <button type="button" onClick={() => onFeedback(anime.id, 'dislike', recommendation)}
-            className={`h-7 px-2 rounded-md border text-[10px] font-bold uppercase tracking-wide ${feedback === 'dislike' ? 'bg-red-500/20 text-red-400 border-red-500/40' : 'bg-white/5 border-white/10 hover:border-red-500/40'}`}
-            title="Not interested">
-            <ThumbsDown className="w-3 h-3" />
-          </button>
-          <button type="button" onClick={() => onFeedback(anime.id, 'skip', recommendation)}
-            className={`h-7 px-2 rounded-md border text-[10px] font-bold uppercase tracking-wide ${feedback === 'skip' ? 'bg-slate-500/25 text-slate-300 border-slate-400/40' : 'bg-white/5 border-white/10 hover:border-slate-400/40'}`}
-            title="Skip for now">
-            Skip
-          </button>
-          <button type="button" onClick={() => onFeedback(anime.id, 'already_seen', recommendation)}
-            className={`h-7 px-2 rounded-md border text-[10px] font-bold uppercase tracking-wide ${feedback === 'already_seen' ? 'bg-amber-500/20 text-amber-400 border-amber-500/40' : 'bg-white/5 border-white/10 hover:border-amber-500/40'}`}
-            title="Already watched">
-            <EyeOff className="w-3 h-3" />
-          </button>
-          <button type="button" onClick={() => setShowExplain((p) => !p)}
-            className="ml-auto h-7 px-2 rounded-md border border-white/10 bg-white/5 text-[10px] font-bold uppercase tracking-wide flex items-center gap-1">
-            Why
-            <ChevronDown className={`w-3 h-3 transition-transform ${showExplain ? 'rotate-180' : ''}`} />
-          </button>
-        </div>
-
-        {showExplain && (
-          <div className="pt-2 border-t border-white/10 space-y-1.5">
-            {FACTOR_ITEMS.map((item) => (
-              <div key={item.key}>
-                <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                  <span>{item.label}</span>
-                  <span>{Math.round((factors[item.key] ?? 0) * 100)}%</span>
-                </div>
-                <div className="h-1.5 rounded bg-white/10 overflow-hidden mt-1">
-                  <div className={`h-full ${item.color}`} style={{ width: `${Math.round((factors[item.key] ?? 0) * 100)}%` }} />
-                </div>
+        {/* Right side: badges, title, reasons, actions, fit bars */}
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <div className={`shrink-0 whitespace-nowrap px-2 py-1 rounded-md text-[11px] font-bold ${confidence > 0.7 ? 'bg-green-500/80 text-white' :
+              confidence > 0.4 ? 'bg-yellow-500/80 text-white' : 'bg-gray-500/80 text-white'}`}>
+              {confidence > 0.7 ? 'High' : confidence > 0.4 ? 'Medium' : 'Low'} Match
+            </div>
+            {tierStyle && (
+              <div className="shrink-0 whitespace-nowrap px-2 py-1 rounded-md text-[10px] font-bold bg-black/60 text-white flex items-center gap-1.5" title="How this score compares to titles you rated">
+                <span className={`w-1.5 h-1.5 rounded-full ${tierStyle.dot}`} />
+                {tierStyle.label}
               </div>
-            ))}
+            )}
+            <div className="shrink-0 whitespace-nowrap px-2.5 py-1 rounded-full bg-primary/90 text-primary-foreground text-[11px] font-bold flex items-center gap-1">
+              <Star className="w-3 h-3 fill-current" />
+              {score}%
+            </div>
           </div>
-        )}
+
+          <Link to={`/anime/${anime.id}`} className="block font-bold text-sm sm:text-base line-clamp-2 hover:text-primary transition-colors">
+            {anime.title}
+          </Link>
+
+          {reasons.length > 0 && (
+            <div className="space-y-0.5">
+              {reasons.slice(0, 2).map((reason, i) => (
+                <p key={i} className="text-xs text-muted-foreground line-clamp-1">• {reason}</p>
+              ))}
+            </div>
+          )}
+
+          {feedback && (
+            <div className="text-[10px] uppercase tracking-wide text-primary font-bold">
+              Feedback: {feedback.replace('_', ' ')}
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button type="button" onClick={() => onFeedback(anime.id, 'like', recommendation)}
+              className={`h-7 px-2 rounded-md border text-[10px] font-bold uppercase tracking-wide ${feedback === 'like' ? 'bg-green-500/20 text-green-400 border-green-500/40' : 'bg-white/5 border-white/10 hover:border-green-500/40'}`}
+              title="More like this">
+              <ThumbsUp className="w-3 h-3" />
+            </button>
+            <button type="button" onClick={() => onFeedback(anime.id, 'dislike', recommendation)}
+              className={`h-7 px-2 rounded-md border text-[10px] font-bold uppercase tracking-wide ${feedback === 'dislike' ? 'bg-red-500/20 text-red-400 border-red-500/40' : 'bg-white/5 border-white/10 hover:border-red-500/40'}`}
+              title="Not interested">
+              <ThumbsDown className="w-3 h-3" />
+            </button>
+            <button type="button" onClick={() => onFeedback(anime.id, 'skip', recommendation)}
+              className={`h-7 px-2 rounded-md border text-[10px] font-bold uppercase tracking-wide ${feedback === 'skip' ? 'bg-slate-500/25 text-slate-300 border-slate-400/40' : 'bg-white/5 border-white/10 hover:border-slate-400/40'}`}
+              title="Skip for now">
+              Skip
+            </button>
+            <button type="button" onClick={() => onFeedback(anime.id, 'already_seen', recommendation)}
+              className={`h-7 px-2 rounded-md border text-[10px] font-bold uppercase tracking-wide ${feedback === 'already_seen' ? 'bg-amber-500/20 text-amber-400 border-amber-500/40' : 'bg-white/5 border-white/10 hover:border-amber-500/40'}`}
+              title="Already watched">
+              <EyeOff className="w-3 h-3" />
+            </button>
+            <button type="button" onClick={() => setShowExplain((p) => !p)}
+              className="h-7 px-2 rounded-md border border-white/10 bg-white/5 text-[10px] font-bold uppercase tracking-wide flex items-center gap-1">
+              Why
+              <ChevronDown className={`w-3 h-3 transition-transform ${showExplain ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
+
+          {showExplain && (
+            <div className="pt-2 border-t border-white/10 grid gap-x-4 gap-y-1.5 sm:grid-cols-2">
+              {FACTOR_ITEMS.map((item) => (
+                <div key={item.key} className="min-w-0">
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                    <span className="truncate">{item.label}</span>
+                    <span className="ml-2 shrink-0">{Math.round((factors[item.key] ?? 0) * 100)}%</span>
+                  </div>
+                  <div className="h-1.5 rounded bg-white/10 overflow-hidden mt-1">
+                    <div className={`h-full ${item.color}`} style={{ width: `${Math.round((factors[item.key] ?? 0) * 100)}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </GlassPanel>
   );
@@ -208,6 +224,16 @@ function TasteProfileDisplay({ profile }: { profile: TasteProfile }) {
                   <span key={i} className="px-2 py-1 bg-primary/20 text-primary text-xs rounded">{s.studio}</span>
                 ))}
               </div>
+            </div>
+          )}
+
+          {profile.accuracy != null && (
+            <div>
+              <h3 className="text-sm font-bold text-muted-foreground mb-2">Prediction Accuracy</h3>
+              <p className="text-sm">
+                Off by <span className="font-bold text-primary">{profile.accuracy.toFixed(1)}%</span> on average
+                <span className="text-muted-foreground"> — predicted scores vs. your actual ratings</span>
+              </p>
             </div>
           )}
 
@@ -375,13 +401,13 @@ export default function RecommendationsPage() {
 
           <TabsContent value="grid">
             {isLoading ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {Array.from({ length: 12 }).map((_, i) => (
-                  <div key={i} className="aspect-[2/3] bg-muted/50 rounded-xl animate-pulse" />
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="h-44 bg-muted/50 rounded-xl animate-pulse" />
                 ))}
               </div>
             ) : filteredRecommendations.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 {filteredRecommendations.map((rec) => (
                   <RecommendationCard
                     key={rec.anime.id}

@@ -1,11 +1,11 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSettingsModal } from "@/contexts/SettingsModalContext";
 import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { Header } from "@/components/layout/Header";
-import { useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
+import { useIsNativeApp, useIsDesktopApp } from "@/hooks/ui/useIsNativeApp";
 import { useIsMobile } from "@/hooks/ui/use-mobile";
 import { cn } from "@/lib/utils";
 import type { MangaSearchItem } from "@/types/manga";
@@ -16,13 +16,18 @@ import { useContentSafetySettings } from "@/hooks/user/useContentSafetySettings"
 import { useMangaHome } from "@/hooks/api/useMangaHome";
 import { inferMangaAdultFlag } from "@/lib/contentSafety";
 import { MangaHeroSection } from "@/components/manga/MangaHeroSection";
+import { CinematicHeroSkeleton, MobileHomeBackdrop, type CinematicSpotlight } from '@/components/anime/CinematicHero';
+import { useMobileAppearance } from '@/hooks/ui/useMobileAppearance';
+import { toMangaSpotlight } from '@/lib/mangaSpotlight';
 import { MangaTrendingGrid } from "@/components/manga/MangaTrendingGrid";
 import { InfiniteMangaSections } from "@/components/manga/InfiniteMangaSections";
 import { IndexMangaShowcase } from "@/components/manga/IndexMangaShowcase";
 import { LastReadMangaSection } from "@/components/manga/LastReadMangaSection";
 import { MangaGenreSlider } from "@/components/manga/MangaGenreSlider";
 import { MangaDiscoveryQuickFilters } from "@/components/manga/MangaDiscoveryQuickFilters";
-import { MangaDiscoveryLane } from "@/components/manga/MangaDiscoveryLane";
+import { MangaSmartDiscover } from "@/components/manga/MangaSmartDiscover";
+import { FollowedMangaUpdates } from "@/components/manga/FollowedMangaUpdates";
+import { MangaExtraLanes } from "@/components/manga/MangaExtraLanes";
 
 
 function toUnifiedMangaCard(
@@ -38,6 +43,10 @@ function toUnifiedMangaCard(
     id: String(id),
     name: displayTitle,
     poster: manga.poster || "",
+    banner: manga.banner,
+    logo: manga.logo,
+    titleLogo: manga.titleLogo,
+    description: manga.description,
     type: manga.mediaType || "manga",
     status: manga.status || undefined,
     rating:
@@ -88,7 +97,10 @@ export default function MangaHomePage() {
   const navigate = useNavigate();
   const { openSettings } = useSettingsModal();
   const isNative = useIsNativeApp();
+  const isDesktopApp = useIsDesktopApp();
   const isMobile = useIsMobile();
+  const refreshed = useMobileAppearance();
+  const [activeSpotlight, setActiveSpotlight] = useState<CinematicSpotlight | null>(null);
   const { settings: contentSafetySettings, updateSettings: updateContentSafetySettings } = useContentSafetySettings();
   const canShowAdultEverywhere = contentSafetySettings.showAdultEverywhere;
 
@@ -115,7 +127,7 @@ export default function MangaHomePage() {
   );
 
   const trendingCards = useMemo(
-    () => laneToCards(home?.trending, 8, { canShowAdult: canShowAdultEverywhere }),
+    () => laneToCards(home?.trending, 12, { canShowAdult: canShowAdultEverywhere }),
     [home, canShowAdultEverywhere],
   );
 
@@ -131,27 +143,28 @@ export default function MangaHomePage() {
   const isInitialLoading = isLoading && !home;
 
   return (
-    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-      {!isNative && <Background />}
+    <div className="relative min-h-screen bg-background text-foreground overflow-x-clip">
+      {refreshed && spotlightCards.length > 0 && <MobileHomeBackdrop anime={toMangaSpotlight(spotlightCards.find(item => item.id === activeSpotlight?.id) || spotlightCards[0])} />}
+      {!isNative && !refreshed && <Background />}
       {!isMobile && <Sidebar />}
 
-      <main className={cn(
-        "relative z-10 pr-6 py-6 max-w-[1800px] mx-auto pb-24 md:pb-6",
-        isNative ? "pl-6" : "pl-6 md:pl-32"
+      <main data-mobile-home data-manga-home className={cn(
+        "app-page relative z-10 pr-6 py-6 max-w-[1800px] mx-auto pb-24 md:pb-6",
+        isDesktopApp ? "pl-6" : "pl-6 md:pl-32"
       )}>
         <Header />
 
         {isInitialLoading ? (
           <div className="space-y-12 mt-6 animate-pulse">
             {/* Hero Banner Skeleton */}
-            <div className="relative w-full aspect-[21/9] md:aspect-[21/7] rounded-3xl bg-muted/40 overflow-hidden border border-white/5 flex items-end p-6 md:p-10">
+            {refreshed ? <CinematicHeroSkeleton /> : <div className="relative w-full aspect-[21/9] md:aspect-[21/7] rounded-3xl bg-muted/40 overflow-hidden border border-white/5 flex items-end p-6 md:p-10">
               <div className="space-y-4 max-w-xl">
                 <div className="w-28 h-6 bg-white/10 rounded-full" />
                 <div className="w-3/4 h-10 md:h-14 bg-white/15 rounded-2xl" />
                 <div className="w-1/2 h-4 bg-white/10 rounded-lg" />
                 <div className="w-36 h-12 bg-white/20 rounded-full mt-4" />
               </div>
-            </div>
+            </div>}
 
             {/* Quick Filters Skeleton */}
             <div className="flex items-center gap-3 overflow-hidden py-2">
@@ -163,7 +176,7 @@ export default function MangaHomePage() {
             {/* First Grid Row Skeleton */}
             <div>
               <div className="w-48 h-7 bg-muted/50 rounded-lg mb-4" />
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              <div data-mobile-home-rail className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <CardSkeleton key={`row1-${i}`} />
                 ))}
@@ -173,7 +186,7 @@ export default function MangaHomePage() {
             {/* Second Grid Row Skeleton */}
             <div>
               <div className="w-56 h-7 bg-muted/50 rounded-lg mb-4" />
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              <div data-mobile-home-rail className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <CardSkeleton key={`row2-${i}`} />
                 ))}
@@ -186,15 +199,15 @@ export default function MangaHomePage() {
               <MangaHeroSection 
                 spotlight={spotlightCards[0]} 
                 spotlights={spotlightCards} 
+                onActiveSpotlightChange={setActiveSpotlight}
               />
             )}
 
             <LastReadMangaSection />
 
-            {/* Discovery Lane Section */}
-            {trendingCards.length > 0 && (
-              <MangaDiscoveryLane items={[...trendingCards, ...spotlightCards]} />
-            )}
+            <FollowedMangaUpdates />
+
+            <MangaSmartDiscover />
 
             <IndexMangaShowcase />
 
@@ -250,13 +263,13 @@ export default function MangaHomePage() {
                   <h3 className="mb-3 text-lg md:text-xl font-black tracking-tight">Mature Picks</h3>
 
                   {isLoading ? (
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                    <div data-mobile-home-rail className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                       {Array.from({ length: 6 }).map((_, index) => (
                         <CardSkeleton key={`adult-skeleton-${index}`} />
                       ))}
                     </div>
                   ) : adultCards.length > 0 ? (
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                    <div data-mobile-home-rail className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                       {adultCards.map((item) => (
                         <UnifiedMediaCard key={`manga-adult-${item.id}`} item={item} />
                       ))}
@@ -281,6 +294,8 @@ export default function MangaHomePage() {
             {trendingCards.length > 0 && (
               <MangaTrendingGrid items={trendingCards} />
             )}
+
+            <MangaExtraLanes />
           </>
         )}
 

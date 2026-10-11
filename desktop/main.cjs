@@ -257,7 +257,7 @@ function startDeferredRuntimeServices() {
 }
 
 require('./ipc/ipc-library.cjs')(ipcMain, app, dialog, shell, fs, path, logger, getMainWindow);
-require('./ipc/ipc-download-manager.cjs')(ipcMain, app, fs, path, logger, getMainWindow);
+require('./ipc/ipc-download-manager.cjs')(ipcMain, app, fs, path, logger, getMainWindow, extensionRuntimeApi);
 // Manga chapter downloads: must resolve pages WITH per-page headers in-main, so
 // it gets the extension runtime (registry/workerPool/ensureExtensionFetchProxy).
 require('./ipc/ipc-manga-download-manager.cjs')(ipcMain, app, fs, path, logger, getMainWindow, extensionRuntimeApi);

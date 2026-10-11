@@ -63,7 +63,7 @@ export function PlaylistCard({
             >
               {displayImages.map((img, idx) => (
                 <div key={idx} className="relative overflow-hidden">
-                  <img src={getProxiedImageUrl(img)} alt="" className="w-full h-full object-cover" />
+                  <img src={getProxiedImageUrl(img)} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
                 </div>
               ))}
               {displayImages.length === 3 && (

@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { getProxiedImageUrl } from '@/lib/api';
-import { useIsNativeApp, useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
+import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   useCommunityBySlug,
@@ -36,7 +36,6 @@ const ROLE_ICON: Record<string, any> = { owner: Crown, mod: Shield };
 export default function CommunitySpacePage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const isNative = useIsNativeApp();
   const isDesktopApp = useIsDesktopApp();
   const { user, isAdmin, isModerator } = useAuth();
   const { data: community, isLoading } = useCommunityBySlug(slug);
@@ -71,7 +70,7 @@ export default function CommunitySpacePage() {
     return (
       <div className="min-h-screen bg-background text-foreground">
         <CommunitySidebar />
-        <main className={cn('relative z-10 w-full', isDesktopApp ? 'pl-24 lg:pl-28' : isNative ? 'pl-0' : 'pl-0 md:pl-24 lg:pl-28')}>
+        <main className={cn('relative z-10 w-full', isDesktopApp ? 'pl-24 lg:pl-28' : 'pl-0 md:pl-24 lg:pl-28')}>
           <div className="mx-auto max-w-2xl px-4 py-16 text-center">
             <h1 className="font-display text-2xl font-bold">Community not found</h1>
             <Button className="mt-4 rounded-full" onClick={() => navigate('/community')}>Back to Community</Button>
@@ -98,7 +97,7 @@ export default function CommunitySpacePage() {
         </div>
       )}
 
-      <main className={cn('relative z-10 w-full', isDesktopApp ? 'pl-24 lg:pl-28' : isNative ? 'pl-0' : 'pl-0 md:pl-24 lg:pl-28')}>
+      <main className={cn('relative z-10 w-full', isDesktopApp ? 'pl-24 lg:pl-28' : 'pl-0 md:pl-24 lg:pl-28')}>
         {/* Shared bounds: hero banner + header + feed all align to the same
             max-width column so the banner's edges line up with the content
             (and the sidebar clearance) instead of bleeding full-width. */}

@@ -203,6 +203,7 @@ export function DisplayPanel() {
             description="Disables all filters, animations, and heavy styles for low-end devices"
             control={
               <Switch
+                aria-label="Ultra Lite Mode"
                 checked={theme === 'ultra-lite'}
                 onCheckedChange={(checked) => setTheme(checked ? 'ultra-lite' : 'cherry-blossom')}
               />
@@ -211,12 +212,12 @@ export function DisplayPanel() {
           <SettingRow
             title="Reduce Motion"
             description="Minimize animations for better performance"
-            control={<Switch checked={reduceMotion} onCheckedChange={setReduceMotion} />}
+            control={<Switch aria-label="Reduce Motion" checked={reduceMotion} onCheckedChange={setReduceMotion} />}
           />
           <SettingRow
             title="High Contrast Mode"
             description="Increase visual contrast for accessibility"
-            control={<Switch checked={highContrast} onCheckedChange={setHighContrast} />}
+            control={<Switch aria-label="High Contrast Mode" checked={highContrast} onCheckedChange={setHighContrast} />}
           />
         </div>
       </SettingsSection>

@@ -79,7 +79,7 @@ export async function updateMALAnimeStatus(
 // ===========================================
 
 const ANILIST_CLIENT_ID = import.meta.env.VITE_ANILIST_CLIENT_ID;
-const ANILIST_REDIRECT_URI = import.meta.env.VITE_ANILIST_REDIRECT_URI || `${window.location.origin}/integration/anilist/redirect`;
+const ANILIST_REDIRECT_URI = String(import.meta.env.VITE_ANILIST_REDIRECT_URI || '').split(',')[0]?.trim() || (typeof window !== 'undefined' ? `${window.location.origin}/integration/anilist/redirect` : 'https://tatakai.me/integration/anilist/redirect');
 const ANILIST_AUTH_URL = 'https://anilist.co/api/v2/oauth/authorize';
 // AniList GraphQL is reached through the TatakaiAPI proxy (see anilistQuery).
 
@@ -100,7 +100,13 @@ export function getAniListAuthUrl(redirectUri?: string, state?: string): string 
     throw new Error('Missing VITE_ANILIST_CLIENT_ID');
   }
 
-  const effectiveRedirect = redirectUri || ANILIST_REDIRECT_URI;
+  const effectiveRedirect = String(redirectUri || ANILIST_REDIRECT_URI).split(',')[0]?.trim() || ANILIST_REDIRECT_URI;
+  if (String(redirectUri || ANILIST_REDIRECT_URI).includes(',')) {
+    console.warn(
+      '[OAuth] AniList redirect URI contained a comma-separated pair; using only the first URL. ' +
+      'Register exactly one URL — a pair triggers a login prompt that loops.',
+    );
+  }
   try {
     localStorage.setItem(ANILIST_REDIRECT_STORAGE_KEY, effectiveRedirect);
     if (state) localStorage.setItem(ANILIST_STATE_STORAGE_KEY, state);

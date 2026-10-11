@@ -59,14 +59,14 @@ const INLINE = new RegExp(
   'gi',
 );
 
-const CODE_CLASS = 'rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.85em] text-white/85';
+const CODE_CLASS = 'rounded bg-muted/50 px-1.5 py-0.5 font-mono text-[0.85em] text-foreground';
 const LINK_CLASS =
   'font-semibold text-primary underline decoration-primary/40 underline-offset-2 hover:decoration-primary';
 
 const HEADING_CLASSES = [
   'font-display mt-6 text-xl font-black tracking-tight text-foreground',
   'font-display mt-6 text-lg font-bold tracking-tight text-foreground',
-  'mt-5 text-base font-bold text-white/90',
+  'mt-5 text-base font-bold text-foreground',
 ];
 
 /** Attribute value off a raw tag, quoted or bare. */
@@ -200,14 +200,14 @@ function pairedNode(tag: string, inner: string, key: string, baseUrl?: string): 
     case 'strong':
     case 'b':
       return (
-        <strong key={key} className="font-bold text-white/90">
+        <strong key={key} className="font-bold text-foreground">
           {children}
         </strong>
       );
     case 'em':
     case 'i':
       return (
-        <em key={key} className="italic text-white/80">
+        <em key={key} className="italic text-foreground">
           {children}
         </em>
       );
@@ -215,7 +215,7 @@ function pairedNode(tag: string, inner: string, key: string, baseUrl?: string): 
       return (
         <kbd
           key={key}
-          className="rounded border border-white/15 bg-white/[0.06] px-1.5 py-0.5 font-mono text-[0.8em] text-white/80"
+          className="rounded border border-border bg-muted/50 px-1.5 py-0.5 font-mono text-[0.8em] text-foreground"
         >
           {children}
         </kbd>
@@ -227,7 +227,7 @@ function pairedNode(tag: string, inner: string, key: string, baseUrl?: string): 
     case 'del':
     case 's':
       return (
-        <del key={key} className="text-white/40">
+        <del key={key} className="text-muted-foreground">
           {children}
         </del>
       );
@@ -350,16 +350,16 @@ function tableNode(
   return (
     <div
       key={key}
-      className="mt-4 overflow-x-auto rounded-xl border border-white/[0.07] bg-white/[0.02]"
+      className="mt-4 overflow-x-auto rounded-xl border border-border bg-muted/50"
     >
       <table className="w-full border-collapse text-sm">
         <thead>
-          <tr className="border-b border-white/[0.07] bg-white/[0.03]">
+          <tr className="border-b border-border bg-muted/50">
             {header.map((cell, column) => (
               <th
                 key={column}
                 className={cn(
-                  'px-3 py-2 text-[11px] font-bold uppercase tracking-[0.16em] text-white/70',
+                  'px-3 py-2 text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground',
                   alignClass(column),
                 )}
               >
@@ -374,7 +374,7 @@ function tableNode(
               {header.map((_, column) => (
                 <td
                   key={column}
-                  className={cn('px-3 py-2 align-top text-white/60', alignClass(column))}
+                  className={cn('px-3 py-2 align-top text-muted-foreground', alignClass(column))}
                 >
                   {renderInline(row[column] ?? '', `${key}-${rowIndex}-${column}`, baseUrl)}
                 </td>
@@ -427,9 +427,9 @@ function matchBlock(text: string, tag: string): { inner: string; length: number 
 }
 
 const PRE_CLASS =
-  'mt-4 overflow-x-auto rounded-xl border border-white/[0.07] bg-black/40 p-4 text-xs leading-relaxed text-white/70';
+  'mt-4 overflow-x-auto rounded-xl border border-border bg-muted/50 p-4 text-xs leading-relaxed text-muted-foreground';
 const QUOTE_CLASS =
-  'mt-4 border-l-2 border-primary/40 pl-4 text-sm italic leading-relaxed text-white/55';
+  'mt-4 border-l-2 border-primary/40 pl-4 text-sm italic leading-relaxed text-muted-foreground';
 
 /** A recognised HTML block, with its contents re-parsed as markdown. */
 function htmlBlockNode(
@@ -475,7 +475,7 @@ function htmlBlockNode(
     return (
       <summary
         key={key}
-        className={cn('cursor-pointer font-bold text-white/85 [&>*:first-child]:mt-0', alignClass)}
+        className={cn('cursor-pointer font-bold text-foreground [&>*:first-child]:mt-0', alignClass)}
       >
         {children}
       </summary>
@@ -486,7 +486,7 @@ function htmlBlockNode(
     return (
       <details
         key={key}
-        className="mt-4 rounded-xl border border-white/[0.07] bg-white/[0.02] p-4 [&>*:first-child]:mt-0"
+        className="mt-4 rounded-xl border border-border bg-muted/50 p-4 [&>*:first-child]:mt-0"
       >
         {children}
       </details>
@@ -528,7 +528,7 @@ function parseBlocks(lines: string[], baseUrl?: string, seed = 'b'): ReactNode[]
     // Everything on the line may have been markup this renderer drops.
     if (nodes.every((node) => typeof node === 'string' && !node.trim())) return;
     blocks.push(
-      <p key={key()} className="mt-3 text-sm leading-relaxed text-white/60">
+      <p key={key()} className="mt-3 text-sm leading-relaxed text-muted-foreground">
         {nodes}
       </p>,
     );
@@ -543,7 +543,7 @@ function parseBlocks(lines: string[], baseUrl?: string, seed = 'b'): ReactNode[]
       <Tag
         key={key()}
         className={cn(
-          'mt-3 space-y-1.5 pl-5 text-sm leading-relaxed text-white/60',
+          'mt-3 space-y-1.5 pl-5 text-sm leading-relaxed text-muted-foreground',
           Tag === 'ol' ? 'list-decimal' : 'list-disc',
         )}
       >
@@ -607,7 +607,7 @@ function parseBlocks(lines: string[], baseUrl?: string, seed = 'b'): ReactNode[]
 
     if (/^\s*(?:[-*_]\s*){3,}$/.test(line) || /^\s*<hr\s*\/?>\s*$/i.test(line)) {
       flushAll();
-      blocks.push(<hr key={key()} className="mt-6 border-white/[0.07]" />);
+      blocks.push(<hr key={key()} className="mt-6 border-border" />);
       continue;
     }
 

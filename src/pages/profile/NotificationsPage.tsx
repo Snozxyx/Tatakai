@@ -29,7 +29,7 @@ import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
 import { useNotifications, type Notification } from '@/hooks/community/useNotifications';
 import { useAuth } from '@/contexts/AuthContext';
-import { useIsNativeApp } from '@/hooks/ui/useIsNativeApp';
+import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 import { cn } from '@/lib/utils';
 
 function typeIcon(n: Notification) {
@@ -50,7 +50,7 @@ function typeIcon(n: Notification) {
 export default function NotificationsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const isNative = useIsNativeApp();
+  const isDesktopApp = useIsDesktopApp();
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
 
   const { data: notifications = [], isLoading, unreadCount, markAsRead, markAllAsRead, deleteNotification } =
@@ -58,7 +58,7 @@ export default function NotificationsPage() {
 
   const shellClass = cn(
     'relative z-10 mx-auto max-w-3xl py-4 pb-24 pr-4 md:py-6 md:pb-6 md:pr-6',
-    isNative ? 'pl-4' : 'pl-4 md:pl-32',
+    isDesktopApp ? 'pl-4' : 'pl-4 md:pl-32',
   );
 
   const visible = useMemo(

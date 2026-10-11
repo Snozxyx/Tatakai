@@ -33,6 +33,48 @@ export interface SeoProps {
   imageAlt?: string;
 }
 
+/** schema.org type emitted for each SeoKind (kept in sync with scripts/seo/inject.mjs). */
+function schemaTypeFor(kind: SeoKind): string {
+  switch (kind) {
+    case "video.other":
+      return "TVSeries";
+    case "book":
+      return "Book";
+    case "article":
+      return "Article";
+    case "profile":
+      return "ProfilePage";
+    default:
+      return "WebPage";
+  }
+}
+
+/** Minimal valid JSON-LD for the page entity — name/image/url/description only,
+ *  so it is always truthful even when ratings/reviews are unavailable. */
+export function entityJsonLd(args: {
+  kind: SeoKind;
+  name: string;
+  description?: string | null;
+  image?: string | null;
+  url: string;
+}): Record<string, unknown> {
+  const desc = (args.description || "").replace(/\s+/g, " ").trim().slice(0, 5000);
+  const node: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": schemaTypeFor(args.kind),
+    name: args.name,
+    url: args.url,
+  };
+  if (desc) node.description = desc;
+  if (args.image) node.image = args.image;
+  (node as Record<string, unknown>).isPartOf = {
+    "@type": "WebSite",
+    name: SITE_NAME,
+    url: SITE_ORIGIN,
+  };
+  return node;
+}
+
 /** Trim to a crawler-friendly length on a word boundary. */
 function clamp(text: string, max = 200): string {
   const t = text.replace(/\s+/g, " ").trim();
@@ -84,6 +126,12 @@ export function Seo({
       <meta name="twitter:title" content={fullTitle} />
       {desc && <meta name="twitter:description" content={desc} />}
       <meta name="twitter:image" content={img} />
+
+      <script type="application/ld+json">
+        {JSON.stringify(
+          entityJsonLd({ kind, name: fullTitle, description: desc || undefined, image: img, url: canonical }),
+        )}
+      </script>
     </Helmet>
   );
 }

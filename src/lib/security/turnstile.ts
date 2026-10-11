@@ -13,9 +13,12 @@
  *  - No VITE_TURNSTILE_SITE_KEY   → disabled; callers proceed without a token.
  *  - Desktop file:// (null origin) → disabled; the widget can't render there and
  *    the siteverify would reject a null hostname, so we skip it entirely.
+ *  - Native iOS → disabled for the packaged app; web Safari remains enabled.
  *  - TatakaiAPI unreachable        → verify fails OPEN (the server itself fails
  *    open on a Cloudflare outage; the DB backstop still guards the write).
  */
+
+import { Capacitor } from '@capacitor/core';
 
 export const TURNSTILE_SITE_KEY = String(
   import.meta.env.VITE_TURNSTILE_SITE_KEY || ""
@@ -31,6 +34,7 @@ export const TURNSTILE_SCRIPT_SRC =
  * build), where the widget can't render and siteverify rejects the null host.
  */
 export function isTurnstileEnabled(): boolean {
+  if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') return false;
   if (!TURNSTILE_SITE_KEY) return false;
   if (typeof window !== "undefined" && window.location.protocol === "file:") return false;
   return true;

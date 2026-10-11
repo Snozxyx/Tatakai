@@ -17,10 +17,10 @@ const FEATURES = [
 
 export function ReleaseV6Banner() {
   return (
-    <section className="mb-10 md:mb-16">
+    <section className="hidden md:block mb-10 md:mb-16">
       <Link
         to="/manga"
-        className="group relative isolate block overflow-hidden rounded-[2rem] border border-white/10 bg-black shadow-2xl ring-1 ring-inset ring-white/5 transition-all duration-500 hover:border-white/20  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        data-balanced-banner className="group relative isolate block overflow-hidden rounded-[2rem] border border-white/10 bg-black shadow-2xl ring-1 ring-inset ring-white/5 transition-[background-color,border-color,box-shadow,transform] duration-500 hover:border-white/20  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         {/* ---------- Background layers ---------- */}
 
@@ -31,7 +31,7 @@ export function ReleaseV6Banner() {
             alt=""
             loading="lazy"
             decoding="async"
-            className="h-full w-full object-cover opacity-60 transition-transform duration-[1200ms] ease-out group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+            className="h-full w-full object-cover opacity-60 transition-transform duration-200 ease-out group-hover:scale-[1.025] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
           />
         </div>
 
@@ -45,7 +45,7 @@ export function ReleaseV6Banner() {
         <div className="absolute inset-0 -z-10 bg-[radial-gradient(rgba(255,255,255,0.07)_1px,transparent_1px)] [background-size:18px_18px] [mask-image:linear-gradient(to_right,black,transparent_60%)]" />
 
         {/* Accent glow */}
-        <div className="absolute -left-32 -top-32 -z-10 h-80 w-80 rounded-full bg-primary/25 opacity-60 blur-3xl transition-opacity duration-700 group-hover:opacity-100" />
+        <div className="absolute -left-32 -top-32 -z-10 h-80 w-80 rounded-full bg-primary/25 opacity-60 blur-3xl transition-opacity duration-200 group-hover:opacity-100" />
 
         {/* Top hairline highlight */}
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
@@ -53,7 +53,7 @@ export function ReleaseV6Banner() {
         {/* Hover shine sweep */}
         <span
           aria-hidden
-          className="pointer-events-none absolute inset-y-0 -left-1/2 z-30 w-1/3 -skew-x-12 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 transition-all duration-1000 ease-out group-hover:left-[120%] group-hover:opacity-100 motion-reduce:hidden"
+          className="pointer-events-none absolute inset-y-0 left-0 z-30 w-1/3 -translate-x-[150%] -skew-x-12 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 transition-[transform,opacity] duration-200 ease-out group-hover:translate-x-[360%] group-hover:opacity-100 motion-reduce:hidden"
         />
 
         {/* ---------- Decorative page stack (desktop) ---------- */}
@@ -64,12 +64,12 @@ export function ReleaseV6Banner() {
           <div className="relative h-64 w-44 xl:h-72 xl:w-48">
             
             {/* Back page */}
-            <div className="absolute inset-0 -translate-x-10 -rotate-12 rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-sm transition-transform duration-700 ease-out group-hover:-translate-x-16 group-hover:-rotate-[18deg]" />
+            <div className="absolute inset-0 -translate-x-10 -rotate-12 rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-sm transition-transform duration-200 ease-out " />
             {/* Middle page */}
             
-            <div className="absolute inset-0 -translate-x-5 -rotate-6 rounded-2xl border border-white/10 bg-white/[0.07] backdrop-blur-sm transition-transform duration-700 ease-out group-hover:-translate-x-8 group-hover:-rotate-[9deg]" />
+            <div className="absolute inset-0 -translate-x-5 -rotate-6 rounded-2xl border border-white/10 bg-white/[0.07] backdrop-blur-sm transition-transform duration-200 ease-out " />
             {/* Front page */}
-            <div className="absolute inset-0 overflow-hidden rounded-2xl border border-white/15 shadow-2xl transition-transform duration-700 ease-out group-hover:-translate-y-2 group-hover:rotate-2">
+            <div className="absolute inset-0 overflow-hidden rounded-2xl border border-white/15 shadow-2xl transition-transform duration-200 ease-out ">
               <img
                 src="https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx172619-LSoXY45QAas4.jpg"
                 alt=""
@@ -84,7 +84,7 @@ export function ReleaseV6Banner() {
                 </p>
                 <p className="mt-0.5 text-sm font-bold text-white">Chapter 142</p>
                 <div className="mt-3 h-1 overflow-hidden rounded-full bg-white/15">
-                  <div className="h-full w-2/3 rounded-full bg-primary transition-all duration-700 group-hover:w-5/6" />
+                  <div className="h-full w-2/3 rounded-full bg-primary" />
                 </div>
               </div>
             </div>
@@ -136,7 +136,7 @@ export function ReleaseV6Banner() {
 
           {/* CTA (visual only, since the whole card is the link) */}
           <div className="mt-8">
-            <span className="inline-flex h-12 items-center gap-2.5 rounded-full bg-white pl-7 pr-2 text-sm font-bold text-black shadow-[0_8px_24px_-8px_rgba(255,255,255,0.5)] transition-all duration-300 group-hover:shadow-[0_10px_32px_-6px_rgba(255,255,255,0.6)] group-active:scale-[0.97]">
+            <span className="inline-flex h-12 items-center gap-2.5 rounded-full bg-white pl-7 pr-2 text-sm font-bold text-black shadow-[0_8px_24px_-8px_rgba(255,255,255,0.5)] transition-[background-color,border-color,box-shadow,transform] duration-300 group-hover:shadow-[0_10px_32px_-6px_rgba(255,255,255,0.6)] group-active:scale-[0.97]">
               Open Manga Hub
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black text-white transition-transform duration-300 group-hover:translate-x-0.5">
                 <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:-rotate-45 motion-reduce:group-hover:rotate-0" />

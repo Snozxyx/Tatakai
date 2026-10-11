@@ -15,11 +15,11 @@ export function CommunitiesShowcase({ onOpen }: { onOpen?: (communityId: string)
   if (!isLoading && communities.length === 0) return null;
 
   return (
-    <div className="w-full">
+    <div data-mobile-community className="w-full">
       {/* Section Header */}
       <div className="mb-4 flex items-center gap-2 px-1">
-        <Users className="h-4 w-4 text-zinc-400" />
-        <p className="text-[11px] font-bold uppercase tracking-widest text-zinc-400">
+        <Users className="h-4 w-4 text-muted-foreground" />
+        <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
           Discover Communities
         </p>
       </div>
@@ -31,22 +31,23 @@ export function CommunitiesShowcase({ onOpen }: { onOpen?: (communityId: string)
           ? [...Array(5)].map((_, i) => (
               <div
                 key={i}
-                className="h-[224px] w-[220px] flex-shrink-0 animate-pulse snap-start rounded-[24px] border border-white/[0.05] bg-white/[0.02] sm:w-[248px]"
+                className="h-[224px] w-[220px] flex-shrink-0 animate-pulse snap-start rounded-[24px] border border-border bg-muted sm:w-[248px]"
               />
             ))
-          : communities.map((c, i) => (
+          : communities.map((c) => (
               <motion.div
                 key={c.id}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: Math.min(i * 0.03, 0.2) }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.15 }}
                 onClick={() => (onOpen ? onOpen(c.id) : navigate(`/community/c/${c.slug}`))}
                 role="link"
                 tabIndex={0}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
-                    onOpen ? onOpen(c.id) : navigate(`/community/c/${c.slug}`);
+                    if (onOpen) onOpen(c.id);
+                    else navigate(`/community/c/${c.slug}`);
                   }
                 }}
                 className="community-card community-card-hover group relative flex h-[224px] w-[220px] flex-shrink-0 cursor-pointer snap-start flex-col sm:w-[248px]"
@@ -75,20 +76,19 @@ export function CommunitiesShowcase({ onOpen }: { onOpen?: (communityId: string)
                   </div>
                   <div className="flex items-end justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <p className="flex items-center gap-1 text-base font-bold leading-tight text-zinc-100 drop-shadow-md transition-colors group-hover:text-white">
+                      <p className="flex items-center gap-1 text-base font-bold leading-tight text-foreground transition-colors">
                         <span className="truncate">{c.name}</span>
                         {c.is_verified && (
                           <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-sky-400" aria-label="Verified community" />
                         )}
                       </p>
                       
-                      {c.description && <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-zinc-300/85">{c.description}</p>}
-                      <div className="mt-2 flex items-center gap-1.5 text-[10px] font-medium text-zinc-300 drop-shadow-md">
+                      {c.description && <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{c.description}</p>}
+                      <div className="mt-2 flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
                         <span>{(c.member_count || 0).toLocaleString()} members</span>
                         <span className="h-1 w-1 shrink-0 rounded-full bg-zinc-400" />
                         <span className="flex shrink-0 items-center gap-1">
                           <span className="relative flex h-1.5 w-1.5">
-                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
                             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
                           </span>
                           {Math.floor((c.member_count || 10) * 0.1)}
@@ -105,7 +105,7 @@ export function CommunitiesShowcase({ onOpen }: { onOpen?: (communityId: string)
                           toggle.mutate({ communityId: c.id, isMember: c.is_member });
                         }}
                         className={cn(
-                          "flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-[background-color,border-color,color,transform] duration-200 active:scale-95",
+                          "flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.98] disabled:opacity-50",
                           c.is_member
                             ? "bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.3)]"
                             : "border border-white/[0.15] bg-black/40 text-white backdrop-blur-md hover:bg-white/10"

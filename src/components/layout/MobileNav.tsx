@@ -92,27 +92,27 @@ function MobileNavButton({
       title={label}
       aria-current={active ? 'page' : undefined}
       className={cn(
-        'group relative flex flex-1 items-center justify-center rounded-xl py-2 outline-none transition-all duration-200 active:scale-95 focus-visible:ring-2 focus-visible:ring-primary/60',
-        active ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
+        'ui-mobile-nav-button group relative flex flex-1 items-center justify-center rounded-xl py-2 outline-none transition-[transform,color] duration-150 motion-safe:active:scale-[.97] focus-visible:ring-2 focus-visible:ring-primary/60',
+        active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
       )}
     >
       <span
         className={cn(
-          'relative flex h-9 min-w-[3rem] items-center justify-center rounded-full px-4 transition-all duration-200',
+          'relative flex h-9 w-full max-w-12 min-w-0 items-center justify-center rounded-xl transition-[background-color,box-shadow] duration-150',
           active
-            ? 'bg-primary/15 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.25)]'
-            : 'group-hover:bg-white/[0.06] group-active:bg-white/[0.08]',
+            ? 'bg-foreground/10 shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.1)]'
+            : 'group-hover:bg-foreground/[0.06] group-active:bg-foreground/[0.08]',
         )}
       >
-        <Icon className={cn('h-[22px] w-[22px] transition-transform duration-200', active ? 'scale-110' : 'group-hover:scale-105')} />
+        <Icon className={cn('h-[22px] w-[22px]')} />
         {badge != null && badge > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold tabular-nums text-primary-foreground shadow-lg">
+          <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-foreground px-1 text-[10px] font-bold tabular-nums text-background shadow-sm">
             {badge > 99 ? '99+' : badge}
           </span>
         )}
         {safeProgress != null && badge != null && badge > 0 && (
-          <span className="absolute inset-x-2 bottom-0 h-0.5 overflow-hidden rounded-full bg-primary/20" aria-hidden="true">
-            <span className="block h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${safeProgress}%` }} />
+          <span className="absolute inset-x-2 bottom-0 h-0.5 overflow-hidden rounded-full bg-foreground/20" aria-hidden="true">
+            <span className="ui-progress-fill block h-full w-full origin-left rounded-full bg-foreground" style={{ transform: `scaleX(${safeProgress / 100})` }} />
           </span>
         )}
       </span>
@@ -239,8 +239,8 @@ export function MobileNav() {
       role="navigation"
       aria-label="Main navigation"
     >
-      {/* Docked tab bar — icon-only, compact, edge-to-edge for easy thumb reach */}
-      <div className="relative flex items-center gap-1 border-t border-white/10 bg-background/95 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl max-[374px]:gap-0 max-[374px]:px-2">
+      {/* Solid, edge-to-edge chrome with safe-area padding for thumb reach. */}
+      <div className="mobile-nav-dock relative flex items-center">
         <MobileNavButton icon={LayoutGrid} label="Home" active={isActive('/')} onClick={() => hapticNavigate('/')} />
         <MobileNavButton icon={Search} label="Search" active={isActive('/search')} onClick={() => hapticNavigate('/search')} />
 
@@ -251,20 +251,21 @@ export function MobileNav() {
               type="button"
               aria-label="Open favorites and trending"
               title="Saved"
+              aria-current={favActive ? 'page' : undefined}
               className={cn(
-                'group relative flex flex-1 items-center justify-center rounded-xl py-2 outline-none transition-all duration-200 active:scale-95 focus-visible:ring-2 focus-visible:ring-primary/60',
-                favActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
+                'ui-mobile-nav-button group relative flex flex-1 items-center justify-center rounded-xl py-2 outline-none transition-[transform,color] duration-150 motion-safe:active:scale-[.97] focus-visible:ring-2 focus-visible:ring-primary/60',
+                favActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
               )}
             >
               <span className={cn(
-                'flex h-9 min-w-[3rem] items-center justify-center rounded-full px-4 transition-all duration-200',
-                favActive ? 'bg-primary/15 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.25)]' : 'group-hover:bg-white/[0.06]',
+                'flex h-9 w-full max-w-12 min-w-0 items-center justify-center rounded-xl transition-[background-color,box-shadow] duration-150',
+                favActive ? 'bg-foreground/10 shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.1)]' : 'group-hover:bg-foreground/[0.06]',
               )}>
-                <Heart className={cn('h-[22px] w-[22px]', favActive && 'fill-primary/20')} />
+                <Heart className={cn('h-[22px] w-[22px]', favActive && 'fill-foreground/20')} />
               </span>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="center" side="top" className="mb-3 w-52 rounded-2xl border-white/10 bg-background/95 p-1.5 shadow-2xl backdrop-blur-xl">
+          <DropdownMenuContent align="center" side="top" className="mb-3 w-52 rounded-2xl border-border bg-card p-1.5 shadow-2xl">
             <DropdownMenuItem onClick={() => hapticNavigate('/favorites')} className="gap-2 rounded-xl px-3 py-2.5 font-medium">
               <Heart className="w-4 h-4 mr-1 text-muted-foreground" />
               Favorites
@@ -283,21 +284,22 @@ export function MobileNav() {
               <button
                 type="button"
                 className={cn(
-                  'group relative flex flex-1 items-center justify-center rounded-xl py-2 outline-none transition-all duration-200 active:scale-95 focus-visible:ring-2 focus-visible:ring-primary/60',
-                  customActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
+                  'ui-mobile-nav-button group relative flex flex-1 items-center justify-center rounded-xl py-2 outline-none transition-[transform,color] duration-150 motion-safe:active:scale-[.97] focus-visible:ring-2 focus-visible:ring-primary/60',
+                  customActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
                 )}
                 aria-label="Custom sources"
                 title="More"
+                aria-current={customActive ? 'page' : undefined}
               >
                 <span className={cn(
-                  'flex h-9 min-w-[3rem] items-center justify-center rounded-full px-4 transition-all duration-200',
-                  customActive ? 'bg-primary/15 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.25)]' : 'group-hover:bg-white/[0.06]',
+                  'flex h-9 w-full max-w-12 min-w-0 items-center justify-center rounded-xl transition-[background-color,box-shadow] duration-150',
+                  customActive ? 'bg-foreground/10 shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.1)]' : 'group-hover:bg-foreground/[0.06]',
                 )}>
                   <Plus className="h-[22px] w-[22px]" />
                 </span>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="center" side="top" className="mb-3 w-56 rounded-2xl border-white/10 bg-background/95 p-1.5 shadow-2xl backdrop-blur-xl">
+            <DropdownMenuContent align="center" side="top" className="mb-3 w-56 rounded-2xl border-border bg-card p-1.5 shadow-2xl">
               {Object.entries(customByNamespace).map(([namespace, sources], groupIdx) => (
                 <div key={namespace}>
                   {groupIdx > 0 && <DropdownMenuSeparator className="bg-white/[0.06]" />}

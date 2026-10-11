@@ -53,7 +53,7 @@ import { useUpdateWatchHistory } from '@/hooks/user/useWatchHistory';
 import { useViewTracker, useAnimeViewCount, formatViewCount } from '@/hooks/user/useViews';
 import { useWatchTracking } from '@/hooks/api/useAnalytics';
 import { getProxiedVideoUrl } from "@/lib/api";
-import { isMobileProxyUrl } from "@/core/extensions/mobile/mobileProxy";
+import { isAnyProxyUrl } from "@/core/extensions/mobile/mobileProxy";
 import { cn } from "@/lib/utils";
 import { clearDiscordRpc } from "@/lib/discordRpc";
 import { ReportModal } from "@/components/ui/ReportModal";
@@ -72,7 +72,7 @@ import { toast } from "sonner";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { trackEvent } from "@/lib/api";
-import { fetchCombinedSources } from "@/lib/api/api-client";
+import { fetchCombinedSources, isEpisodeUnaired } from "@/lib/api/api-client";
 import { markProviderSourcesExpired } from "@/core/content/provider-orchestrator";
 import {
   buildDubSubtitles,
@@ -308,6 +308,7 @@ export default function WatchPage() {
   const [autoRepairCount, setAutoRepairCount] = useState(0);
   const torrentCompletionHandledRef = useRef(false);
   const lastPlaybackTimeRef = useRef(0);
+  const [startedPlaybackEpisode, setStartedPlaybackEpisode] = useState<string | null>(null);
   const debridResolveGenerationRef = useRef(0);
 
   const leaveDebridPlayback = useCallback(() => {
@@ -1023,6 +1024,9 @@ export default function WatchPage() {
       const loadOfflineContent = async () => {
         try {
           if (mobileOfflinePath) {
+            const nativeOffline = mobileOfflinePath.startsWith('native-offline://')
+              ? await (await import('@/core/download/mobile/nativeDownloads')).resolveNativeOfflineEpisode(decodedEpisodeId)
+              : null;
             const manifest = {
               animeName: mobileOfflineMetadata.title,
               poster: mobileOfflineMetadata.poster || undefined,
@@ -1034,7 +1038,7 @@ export default function WatchPage() {
               }],
             };
             setOfflineManifest(manifest);
-            setOfflineSubtitles([]);
+            setOfflineSubtitles(nativeOffline?.subtitles || []);
 
             // Torrent downloads are reattached by the existing session effect.
             // Direct files and downloaded HLS playlists can go straight to the
@@ -1043,9 +1047,9 @@ export default function WatchPage() {
               setOfflineSources([]);
               return;
             }
-            const sourceUrl = /^(https?:|blob:|data:)/i.test(mobileOfflinePath)
+            const sourceUrl = nativeOffline?.url || (/^(https?:|blob:|data:)/i.test(mobileOfflinePath)
               ? mobileOfflinePath
-              : Capacitor.convertFileSrc(mobileOfflinePath);
+              : Capacitor.convertFileSrc(mobileOfflinePath));
             setOfflineSources([{
               url: sourceUrl,
               isM3U8: /\.m3u8(?:$|[?#])/i.test(sourceUrl),
@@ -1505,6 +1509,27 @@ export default function WatchPage() {
     return list?.[currentEpisodeIndex];
   }, [isOfflineMode, offlineManifest, episodesData, currentEpisodeIndex]);
 
+  // An episode ani.zip dates in the future must never reach the player: with no
+  // legitimate streams, resolution can fall back to an unrelated title's
+  // sources (reported as another show playing instead of this episode).
+  const isCurrentUnaired =
+    !isOfflineMode && !isGenericTorrent && isEpisodeUnaired(currentEpisode as any);
+
+  const unairedAirDateText = useMemo(() => {
+    const ep: any = currentEpisode;
+    const iso = ep?.airDateUtc || ep?.airDate;
+    if (!iso) return "Air date hasn't been announced yet";
+    const parsed = new Date(iso);
+    if (Number.isNaN(parsed.getTime())) return String(ep?.airDate || iso);
+    const date = parsed.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+    const days = Math.ceil((parsed.getTime() - Date.now()) / 86400000);
+    return days > 0 ? `Airs ${date} · in ${days}d` : `Airs ${date}`;
+  }, [currentEpisode]);
+
   const prevEpisode = useMemo(() => {
     const list = isOfflineMode ? offlineManifest?.episodes : episodesData?.episodes;
     return currentEpisodeIndex > 0 ? list?.[currentEpisodeIndex - 1] : null;
@@ -1519,7 +1544,8 @@ export default function WatchPage() {
   const combinedSourceServer = "hd-1";
 
   useEffect(() => {
-    if (isOfflineMode || !nextEpisode?.episodeId) return;
+    if (isOfflineMode || !nextEpisode?.episodeId || isEpisodeUnaired(nextEpisode as any)) return;
+    if (isMobileApp && startedPlaybackEpisode !== decodedEpisodeId) return;
     queryClient.prefetchQuery({
       queryKey: [
         "combined-sources",
@@ -1545,6 +1571,27 @@ export default function WatchPage() {
         ),
       staleTime: 2 * 60 * 1000,
     });
+    // Mobile: warm the in-WebView extension result cache for the next episode
+    // while this one plays, so advancing resolves instantly. Fire-and-forget;
+    // the result lands in the shared cache even though nothing consumes it here.
+    if (Capacitor.isNativePlatform()) {
+      const anilistId =
+        (animeData as any)?.anilistID || animeData?.moreInfo.anilistId || null;
+      if (anilistId || animeData?.info.name) {
+        void import('@/core/extensions/mobile/mobileExtensionHost').then(
+          ({ mobileExtensionDispatch }) =>
+            mobileExtensionDispatch
+              .resolveSources('toko', 'sources', {
+                anilistId: anilistId ?? undefined,
+                titles: animeData?.info.name ? [animeData.info.name] : undefined,
+                episode: nextEpisode.number,
+                resolution: '1080p',
+                preferredLanguage: category,
+              })
+              .catch(() => {}),
+        ).catch(() => {});
+      }
+    }
   }, [
     animeData?.info.name,
     animeData?.moreInfo.anilistId,
@@ -1556,6 +1603,9 @@ export default function WatchPage() {
     nextEpisode?.number,
     queryClient,
     user?.id,
+    isMobileApp,
+    startedPlaybackEpisode,
+    decodedEpisodeId,
   ]);
 
   const discordDetails = animeData?.info.name ?? null;
@@ -1579,7 +1629,7 @@ export default function WatchPage() {
 
   const { data: fastStartData, isLoading: loadingFastStart } = useQuery({
     queryKey: ["fast-start-source", decodedEpisodeId, currentServer?.serverName, category],
-    enabled: !isOfflineMode && !!decodedEpisodeId && !!currentServer?.serverName,
+    enabled: !isMobileApp && !isOfflineMode && !!decodedEpisodeId && !!currentServer?.serverName,
     staleTime: 90 * 1000,
     queryFn: async () => {
       const empty = {
@@ -2163,7 +2213,7 @@ export default function WatchPage() {
       // This is an in-process token, not a network URL. The native loader
       // resolves and validates it; browser preflight can only fail and delay
       // first playback by the timeout window.
-      if (isMobileApp && isMobileProxyUrl(activePlaybackSource.url)) {
+      if (isMobileApp && isAnyProxyUrl(activePlaybackSource.url)) {
         setSourceReady(true);
         setSourcePreflightError(null);
         return;
@@ -2507,6 +2557,8 @@ export default function WatchPage() {
   const attemptedFailoverRef = useRef<Set<string>>(new Set());
   const sourceRefreshThrottleRef = useRef(0);
   const sourceRefreshInFlightRef = useRef(false);
+  const automaticRefreshCountRef = useRef(0);
+  useEffect(() => { automaticRefreshCountRef.current = 0; }, [decodedEpisodeId, category]);
   const sourceRefreshHandlerRef = useRef<null | (() => Promise<void>)>(null);
 
   const requestSourceRefresh = useCallback((reason: string, options?: { purgeProviderFallback?: boolean }) => {
@@ -2519,11 +2571,13 @@ export default function WatchPage() {
 
     const now = Date.now();
     if (sourceRefreshInFlightRef.current) return;
+    if (automaticRefreshCountRef.current >= 1) return;
     if (now - sourceRefreshThrottleRef.current < 15000) return;
 
     pendingPlaybackCommitRef.current = true;
     sourceRefreshThrottleRef.current = now;
     sourceRefreshInFlightRef.current = true;
+    automaticRefreshCountRef.current += 1;
     setSourcePreflightError(`Refreshing stream links (${reason})...`);
 
     void handler().finally(() => {
@@ -2703,8 +2757,7 @@ export default function WatchPage() {
 
     if (nextIndex === -1) {
       requestSourceRefresh("all servers failed", { purgeProviderFallback: true });
-      attemptedFailoverRef.current.clear();
-      nextIndex = availableServers.findIndex((server) => server.serverName !== currentServer.serverName);
+      return;
     }
 
     if (nextIndex !== -1) {
@@ -2718,12 +2771,12 @@ export default function WatchPage() {
   }, [currentServer, availableServers, selectedServerIndex, failedServers, animeId, decodedEpisodeId, category, user?.id, refererRetryIndex, activePlaybackHeaders?.Referer, activePlaybackSource?.isM3U8, activePlaybackSource?.url, activePlaybackSource?.providerName, activePlaybackSource?.server, activePlaybackSource?.quality, selectRegularServer, requestSourceRefresh, blockPlaybackSourceUrl, moveToNextVisibleSource]);
 
   useEffect(() => {
-    attemptedFailoverRef.current.clear();
     if (failoverTimeoutRef.current !== null) {
       window.clearTimeout(failoverTimeoutRef.current);
       failoverTimeoutRef.current = null;
     }
   }, [selectedServerIndex]);
+  useEffect(() => { attemptedFailoverRef.current.clear(); }, [decodedEpisodeId, category]);
 
   useEffect(() => {
     return () => {
@@ -2841,6 +2894,7 @@ export default function WatchPage() {
     // Track playback time for seamless torrent completion source switch
     if (Number.isFinite(progressSeconds) && progressSeconds > 0) {
       lastPlaybackTimeRef.current = progressSeconds;
+      setStartedPlaybackEpisode(decodedEpisodeId);
     }
     if (!animeData || !currentEpisode) return;
     try {
@@ -2979,7 +3033,9 @@ export default function WatchPage() {
   }, [animeId, decodedEpisodeId, category, currentServer?.serverName, user?.id]);
 
   const handleEpisodeEnd = () => {
-    if (settings.autoNextEpisode && nextEpisode?.episodeId) {
+    // Never auto-advance into an unreleased episode — there is nothing
+    // legitimate to play there yet.
+    if (settings.autoNextEpisode && nextEpisode?.episodeId && !isEpisodeUnaired(nextEpisode as any)) {
       handleEpisodeChange(nextEpisode.episodeId);
       return;
     }
@@ -3054,10 +3110,43 @@ export default function WatchPage() {
           )}>
             {/* Live torrent session state renders below the player (TorrentSessionPanel) */}
 
-            <div className="rounded-xl md:rounded-2xl overflow-hidden border border-border/30 bg-card/60">
+            <div className={cn("rounded-xl md:rounded-2xl border border-border/30 bg-card/60", isMobileApp ? "overflow-visible" : "overflow-hidden")}>
 
-              {/* Render EmbedPlayer for embed sources */}
-              {activePlaybackSource?.isEmbed ? (
+              {/* Unreleased episode: schedule visibility only — never resolve or
+                  play, so a fallback can never substitute another show's streams. */}
+              {isCurrentUnaired ? (
+                <div className="flex flex-col items-center justify-center gap-4 px-6 py-16 md:py-24 text-center">
+                  {animeData?.info.poster ? (
+                    <img
+                      src={animeData.info.poster}
+                      alt=""
+                      loading="lazy"
+                      className="h-36 w-24 rounded-xl object-cover opacity-80"
+                    />
+                  ) : null}
+                  <div>
+                    <p className="text-[11px] font-black uppercase tracking-[0.2em] text-primary">
+                      Episode {currentEpisode?.number} · Upcoming
+                    </p>
+                    <h2 className="mt-2 font-display text-xl md:text-2xl font-bold">
+                      {currentEpisode?.title || `Episode ${currentEpisode?.number ?? ""}`}
+                    </h2>
+                    <p className="mt-2 flex items-center justify-center gap-1.5 text-sm text-muted-foreground">
+                      <Clock className="w-4 h-4" aria-hidden="true" />
+                      {unairedAirDateText}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground/70">
+                      Unreleased episodes can&apos;t be played yet — check back after it airs.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => animeId && navigate(`/anime/${encodeURIComponent(animeId)}`)}
+                    className="rounded-full border border-white/15 bg-white/5 px-5 py-2 text-xs font-bold uppercase tracking-wider text-foreground transition-colors hover:bg-white/10"
+                  >
+                    Back to anime
+                  </button>
+                </div>
+              ) : activePlaybackSource?.isEmbed ? (
                 <EmbedPlayer
                   url={activePlaybackSource.url}
                   poster={animeData?.info.poster}
@@ -3236,7 +3325,8 @@ export default function WatchPage() {
                       onClick={() =>
                         prevEpisode && handleEpisodeChange(prevEpisode.episodeId)
                       }
-                      disabled={!prevEpisode}
+                      disabled={!prevEpisode || isEpisodeUnaired(prevEpisode as any)}
+                      title={prevEpisode && isEpisodeUnaired(prevEpisode as any) ? "Previous episode hasn't aired yet" : undefined}
                       className="flex-1 sm:flex-none h-10 px-3 md:px-4 rounded-xl bg-muted hover:bg-muted/80 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all text-sm"
                     >
                       <ChevronLeft className="w-4 h-4" />
@@ -3247,7 +3337,8 @@ export default function WatchPage() {
                       onClick={() =>
                         nextEpisode && handleEpisodeChange(nextEpisode.episodeId)
                       }
-                      disabled={!nextEpisode}
+                      disabled={!nextEpisode || isEpisodeUnaired(nextEpisode as any)}
+                      title={nextEpisode && isEpisodeUnaired(nextEpisode as any) ? "Next episode hasn't aired yet" : undefined}
                       className="flex-1 sm:flex-none h-10 px-3 md:px-4 rounded-xl bg-primary hover:bg-primary/80 text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all text-sm"
                     >
                       <span>Next</span>
@@ -3258,8 +3349,8 @@ export default function WatchPage() {
               )}
             </div>
 
-            {/* Server & Category Selection - Hide in offline mode or generic torrent */}
-            {!isOfflineMode && !isGenericTorrent && (
+            {/* Server & Category Selection - Hide in offline mode, generic torrent, or unreleased episode */}
+            {!isOfflineMode && !isGenericTorrent && !isCurrentUnaired && (
               <GlassPanel className="p-4 md:p-5">
                 <div className="flex flex-col gap-4 md:gap-6">
                   {/* Category Toggle */}
@@ -3699,32 +3790,47 @@ export default function WatchPage() {
                 )}
 
                 <div id="episode-list-container" className="flex-1 overflow-y-auto space-y-1.5 md:space-y-2 pr-2 scrollbar-thin">
-                  {(isOfflineMode ? offlineManifest?.episodes : episodesData?.episodes)?.map((ep: any) => (
+                  {(isOfflineMode ? offlineManifest?.episodes : episodesData?.episodes)?.map((ep: any) => {
+                    const unaired = !isOfflineMode && isEpisodeUnaired(ep);
+                    const isCurrent = (ep.episodeId || ep.id) === decodedEpisodeId;
+                    return (
                     <button
                       key={ep.episodeId || ep.id}
                       id={`ep-${ep.episodeId || ep.id}`}
+                      disabled={unaired}
+                      aria-disabled={unaired}
+                      title={unaired ? `Episode ${ep.number} — not yet aired${ep.airDate ? ` (${ep.airDate})` : ""}` : undefined}
                       onClick={() => {
+                        if (unaired) return;
                         if (isOfflineMode) {
                           navigate(`/watch/${encodeURIComponent(ep.id)}?offline=true&path=${encodeURIComponent(offlinePath)}`);
                         } else {
                           handleEpisodeChange(ep.episodeId);
                         }
                       }}
-                      className={`w-full text-left p-2.5 md:p-3 rounded-xl transition-all text-sm ${(ep.episodeId || ep.id) === decodedEpisodeId
+                      className={`w-full text-left p-2.5 md:p-3 rounded-xl transition-all text-sm disabled:cursor-not-allowed ${isCurrent
                         ? "bg-primary text-primary-foreground"
-                        : ep.isFiller
-                          ? "bg-orange/10 border border-orange/30 hover:bg-orange/20"
-                          : "bg-muted/50 hover:bg-muted"
+                        : unaired
+                          ? "border border-dashed border-white/15 bg-muted/30 opacity-70"
+                          : ep.isFiller
+                            ? "bg-orange/10 border border-orange/30 hover:bg-orange/20"
+                            : "bg-muted/50 hover:bg-muted"
                         }`}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-bold">EP {ep.number}</span>
-                        {ep.isFiller && (
-                          <span className="text-xs px-1.5 py-0.5 rounded-full bg-orange/20 text-orange">
-                            Filler
+                        {unaired ? (
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-primary/20 text-primary">
+                            Upcoming{ep.airDate ? ` · ${ep.airDate}` : ""}
                           </span>
+                        ) : (
+                          ep.isFiller && (
+                            <span className="text-xs px-1.5 py-0.5 rounded-full bg-orange/20 text-orange">
+                              Filler
+                            </span>
+                          )
                         )}
-                        {(ep.episodeId || ep.id) === decodedEpisodeId && (
+                        {isCurrent && !unaired && (
                           <span className="text-xs">▶</span>
                         )}
                       </div>
@@ -3734,7 +3840,8 @@ export default function WatchPage() {
                         </p>
                       )}
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
               </GlassPanel>
             </div>

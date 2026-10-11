@@ -300,6 +300,7 @@ function ReplyRow({
             {replying && (
               <div className="mt-2">
                 <RichCommentComposer
+                  draftKey={`reply:${threadParentId}:${reply.id}`}
                   compact
                   autoFocus
                   allowTimestamp={isAnime}

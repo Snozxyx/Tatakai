@@ -23,15 +23,15 @@ const ToastViewport = React.forwardRef<
 ToastViewport.displayName = ToastPrimitives.Viewport.displayName;
 
 const toastVariants = cva(
-  "group pointer-events-auto relative flex w-full items-center gap-4 overflow-hidden rounded-2xl border border-white/10 p-4 pr-10 shadow-2xl transition-all backdrop-blur-xl data-[swipe=cancel]:translate-x-0 data-[swipe=end]:translate-x-[var(--radix-toast-swipe-end-x)] data-[swipe=move]:translate-x-[var(--radix-toast-swipe-move-x)] data-[swipe=move]:transition-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[swipe=end]:animate-out data-[state=closed]:fade-out-80 data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-bottom-full",
+  "group pointer-events-auto relative flex w-full items-center gap-4 overflow-hidden rounded-2xl border border-border p-4 pr-10 shadow-2xl transition-[opacity,transform,background-color,color] backdrop-blur-xl data-[swipe=cancel]:translate-x-0 data-[swipe=end]:translate-x-[var(--radix-toast-swipe-end-x)] data-[swipe=move]:translate-x-[var(--radix-toast-swipe-move-x)] data-[swipe=move]:transition-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[swipe=end]:animate-out data-[state=closed]:fade-out-80 data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-bottom-full",
   {
     variants: {
       variant: {
-        default: "bg-background/80 text-foreground border-white/10",
-        destructive: "bg-red-500/20 text-red-100 border-red-500/30",
-        success: "bg-emerald-500/20 text-emerald-100 border-emerald-500/30",
-        warning: "bg-amber-500/20 text-amber-100 border-amber-500/30",
-        info: "bg-blue-500/20 text-blue-100 border-blue-500/30",
+        default: "bg-background text-foreground border-border",
+        destructive: "bg-background text-foreground border-red-500/30",
+        success: "bg-background text-foreground border-emerald-500/30",
+        warning: "bg-background text-foreground border-amber-500/30",
+        info: "bg-background text-foreground border-blue-500/30",
       },
     },
     defaultVariants: {
@@ -69,7 +69,7 @@ const ToastAction = React.forwardRef<
   <ToastPrimitives.Action
     ref={ref}
     className={cn(
-      "inline-flex h-8 shrink-0 items-center justify-center rounded-xl bg-white/10 px-4 text-xs font-bold uppercase tracking-wider ring-offset-background transition-all hover:bg-white/20 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+      "inline-flex h-8 shrink-0 items-center justify-center rounded-xl bg-muted px-4 text-xs font-bold uppercase tracking-wider ring-offset-background transition-[opacity,transform,background-color,color] hover:bg-muted/80 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
       "group-[.destructive]:bg-red-500/30 group-[.destructive]:hover:bg-red-500/40",
       className,
     )}
@@ -85,7 +85,7 @@ const ToastClose = React.forwardRef<
   <ToastPrimitives.Close
     ref={ref}
     className={cn(
-      "absolute right-3 top-3 rounded-full p-1.5 text-foreground/50 opacity-0 transition-all hover:bg-white/10 hover:text-foreground group-hover:opacity-100 focus:opacity-100 focus:outline-none",
+      "absolute right-1 top-1 flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-[opacity,transform,background-color,color] hover:bg-muted hover:text-foreground group-hover:opacity-100 focus:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
       className,
     )}
     toast-close=""
@@ -108,7 +108,7 @@ const ToastDescription = React.forwardRef<
   React.ElementRef<typeof ToastPrimitives.Description>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitives.Description>
 >(({ className, ...props }, ref) => (
-  <ToastPrimitives.Description ref={ref} className={cn("text-xs text-foreground/70 mt-0.5", className)} {...props} />
+  <ToastPrimitives.Description ref={ref} className={cn("text-sm leading-relaxed text-muted-foreground mt-0.5", className)} {...props} />
 ));
 ToastDescription.displayName = ToastPrimitives.Description.displayName;
 

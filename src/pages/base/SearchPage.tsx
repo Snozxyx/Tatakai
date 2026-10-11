@@ -2,8 +2,9 @@ import { useSearchParams, useNavigate, useParams } from "react-router-dom";
 import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
+import { HeaderSearchSuggestions } from "@/components/layout/HeaderSearchSuggestions";
 // import { Header } from "@/components/layout/Header";
-import { useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
+import { useIsNativeApp, useIsDesktopApp } from "@/hooks/ui/useIsNativeApp";
 import { useIsMobile } from "@/hooks/ui/use-mobile";
 import { cn } from "@/lib/utils";
 import { CardSkeleton } from "@/components/ui/skeleton-custom";
@@ -19,6 +20,9 @@ import { useRef, useCallback, useState, useEffect, useMemo } from "react";
 import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import { searchCharacters } from "@/core/content/character-client";
 import { fetchProducerAnimes } from "@/lib/api";
+import { getMangaTagOptions } from "@/core/content/manga-tag-search";
+import { AppliedFilters } from '@/components/search/AppliedFilters';
+import { Button } from '@/components/ui/button';
 import { type MangaSearchOptions } from "@/core/content/manga-client";
 import { getProxiedImageUrl } from "@/lib/api";
 import { UnifiedMediaCard } from "@/components/UnifiedMediaCard";
@@ -35,6 +39,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Check, ChevronDown, Tag } from 'lucide-react';
+import { TagGroupCloud } from '@/components/manga/TagGroupCloud';
 import { discoverYears, DISCOVER_SORTS, type DiscoverSort, useDiscoverMedia } from '@/hooks/api/useDiscover';
 import { controlItemClass, controlMenuClass, controlTriggerClass } from '@/components/anime/discover/types';
 import { celebrate, type CelebrateVariant } from '@/components/effects/Celebrate';
@@ -64,10 +69,11 @@ function useExtensionSearch(query: string, enabled: boolean) {
 
 
 export default function SearchPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { producerName } = useParams<{ producerName?: string }>();
   const navigate = useNavigate();
   const isNative = useIsNativeApp();
+  const isDesktopApp = useIsDesktopApp();
   const isMobile = useIsMobile();
   const decodedProducerName = useMemo(() => {
     if (!producerName) return "";
@@ -97,6 +103,8 @@ export default function SearchPage() {
   const queryParam = searchParams.get("q") || decodedProducerName || "";
   const [query, setQuery] = useState(queryParam);
   const [searchInput, setSearchInput] = useState(queryParam);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const closeSuggestions = useCallback(() => setShowSuggestions(false), []);
 
   // Secret search phrases: typing one exactly fires a celebration flourish and
   // nothing else — results are untouched. Guarded so it fires once per phrase,
@@ -183,25 +191,21 @@ export default function SearchPage() {
     const generic = typeParam === 'manga' ? searchParams.getAll('tag').concat(searchParams.get('tags')?.split(',') ?? []) : [];
     return Array.from(new Set([...values, ...(packed ? packed.split(',') : []), ...generic].filter(Boolean)));
   });
+  const [mangaTagSource, setMangaTagSource] = useState<'anilist' | 'mangabaka' | undefined>(() => {
+    const source = searchParams.get('mangaTagSource');
+    return source === 'anilist' || source === 'mangabaka' ? source : undefined;
+  });
+  const { data: mangaBakaTags = [] } = useQuery({
+    queryKey: ['mangabaka-tags'], queryFn: () => getMangaTagOptions('mangabaka'),
+    enabled: showAdvancedAssist && mangaTagSource === 'mangabaka', staleTime: 24 * 60 * 60 * 1000,
+  });
   const [tagSearch, setTagSearch] = useState('');
   const [mangaTagSearch, setMangaTagSearch] = useState('');
   const [showSpoilerTags, setShowSpoilerTags] = useState(false);
 
   const { data: anilistTags = [] } = useQuery({
     queryKey: ['anilist-media-tags'],
-    queryFn: async () => {
-      const response = await fetch(`${resolveApiV3Base()}/content/tags`);
-      if (!response.ok) return [];
-      const payload = await response.json();
-      return Array.isArray(payload?.data) ? payload.data as Array<{
-        id: number;
-        name: string;
-        description?: string | null;
-        category?: string | null;
-        isGeneralSpoiler?: boolean;
-        isAdult?: boolean;
-      }> : [];
-    },
+    queryFn: () => getMangaTagOptions('anilist'),
     staleTime: 24 * 60 * 60 * 1000,
     enabled: showAdvancedAssist,
   });
@@ -298,9 +302,9 @@ export default function SearchPage() {
   const { genres: anilistGenres } = useAniListGenres();
   // Group tag options by AniList category, hiding general-spoiler tags unless
   // the viewer opts in. Returns [{ category, tags }] sorted by category name.
-  const groupTagOptions = useCallback((term: string) => {
+  const groupTagOptions = useCallback((term: string, collection = anilistTags) => {
     const needle = term.trim().toLowerCase();
-    const rows = anilistTags
+    const rows = collection
       .filter((tag) => !tag.isAdult || contentSafetySettings.showAdultEverywhere)
       .filter((tag) => showSpoilerTags || !tag.isGeneralSpoiler)
       .filter((tag) => !needle || tag.name.toLowerCase().includes(needle) || tag.category?.toLowerCase().includes(needle));
@@ -321,7 +325,7 @@ export default function SearchPage() {
   }, [anilistTags, contentSafetySettings.showAdultEverywhere, showSpoilerTags]);
 
   const filteredTagOptions = useMemo(() => groupTagOptions(tagSearch), [groupTagOptions, tagSearch]);
-  const filteredMangaTagOptions = useMemo(() => groupTagOptions(mangaTagSearch), [groupTagOptions, mangaTagSearch]);
+  const filteredMangaTagOptions = useMemo(() => groupTagOptions(mangaTagSearch, mangaTagSource === 'mangabaka' ? mangaBakaTags : anilistTags), [groupTagOptions, mangaTagSearch, mangaTagSource, mangaBakaTags, anilistTags]);
   const explicitMangaQuery = useMemo(() => isExplicitMangaSearchQuery(query), [query]);
   const allowAdultAnime = useMemo(
     () => contentSafetySettings.showAdultEverywhere || explicitMangaQuery,
@@ -506,6 +510,7 @@ export default function SearchPage() {
       provider: 'all',
       genre: resolvedMangaGenre,
       tags: selectedMangaTags,
+      tagSource: mangaTagSource,
       origin: mangaOrigin === 'all' ? undefined : mangaOrigin,
       sort: hasGenre ? 'POPULARITY_DESC' : undefined,
       adult: mangaAdultFilter || explicitMangaQuery || contentSafetySettings.showAdultEverywhere,
@@ -522,6 +527,7 @@ export default function SearchPage() {
     contentSafetySettings.showAdultEverywhere,
     normalizedMangaTypeFilter,
     selectedMangaTags,
+    mangaTagSource,
     mangaOrigin,
   ]);
 
@@ -550,8 +556,8 @@ export default function SearchPage() {
   const shouldEnableAnimeSearch =
     shouldSearchAnime && !isProducerRoute && (query.length > 0 || animeFilterActive || genreFilterActive || tagFilterActive);
 
-  const { 
-    data: infiniteData, 
+  const {
+    data: infiniteData,
     fetchNextPage: fetchNextSearchPage,
     hasNextPage: hasNextSearchPage,
     isFetchingNextPage: isFetchingNextSearchPage,
@@ -606,7 +612,9 @@ export default function SearchPage() {
     fetchNextPage: fetchNextMangaPage,
     hasNextPage: hasNextMangaPage,
     isFetchingNextPage: isFetchingNextMangaPage,
-    isLoading: isLoadingManga
+    isLoading: isLoadingManga,
+    error: mangaSearchError,
+    refetch: retryMangaSearch,
   } = useInfiniteMangaSearch(query, 20, shouldEnableMangaSearch, mangaSearchOptions);
 
   const { data: extensionResults, isLoading: isLoadingExtensions } = useExtensionSearch(query, resultType === 'all' || resultType === 'anime');
@@ -693,6 +701,7 @@ export default function SearchPage() {
           return {
             id: String(normalizedId),
             name: fallbackTitle,
+            href: manga.href,
             poster: manga?.poster || "",
             type: manga?.type || manga?.mediaType || "manga",
             status: manga?.status || undefined,
@@ -843,7 +852,7 @@ export default function SearchPage() {
         }))
       );
     }
-    
+
     if (sortMode === 'relevance') return arr;
 
     const sorted = [...arr].sort((a, b) => {
@@ -873,38 +882,92 @@ export default function SearchPage() {
     query,
   ]);
 
-  const activeFilterCount = useMemo(() => {
-    return [
-      animeTypeFilter !== 'all',
-      animeStatusFilter !== 'all',
-      animeGenreFilter !== 'all',
-      animeSortFilter !== 'default',
-      mangaTypeFilter !== 'all',
-      mangaStatusFilter !== 'all',
-      mangaGenreFilter !== 'all',
-      mangaOrigin !== 'all',
-      mangaAdultFilter,
-      minRating > 0,
-      minReleaseYear > 0,
-      selectedAnimeTags.length > 0 || selectedMangaTags.length > 0,
-      sortMode !== 'relevance',
-    ].filter(Boolean).length;
-  }, [
-    animeTypeFilter,
-    animeStatusFilter,
-    animeGenreFilter,
-    animeSortFilter,
-    mangaTypeFilter,
-    mangaStatusFilter,
-    mangaGenreFilter,
-    mangaOrigin,
-    mangaAdultFilter,
-    minRating,
-    minReleaseYear,
-    selectedAnimeTags,
-    selectedMangaTags,
-    sortMode,
-  ]);
+  // Only URL keys belonging to filters are rewritten; q/type/producer context survives.
+  const clearFilterUrl = (genre = false, animeTags: string[] = [], mangaTags: string[] = []) => {
+    const next = new URLSearchParams(searchParams);
+    ['tag', 'tags', 'animeTag', 'animeTags', 'mangaTag', 'mangaTags', 'manwhaTag', 'manwhaTags'].forEach(key => next.delete(key));
+    animeTags.forEach(tag => next.append('animeTag', tag));
+    mangaTags.forEach(tag => next.append('mangaTag', tag));
+    if (genre) next.delete('genre');
+    setSearchParams(next, { replace: true });
+  };
+  const resetFilters = () => {
+    setLocalAnimeType('all');
+    setLocalAnimeStatus('all');
+    setLocalAnimeGenre('all');
+    setLocalAnimeSort('default');
+    setLocalMangaType('all');
+    setLocalMangaStatus('all');
+    setLocalMangaOrigin('all');
+    setLocalMangaGenre('all');
+    setLocalMangaAdult(false);
+    setLocalMinRating(0);
+    setLocalMinReleaseYear(0);
+    setLocalMaxRating(0);
+    setLocalMaxReleaseYear(0);
+    setLocalSeason('all');
+    setLocalMinEpisodes(0);
+    setLocalMaxEpisodes(0);
+    setLocalSortMode('relevance');
+
+    // Immediately apply reset
+    setAnimeTypeFilter('all');
+    setAnimeStatusFilter('all');
+    setAnimeGenreFilter('all');
+    setAnimeSortFilter('default');
+    setMangaTypeFilter('all');
+    setMangaStatusFilter('all');
+    setMangaOrigin('all');
+    setMangaGenreFilter('all');
+    setMangaAdultFilter(false);
+    setMinRating(0);
+    setMinReleaseYear(0);
+    setMaxRating(0);
+    setMaxReleaseYear(0);
+    setSeasonFilter('all');
+    setMinEpisodes(0);
+    setMaxEpisodes(0);
+    setSortMode('relevance');
+    setSelectedAnimeTags([]);
+    setSelectedMangaTags([]);
+    setTagSearch('');
+    setMangaTagSearch('');
+    clearFilterUrl(true);
+    setDiscoverSort('for-you');
+    setPage(1);
+  };
+
+  const appliedFilters: { id: string; label: string; remove: () => void }[] = [];
+  const addFilter = (id: string, value: string | number, active: boolean, remove: () => void) => {
+    if (active) appliedFilters.push({ id, label: String(value), remove: () => { remove(); setPage(1); } });
+  };
+  const readable = (value: string) => /^(tv|ova|ona)$/i.test(value) ? value.toUpperCase() : value.replace(/_/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase());
+  addFilter('anime-type', 'Anime: ' + readable(animeTypeFilter), animeTypeFilter !== 'all', () => setAnimeTypeFilter('all'));
+  addFilter('anime-status', 'Anime status: ' + readable(animeStatusFilter), animeStatusFilter !== 'all', () => setAnimeStatusFilter('all'));
+  addFilter('manga-type', 'Manga: ' + readable(mangaTypeFilter), mangaTypeFilter !== 'all', () => setMangaTypeFilter('all'));
+  addFilter('manga-status', 'Manga status: ' + readable(mangaStatusFilter), mangaStatusFilter !== 'all', () => setMangaStatusFilter('all'));
+  addFilter('origin', 'Origin: ' + readable(mangaOrigin), mangaOrigin !== 'all', () => setMangaOrigin('all'));
+  const clearGenre = () => { setAnimeGenreFilter('all'); setMangaGenreFilter('all'); clearFilterUrl(true, selectedAnimeTags, selectedMangaTags); };
+  addFilter('genre', 'Genre: ' + readable(animeGenreFilter !== 'all' ? animeGenreFilter : mangaGenreFilter), animeGenreFilter !== 'all' || mangaGenreFilter !== 'all', clearGenre);
+  addFilter('mature', 'Mature manga', mangaAdultFilter, () => setMangaAdultFilter(false));
+  addFilter('min-score', 'Score ≥ ' + minRating, minRating > 0, () => setMinRating(0));
+  addFilter('max-score', 'Score ≤ ' + maxRating, maxRating > 0, () => setMaxRating(0));
+  addFilter('min-year', 'Year ≥ ' + minReleaseYear, minReleaseYear > 0, () => setMinReleaseYear(0));
+  addFilter('max-year', 'Year ≤ ' + maxReleaseYear, maxReleaseYear > 0, () => setMaxReleaseYear(0));
+  addFilter('season', 'Season: ' + readable(seasonFilter), seasonFilter !== 'all', () => setSeasonFilter('all'));
+  addFilter('min-episodes', 'Episodes ≥ ' + minEpisodes, minEpisodes > 0, () => setMinEpisodes(0));
+  addFilter('max-episodes', 'Episodes ≤ ' + maxEpisodes, maxEpisodes > 0, () => setMaxEpisodes(0));
+  const presetSort = (animeSortFilter === 'score_desc' && sortMode === 'rating') || (animeSortFilter === 'title_asc' && sortMode === 'title') || (animeSortFilter === 'start_date_desc' && sortMode === 'relevance');
+  const resetSort = () => { setAnimeSortFilter('default'); setSortMode('relevance'); setDiscoverSort('for-you'); };
+  addFilter('anime-sort', 'Anime order: ' + readable(animeSortFilter), animeSortFilter !== 'default' && !presetSort, () => { setAnimeSortFilter('default'); setDiscoverSort('for-you'); });
+  addFilter('sort', 'Sort: ' + (presetSort ? (animeSortFilter === 'score_desc' ? 'Top rated' : animeSortFilter === 'title_asc' ? 'A–Z' : 'Newest') : readable(sortMode)), sortMode !== 'relevance' || presetSort, resetSort);
+  selectedAnimeTags.forEach(tag => addFilter('anime-tag-' + tag, 'Anime tag: ' + tag, true, () => {
+    const next = selectedAnimeTags.filter(value => value !== tag); setSelectedAnimeTags(next); clearFilterUrl(false, next, selectedMangaTags);
+  }));
+  selectedMangaTags.forEach(tag => addFilter('manga-tag-' + tag, 'Manga tag: ' + tag, true, () => {
+    const next = selectedMangaTags.filter(value => value !== tag); setSelectedMangaTags(next); clearFilterUrl(false, selectedAnimeTags, next);
+  }));
+  const activeFilterCount = appliedFilters.length;
 
   const filteredImageResults = (imageResults || []).filter((result) => {
     return Number(result?.similarity || 0) >= imageConfidenceThreshold;
@@ -994,8 +1057,11 @@ export default function SearchPage() {
   };
 
   useEffect(() => {
+    const tagSource = searchParams.get('mangaTagSource');
+    setMangaTagSource(tagSource === 'anilist' || tagSource === 'mangabaka' ? tagSource : undefined);
     setQuery(queryParam);
     setSearchInput(queryParam);
+    setShowSuggestions(false);
     const typeParam = searchParams.get('type');
     if (typeParam === 'anime' || typeParam === 'manga' || typeParam === 'character' || typeParam === 'all') {
       setResultType(typeParam as any);
@@ -1033,6 +1099,7 @@ export default function SearchPage() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    setShowSuggestions(false);
     const term = searchInput.trim();
     if (term) {
       try {
@@ -1049,6 +1116,7 @@ export default function SearchPage() {
 
   const handleClearSearch = () => {
     setSearchInput('');
+    setShowSuggestions(false);
     if (query) {
       navigate('/search');
     }
@@ -1114,11 +1182,11 @@ export default function SearchPage() {
       {!isMobile && <Sidebar />}
 
       <main className={cn(
-        "relative z-10 pr-6 py-6 max-w-[1800px] mx-auto pb-24 md:pb-6",
-        isNative ? "p-6" : "pl-6 md:pl-32"
+        "app-page relative z-10 pr-6 py-6 max-w-[1800px] mx-auto pb-24 md:pb-6",
+        isDesktopApp ? "p-6" : "pl-6 md:pl-32"
       )}>
-        {/* Discover Hero when browsing */}
-        {!hasSearchContext && !isProducerRoute && (
+        {/* Discover Hero when browsing — desktop only (hidden on mobile) */}
+        {!hasSearchContext && !isProducerRoute && !isMobile && (
           <div className="mb-8 mt-2">
             <DiscoverHero />
           </div>
@@ -1126,16 +1194,31 @@ export default function SearchPage() {
 
         {/* Centered Search Bar in Middle of Page after Hero */}
         <div className="flex justify-center mb-8">
-          <form onSubmit={handleSearch} className="w-full max-w-2xl">
-            <div className="relative flex items-center shadow-2xl rounded-full">
+          <form
+            onSubmit={handleSearch}
+            onBlur={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) closeSuggestions();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') closeSuggestions();
+            }}
+            className="relative z-30 w-full max-w-2xl"
+          >
+            <div className="premium-search-field relative flex items-center rounded-full">
               <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-primary pointer-events-none" />
               <Input
                 id="tatakai-search-page-input"
                 type="text"
-                placeholder="Search anime, manga, characters..."
+                placeholder="Search anime, manga, manhwa or alternate titles..."
                 value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                className="pl-14 pr-32 h-14 bg-card/85 hover:bg-card focus:bg-card border border-white/15 hover:border-primary/40 focus:border-primary rounded-full text-base shadow-lg shadow-black/20 backdrop-blur-md transition-all"
+                onChange={(e) => {
+                  setSearchInput(e.target.value);
+                  setShowSuggestions(true);
+                }}
+                onFocus={() => setShowSuggestions(true)}
+                aria-label="Search anime, manga, manhwa and characters by title or alternate title"
+                autoComplete="off"
+                className="pl-14 pr-32 h-14 bg-card/85 hover:bg-card focus:bg-card border border-border hover:border-primary/40 focus:border-primary rounded-full text-base backdrop-blur-md transition-[color,background-color,border-color,opacity,transform]"
               />
               <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
                 {searchInput && (
@@ -1150,24 +1233,33 @@ export default function SearchPage() {
                 )}
                 <button
                   type="submit"
-                  className="px-5 h-9 rounded-full bg-primary text-primary-foreground font-semibold text-sm hover:brightness-110 active:scale-95 transition-all shadow-md"
+                  className="px-5 h-9 rounded-full bg-primary text-primary-foreground font-semibold text-sm hover:brightness-110 active:scale-95 transition-[color,background-color,border-color,opacity,transform] shadow-md"
                 >
                   Search
                 </button>
               </div>
             </div>
+            <HeaderSearchSuggestions
+              query={searchInput}
+              visible={showSuggestions && !isProducerRoute}
+              onSelect={(name) => {
+                setSearchInput(name);
+                closeSuggestions();
+              }}
+              onClose={closeSuggestions}
+            />
           </form>
         </div>
 
         <div className="mb-8 md:mb-10">
-          
+
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5 mb-6">
             <div>
               <h1 className="font-display text-2xl md:text-3xl font-bold flex items-center gap-3">
                 <Search className="w-6 h-6 md:w-7 md:h-7 text-primary" />
                 {hasSearchContext ? 'Search Results' : 'Discover'}
               </h1>
-              {(query || isQuerylessMangaMode) && (
+              {hasSearchContext && (
                 <p className="text-muted-foreground text-xs md:text-sm mt-1">
                   {query ? (
                     <>
@@ -1187,11 +1279,11 @@ export default function SearchPage() {
             </div>
 
           </div>
-          
+
 
           {/* Sleek Discover Filter Bar (docs/image-8.png / GenrePage style) */}
           <div className="flex flex-wrap items-center gap-2.5">
-            
+
             <PillGroup
               options={DISCOVER_SORTS}
               value={discoverSort}
@@ -1209,9 +1301,10 @@ export default function SearchPage() {
               ].map(type => (
                 <button
                   key={type.id}
+                  aria-pressed={resultType === type.id}
                   onClick={() => setResultType(type.id as any)}
                   className={cn(
-                    "px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all whitespace-nowrap",
+                    "px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-[color,background-color,border-color,opacity,transform] whitespace-nowrap",
                     resultType === type.id
                       ? "bg-primary text-primary-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
@@ -1255,7 +1348,7 @@ export default function SearchPage() {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            
+
             {/* Trace.moe image search */}
             <div className="flex items-center gap-2">
               <label className={controlTriggerClass}>
@@ -1271,7 +1364,7 @@ export default function SearchPage() {
                 <button
                   onClick={handleImageSearch}
                   disabled={isSearchingImage}
-                  className="px-3.5 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-bold hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5"
+                  className="px-3.5 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-bold hover:brightness-110 active:scale-95 transition-[color,background-color,border-color,opacity,transform] flex items-center gap-1.5"
                 >
                   {isSearchingImage ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Identify'}
                 </button>
@@ -1315,14 +1408,17 @@ export default function SearchPage() {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            
+
 
             {/* Power Filters Button */}
             <button
               type="button"
+              id="search-filters-toggle"
+              aria-expanded={showAdvancedAssist}
+              aria-controls="search-advanced-filters"
               onClick={() => setShowAdvancedAssist((val) => !val)}
               className={cn(
-                "h-8 px-3 rounded-full text-xs font-semibold border transition-all flex items-center gap-1.5",
+                "h-8 px-3 rounded-full text-xs font-semibold border transition-[color,background-color,border-color,opacity,transform] flex items-center gap-1.5",
                 showAdvancedAssist
                   ? "border-primary text-primary bg-primary/10 shadow-sm"
                   : "border-white/10 text-muted-foreground hover:text-foreground hover:border-white/20 bg-muted/20"
@@ -1338,67 +1434,37 @@ export default function SearchPage() {
             </button>
           </div>
 
+          <AppliedFilters filters={appliedFilters} onClear={resetFilters} />
+
           {showAdvancedAssist && (
-            <GlassPanel className="mt-4 p-4 md:p-6 space-y-6 border border-white/10 shadow-xl overflow-hidden relative animate-in fade-in slide-in-from-top-2 duration-300">
-              <div className="flex flex-wrap items-center justify-between gap-4 relative z-10 pb-3 border-b border-white/5">
-                <div className="flex items-center gap-2">
-                  <SlidersHorizontal className="w-4 h-4 text-primary" />
+            <GlassPanel id="search-advanced-filters" className="premium-filter-panel mt-4 p-4 md:p-6 space-y-6 rounded-2xl border border-border overflow-hidden relative ui-state-fade bg-card/60">
+
+              <div className="flex flex-wrap items-center justify-between gap-4 relative z-10 pb-4 border-b border-white/[0.07]">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/15 text-primary">
+                    <SlidersHorizontal className="w-4 h-4" />
+                  </span>
                   <span className="text-xs font-bold uppercase tracking-wider">Power Filters</span>
+                  {activeFilterCount > 0 && (
+                    <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-black text-primary-foreground">
+                      {activeFilterCount} active
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
-                    onClick={() => {
-                      setLocalAnimeType('all');
-                      setLocalAnimeStatus('all');
-                      setLocalAnimeGenre('all');
-                      setLocalAnimeSort('default');
-                      setLocalMangaType('all');
-                      setLocalMangaStatus('all');
-                      setLocalMangaOrigin('all');
-                      setLocalMangaGenre('all');
-                      setLocalMangaAdult(false);
-                      setLocalMinRating(0);
-                      setLocalMinReleaseYear(0);
-                      setLocalMaxRating(0);
-                      setLocalMaxReleaseYear(0);
-                      setLocalSeason('all');
-                      setLocalMinEpisodes(0);
-                      setLocalMaxEpisodes(0);
-                      setLocalSortMode('relevance');
-
-                      // Immediately apply reset
-                      setAnimeTypeFilter('all');
-                      setAnimeStatusFilter('all');
-                      setAnimeGenreFilter('all');
-                      setAnimeSortFilter('default');
-                      setMangaTypeFilter('all');
-                      setMangaStatusFilter('all');
-                      setMangaOrigin('all');
-                      setMangaGenreFilter('all');
-                      setMangaAdultFilter(false);
-                      setMinRating(0);
-                      setMinReleaseYear(0);
-                      setMaxRating(0);
-                      setMaxReleaseYear(0);
-                      setSeasonFilter('all');
-                      setMinEpisodes(0);
-                      setMaxEpisodes(0);
-                      setSortMode('relevance');
-                      setSelectedAnimeTags([]);
-                      setSelectedMangaTags([]);
-                      setTagSearch('');
-                      setMangaTagSearch('');
-                    }}
-                    className="h-9 px-3.5 rounded-xl text-xs font-bold uppercase tracking-wide bg-background/70 border border-white/10 text-muted-foreground hover:text-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-all"
+                    onClick={resetFilters}
+                    className="h-9 px-3.5 rounded-xl text-xs font-bold uppercase tracking-wide bg-background/70 border border-white/10 text-muted-foreground hover:text-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-[color,background-color,border-color,opacity,transform]"
                   >
                     Reset all
                   </button>
 
                   <button
                     onClick={applyFilters}
-                    className="h-9 px-6 rounded-xl bg-primary text-primary-foreground font-bold hover:scale-105 active:scale-95 transition-all shadow-lg shadow-primary/20 flex items-center gap-2 text-xs"
+                    type="button"
+                    className="ui-button h-10 px-6 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 motion-safe:active:scale-[.97] transition-[color,background-color,border-color,opacity,transform] shadow-lg shadow-primary/20 flex items-center gap-2 text-xs"
                   >
                     <Search className="w-3.5 h-3.5" />
                     Apply Filters
@@ -1406,21 +1472,22 @@ export default function SearchPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pt-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 pt-2">
                 {/* Anime Section */}
-                <div className="space-y-4">
+                <div className="space-y-4 rounded-2xl border border-white/[0.06] bg-white/[0.015] p-4 md:p-5">
                   <div className="flex items-center gap-2 pb-2 border-b border-white/5">
                     <Film className="w-4 h-4 text-primary" />
                     <h3 className="text-xs font-black uppercase tracking-[0.2em] text-foreground">Anime Filters</h3>
                   </div>
-                  
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Type</p>
+                      <label htmlFor="filter-localAnimeType" className="text-xs text-muted-foreground font-semibold">Type</label>
                       <select
+                        id="filter-localAnimeType"
                         value={localAnimeType}
                         onChange={(e) => setLocalAnimeType(e.target.value)}
-                        className="w-full h-10 rounded-xl bg-background/80 border border-white/10 px-3 text-sm focus:border-primary/50 outline-none transition-colors"
+                        className="w-full h-11 rounded-xl bg-background/80 border border-white/10 px-3 text-sm outline-none transition-[color,background-color,border-color,opacity,transform] cursor-pointer hover:border-white/25 hover:bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
                       >
                         <option value="all">All types</option>
                         <option value="tv">TV</option>
@@ -1432,11 +1499,12 @@ export default function SearchPage() {
                     </div>
 
                     <div className="space-y-1.5">
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Status</p>
+                      <label htmlFor="filter-localAnimeStatus" className="text-xs text-muted-foreground font-semibold">Status</label>
                       <select
+                        id="filter-localAnimeStatus"
                         value={localAnimeStatus}
                         onChange={(e) => setLocalAnimeStatus(e.target.value)}
-                        className="w-full h-10 rounded-xl bg-background/80 border border-white/10 px-3 text-sm focus:border-primary/50 outline-none transition-colors"
+                        className="w-full h-11 rounded-xl bg-background/80 border border-white/10 px-3 text-sm outline-none transition-[color,background-color,border-color,opacity,transform] cursor-pointer hover:border-white/25 hover:bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
                       >
                         <option value="all">Any status</option>
                         <option value="currently-airing">Currently Airing</option>
@@ -1447,11 +1515,12 @@ export default function SearchPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Genre</p>
+                    <label htmlFor="filter-localAnimeGenre" className="text-xs text-muted-foreground font-semibold">Genre</label>
                     <select
+                      id="filter-localAnimeGenre"
                       value={localAnimeGenre}
                       onChange={(e) => setLocalAnimeGenre(e.target.value)}
-                      className="w-full h-10 rounded-xl bg-background/80 border border-white/10 px-3 text-sm focus:border-primary/50 outline-none transition-colors"
+                      className="w-full h-11 rounded-xl bg-background/80 border border-white/10 px-3 text-sm outline-none transition-[color,background-color,border-color,opacity,transform] cursor-pointer hover:border-white/25 hover:bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
                     >
                       <option value="all">Any genre</option>
                       {animeGenreOptions.map((genre) => (
@@ -1465,9 +1534,10 @@ export default function SearchPage() {
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <Tags className="w-3.5 h-3.5 text-primary" />
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">AniList Tags</p>
+                      <p className="text-xs text-muted-foreground font-semibold">AniList Tags</p>
                     </div>
                     <Input
+                      aria-label="Search AniList tags"
                       value={tagSearch}
                       onChange={(event) => setTagSearch(event.target.value)}
                       placeholder="Search tags..."
@@ -1500,40 +1570,22 @@ export default function SearchPage() {
                         ))}
                       </div>
                     )}
-                    <div className="flex max-h-40 flex-col gap-2 overflow-y-auto pr-1">
-                      {filteredTagOptions.map(({ category, tags }) => (
-                        <div key={category} className="space-y-1">
-                          <p className="text-[9px] uppercase tracking-[0.15em] text-muted-foreground/70 font-bold sticky top-0 bg-background/95 py-0.5">{category}</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {tags.map((tag) => (
-                              <button
-                                key={tag.id}
-                                type="button"
-                                title={tag.description || tag.category || tag.name}
-                                onClick={() => setSelectedAnimeTags((current) => current.includes(tag.name) ? current.filter((value) => value !== tag.name) : [...current, tag.name])}
-                                className={cn(
-                                  "rounded-md border px-2 py-1 text-[10px] transition-colors",
-                                  selectedAnimeTags.includes(tag.name)
-                                    ? "border-primary/50 bg-primary/15 text-primary"
-                                    : "border-white/10 bg-background/60 text-muted-foreground hover:border-primary/30 hover:text-foreground"
-                                )}
-                              >
-                                {tag.name}
-                                {tag.isGeneralSpoiler && <span className="ml-1 text-amber-400" title="General spoiler">!</span>}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <TagGroupCloud
+                      groups={filteredTagOptions}
+                      selected={selectedAnimeTags}
+                      onToggle={(name) => setSelectedAnimeTags((current) => current.includes(name) ? current.filter((value) => value !== name) : [...current, name])}
+                      maxHeightClass="max-h-40"
+                      emptyText="No tags match that search."
+                    />
                   </div>
 
                   <div className="space-y-1.5">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Sort Method</p>
+                    <label htmlFor="filter-localAnimeSort" className="text-xs text-muted-foreground font-semibold">Sort Method</label>
                     <select
+                      id="filter-localAnimeSort"
                       value={localAnimeSort}
                       onChange={(e) => setLocalAnimeSort(e.target.value)}
-                      className="w-full h-10 rounded-xl bg-background/80 border border-white/10 px-3 text-sm focus:border-primary/50 outline-none transition-colors"
+                      className="w-full h-11 rounded-xl bg-background/80 border border-white/10 px-3 text-sm outline-none transition-[color,background-color,border-color,opacity,transform] cursor-pointer hover:border-white/25 hover:bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
                     >
                       <option value="default">Best match</option>
                       <option value="recently-added">Recently Added</option>
@@ -1546,18 +1598,19 @@ export default function SearchPage() {
                 </div>
 
                 {/* Manga Section */}
-                <div className="space-y-4">
+                <div className="space-y-4 rounded-2xl border border-white/[0.06] bg-white/[0.015] p-4 md:p-5">
                   <div className="flex items-center gap-2 pb-2 border-b border-white/5">
                     <BookOpen className="w-4 h-4 text-primary" />
                     <h3 className="text-xs font-black uppercase tracking-[0.2em] text-foreground">Manga Filters</h3>
                   </div>
 
                   <div className="space-y-1.5">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Origin</p>
+                    <label htmlFor="filter-localMangaOrigin" className="text-xs text-muted-foreground font-semibold">Origin</label>
                     <select
+                      id="filter-localMangaOrigin"
                       value={localMangaOrigin}
                       onChange={(e) => setLocalMangaOrigin(e.target.value)}
-                      className="w-full h-10 rounded-xl bg-background/80 border border-white/10 px-3 text-sm focus:border-primary/50 outline-none transition-colors"
+                      className="w-full h-11 rounded-xl bg-background/80 border border-white/10 px-3 text-sm outline-none transition-[color,background-color,border-color,opacity,transform] cursor-pointer hover:border-white/25 hover:bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
                     >
                       <option value="all">All origins</option>
                       <option value="JP">Japan (Manga)</option>
@@ -1567,7 +1620,7 @@ export default function SearchPage() {
                   </div>
 
                   <div className="space-y-2 rounded-xl border border-white/10 bg-background/50 p-3">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Popular Manhwa / Webtoon Tags</p>
+                    <p className="text-xs text-muted-foreground font-semibold">Popular Manhwa / Webtoon Tags</p>
                     <div className="flex flex-wrap gap-1.5">
                       {['Cultivation', 'Dungeon', 'Necromancy', 'Age Regression', 'Video Games', 'Revenge', 'Survival', 'Martial Arts', 'Post-Apocalyptic'].map((tag) => (
                         <button
@@ -1575,7 +1628,7 @@ export default function SearchPage() {
                           type="button"
                           onClick={() => setSelectedMangaTags((current) => current.includes(tag) ? current.filter((value) => value !== tag) : [...current, tag])}
                           className={cn(
-                            "rounded-md border px-2 py-1 text-[10px] transition-colors",
+                            "rounded-lg border px-2.5 py-1.5 min-h-[30px] text-[10px] font-semibold transition-[color,background-color,border-color,opacity,transform] active:scale-95",
                             selectedMangaTags.includes(tag) ? "border-primary/50 bg-primary/15 text-primary" : "border-white/10 text-muted-foreground hover:border-primary/30 hover:text-foreground"
                           )}
                         >
@@ -1583,7 +1636,7 @@ export default function SearchPage() {
                         </button>
                       ))}
                     </div>
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Popular Manga Tags</p>
+                    <p className="text-xs text-muted-foreground font-semibold">Popular Manga Tags</p>
                     <div className="flex flex-wrap gap-1.5">
                       {['School', 'Shounen', 'Seinen', 'Shoujo', 'Josei', 'Isekai', 'Cyberpunk', 'Samurai', 'Ninja', 'Family Life'].map((tag) => (
                         <button
@@ -1591,7 +1644,7 @@ export default function SearchPage() {
                           type="button"
                           onClick={() => setSelectedMangaTags((current) => current.includes(tag) ? current.filter((value) => value !== tag) : [...current, tag])}
                           className={cn(
-                            "rounded-md border px-2 py-1 text-[10px] transition-colors",
+                            "rounded-lg border px-2.5 py-1.5 min-h-[30px] text-[10px] font-semibold transition-[color,background-color,border-color,opacity,transform] active:scale-95",
                             selectedMangaTags.includes(tag) ? "border-primary/50 bg-primary/15 text-primary" : "border-white/10 text-muted-foreground hover:border-primary/30 hover:text-foreground"
                           )}
                         >
@@ -1603,11 +1656,12 @@ export default function SearchPage() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Format</p>
+                      <label htmlFor="filter-localMangaType" className="text-xs text-muted-foreground font-semibold">Format</label>
                       <select
+                        id="filter-localMangaType"
                         value={localMangaType}
                         onChange={(e) => setLocalMangaType(e.target.value)}
-                        className="w-full h-10 rounded-xl bg-background/80 border border-white/10 px-3 text-sm focus:border-primary/50 outline-none transition-colors"
+                        className="w-full h-11 rounded-xl bg-background/80 border border-white/10 px-3 text-sm outline-none transition-[color,background-color,border-color,opacity,transform] cursor-pointer hover:border-white/25 hover:bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
                       >
                         <option value="all">All formats</option>
                         <option value="manga">Manga</option>
@@ -1618,11 +1672,12 @@ export default function SearchPage() {
                     </div>
 
                     <div className="space-y-1.5">
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Status</p>
+                      <label htmlFor="filter-localMangaStatus" className="text-xs text-muted-foreground font-semibold">Status</label>
                       <select
+                        id="filter-localMangaStatus"
                         value={localMangaStatus}
                         onChange={(e) => setLocalMangaStatus(e.target.value)}
-                        className="w-full h-10 rounded-xl bg-background/80 border border-white/10 px-3 text-sm focus:border-primary/50 outline-none transition-colors"
+                        className="w-full h-11 rounded-xl bg-background/80 border border-white/10 px-3 text-sm outline-none transition-[color,background-color,border-color,opacity,transform] cursor-pointer hover:border-white/25 hover:bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
                       >
                         <option value="all">Any status</option>
                         <option value="ongoing">Ongoing</option>
@@ -1635,11 +1690,12 @@ export default function SearchPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Genre</p>
+                    <label htmlFor="filter-localMangaGenre" className="text-xs text-muted-foreground font-semibold">Genre</label>
                     <select
+                      id="filter-localMangaGenre"
                       value={localMangaGenre}
                       onChange={(e) => setLocalMangaGenre(e.target.value)}
-                      className="w-full h-10 rounded-xl bg-background/80 border border-white/10 px-3 text-sm focus:border-primary/50 outline-none transition-colors"
+                      className="w-full h-11 rounded-xl bg-background/80 border border-white/10 px-3 text-sm outline-none transition-[color,background-color,border-color,opacity,transform] cursor-pointer hover:border-white/25 hover:bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
                     >
                       <option value="all">Any genre</option>
                       {/* If a tag from MangaPage was passed via URL and isn't in the list, show it as the first option */}
@@ -1659,7 +1715,12 @@ export default function SearchPage() {
                   <div className="space-y-2 rounded-xl border border-primary/10 bg-primary/5 p-3">
                     <div className="flex items-center gap-2">
                       <Tags className="w-3.5 h-3.5 text-primary" />
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">AniList Tags</p>
+                      <select aria-label="Manga tag catalog" value={mangaTagSource || 'anilist'}
+                        onChange={(event) => { setMangaTagSource(event.target.value as 'anilist' | 'mangabaka'); setSelectedMangaTags([]); }}
+                        className="min-h-11 rounded-lg border border-border bg-background px-3 text-sm">
+                        <option value="anilist">AniList tags</option>
+                        <option value="mangabaka">MangaBaka tags</option>
+                      </select>
                     </div>
                     <Input
                       value={mangaTagSearch}
@@ -1693,35 +1754,16 @@ export default function SearchPage() {
                         <span className="text-[10px] text-muted-foreground">No manga tags selected</span>
                       )}
                     </div>
-                    <div className="flex max-h-40 flex-col gap-2 overflow-y-auto pr-1">
-                      {filteredMangaTagOptions.map(({ category, tags }) => (
-                        <div key={`manga-cat-${category}`} className="space-y-1">
-                          <p className="text-[9px] uppercase tracking-[0.15em] text-muted-foreground/70 font-bold sticky top-0 bg-background/95 py-0.5">{category}</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {tags.map((tag) => (
-                              <button
-                                key={`manga-tag-${tag.id}`}
-                                type="button"
-                                title={tag.description || tag.category || tag.name}
-                                onClick={() => setSelectedMangaTags((current) => current.includes(tag.name) ? current.filter((value) => value !== tag.name) : [...current, tag.name])}
-                                className={cn(
-                                  "rounded-md border px-2 py-1 text-[10px] transition-colors",
-                                  selectedMangaTags.includes(tag.name)
-                                    ? "border-primary/50 bg-primary/15 text-primary"
-                                    : "border-white/10 bg-background/60 text-muted-foreground hover:border-primary/30 hover:text-foreground"
-                                )}
-                              >
-                                {tag.name}
-                                {tag.isGeneralSpoiler && <span className="ml-1 text-amber-400" title="General spoiler">!</span>}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <TagGroupCloud
+                      groups={filteredMangaTagOptions}
+                      selected={selectedMangaTags}
+                      onToggle={(name) => setSelectedMangaTags((current) => current.includes(name) ? current.filter((value) => value !== name) : [...current, name])}
+                      maxHeightClass="max-h-40"
+                      emptyText="No tags match that search."
+                    />
                   </div>
 
-                  <div className="flex items-center gap-2 p-3 rounded-xl bg-background/70 border border-white/10 hover:border-primary/30 transition-all cursor-pointer group" onClick={() => setLocalMangaAdult(!localMangaAdult)}>
+                  <div className="flex items-center gap-2 p-3 rounded-xl bg-background/70 border border-white/10 hover:border-primary/30 transition-[color,background-color,border-color,opacity,transform] cursor-pointer group" onClick={() => setLocalMangaAdult(!localMangaAdult)}>
                     <input
                       type="checkbox"
                       checked={localMangaAdult}
@@ -1737,18 +1779,19 @@ export default function SearchPage() {
                 </div>
 
                 {/* Common Section */}
-                <div className="space-y-4">
+                <div className="space-y-4 rounded-2xl border border-white/[0.06] bg-white/[0.015] p-4 md:p-5">
                   <div className="flex items-center gap-2 pb-2 border-b border-white/5">
                     <SlidersHorizontal className="w-4 h-4 text-primary" />
                     <h3 className="text-xs font-black uppercase tracking-[0.2em] text-foreground">General Tuning</h3>
                   </div>
 
                   <div className="space-y-1.5">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Global Sort Method</p>
+                    <label htmlFor="filter-localSortMode" className="text-xs text-muted-foreground font-semibold">Global Sort Method</label>
                     <select
+                      id="filter-localSortMode"
                       value={localSortMode}
                       onChange={(e) => setLocalSortMode(e.target.value as any)}
-                      className="w-full h-10 rounded-xl bg-background/80 border border-white/10 px-3 text-sm focus:border-primary/50 outline-none transition-colors"
+                      className="w-full h-11 rounded-xl bg-background/80 border border-white/10 px-3 text-sm outline-none transition-[color,background-color,border-color,opacity,transform] cursor-pointer hover:border-white/25 hover:bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
                     >
                       <option value="relevance">Relevance</option>
                       <option value="rating">Highest Rating</option>
@@ -1759,7 +1802,7 @@ export default function SearchPage() {
 
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Min Rating</p>
+                      <p className="text-xs text-muted-foreground font-semibold">Min Rating</p>
                       <span className="text-xs font-bold text-primary">{localMinRating.toFixed(1)}</span>
                     </div>
                     <input
@@ -1767,20 +1810,20 @@ export default function SearchPage() {
                       min={0}
                       max={10}
                       step={0.5}
-                      value={localMinRating}
+                      aria-label="Minimum rating" value={localMinRating}
                       onChange={(e) => setLocalMinRating(Number(e.target.value))}
                       className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Min Release Year</p>
+                    <p className="text-xs text-muted-foreground font-semibold">Min Release Year</p>
                     <div className="relative">
                       <Input
                         type="number"
                         min={1900}
                         max={new Date().getFullYear() + 1}
-                        value={localMinReleaseYear || ''}
+                        aria-label="Minimum release year" value={localMinReleaseYear || ''}
                         onChange={(e) => setLocalMinReleaseYear(Math.max(0, Number(e.target.value) || 0))}
                         className="h-10 rounded-xl bg-background/80 border-white/10 focus:border-primary/50"
                         placeholder="Any year..."
@@ -1798,7 +1841,7 @@ export default function SearchPage() {
 
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Max Rating</p>
+                      <p className="text-xs text-muted-foreground font-semibold">Max Rating</p>
                       <span className="text-xs font-bold text-primary">{localMaxRating > 0 ? localMaxRating.toFixed(1) : 'Any'}</span>
                     </div>
                     <input
@@ -1806,20 +1849,20 @@ export default function SearchPage() {
                       min={0}
                       max={10}
                       step={0.5}
-                      value={localMaxRating}
+                      aria-label="Maximum rating" value={localMaxRating}
                       onChange={(e) => setLocalMaxRating(Number(e.target.value))}
                       className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Max Release Year</p>
+                    <p className="text-xs text-muted-foreground font-semibold">Max Release Year</p>
                     <div className="relative">
                       <Input
                         type="number"
                         min={1900}
                         max={new Date().getFullYear() + 1}
-                        value={localMaxReleaseYear || ''}
+                        aria-label="Maximum release year" value={localMaxReleaseYear || ''}
                         onChange={(e) => setLocalMaxReleaseYear(Math.max(0, Number(e.target.value) || 0))}
                         className="h-10 rounded-xl bg-background/80 border-white/10 focus:border-primary/50"
                         placeholder="Any year..."
@@ -1836,11 +1879,11 @@ export default function SearchPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Season <span className="text-muted-foreground/60 normal-case">(anime)</span></p>
-                    <select
-                      value={localSeason}
+                    <p className="text-xs text-muted-foreground font-semibold">Season <span className="text-muted-foreground/60 normal-case">(anime)</span></p>
+                    <select aria-label="Season"
+                        value={localSeason}
                       onChange={(e) => setLocalSeason(e.target.value)}
-                      className="w-full h-10 rounded-xl bg-background/80 border border-white/10 px-3 text-sm focus:border-primary/50 outline-none transition-colors"
+                      className="w-full h-11 rounded-xl bg-background/80 border border-white/10 px-3 text-sm outline-none transition-[color,background-color,border-color,opacity,transform] cursor-pointer hover:border-white/25 hover:bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
                     >
                       <option value="all">Any season</option>
                       <option value="WINTER">Winter</option>
@@ -1851,12 +1894,12 @@ export default function SearchPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Episodes <span className="text-muted-foreground/60 normal-case">(anime)</span></p>
+                    <p className="text-xs text-muted-foreground font-semibold">Episodes <span className="text-muted-foreground/60 normal-case">(anime)</span></p>
                     <div className="grid grid-cols-2 gap-2">
                       <Input
                         type="number"
                         min={0}
-                        value={localMinEpisodes || ''}
+                        aria-label="Minimum episodes" value={localMinEpisodes || ''}
                         onChange={(e) => setLocalMinEpisodes(Math.max(0, Number(e.target.value) || 0))}
                         className="h-10 rounded-xl bg-background/80 border-white/10 focus:border-primary/50"
                         placeholder="Min"
@@ -1864,7 +1907,7 @@ export default function SearchPage() {
                       <Input
                         type="number"
                         min={0}
-                        value={localMaxEpisodes || ''}
+                        aria-label="Maximum episodes" value={localMaxEpisodes || ''}
                         onChange={(e) => setLocalMaxEpisodes(Math.max(0, Number(e.target.value) || 0))}
                         className="h-10 rounded-xl bg-background/80 border-white/10 focus:border-primary/50"
                         placeholder="Max"
@@ -1874,7 +1917,7 @@ export default function SearchPage() {
 
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold">Image Confidence</p>
+                      <p className="text-xs text-muted-foreground font-semibold">Image Confidence</p>
                       <span className="text-xs font-bold text-primary">{Math.round(imageConfidenceThreshold * 100)}%</span>
                     </div>
                     <input
@@ -1882,20 +1925,20 @@ export default function SearchPage() {
                       min={0.5}
                       max={1}
                       step={0.01}
-                      value={imageConfidenceThreshold}
+                      aria-label="Image confidence" value={imageConfidenceThreshold}
                       onChange={(e) => setImageConfidenceThreshold(Number(e.target.value))}
                       className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
                     />
                   </div>
-                  
+
                 </div>
-                
+
               </div>
-              
+
             </GlassPanel>
-            
+
           )}
-          
+
 
 
         {/* Image Search Results Overlay/Section */}
@@ -2010,13 +2053,13 @@ export default function SearchPage() {
                           <div className="mt-3 flex gap-2">
                             <button
                               onClick={() => navigate(`/anime/${result.anilist}`)}
-                              className="flex-1 py-1.5 rounded-lg bg-primary/15 hover:bg-primary/30 text-[10px] font-bold text-primary transition-all border border-primary/20 hover:border-primary/40"
+                              className="flex-1 py-1.5 rounded-lg bg-primary/15 hover:bg-primary/30 text-[10px] font-bold text-primary transition-[color,background-color,border-color,opacity,transform] border border-primary/20 hover:border-primary/40"
                             >
                               View Anime
                             </button>
                             <button
                               onClick={() => navigate(`/search?q=${encodeURIComponent(animeTitle)}`)}
-                              className="flex-1 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[10px] font-bold text-muted-foreground hover:text-foreground transition-all border border-white/5"
+                              className="flex-1 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[10px] font-bold text-muted-foreground hover:text-foreground transition-[color,background-color,border-color,opacity,transform] border border-white/5"
                             >
                               Search
                             </button>
@@ -2039,7 +2082,7 @@ export default function SearchPage() {
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {extensionResults.map((result, idx) => (
-                <GlassPanel key={idx} className="p-4 flex gap-4 items-center group hover:border-primary/50 transition-all cursor-pointer" onClick={() => result.url && window.open(result.url, '_blank')}>
+                <GlassPanel key={idx} className="p-4 flex gap-4 items-center group hover:border-primary/50 transition-[color,background-color,border-color,opacity,transform] cursor-pointer" onClick={() => result.url && window.open(result.url, '_blank')}>
                   <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
                     {result.image ? (
                       <img src={result.image} alt="" className="w-full h-full object-cover rounded-xl" />
@@ -2078,7 +2121,7 @@ export default function SearchPage() {
                   {characterResults.map((character: any) => (
                     <UnifiedMediaCard
                       key={character.id}
-                      variant="poster"
+
                       item={{
                         id: String(character.id),
                         name: character.name?.full || character.name || 'Character',
@@ -2107,7 +2150,7 @@ export default function SearchPage() {
                   {episodeTitleResults.map((hit: any, idx: number) => (
                     <GlassPanel
                       key={`ep-${hit.anilistId ?? idx}`}
-                      className="p-3 flex items-center gap-4 hover:bg-white/10 transition-all cursor-pointer group border-white/5 hover:border-primary/30"
+                      className="p-3 flex items-center gap-4 hover:bg-white/10 transition-[color,background-color,border-color,opacity,transform] cursor-pointer group border-white/5 hover:border-primary/30"
                       onClick={() => navigate(`/anime/${hit.animeId || hit.anilistId}`)}
                     >
                       {hit.animePoster && (
@@ -2136,11 +2179,20 @@ export default function SearchPage() {
               </div>
             )}
 
-            {(showAnimeResults || showMangaResults) && hasMixedResults && (
+            {showMangaResults && mangaSearchError && (
+              <div role="alert" className="my-6 rounded-2xl border border-destructive/30 p-5">
+                <p>{mangaSearchError.message}</p>
+                <Button className="mt-3" onClick={() => void retryMangaSearch()}>Retry manga search</Button>
+              </div>
+            )}
+            {showMangaResults && infiniteMangaData?.pages[0]?.source === 'mangabaka' && (
+              <p className="my-4 text-sm text-muted-foreground">Catalog: <a className="underline" href="https://mangabaka.org/data/api" target="_blank" rel="noreferrer">MangaBaka and its metadata providers</a>. Titles without a Tatakai mapping open on MangaBaka.</p>
+            )}
+            {(showAnimeResults || showMangaResults) && (hasMixedResults || hasMoreResults) && (
               <>
                 <div className={POSTER_GRID_CLASS}>
                   {unifiedResults.map((item) => (
-                    <UnifiedMediaCard key={item.id} item={item} variant="poster" />
+                    <UnifiedMediaCard key={item.id} item={item} />
                   ))}
                 </div>
 
@@ -2152,7 +2204,10 @@ export default function SearchPage() {
                       <span className="text-sm font-bold uppercase tracking-wider">Loading more...</span>
                     </div>
                   ) : hasMoreResults ? (
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary/20 animate-bounce" />
+                    <Button variant="outline" onClick={() => {
+                      if (hasNextAnimePage) void (isProducerRoute ? fetchNextProducerPage() : fetchNextSearchPage());
+                      if (hasNextMangaPage) void fetchNextMangaPage();
+                    }}>Load more results</Button>
                   ) : (
                     <div className="flex flex-col items-center gap-2 opacity-40">
                       <div className="h-px w-24 bg-border" />
@@ -2163,7 +2218,7 @@ export default function SearchPage() {
               </>
             )}
 
-            {!hasAnyResult && (
+            {!hasAnyResult && !hasMoreResults && !mangaSearchError && (
               <div className="text-center py-20">
                 <Search className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
                 <h2 className="text-xl font-semibold mb-2">No results found</h2>
@@ -2179,7 +2234,7 @@ export default function SearchPage() {
                 <p className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Recent searches</p>
                 <div className="flex flex-wrap justify-center gap-2.5">
                   {recentSearches.map((term, idx) => (
-                    <div key={idx} className="group inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-xs transition-all">
+                    <div key={idx} className="group inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-xs transition-[color,background-color,border-color,opacity,transform]">
                       <button
                         onClick={() => runRecentSearch(term)}
                         className="font-medium text-foreground"
@@ -2199,7 +2254,7 @@ export default function SearchPage() {
               </div>
             )}
 
-            
+
           </div>
         )}
       </main>

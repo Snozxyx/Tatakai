@@ -24,17 +24,24 @@ export function MobileDeepLinkBridge() {
     (async () => {
       try {
         const { App } = await import('@capacitor/app');
+        const followRoute = (route: string, replace = false) => {
+          if (cancelled) return;
+          if (route.startsWith('/integration/') || route.startsWith('/api/mal/redirect')) {
+            void import('@capacitor/browser').then(({ Browser }) => Browser.close()).catch(() => undefined);
+          }
+          navigate(route, { replace });
+        };
         // Cold start: the launch URL is NOT delivered via appUrlOpen.
         try {
           const launch = await App.getLaunchUrl();
           const route = launch?.url ? toRoute(launch.url) : null;
-          if (route) navigate(route, { replace: true });
+          if (route) followRoute(route, true);
         } catch {
           /* no launch url */
         }
         const handle = await App.addListener('appUrlOpen', ({ url }) => {
           const route = toRoute(url);
-          if (route) navigate(route);
+          if (route) followRoute(route);
         });
         if (cancelled) {
           void handle.remove();
@@ -83,7 +90,7 @@ export function toRoute(raw: string): string | null {
       // `tatakai:watch/x` (opaque, no slashes) → pathname is `watch/x`.
       if (!path.startsWith('/')) path = `/${path}`;
     } else {
-      if (!/tatakai\.me$/i.test(u.hostname)) return null;
+      if (!['https:', 'http:'].includes(u.protocol) || !/(^|\.)tatakai\.me$/i.test(u.hostname)) return null;
       path = `${u.pathname}${u.search}${u.hash}`;
     }
     if (!path.startsWith('/')) return `/${path}`;
@@ -97,8 +104,6 @@ export function toRoute(raw: string): string | null {
     }
     return path;
   } catch {
-    const m = raw.match(/^[a-z][a-z0-9+.-]*:\/\/[^/]*(\/.*)$/i);
-    if (m) return m[1];
     // Bare `tatakai:anime/1/ep/2` without slashes.
     const bare = raw.match(/^tatakai:(.+)$/i);
     if (bare) return bare[1].startsWith('/') ? bare[1] : `/${bare[1]}`;

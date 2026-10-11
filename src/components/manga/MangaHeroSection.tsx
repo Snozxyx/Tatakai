@@ -1,20 +1,40 @@
-import { Star, BookOpen } from "lucide-react";
+import { Star, BookOpen, Pause, Play } from "lucide-react";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import { UnifiedMediaCardProps } from "@/components/UnifiedMediaCard";
 import { getHighQualityImage } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import type { TouchEvent as ReactTouchEvent } from "react";
+import { useMemo } from 'react';
+import { useMotionPreference } from '@/hooks/ui/useMotionPreference';
+import { useVisibleAutoplay } from '@/hooks/ui/useVisibleAutoplay';
+import { toMangaSpotlight } from '@/lib/mangaSpotlight';
+import { useMobileAppearance } from '@/hooks/ui/useMobileAppearance';
+import { CinematicHero, type CinematicSpotlight } from '@/components/anime/CinematicHero';
 
 interface MangaHeroSectionProps {
   spotlight: UnifiedMediaCardProps["item"];
   spotlights?: UnifiedMediaCardProps["item"][];
+  onActiveSpotlightChange?: (item: CinematicSpotlight) => void;
 }
 
-export function MangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectionProps) {
+
+export function MangaHeroSection({ spotlight, spotlights, onActiveSpotlightChange }: MangaHeroSectionProps) {
+  const refreshed = useMobileAppearance();
+  const items = useMemo(() => (spotlights?.length ? spotlights : [spotlight]).map(toMangaSpotlight), [spotlight, spotlights]);
+  return refreshed ? <CinematicHero spotlights={items} mediaType="manga" onActiveSpotlightChange={onActiveSpotlightChange} />
+    : <ClassicMangaHeroSection spotlight={spotlight} spotlights={spotlights} />;
+}
+
+function ClassicMangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectionProps) {
   const navigate = useNavigate();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const reduced = useMotionPreference();
+  const { ref: sectionRef, visible: inView } = useVisibleAutoplay();
+  const transitionTimer = useRef<ReturnType<typeof setTimeout>>();
 
   const allSpotlights = spotlights.length > 0 ? spotlights.slice(0, 5) : [spotlight];
   const activeSpotlight = allSpotlights[currentIndex] || spotlight;
@@ -24,18 +44,19 @@ export function MangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
   const spotlightStatus = activeSpotlight?.status || "Ongoing";
 
   useEffect(() => {
-    if (allSpotlights.length <= 1) return;
+    if (allSpotlights.length <= 1 || paused || focused || reduced || !inView) return;
 
     const interval = setInterval(() => {
       setIsTransitioning(true);
-      setTimeout(() => {
+      transitionTimer.current = setTimeout(() => {
         setCurrentIndex((prev) => (prev + 1) % allSpotlights.length);
         setIsTransitioning(false);
       }, 400);
     }, 6000);
 
-    return () => clearInterval(interval);
-  }, [allSpotlights.length]);
+    return () => { clearInterval(interval); clearTimeout(transitionTimer.current); setIsTransitioning(false); };
+  }, [allSpotlights.length, paused, focused, reduced, inView]);
+  useEffect(() => () => clearTimeout(transitionTimer.current), []);
 
   const handleRead = () => {
     if (activeSpotlight) navigate(`/manga/${activeSpotlight.id}`);
@@ -43,8 +64,10 @@ export function MangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
 
   const goTo = (idx: number) => {
     if (idx === currentIndex) return;
+    clearTimeout(transitionTimer.current);
+    if (reduced) { setCurrentIndex(idx); setIsTransitioning(false); return; }
     setIsTransitioning(true);
-    setTimeout(() => {
+    transitionTimer.current = setTimeout(() => {
       setCurrentIndex(idx);
       setIsTransitioning(false);
     }, 250);
@@ -67,9 +90,9 @@ export function MangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
   if (!activeSpotlight) return null;
 
   return (
-    <section className="relative mb-16 md:mb-24">
+    <section ref={sectionRef} onFocusCapture={() => setFocused(true)} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false); }} className="balanced-spotlight relative mb-12 md:mb-16">
       <div
-        className="lg:hidden relative overflow-hidden rounded-3xl border border-white/[0.08] bg-background/40 shadow-2xl shadow-black/50"
+        className="classic-spotlight-mobile lg:hidden relative overflow-hidden rounded-3xl border border-white/[0.08] bg-black/80 shadow-2xl shadow-black/50"
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
@@ -79,14 +102,14 @@ export function MangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
             alt=""
             className="w-full h-full object-cover scale-105 brightness-50"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-primary/15 via-background/85 to-background" />
+          <div className="absolute inset-0 bg-gradient-to-b from-primary/15 via-black/70 to-black/90" />
           {/* Ambient glow — same token language as the anime hero */}
           <div className="absolute -top-16 left-1/2 h-40 w-3/4 -translate-x-1/2 rounded-full bg-primary/25 blur-[80px]" aria-hidden />
         </div>
 
         <div
-          className={`relative z-10 pt-8 px-4 pb-5 transition-all duration-500 ${
-            isTransitioning ? "opacity-0 translate-y-2" : "opacity-100 translate-y-0"
+          className={`relative z-10 pt-8 px-4 pb-5 transition-opacity duration-300 ${
+            isTransitioning ? "opacity-0" : "opacity-100"
           }`}
         >
           <div className="flex gap-4 mb-6">
@@ -122,7 +145,7 @@ export function MangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
           <div className="flex gap-3">
             <button
               onClick={handleRead}
-              className="flex-1 h-12 rounded-2xl bg-white text-black font-bold text-sm hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 shadow-xl shadow-black/40 ring-1 ring-white/40"
+              className="flex-1 h-12 rounded-2xl bg-white text-black font-bold text-sm hover:bg-white/90 motion-safe:active:scale-[.98] transition-[opacity,transform,background-color] flex items-center justify-center gap-2 shadow-xl shadow-black/40 ring-1 ring-white/40"
             >
               <BookOpen className="w-4 h-4 fill-black" />
               Read Now
@@ -131,15 +154,16 @@ export function MangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
 
           {allSpotlights.length > 1 && (
             <div className="flex items-center justify-center gap-1 pt-4">
+              {!reduced && <button type="button" onClick={() => setPaused(value => !value)} aria-label={paused ? 'Resume spotlight rotation' : 'Pause spotlight rotation'} aria-pressed={paused} className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-muted/30">{paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}</button>}
               {allSpotlights.map((_, idx) => (
                 <button
                   key={idx}
                   onClick={() => goTo(idx)}
                   aria-label={`Show spotlight ${idx + 1}`}
-                  className="flex h-7 w-7 items-center justify-center"
+                  aria-pressed={idx === currentIndex} className="flex h-11 w-11 items-center justify-center rounded-full"
                 >
                   <span
-                    className={`transition-all duration-300 rounded-full ${
+                    className={`transition-[opacity,transform,background-color] duration-300 rounded-full ${
                       idx === currentIndex
                         ? "w-6 h-1.5 bg-white"
                         : "w-1.5 h-1.5 bg-white/35"
@@ -154,8 +178,8 @@ export function MangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
 
       <div className="hidden lg:grid grid-cols-12 gap-8 items-center">
         <div
-          className={`col-span-5 space-y-8 z-20 transition-all duration-500 ${
-            isTransitioning ? "opacity-0 translate-y-2" : "opacity-100 translate-y-0 animate-fade-in"
+          className={`col-span-5 space-y-8 z-20 transition-opacity duration-300 ${
+            isTransitioning ? "opacity-0" : "opacity-100 "
           }`}
         >
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-amber/30 bg-amber/10 text-amber text-xs font-bold tracking-wider uppercase">
@@ -163,7 +187,7 @@ export function MangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
             Featured Manga
           </div>
 
-          <h1 className="font-display text-5xl md:text-7xl font-black tracking-tighter leading-[0.9] gradient-text">
+          <h1 data-long-title={spotlightName.length > 60} className="spotlight-heading font-display text-5xl font-bold tracking-tight leading-[1.04] text-foreground">
             {spotlightName.split(" ").slice(0, 3).join(" ")}
             {spotlightName.split(" ").length > 3 && (
               <>
@@ -190,7 +214,7 @@ export function MangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
           <div className="flex items-center gap-4 pt-4">
             <button
               onClick={handleRead}
-              className="h-14 px-8 rounded-full bg-foreground text-background font-bold text-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-2 glow-primary"
+              className="h-14 px-8 rounded-full bg-foreground text-background font-bold text-lg hover:scale-105 active:scale-95 transition-[opacity,transform,background-color] flex items-center gap-2 glow-primary"
             >
               <BookOpen className="w-5 h-5 fill-background" />
               Read Now
@@ -199,30 +223,23 @@ export function MangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
 
           {allSpotlights.length > 1 && (
             <div className="flex items-center gap-2 pt-4">
+              {!reduced && <button type="button" onClick={() => setPaused(value => !value)} aria-label={paused ? 'Resume spotlight rotation' : 'Pause spotlight rotation'} aria-pressed={paused} className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-muted/30">{paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}</button>}
               {allSpotlights.map((_, idx) => (
                 <button
                   key={idx}
-                  onClick={() => {
-                    setIsTransitioning(true);
-                    setTimeout(() => {
-                      setCurrentIndex(idx);
-                      setIsTransitioning(false);
-                    }, 300);
-                  }}
-                  className={`transition-all duration-300 rounded-full ${
-                    idx === currentIndex
-                      ? "w-8 h-2 bg-foreground"
-                      : "w-2 h-2 bg-muted-foreground/30 hover:bg-muted-foreground/50"
-                  }`}
-                />
+                  onClick={() => goTo(idx)}
+                  aria-label={`Show spotlight ${idx + 1}`}
+                  aria-pressed={idx === currentIndex}
+                  className="flex h-11 w-11 items-center justify-center rounded-full"
+                ><span className={`h-2 rounded-full ${idx === currentIndex ? 'w-8 bg-foreground' : 'w-2 bg-muted-foreground/50'}`} /></button>
               ))}
             </div>
           )}
         </div>
 
         <div
-          className={`col-span-7 relative transition-all duration-700 ease-out ${
-            isTransitioning ? "opacity-0 scale-95 translate-x-4" : "opacity-100 scale-100 translate-x-0"
+          className={`col-span-7 relative transition-[opacity,transform,background-color] duration-700 ease-out ${
+            isTransitioning ? "opacity-0" : "opacity-100"
           }`}
         >
           <div className="relative aspect-[16/9] w-full rounded-[2.5rem] overflow-hidden group">

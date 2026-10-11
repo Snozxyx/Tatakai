@@ -12,7 +12,7 @@ import { ArrowLeft, BookOpen, Loader2, Play } from "lucide-react";
 import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
-import { useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
+import { useIsNativeApp, useIsDesktopApp } from "@/hooks/ui/useIsNativeApp";
 import { useIsMobile } from "@/hooks/ui/use-mobile";
 import { cn } from "@/lib/utils";
 import { GlassPanel } from "@/components/ui/GlassPanel";
@@ -25,6 +25,7 @@ import { registerMobileSource } from "@/core/extensions/mobile/mobileProxy";
 export default function CustomInfoPage() {
   const navigate = useNavigate();
   const isNative = useIsNativeApp();
+  const isDesktopApp = useIsDesktopApp();
   const isMobile = useIsMobile();
   const { namespace, sourceId, id } = useParams<{ namespace: string; sourceId: string; id: string }>();
   const { source } = useCustomSource(namespace, sourceId);
@@ -53,7 +54,7 @@ export default function CustomInfoPage() {
       <main
         className={cn(
           "relative z-10 mx-auto max-w-[1400px] py-6 pr-6 pb-24 md:pb-6",
-          isNative ? "pl-6" : "pl-6 md:pl-32",
+          isDesktopApp ? "pl-6" : "pl-6 md:pl-32",
         )}
       >
         <button

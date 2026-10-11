@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { mediaToPosterItem } from '@/hooks/api/useDiscover';
 import type { TatakaiMedia } from '@/core/content/types';
 import { PosterCard } from './PosterCard';
+import { CardSkeleton } from '@/components/ui/skeleton-custom';
 
 export const POSTER_GRID_CLASS =
   'grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7';
@@ -24,13 +25,9 @@ interface DiscoverPosterGridProps {
 
 export function PosterGridSkeleton({ count = 14, className }: { count?: number; className?: string }) {
   return (
-    <div className={cn(POSTER_GRID_CLASS, className)}>
+    <div data-mobile-poster-grid className={cn(POSTER_GRID_CLASS, className)}>
       {Array.from({ length: count }).map((_, i) => (
-        <div key={`poster-skeleton-${i}`}>
-          <div className="aspect-[2/3] w-full animate-pulse rounded-2xl border border-white/5 bg-white/[0.04]" />
-          <div className="mt-3 h-3.5 w-4/5 animate-pulse rounded bg-white/[0.06]" />
-          <div className="mt-2 h-3 w-1/2 animate-pulse rounded bg-white/[0.04]" />
-        </div>
+        <CardSkeleton key={`poster-skeleton-${i}`} />
       ))}
     </div>
   );
@@ -48,7 +45,7 @@ export function DiscoverPosterGrid({
   }
 
   return (
-    <div className={cn(POSTER_GRID_CLASS, className)}>
+    <div data-mobile-poster-grid className={cn(POSTER_GRID_CLASS, className)}>
       {media.map((item, index) => (
         <PosterCard
           key={`${item.anilistId || item.malId || item.titleRomaji}-${index}`}

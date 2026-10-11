@@ -46,6 +46,7 @@ class AutoDownloader {
                             addedAt: rec.addedAt,
                             // Migrate old records that lack enqueuedEpisodes
                             enqueuedEpisodes: Array.isArray(rec.enqueuedEpisodes) ? rec.enqueuedEpisodes : [],
+                            anilistId: Number(rec.anilistId) || null,
                         },
                     ])
                 );
@@ -77,12 +78,13 @@ class AutoDownloader {
      * @param {string} title
      * @param {number} nextEpisode
      */
-    subscribe(animeId, title, nextEpisode) {
+    subscribe(animeId, title, nextEpisode, anilistId) {
         this.subscriptions.set(animeId, {
             title,
             nextEpisode,
             addedAt: Date.now(),
             enqueuedEpisodes: [],
+            anilistId: Number(anilistId) || (/^\d+$/.test(String(animeId)) ? Number(animeId) : null),
         });
         this.saveConfig();
         this.logger.info(`[AutoDownloader] Subscribed to "${title}" starting at episode ${nextEpisode}`);
@@ -193,6 +195,13 @@ class AutoDownloader {
             return;
         }
 
+        // An extension search hit is not evidence that a future episode aired.
+        // Unknown schedules are retried next poll without advancing the cursor.
+        if (!await this._isEpisodeAvailable(data.anilistId || (/^\d+$/.test(String(animeId)) ? Number(animeId) : null), nextEpisode)) {
+            this.logger.info(`[AutoDownloader] Episode ${nextEpisode} is not confirmed aired — waiting.`);
+            return;
+        }
+
         // Attempt to find a source for episode N
         const source = await this._resolveSource(animeId, title, nextEpisode);
 
@@ -211,6 +220,8 @@ class AutoDownloader {
             animeName: title,
             episodeNumber: nextEpisode,
             sourceType: source.sourceType,
+            anilistId: data.anilistId,
+            subtitles: source.subtitles,
             ...(source.sourceType === 'hls' ? { url: source.url, headers: source.headers || {} } : {}),
             ...(source.sourceType === 'torrent' ? { magnet: source.magnet } : {}),
         };
@@ -225,12 +236,12 @@ class AutoDownloader {
 
         // Enqueue the download
         if (typeof this._enqueueFn === 'function') {
-            const result = await this._enqueueFn(payload);
-            if (result && result.success !== false) {
-                // Requirement 20.6: after successful enqueue, register a completion
-                // listener so nextEpisode is advanced to N+1 once the download finishes.
-                this._watchForCompletion(animeId, nextEpisode, episodeId);
-            } else {
+            this._watchForCompletion(animeId, nextEpisode, episodeId);
+            let result;
+            try { result = await this._enqueueFn(payload); }
+            catch (error) { result = { success: false, error: error.message }; }
+            if (!result || result.success === false) {
+                this._pendingCompletions?.delete(episodeId);
                 // Enqueue failed — remove from enqueuedEpisodes so it can be retried
                 data.enqueuedEpisodes = data.enqueuedEpisodes.filter((ep) => ep !== nextEpisode);
                 this.saveConfig();
@@ -253,6 +264,7 @@ class AutoDownloader {
      * @returns {Promise<{sourceType: 'hls'|'torrent', url?: string, magnet?: string, headers?: object}|null>}
      */
     async _resolveSource(animeId, title, episode) {
+        if (this.sourceResolver) return this.sourceResolver(this.subscriptions.get(animeId)?.anilistId || Number(animeId), title, episode);
         // ── Step 1: Try HLS source ────────────────────────────────────────────
         // Requirement 20.5 / 20.8: attempt HLS first
         try {
@@ -283,6 +295,34 @@ class AutoDownloader {
 
         // Requirement 20.9: both unavailable
         return null;
+    }
+
+    async _isEpisodeAvailable(anilistId, episode) {
+        if (!anilistId) return false;
+        try {
+            const response = await fetch('https://graphql.anilist.co', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                signal: AbortSignal.timeout(15000),
+                body: JSON.stringify({
+                    query: `query ($id: Int) { Media(id: $id, type: ANIME) {
+                        status episodes nextAiringEpisode { episode airingAt }
+                        airingSchedule(notYetAired: false, perPage: 50, sort: TIME_DESC) { nodes { episode airingAt } }
+                    } }`, variables: { id: anilistId },
+                }),
+            });
+            if (!response.ok) return false;
+            const result = await response.json();
+            const media = result.errors?.length ? null : result.data?.Media;
+            if (!media) return false;
+            const now = Date.now() / 1000;
+            const next = media.nextAiringEpisode;
+            if (next?.airingAt > now && episode >= next.episode) return false;
+            if (media.status === 'FINISHED' && media.episodes >= episode) return true;
+            return (media.airingSchedule?.nodes || []).some(row => row.episode === episode && row.airingAt <= now);
+        } catch (error) {
+            this.logger.warn('[AutoDownloader] Airing check failed:', error.message);
+            return false;
+        }
     }
 
     /**
@@ -381,6 +421,15 @@ class AutoDownloader {
         const { animeId, episode } = this._pendingCompletions.get(episodeId);
         this._pendingCompletions.delete(episodeId);
         this._onEpisodeDownloaded(animeId, episode);
+    }
+
+    notifyDownloadFailed(episodeId) {
+        const pending = this._pendingCompletions?.get(episodeId);
+        if (!pending) return;
+        this._pendingCompletions.delete(episodeId);
+        const subscription = this.subscriptions.get(pending.animeId);
+        if (subscription) subscription.enqueuedEpisodes = subscription.enqueuedEpisodes.filter(episode => episode !== pending.episode);
+        this.saveConfig();
     }
 
     /**

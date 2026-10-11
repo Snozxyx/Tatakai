@@ -1,3 +1,4 @@
+import { usePersistentState } from '@/hooks/ui/usePersistentState';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -475,35 +476,35 @@ const onboardingSteps: OnboardingStep[] = [
 ];
 
 export default function OnboardingPage() {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const filteredSteps = onboardingSteps.filter(step => !step.condition || step.condition(user));
 
-  const [currentStep, setCurrentStep] = useState(0);
+  const progressKey = user ? `tatakai_onboarding_step:${user.id}` : null;
+  const [savedStep, setSavedStep] = usePersistentState(progressKey, 'welcome', 'local');
+  const currentStep = Math.max(0, filteredSteps.findIndex(step => step.id === savedStep));
+  const setCurrentStep = (index: number) => setSavedStep(filteredSteps[index].id);
   const [isComplete, setIsComplete] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!user) {
-      navigate('/auth');
-      return;
-    }
-    setCurrentStep(0);
-  }, [user, navigate]);
+    if (!isLoading && !user) navigate('/auth');
+  }, [user?.id, isLoading, navigate]);
 
   const handleNext = () => {
     if (currentStep < filteredSteps.length - 1) {
-      setCurrentStep(prev => prev + 1);
+      setCurrentStep(currentStep + 1);
     } else {
       handleComplete();
     }
   };
 
   const handlePrevious = () => {
-    if (currentStep > 0) setCurrentStep(prev => prev - 1);
+    if (currentStep > 0) setCurrentStep(currentStep - 1);
   };
 
   const handleComplete = () => {
     setIsComplete(true);
+    if (progressKey) localStorage.removeItem(progressKey);
     localStorage.setItem('tatakai_onboarding_complete', 'true');
     localStorage.setItem('tatakai_theme_selected_v2', 'true');
     setTimeout(() => navigate('/'), 1000);
@@ -526,7 +527,7 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col selection:bg-primary/30 relative">
-      <Background className="opacity-50" />
+      <Background />
 
       {/* Top Header */}
       <header className="relative z-20 flex items-center justify-end p-6 md:px-12 md:py-8">
@@ -589,10 +590,10 @@ export default function OnboardingPage() {
       </main>
 
       {/* Floating Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 p-6 md:p-8 bg-gradient-to-t from-background via-background/90 to-transparent pointer-events-none">
-        <div className="max-w-3xl mx-auto flex items-center justify-between gap-4 pointer-events-auto bg-background/60 backdrop-blur-2xl border border-border/50 p-4 rounded-full shadow-2xl">
+      <div className="fixed bottom-0 left-0 right-0 z-50 px-3 pt-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:p-8 bg-gradient-to-t from-background via-background/90 to-transparent pointer-events-none">
+        <div className="max-w-3xl mx-auto flex flex-wrap items-center justify-between gap-3 pointer-events-auto bg-background/60 backdrop-blur-2xl border border-border/50 p-3 rounded-3xl sm:p-4 sm:rounded-full shadow-2xl">
           
-          <div className="flex-1 flex items-center gap-2 pl-4">
+          <div className="flex w-full justify-center items-center gap-2 sm:w-auto sm:flex-1 sm:justify-start sm:pl-4">
             {filteredSteps.map((_, index) => (
               <div
                 key={index}
@@ -604,25 +605,31 @@ export default function OnboardingPage() {
             ))}
           </div>
 
-          <div className="flex items-center gap-3 pr-1">
+          <div className="flex w-full min-w-0 items-center justify-end gap-2 sm:w-auto sm:gap-3 sm:pr-1">
             <Button
               variant="ghost"
               onClick={handlePrevious}
               disabled={currentStep === 0}
               className={cn(
-                "rounded-full px-6 font-medium transition-all duration-300", 
+                "shrink-0 rounded-full px-3 font-medium transition-colors duration-300 min-[380px]:px-4 sm:px-6",
                 currentStep === 0 ? "opacity-0 w-0 p-0 overflow-hidden" : "opacity-100 hover:bg-muted text-muted-foreground hover:text-foreground"
               )}
             >
               Back
             </Button>
 
+            {/* flex-1 + min-w-0 + truncated label: on 320px viewports the
+                full "Start Exploring" text + arrow + Back button exceed the
+                bar width, so the label shrinks instead of clipping past the
+                screen edge. h-12 replaces the conflicting h-10/py-6 combo. */}
             <Button
               onClick={handleNext}
-              className="rounded-full px-8 py-6 bg-foreground text-background hover:bg-foreground/90 font-bold text-base shadow-lg hover:scale-105 active:scale-95 transition-all gap-2 group"
+              className="h-12 min-w-0 flex-1 overflow-hidden rounded-full bg-foreground px-3 py-0 font-bold text-background text-sm shadow-lg transition-colors hover:bg-foreground/90 active:scale-95 group min-[380px]:px-4 min-[380px]:text-base sm:flex-none sm:px-8 sm:text-base [&_svg]:shrink-0"
             >
-              {currentStep === filteredSteps.length - 1 ? 'Start Exploring' : 'Continue'}
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              <span className="min-w-0 flex-1 truncate">
+                {currentStep === filteredSteps.length - 1 ? 'Start Exploring' : 'Continue'}
+              </span>
+              <ArrowRight className="w-5 h-5 shrink-0 group-hover:translate-x-1 transition-transform" />
             </Button>
           </div>
         </div>

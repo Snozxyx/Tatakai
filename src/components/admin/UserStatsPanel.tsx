@@ -22,14 +22,16 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { subDays, subMonths, startOfDay } from 'date-fns';
+import { subDays, subMonths, startOfDay, format } from 'date-fns';
 import {
   groupSignupsByPeriod,
   computeDau,
   computeRetention,
-  topCountries as computeTopCountries,
+  countDistinctActives,
+  aggregateCountrySessions,
 } from '@/utils/userStats';
 import type { TimeRange, UserStatsData } from '@/types/admin-dashboard';
+import { WorldMap } from '@/components/admin/WorldMap';
 
 // ---------------------------------------------------------------------------
 // Query key factory
@@ -71,7 +73,15 @@ export function UserStatsPanel() {
     isFetching,
   } = useQuery({
     queryKey: makeQueryKey(timeRange),
-    queryFn: async (): Promise<Omit<UserStatsData, 'retentionPercent'>> => {
+    queryFn: async (): Promise<
+      Omit<UserStatsData, 'retentionPercent'> & {
+        dauToday: number;
+        dauTodayMembers: number;
+        dauTodayGuests: number;
+        rangeActives: number;
+        unknownCountrySessions: number;
+      }
+    > => {
       const rangeStart = getRangeStart(timeRange);
       const rangeStartISO = rangeStart.toISOString();
 
@@ -85,43 +95,64 @@ export function UserStatsPanel() {
       const { data: signupRows, error: signupError } = await supabase
         .from('profiles')
         .select('created_at')
-        .gte('created_at', rangeStartISO);
+        .gte('created_at', rangeStartISO)
+        .limit(20000);
       if (signupError) throw signupError;
 
       const signupTimestamps = (signupRows ?? []).map((r) => r.created_at as string);
       const signupGroups = groupSignupsByPeriod(signupTimestamps, timeRange);
 
-      // 2b. Country data — separate query with graceful failure (column may not exist yet)
-      let countriesInput: { country: string | null }[] = [];
-      try {
-        const { data: countryRows } = await (supabase
-          .from('profiles')
-          .select('country')
-          .gte('created_at', rangeStartISO) as any);
-        countriesInput = (countryRows ?? []).map((r: any) => ({ country: r.country as string | null }));
-      } catch (_) {
-        // country column not yet present — skip
-      }
-
-      // 3. DAU from page_visits in selected range
+      // 3. DAU + geo from page_visits in selected range.
+      // country lives on page_visits (written by trackPageVisit via ipapi.co) —
+      // profiles.country is not a reliable source, which is why the old "Top 5"
+      // list was perpetually empty.
       const { data: pageVisitRows, error: pvError } = await supabase
         .from('page_visits')
-        .select('user_id, created_at')
-        .gte('created_at', rangeStartISO);
+        .select('user_id, session_id, created_at, country')
+        .gte('created_at', rangeStartISO)
+        .limit(20000);
       if (pvError) throw pvError;
 
-      const dauSeries = computeDau(
-        (pageVisitRows ?? []) as { user_id: string | null; created_at: string }[],
-      );
+      const visits = (pageVisitRows ?? []) as {
+        user_id: string | null;
+        session_id: string | null;
+        created_at: string;
+        country: string | null;
+      }[];
 
-      // 4. Top 5 countries from signups in range (countriesInput filled above)
-      const topCountriesList = computeTopCountries(countriesInput, 5);
+      // Guests (null user_id) count via session_id — previously dropped, which
+      // is why DAU sat at 0 on a mostly logged-out site. Zero-fills the window
+      // so "Today" is always present on the chart.
+      const dauSeries = computeDau(visits, { rangeStart });
+
+      // Headline DAU (Today): distinct members + guest sessions seen today.
+      const todayKey = format(new Date(), 'yyyy-MM-dd');
+      const todayVisits = visits.filter(
+        (v) => typeof v.created_at === 'string' && v.created_at.slice(0, 10) === todayKey,
+      );
+      const todayActives = countDistinctActives(todayVisits);
+      const rangeActives = countDistinctActives(visits).total;
+
+      // All countries by unique session (not just top 5) for the world map.
+      const countryTraffic = aggregateCountrySessions(visits);
+      const topCountriesList = countryTraffic.map((c) => ({
+        country: c.name,
+        count: c.value,
+      }));
+      const unknownCountrySessions = visits.filter(
+        (v) => !(v.country ?? '').trim() && v.session_id,
+      ).length;
 
       return {
         totalCount: totalCount ?? 0,
         signupGroups,
         dauSeries,
         topCountries: topCountriesList,
+        dauToday: todayActives.total,
+        dauTodayMembers: todayActives.members,
+        dauTodayGuests: todayActives.guests,
+        rangeActives,
+        unknownCountrySessions,
       };
     },
     staleTime: 2 * 60 * 1000,   // 2 minutes — fresh enough for admin use
@@ -337,37 +368,22 @@ export function UserStatsPanel() {
 
   const renderTopCountries = () => {
     const countries = stats?.topCountries ?? [];
-    const maxCount = countries[0]?.count ?? 1;
     return (
       <GlassPanel className="p-6">
-        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+        <h3 className="text-sm font-semibold mb-1 flex items-center gap-2">
           <Globe className="w-4 h-4 text-primary" />
-          Top 5 Countries by Signups
+          World Map — Visitors by Country
         </h3>
+        <p className="text-xs text-muted-foreground mb-4">
+          Every geo-tagged country in range, sized by unique visitors. Hover a bubble or row for detail.
+        </p>
         {countries.length === 0 ? (
           renderEmptyChart()
         ) : (
-          <div className="space-y-3">
-            {countries.map((c, idx) => (
-              <div key={c.country} className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary shrink-0">
-                  {idx + 1}
-                </div>
-                <span className="text-sm font-medium w-32 truncate">{c.country}</span>
-                <div className="flex-1">
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary rounded-full transition-all duration-500"
-                      style={{ width: `${(c.count / maxCount) * 100}%` }}
-                    />
-                  </div>
-                </div>
-                <span className="text-xs text-muted-foreground w-16 text-right shrink-0">
-                  {c.count.toLocaleString()}
-                </span>
-              </div>
-            ))}
-          </div>
+          <WorldMap
+            data={countries.map((c) => ({ name: c.country, value: c.count }))}
+            unknownCount={stats?.unknownCountrySessions ?? 0}
+          />
         )}
       </GlassPanel>
     );
@@ -375,6 +391,10 @@ export function UserStatsPanel() {
 
   const renderStatCards = () => {
     const totalCount = stats?.totalCount ?? 0;
+    const dauToday = stats?.dauToday ?? 0;
+    const dauMembers = stats?.dauTodayMembers ?? 0;
+    const dauGuests = stats?.dauTodayGuests ?? 0;
+    const rangeActives = stats?.rangeActives ?? 0;
     const retentionDisplay = isRetentionLoading
       ? '…'
       : isRetentionError
@@ -382,7 +402,7 @@ export function UserStatsPanel() {
         : `${(retentionPercent ?? 0).toFixed(1)}%`;
 
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Users */}
         <GlassPanel className="p-5 bg-gradient-to-br from-blue-500 to-blue-700 border-0">
           <div className="flex items-start justify-between">
@@ -394,6 +414,38 @@ export function UserStatsPanel() {
             <p className="text-2xl font-bold text-white">{totalCount.toLocaleString()}</p>
             <p className="text-sm text-white/70">Total Registered Users</p>
             <p className="text-xs text-white/50 mt-1">All time count</p>
+          </div>
+        </GlassPanel>
+
+        {/* DAU Today — members + guests, the headline that used to read 0 */}
+        <GlassPanel className="p-5 bg-gradient-to-br from-pink-500 to-rose-700 border-0">
+          <div className="flex items-start justify-between">
+            <div className="p-2 rounded-xl bg-white/20">
+              <Activity className="w-5 h-5 text-white" />
+            </div>
+          </div>
+          <div className="mt-4">
+            <p className="text-2xl font-bold text-white">{dauToday.toLocaleString()}</p>
+            <p className="text-sm text-white/70">DAU (Today)</p>
+            <p className="text-xs text-white/50 mt-1">
+              {dauMembers.toLocaleString()} members · {dauGuests.toLocaleString()} guests
+            </p>
+          </div>
+        </GlassPanel>
+
+        {/* Actives in range */}
+        <GlassPanel className="p-5 bg-gradient-to-br from-violet-500 to-purple-700 border-0">
+          <div className="flex items-start justify-between">
+            <div className="p-2 rounded-xl bg-white/20">
+              <TrendingUp className="w-5 h-5 text-white" />
+            </div>
+          </div>
+          <div className="mt-4">
+            <p className="text-2xl font-bold text-white">{rangeActives.toLocaleString()}</p>
+            <p className="text-sm text-white/70">Active in range</p>
+            <p className="text-xs text-white/50 mt-1">
+              Unique members + guest sessions
+            </p>
           </div>
         </GlassPanel>
 

@@ -1,15 +1,13 @@
 import { useMemo, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, BookOpen, ChevronLeft, ChevronRight, Flame, Star } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ArrowRight, BookOpen, ChevronLeft, ChevronRight, Flame } from "lucide-react";
 import type { MangaSearchItem } from "@/types/manga";
-import type { UnifiedMediaCardProps } from "@/components/UnifiedMediaCard";
-import { GlassPanel } from "@/components/ui/GlassPanel";
+import { UnifiedMediaCard, type UnifiedMediaCardProps } from "@/components/UnifiedMediaCard";
+import { CardSkeleton } from "@/components/ui/skeleton-custom";
 import { useContentSafetySettings } from "@/hooks/user/useContentSafetySettings";
 import { useMangaHome } from "@/hooks/api/useMangaHome";
 import { inferMangaAdultFlag } from "@/lib/contentSafety";
 import { HomeSectionHeading } from "@/components/home/HomeSectionHeading";
-import { Peekable } from "@/components/media/MediaQuickPeek";
-import { peekFromManga } from "@/components/media/quickPeekStore";
 
 type MangaCardItem = UnifiedMediaCardProps["item"];
 
@@ -59,89 +57,22 @@ function formatStatus(status?: string) {
   return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
 }
 
-const CARD_WIDTH = "w-[150px] sm:w-[170px] md:w-[190px] lg:w-[210px] flex-shrink-0 snap-start";
+const CARD_WIDTH = "w-36 shrink-0 snap-start sm:w-44 md:w-48";
 
 function MangaShowcaseCard({ item }: { item: MangaCardItem }) {
-  const navigate = useNavigate();
-  const status = formatStatus(item.status);
-
+  // No explicit variant: the card follows the appearance setting like every
+  // other rail — text inside the artwork ("Cinematic overlay") or below it
+  // ("Clean poster"), per Settings → Appearance → Media cards.
   return (
-    <Peekable media={peekFromManga(item, `/manga/${item.id}`)}>
-    <GlassPanel
-      className="group relative cursor-pointer overflow-hidden transition-transform duration-300 ease-out hover:-translate-y-1"
-      onClick={() => navigate(`/manga/${item.id}`)}
-    >
-      <div className="relative aspect-[2/3]">
-        <img
-          src={item.poster}
-          alt={item.name}
-          loading="lazy"
-          decoding="async"
-          className={`w-full h-full object-cover transition-all duration-700 ease-out group-hover:scale-105 group-hover:brightness-110 ${
-            item.isAdult ? "blur-md scale-110" : ""
-          }`}
-        />
-
-        {/* Overlays */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
-        <div className="absolute inset-0 transition-colors duration-300 group-hover:bg-black/10" />
-
-        {/* Type */}
-        {item.type && (
-          <div className="absolute top-3 left-3 flex items-center gap-1 px-2 py-0.5 rounded-md bg-orange-500/90 text-white text-[10px] font-bold uppercase tracking-wider shadow-md shadow-black/30">
-            <BookOpen className="w-3 h-3" />
-            {item.type}
-          </div>
-        )}
-
-        {/* Score */}
-        {item.rating && (
-          <div className="absolute top-3 right-3 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-black/50 backdrop-blur-md border border-white/10 text-[10px] font-bold text-white">
-            <Star className="w-3 h-3 fill-amber text-amber" />
-            {item.rating}
-          </div>
-        )}
-
-        {/* Adult veil */}
-        {item.isAdult && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="px-2 py-1 rounded-md bg-black/60 backdrop-blur border border-white/10 text-[10px] font-bold uppercase tracking-widest text-white/80">
-              18+
-            </span>
-          </div>
-        )}
-
-        {/* Content */}
-        <div className="absolute bottom-0 left-0 right-0 p-3.5 pt-10">
-          <h4 className="font-bold text-sm leading-tight line-clamp-2 drop-shadow-md group-hover:text-orange-200 transition-colors duration-300">
-            {item.name}
-          </h4>
-
-          <div className="mt-2 flex items-center gap-1.5 flex-wrap">
-            {item.chapters && (
-              <span className="inline-flex items-center bg-white/10 backdrop-blur-sm border border-white/5 px-1.5 py-0.5 rounded-md text-[10px] font-mono font-semibold uppercase tracking-wider text-white/80">
-                CH {item.chapters}
-              </span>
-            )}
-            {status && (
-              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-white/55">
-                {status === "Ongoing" && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                )}
-                {status}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-    </GlassPanel>
-    </Peekable>
+    <UnifiedMediaCard
+      item={{ ...item, status: formatStatus(item.status) || undefined, blurAdult: Boolean(item.isAdult) }}
+    />
   );
 }
 
 function ShowcaseSkeleton() {
   return (
-    <div className="aspect-[2/3] rounded-xl bg-white/5 border border-white/5 animate-pulse" />
+    <CardSkeleton />
   );
 }
 
@@ -228,18 +159,13 @@ export function IndexMangaShowcase() {
           ))}
         </div>
       ) : showcaseCards.length > 0 ? (
-        <div className="relative">
-          <div className="pointer-events-none absolute left-0 top-0 bottom-4 w-8 bg-gradient-to-r from-background to-transparent z-10" />
-          <div className="pointer-events-none absolute right-0 top-0 bottom-4 w-8 bg-gradient-to-l from-background to-transparent z-10" />
-
-          <div ref={scrollRef} className={railClasses}>
-            {showcaseCards.map((item) => (
-              <div key={`index-manga-${item.id}`} className={CARD_WIDTH}>
-                <MangaShowcaseCard item={item} />
-              </div>
-            ))}
-            <div className="w-2 flex-shrink-0" aria-hidden="true" />
-          </div>
+        <div data-mobile-home-rail ref={scrollRef} className={railClasses}>
+          {showcaseCards.map((item) => (
+            <div key={`index-manga-${item.id}`} className={CARD_WIDTH}>
+              <MangaShowcaseCard item={item} />
+            </div>
+          ))}
+          <div className="w-2 flex-shrink-0" aria-hidden="true" />
         </div>
       ) : (
         <div className="mx-2 rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-8 text-center">

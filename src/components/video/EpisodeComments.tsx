@@ -369,6 +369,8 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <RichCommentComposer
+                      key={`${user.id}:${entityType}:${entityId}:${epId ?? "all"}`}
+                      draftKey={`${entityType}:${entityId}:${epId ?? "all"}`}
                       compact
                       allowTimestamp={isAnime}
                       allowEmbeds
@@ -769,6 +771,7 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
                         {replyingId === comment.id && (
                           <div className="mt-3 ml-11">
                             <RichCommentComposer
+                              draftKey={`reply:${comment.id}`}
                               compact
                               autoFocus
                               allowTimestamp={isAnime}

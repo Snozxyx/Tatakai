@@ -323,7 +323,7 @@ export function ReaderImage({ page, mode, style, eager, onRetryChapter }: {
           src={imgSrc}
           alt={`Page ${page.pageNumber}`}
           className="mx-auto block h-auto rounded-none bg-black/30"
-          style={{ ...style, ...reserve, contentVisibility: "auto" }}
+          style={{ ...style, ...reserve }}
           loading={eager ? "eager" : "lazy"}
           // First pages of the chapter win the bandwidth race; the rest wait.
           fetchPriority={eager ? "high" : "auto"}

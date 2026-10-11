@@ -88,33 +88,95 @@ function formatBucketKey(date: Date, period: TimeRange): string {
 // computeDau
 // ---------------------------------------------------------------------------
 
+export interface DauVisit {
+  user_id: string | null;
+  /** Guest fallback — distinct sessions count as distinct actives when logged out. */
+  session_id?: string | null;
+  created_at: string;
+}
+
+export interface ComputeDauOptions {
+  /** Inclusive start day (any time-of-day ok — truncated to day). Zero-fills from here. */
+  rangeStart?: Date;
+  /** Inclusive end day. Defaults to today when rangeStart is given. */
+  rangeEnd?: Date;
+}
+
 /**
  * Computes DAU series from page_visits records.
  *
- * Returns the count of distinct non-null `user_id` values per calendar day,
- * sorted ascending by date.
+ * An "active" identity per day is:
+ * - `user:<user_id>` when logged in, else
+ * - `session:<session_id>` for guests (logged-out traffic still counts).
+ *
+ * Rows with neither are skipped. When `rangeStart` is supplied, every calendar
+ * day in [rangeStart, rangeEnd ?? today] is present in the output (zero-filled),
+ * so "Today" never disappears from the chart.
  *
  * Requirement 4.3 — DAU count accuracy.
  */
 export function computeDau(
-  pageVisits: { user_id: string | null; created_at: string }[],
+  pageVisits: DauVisit[],
+  opts?: ComputeDauOptions,
 ): DauPoint[] {
-  // day-key → Set<user_id>
+  // day-key → Set<identity>
   const dailyUsers = new Map<string, Set<string>>();
 
   for (const visit of pageVisits) {
-    if (visit.user_id === null) continue;
+    const identity = visit.user_id
+      ? `u:${visit.user_id}`
+      : visit.session_id
+        ? `s:${visit.session_id}`
+        : null;
+    if (!identity) continue;
 
-    const day = format(parseISO(visit.created_at), 'yyyy-MM-dd');
+    let day: string;
+    try {
+      day = format(parseISO(visit.created_at), 'yyyy-MM-dd');
+    } catch {
+      continue;
+    }
     if (!dailyUsers.has(day)) {
       dailyUsers.set(day, new Set());
     }
-    dailyUsers.get(day)!.add(visit.user_id);
+    dailyUsers.get(day)!.add(identity);
+  }
+
+  // Zero-fill the requested window so the series is continuous.
+  if (opts?.rangeStart) {
+    const start = startOfDay(opts.rangeStart);
+    const end = startOfDay(opts.rangeEnd ?? new Date());
+    for (let d = start; !isAfter(d, end); d = addDays(d, 1)) {
+      const key = format(d, 'yyyy-MM-dd');
+      if (!dailyUsers.has(key)) dailyUsers.set(key, new Set());
+    }
   }
 
   return Array.from(dailyUsers.entries())
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
     .map(([date, users]) => ({ date, dau: users.size }));
+}
+
+/**
+ * Counts distinct active identities (logged-in users + guest sessions) in a
+ * set of page_visits rows. Used for headline DAU/WAU figures.
+ */
+export function countDistinctActives(
+  pageVisits: DauVisit[],
+): { total: number; members: number; guests: number } {
+  const total = new Set<string>();
+  const members = new Set<string>();
+  const guests = new Set<string>();
+  for (const visit of pageVisits) {
+    if (visit.user_id) {
+      total.add(`u:${visit.user_id}`);
+      members.add(visit.user_id);
+    } else if (visit.session_id) {
+      total.add(`s:${visit.session_id}`);
+      guests.add(visit.session_id);
+    }
+  }
+  return { total: total.size, members: members.size, guests: guests.size };
 }
 
 // ---------------------------------------------------------------------------
@@ -169,6 +231,44 @@ export function computeRetention(
   const pct = (retainedCount / cohortSize) * 100;
   // Clamp to [0, 100] for safety
   return Math.min(100, Math.max(0, pct));
+}
+
+// ---------------------------------------------------------------------------
+// country aggregation (traffic-based: page_visits.country by unique session)
+// ---------------------------------------------------------------------------
+
+export interface CountryTraffic {
+  name: string;
+  /** Unique sessions seen from this country. */
+  value: number;
+}
+
+/**
+ * Aggregates page_visits rows into per-country unique-session counts, sorted
+ * descending. Null/blank countries are excluded (counted separately by callers
+ * as "Unknown" when needed).
+ */
+export function aggregateCountrySessions(
+  visits: { country?: string | null; session_id?: string | null }[],
+): CountryTraffic[] {
+  const byCountry = new Map<string, Set<string>>();
+  const noSessionCount = new Map<string, number>();
+  for (const v of visits) {
+    const name = (v.country ?? '').trim();
+    if (!name) continue;
+    if (v.session_id) {
+      if (!byCountry.has(name)) byCountry.set(name, new Set());
+      byCountry.get(name)!.add(v.session_id);
+    } else {
+      noSessionCount.set(name, (noSessionCount.get(name) ?? 0) + 1);
+    }
+  }
+  const out: CountryTraffic[] = [];
+  for (const [name, sessions] of byCountry) out.push({ name, value: sessions.size });
+  for (const [name, n] of noSessionCount) {
+    if (!byCountry.has(name)) out.push({ name, value: n });
+  }
+  return out.sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
 }
 
 // ---------------------------------------------------------------------------

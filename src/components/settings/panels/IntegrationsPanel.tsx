@@ -9,10 +9,10 @@ import { List, Search, Loader2, Link2, Trash2, CheckCircle, RefreshCw, ExternalL
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { contentGraph, toAnimeCard } from '@/core';
-import { getMalAuthUrl, disconnectMal } from '@/lib/mal';
+import { getMalAuthUrl, disconnectMal, assertWebMalRedirectMatchesOrigin, isMalLoginPendingFresh, clearMalOAuthStorage } from '@/lib/mal';
 import { getAniListAuthUrl, disconnectAniList } from '@/lib/externalIntegrations';
 import {
-  isDesktopApp,
+  isNativeOAuthApp,
   openOAuthInBrowser,
   buildDesktopOAuthState,
   getWebAnilistRedirectUri,
@@ -228,39 +228,99 @@ export function IntegrationsPanel() {
     }
   };
 
-  const handleMALConnect = async () => {
+  const handleMALConnect = async (force = false) => {
     try {
-      if (isDesktopApp()) {
-        // Desktop uses the shared https redirect + a state marker; the web
+      // Each Connect click mints a fresh PKCE verifier, permanently invalidating
+      // any MAL tab opened by a previous click (its code would die with
+      // `invalid_grant`). If a login is still in flight, make restarting
+      // explicit instead of silently dooming the open tab.
+      if (!force && isMalLoginPendingFresh()) {
+        toast.warning('A MyAnimeList login is already in progress.', {
+          description: 'Only the newest MAL tab can complete — finish it, or discard it and start fresh.',
+          duration: 10000,
+          action: {
+            label: 'Discard & restart',
+            onClick: () => {
+              clearMalOAuthStorage();
+              void handleMALConnect(true);
+            },
+          },
+        });
+        return;
+      }
+      if (isNativeOAuthApp()) {
+        // Packaged apps use the shared https redirect + a state marker; the web
         // redirect page forwards the callback to the app via `tatakai://`
         // (AniList/MAL dashboards only need the https URI registered).
         const url = await getMalAuthUrl(getWebMalRedirectUri(), buildDesktopOAuthState());
-        if (openOAuthInBrowser(url)) {
+        if (await openOAuthInBrowser(url)) {
           toast.info('Complete the MyAnimeList login in your browser, then return to the app.');
           return;
         }
-        window.location.href = url;
+        // In-app navigation to myanimelist.net is blocked by the desktop
+        // shell (will-navigate allow-list), so falling back to it would leave
+        // the user stuck. Surface the failure instead of a dead navigation.
+        toast.error('Could not open your browser for MyAnimeList login. Please copy the login link manually.', {
+          action: {
+            label: 'Copy link',
+            onClick: () => {
+              void navigator.clipboard?.writeText(url).then(
+                () => toast.success('Login link copied — paste it into your browser.'),
+                () => toast.error('Copy failed. Please try again.'),
+              );
+            },
+          },
+        });
         return;
       }
-      const url = await getMalAuthUrl();
-      window.location.href = url;
+      const redirectUri = getWebMalRedirectUri();
+      // Origin check BEFORE minting a verifier/state: generating the URL
+      // overwrites the stored PKCE verifier, which permanently invalidates any
+      // MAL tab opened by a previous click. A localhost build sending the
+      // production redirect URI (or vice versa) can never complete — surface
+      // the setup fix instead of dooming the previous tab and navigating.
+      try {
+        assertWebMalRedirectMatchesOrigin(redirectUri);
+      } catch (err) {
+        // assertWebMalRedirectMatchesOrigin throws the setup explanation;
+        // anything else (URL parse) falls through to the navigation attempt.
+        if (err instanceof Error && err.message.startsWith("MAL login can't complete")) {
+          toast.error(err.message, { duration: 9000 });
+          return;
+        }
+      }
+      window.location.href = getMalAuthUrl(redirectUri);
     } catch (err) {
-      toast.error('Failed to generate MAL auth URL');
+      toast.error(err instanceof Error ? err.message : 'Could not open MyAnimeList login.');
     }
   };
 
-  const handleAniListConnect = () => {
-    if (isDesktopApp()) {
-      // Same https bridge as MAL: `tatakai://` is never sent as redirect_uri.
-      const url = getAniListAuthUrl(getWebAnilistRedirectUri(), buildDesktopOAuthState());
-      if (openOAuthInBrowser(url)) {
-        toast.info('Complete the AniList login in your browser, then return to the app.');
+  const handleAniListConnect = async () => {
+    try {
+      if (isNativeOAuthApp()) {
+        // Same https bridge as MAL: `tatakai://` is never sent as redirect_uri.
+        const url = getAniListAuthUrl(getWebAnilistRedirectUri(), buildDesktopOAuthState());
+        if (await openOAuthInBrowser(url)) {
+          toast.info('Complete the AniList login in your browser, then return to the app.');
+          return;
+        }
+        toast.error('Could not open your browser for AniList login. Please copy the login link manually.', {
+          action: {
+            label: 'Copy link',
+            onClick: () => {
+              void navigator.clipboard?.writeText(url).then(
+                () => toast.success('Login link copied — paste it into your browser.'),
+                () => toast.error('Copy failed. Please try again.'),
+              );
+            },
+          },
+        });
         return;
       }
-      window.location.href = url;
-      return;
+      window.location.href = getAniListAuthUrl();
+    } catch {
+      toast.error('Could not open AniList login. Please try again.');
     }
-    window.location.href = getAniListAuthUrl();
   };
 
   const handleMALDisconnect = async () => {
@@ -364,7 +424,7 @@ export function IntegrationsPanel() {
                   ) : (
                     <Button
                       size="default"
-                      onClick={handleMALConnect}
+                      onClick={() => void handleMALConnect()}
                       className="gap-2 bg-[#2E51A2] hover:bg-[#2E51A2]/90 px-6 shadow-lg shadow-[#2E51A2]/20"
                     >
                       <ExternalLink className="w-4 h-4" />
@@ -486,9 +546,9 @@ export function IntegrationsPanel() {
         )}
       </div>
 
-      {/* MAL Import Selection Modal */}
+      {/* MAL Import Selection Modal — nested in Settings (z-[80]), so it must sit above it. */}
       <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden bg-background/95 backdrop-blur-xl border-border/50">
+        <DialogContent overlayClassName="z-[90]" className="z-[95] max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden bg-background/95 backdrop-blur-xl border-border/50">
           <DialogHeader className="p-6 pb-2">
             <DialogTitle className="text-2xl font-bold flex items-center gap-2">
               {importSource === 'mal' ? (

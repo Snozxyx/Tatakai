@@ -30,6 +30,8 @@
              installSplashScreen(). The result is a permanent black screen.
              Using AppTheme.NoActionBar as parent lets Capacitor manage the splash
              entirely via its own overlay/dialog, which works correctly on all APIs. -->
-        <item name="android:background">@drawable/splash</item>
+        <!-- A global android:background also paints selection menus and other
+             framework views with the splash art. Only theme the window. -->
+        <item name="android:windowBackground">#09090B</item>
     </style>
 </resources>

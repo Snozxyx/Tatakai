@@ -137,11 +137,17 @@ function AdoptionRateSection() {
       const policy = policyRows?.[0];
       if (!policy) return { rate: null, targetVersion: null };
 
-      // Get all profiles app_version
+      // Get all profiles app_version (column from 20261009000001 — handle
+      // gracefully when the migration hasn't been applied yet).
       const { data: profileRows, error: profileError } = await supabase
         .from('profiles')
         .select('app_version');
-      if (profileError) throw profileError;
+      if (profileError) {
+        if (profileError.code === '42703' || profileError.message?.includes('column')) {
+          return { rate: null, targetVersion: policy.target_version };
+        }
+        throw profileError;
+      }
 
       const profiles = (profileRows ?? []) as { app_version: string | null }[];
       const rate = adoptionRate(profiles, { target_version: policy.target_version });

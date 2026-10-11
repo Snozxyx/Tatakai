@@ -68,7 +68,7 @@ export function ExtensionIcon({
   return (
     <div
       className={cn(
-        'relative flex shrink-0 items-center justify-center overflow-hidden border border-white/10 bg-gradient-to-br font-black text-white/90',
+        'relative flex shrink-0 items-center justify-center overflow-hidden border border-border bg-gradient-to-br font-black text-foreground',
         visual.tileClass,
         ICON_SIZES[size],
         className,
@@ -104,8 +104,8 @@ const INSTALL_LABELS: Record<InstallState, string> = {
 
 const INSTALL_CLASSES: Record<InstallState, string> = {
   idle: 'bg-primary text-primary-foreground shadow-sm shadow-primary/25 hover:bg-primary/90',
-  installing: 'bg-white/10 text-white/70',
-  installed: 'border border-white/10 bg-white/[0.06] text-white/70 hover:bg-white/10',
+  installing: 'bg-muted/50 text-muted-foreground',
+  installed: 'border border-border bg-muted/50 text-muted-foreground hover:bg-muted/50',
   not_loaded: 'bg-amber/15 text-amber border border-amber/30 hover:bg-amber/25',
 };
 
@@ -186,7 +186,7 @@ export function ExtensionChips({
         </span>
       ) : null}
       {health ? (
-        <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] font-bold text-white/55">
+        <span className="inline-flex items-center rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
           {health} healthy
         </span>
       ) : null}
@@ -217,7 +217,7 @@ export function ExtensionHeroCard({
     <Link
       to={href}
       className={cn(
-        'group relative flex min-h-[19rem] flex-col justify-end overflow-hidden rounded-[1.75rem] border border-white/[0.07] bg-surface p-6 transition-colors hover:border-white/15 sm:p-8',
+        'group relative flex min-h-[19rem] flex-col justify-end overflow-hidden rounded-[1.75rem] border border-border bg-surface p-6 transition-colors hover:border-border sm:p-8',
         className,
       )}
     >
@@ -242,15 +242,15 @@ export function ExtensionHeroCard({
             <h3 className="font-display truncate text-2xl font-black tracking-tight text-foreground sm:text-4xl">
               {extension.name}
             </h3>
-            <p className="mt-1 text-sm font-medium text-white/50">by {extension.author}</p>
+            <p className="mt-1 text-sm font-medium text-muted-foreground">by {extension.author}</p>
           </div>
         </div>
-        <p className="max-w-xl text-sm leading-relaxed text-white/65 line-clamp-2">
+        <p className="max-w-xl text-sm leading-relaxed text-muted-foreground line-clamp-2">
           {extension.description || 'No description provided.'}
         </p>
         <div className="flex flex-wrap items-center gap-3">
           <InstallButton state={state} onClick={onInstall} size="lg" />
-          <span className="text-xs font-semibold text-white/40">
+          <span className="text-xs font-semibold text-muted-foreground">
             {formatCompact(extension.installs || extension.downloads)} installs · v{extension.version}
           </span>
         </div>
@@ -278,15 +278,15 @@ export function ExtensionPromoTile({
     <Link
       to={href}
       className={cn(
-        'group relative flex flex-1 items-center gap-4 overflow-hidden rounded-[1.5rem] border border-white/[0.07] bg-surface p-5 transition-colors hover:border-white/15',
+        'group relative flex flex-1 items-center gap-4 overflow-hidden rounded-[1.5rem] border border-border bg-surface p-5 transition-colors hover:border-border',
         className,
       )}
     >
       <div className={cn('absolute inset-0 bg-gradient-to-r opacity-70', visual.glowClass)} />
       <ExtensionIcon extension={extension} size="md" className="relative" />
       <div className="relative min-w-0 flex-1">
-        <p className="truncate text-sm font-bold text-white/90">{extension.name}</p>
-        <p className="mt-0.5 truncate text-xs font-medium text-white/45">
+        <p className="truncate text-sm font-bold text-foreground">{extension.name}</p>
+        <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">
           {visual.label} · {formatCompact(extension.installs || extension.downloads)} installs
         </p>
       </div>
@@ -319,20 +319,20 @@ export function ExtensionRow({
     <Link
       to={href}
       className={cn(
-        'group flex items-center gap-3 rounded-2xl px-2 py-2.5 transition-colors hover:bg-white/[0.04]',
+        'group flex items-center gap-3 rounded-2xl px-2 py-2.5 transition-colors hover:bg-muted/50',
         className,
       )}
     >
       {typeof rank === 'number' ? (
-        <span className="w-5 shrink-0 text-center text-sm font-black text-white/25">{rank}</span>
+        <span className="w-5 shrink-0 text-center text-sm font-black text-muted-foreground">{rank}</span>
       ) : null}
       <ExtensionIcon extension={extension} size="sm" />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-bold text-white/90">{extension.name}</p>
-        <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs font-medium text-white/40">
+        <p className="truncate text-sm font-bold text-foreground">{extension.name}</p>
+        <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs font-medium text-muted-foreground">
           <visual.icon className={cn('h-3 w-3', visual.textClass)} />
           {visual.short}
-          <span className="text-white/20">·</span>
+          <span className="text-muted-foreground">·</span>
           {formatCompact(extension.installs || extension.downloads)}
         </p>
       </div>
@@ -360,7 +360,7 @@ export function ExtensionTile({
     <Link
       to={href}
       className={cn(
-        'group relative flex flex-col overflow-hidden rounded-[1.25rem] border border-white/[0.07] bg-white/[0.02] p-4 transition-colors hover:border-primary/40 hover:bg-white/[0.04]',
+        'group relative flex flex-col overflow-hidden rounded-[1.25rem] border border-border bg-muted/50 p-4 transition-colors hover:border-primary/40 hover:bg-muted/50',
         className,
       )}
     >
@@ -373,16 +373,16 @@ export function ExtensionTile({
       <div className="relative flex items-start gap-3">
         <ExtensionIcon extension={extension} size="md" />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold text-white/90">{extension.name}</p>
-          <p className="mt-0.5 truncate text-xs font-medium text-white/40">{extension.author}</p>
+          <p className="truncate text-sm font-bold text-foreground">{extension.name}</p>
+          <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">{extension.author}</p>
           <ExtensionChips extension={extension} className="mt-2" showHealth={false} />
         </div>
       </div>
-      <p className="relative mt-3 text-xs leading-relaxed text-white/50 line-clamp-2">
+      <p className="relative mt-3 text-xs leading-relaxed text-muted-foreground line-clamp-2">
         {extension.description || 'No description provided.'}
       </p>
       <div className="relative mt-4 flex items-center justify-between gap-2">
-        <span className="text-[11px] font-semibold text-white/35">
+        <span className="text-[11px] font-semibold text-muted-foreground">
           v{extension.version} · {formatCompact(extension.installs || extension.downloads)} installs
         </span>
         <InstallButton state={state} onClick={onInstall} size="sm" />
@@ -427,7 +427,7 @@ export const StoreShelf = forwardRef<
       <span className="font-display text-xl font-black tracking-tight text-foreground sm:text-2xl">
         {title}
       </span>
-      {href ? <ChevronRight className="h-5 w-5 text-white/40" /> : null}
+      {href ? <ChevronRight className="h-5 w-5 text-muted-foreground" /> : null}
     </span>
   );
 
@@ -480,7 +480,7 @@ function ShelfArrow({ direction, onClick }: { direction: -1 | 1; onClick: () => 
       type="button"
       onClick={onClick}
       aria-label={direction === -1 ? 'Scroll left' : 'Scroll right'}
-      className="flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.07] bg-white/[0.03] text-white/60 transition-colors hover:border-white/20 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+      className="flex h-11 w-11 items-center justify-center rounded-full border border-border bg-muted/50 text-muted-foreground transition-colors hover:border-border hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
     >
       <Icon className="h-4 w-4" />
     </button>

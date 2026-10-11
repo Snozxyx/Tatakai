@@ -139,6 +139,9 @@ export function ensureDownloadMonitor() {
   bridge.onDownloadProgress((data: Record<string, unknown>) => {
     const id = String(data?.episodeId || '');
     if (!id) return;
+    if (data.recoveryMeta && typeof data.recoveryMeta === 'object') {
+      try { if (!localStorage.getItem(`tatakai:dl:meta:${id}`)) localStorage.setItem(`tatakai:dl:meta:${id}`, JSON.stringify(data.recoveryMeta)); } catch { /* optional metadata */ }
+    }
     const pct = typeof data.percent === 'number' ? data.percent : Number(data.percent) || 0;
     const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
     upsert(id, {
@@ -170,9 +173,14 @@ export function ensureDownloadMonitor() {
     const id = String(data?.episodeId || '');
     if (!id) return;
     const errMsg = typeof data.error === 'string' ? data.error : 'Download failed';
-    upsert(id, { status: 'failed', error: errMsg });
-    recordHistory(id, 'failed', { errorMessage: errMsg });
+    upsert(id, { status: errMsg === 'cancelled' ? 'cancelled' : 'failed', error: errMsg });
+    recordHistory(id, errMsg === 'cancelled' ? 'cancelled' : 'failed', { errorMessage: errMsg });
   });
+  if (bridge.getDownloadRecovery && bridge.resumeInterruptedDownloads) {
+    void bridge.getDownloadRecovery().then((state: { autoResume?: boolean }) => {
+      if (state.autoResume) return bridge.resumeInterruptedDownloads();
+    }).catch((error: unknown) => console.warn('[Downloads] Could not resume interrupted jobs:', error));
+  }
 }
 
 // ── Optimistic actions (called by useDownload) ─────────────────────────────
@@ -202,7 +210,6 @@ export function markProgress(id: string, percent: number, extra?: { speed?: stri
 }
 export function markCompleted(id: string, opts?: { localUri?: string; fileSizeBytes?: number }) {
   upsert(id, { status: 'completed', progress: 100, localUri: opts?.localUri });
-  recordHistory(id, 'completed', { localPath: opts?.localUri, fileSizeBytes: opts?.fileSizeBytes });
   void triggerHaptic('download-complete');
   // Auto-download-next: finishing episode N arms a one-shot intent for N+1
   // (consumed by the player download button when the next episode resolves).
@@ -226,6 +233,7 @@ export function markCompleted(id: string, opts?: { localUri?: string; fileSizeBy
   } catch {
     /* meta unreadable — no auto-next */
   }
+  recordHistory(id, 'completed', { localPath: opts?.localUri, fileSizeBytes: opts?.fileSizeBytes });
 }
 export function markError(id: string, error: string) {
   upsert(id, { status: 'failed', error });
@@ -233,6 +241,25 @@ export function markError(id: string, error: string) {
 }
 
 // ── React binding ──────────────────────────────────────────────────────────
+/** Native snapshots are authoritative, including terminal states restored after relaunch. */
+export function reconcileMobileDownloads(entries: DownloadMonitorEntry[]): void {
+  const next = { ...states };
+  for (const entry of entries) {
+    const previous = states[entry.episodeId];
+    if (previous?.status !== entry.status && localStorage.getItem(`tatakai:dl:meta:${entry.episodeId}`)) {
+      if (entry.status === 'completed') markCompleted(entry.episodeId, { localUri: entry.localUri });
+      if (entry.status === 'failed') recordHistory(entry.episodeId, 'failed', { errorMessage: entry.error });
+      if (entry.status === 'cancelled') recordHistory(entry.episodeId, 'cancelled', {});
+    }
+    next[entry.episodeId] = entry;
+  }
+  states = next;
+  notify();
+}
+
+export function removeMobileDownloadState(id: string): void {
+  const next = { ...states }; delete next[id]; states = next; notify();
+}
 function subscribe(cb: () => void) {
   ensureDownloadMonitor();
   listeners.add(cb);

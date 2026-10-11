@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronRight, History, ScrollText, SlidersHorizontal } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { DesktopSettings } from '@/components/settings/DesktopSettings';
+import { DownloadResumeSetting } from '@/components/settings/DownloadResumeSetting';
 import { TorrentSessionHistory } from '@/components/settings/TorrentSessionHistory';
 import { ChangelogPanel } from '@/components/settings/panels/ChangelogPanel';
 import { StorageSettingsPanel } from '@/components/settings/StorageSettingsPanel';
@@ -31,6 +32,7 @@ type AppSection = {
 
 /** Human label for each top-level section, shown on a search-result chip. */
 const SECTION_LABELS: Record<string, string> = {
+  'download-resume': 'Downloads',
   desktop: 'Desktop & Playback',
   'display-window': 'Display & Window',
   storage: 'Storage',
@@ -51,6 +53,7 @@ type IndexedSetting = { title: string; keywords: string; section: string };
  * (not a whole panel). Selecting a result jumps to the section holding it.
  */
 const SETTING_INDEX: IndexedSetting[] = [
+  { title: 'Resume interrupted downloads', keywords: 'resume download anime manga interrupted retry progress automatic', section: 'download-resume' },
   { title: 'Launch at Startup', keywords: 'startup auto launch login boot', section: 'desktop' },
   { title: 'Download Location', keywords: 'download path folder location save directory', section: 'desktop' },
   { title: 'External Player', keywords: 'external player mpv vlc mpc playback', section: 'desktop' },
@@ -138,6 +141,11 @@ export function AppSettingsPanel({ section }: { section?: string }) {
         id: 'storage',
         keywords: ['storage', 'disk', 'space', 'cache', 'downloads', 'quota', 'limit', 'gb', 'clear', 'folder'],
         render: () => <StorageSettingsPanel />,
+      },
+      {
+        id: 'download-resume',
+        keywords: ['download', 'resume', 'interrupted', 'retry', 'anime', 'manga', 'automatic', 'progress'],
+        render: () => <DownloadResumeSetting />,
       },
       {
         id: 'performance',

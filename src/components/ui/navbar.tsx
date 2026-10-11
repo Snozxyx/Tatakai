@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createPortal } from "react-dom";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Menu, X, LogOut } from "lucide-react";
@@ -30,18 +30,6 @@ export function Navigation() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Lock body scroll when mobile menu is open
-  useEffect(() => {
-    if (isMobileMenuOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [isMobileMenuOpen]);
-
   const handleSignOut = async () => {
     await signOut();
     setIsMobileMenuOpen(false);
@@ -63,13 +51,14 @@ export function Navigation() {
   //    open clips that bleed.
   const renderMobileMenu = () => {
     const overlay = (
-      <div
-        className={`md:hidden fixed inset-0 z-[55] bg-background overflow-hidden transition-all duration-500 ${
+      <DialogPrimitive.Content aria-describedby={undefined}
+        className={`md:hidden fixed inset-0 z-[55] bg-background overflow-hidden transition-[background-color,border-color,opacity,transform] duration-200 ${
           isMobileMenuOpen
             ? "opacity-100 pointer-events-auto"
             : "opacity-0 pointer-events-none"
         }`}
       >
+        <DialogPrimitive.Title className="sr-only">Navigation</DialogPrimitive.Title>
         {/* Overlay close button */}
         <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-6 h-20">
           <Link
@@ -97,7 +86,7 @@ export function Navigation() {
                 key={link.name}
                 to={link.href}
                 onClick={() => setIsMobileMenuOpen(false)}
-                className={`text-4xl font-display text-foreground hover:text-muted-foreground transition-all duration-500 ${
+                className={`text-4xl font-display text-foreground hover:text-muted-foreground transition-[background-color,border-color,opacity,transform] duration-200 ${
                   isMobileMenuOpen
                     ? "opacity-100 translate-y-0"
                     : "opacity-0 translate-y-4"
@@ -110,7 +99,7 @@ export function Navigation() {
           </div>
 
           {/* Bottom CTAs */}
-          <div className={`flex gap-4 pt-8 border-t border-foreground/10 transition-all duration-500 ${
+          <div className={`flex gap-4 pt-8 border-t border-foreground/10 transition-[background-color,border-color,opacity,transform] duration-200 ${
             isMobileMenuOpen
               ? "opacity-100 translate-y-0"
               : "opacity-0 translate-y-4"
@@ -150,39 +139,39 @@ export function Navigation() {
             </Button>
           </div>
         </div>
-      </div>
+      </DialogPrimitive.Content>
     );
 
-    return typeof document !== "undefined" ? createPortal(overlay, document.body) : overlay;
+    return <DialogPrimitive.Portal>{overlay}</DialogPrimitive.Portal>;
   };
 
   return (
-    <>
+    <DialogPrimitive.Root open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
       {renderMobileMenu()}
 
       <header
-        className={`fixed z-50 transition-all duration-500 ${
+        className={`fixed z-50 transition-[background-color,border-color,opacity,transform] duration-200 ${
           isScrolled
             ? "top-4 left-4 right-4"
             : "top-0 left-0 right-0"
         }`}
       >
         <nav
-          className={`mx-auto transition-all duration-500 ${
+          className={`mx-auto transition-[background-color,border-color,opacity,transform] duration-200 ${
             isScrolled || isMobileMenuOpen
               ? "bg-background/80 backdrop-blur-xl border border-foreground/10 rounded-2xl shadow-lg max-w-[1200px]"
               : "bg-transparent max-w-[1400px]"
           }`}
         >
           <div
-            className={`flex items-center justify-between transition-all duration-500 px-6 lg:px-8 ${
+            className={`flex items-center justify-between transition-[background-color,border-color,opacity,transform] duration-200 px-6 lg:px-8 ${
               isScrolled ? "h-14" : "h-20"
             }`}
           >
             {/* Logo */}
             <Link to={user ? "/browse" : "/welcome"} className="flex items-center gap-2 group">
-              <span className={`font-display tracking-tight transition-all duration-500 ${isScrolled ? "text-xl text-foreground" : "text-2xl text-white"}`}>TATAKAI</span>
-              <span className={`font-mono transition-all duration-500 ${isScrolled ? "text-[10px] mt-0.5 text-muted-foreground" : "text-xs mt-1 text-white/60"}`}>ANIME</span>
+              <span className={`font-display tracking-tight transition-[background-color,border-color,opacity,transform] duration-200 ${isScrolled ? "text-xl text-foreground" : "text-2xl text-white"}`}>TATAKAI</span>
+              <span className={`font-mono transition-[background-color,border-color,opacity,transform] duration-200 ${isScrolled ? "text-[10px] mt-0.5 text-muted-foreground" : "text-xs mt-1 text-white/60"}`}>ANIME</span>
             </Link>
 
             {/* Desktop Navigation */}
@@ -194,7 +183,7 @@ export function Navigation() {
                   className={`text-sm transition-colors duration-300 relative group ${isScrolled ? "text-foreground/70 hover:text-foreground" : "text-white/70 hover:text-white"}`}
                 >
                   {link.name}
-                  <span className={`absolute -bottom-1 left-0 w-0 h-px transition-all duration-300 group-hover:w-full ${isScrolled ? "bg-foreground" : "bg-white"}`} />
+                  <span className={`absolute -bottom-1 left-0 w-0 h-px transition-[background-color,border-color,opacity,transform] duration-300 group-hover:w-full ${isScrolled ? "bg-foreground" : "bg-white"}`} />
                 </Link>
               ))}
             </div>
@@ -205,7 +194,7 @@ export function Navigation() {
                 <div className="flex items-center gap-3">
                   <Link
                     to="/profile"
-                    className={`flex items-center gap-2 text-sm transition-all duration-500 ${
+                    className={`flex items-center gap-2 text-sm transition-[background-color,border-color,opacity,transform] duration-200 ${
                       isScrolled ? "text-foreground/80 hover:text-foreground" : "text-white/80 hover:text-white"
                     }`}
                   >
@@ -234,7 +223,7 @@ export function Navigation() {
               ) : (
                 <Link
                   to="/auth"
-                  className={`transition-all duration-500 font-medium ${
+                  className={`transition-[background-color,border-color,opacity,transform] duration-200 font-medium ${
                     isScrolled ? "text-xs text-foreground/70 hover:text-foreground" : "text-sm text-white/70 hover:text-white"
                   }`}
                 >
@@ -245,7 +234,7 @@ export function Navigation() {
               <Button
                 size="sm"
                 onClick={() => navigate(user ? "/browse" : "/auth")}
-                className={`rounded-full transition-all duration-500 font-medium ${
+                className={`rounded-full transition-[background-color,border-color,opacity,transform] duration-200 font-medium ${
                   isScrolled ? "bg-foreground hover:bg-foreground/90 text-background px-4 h-8 text-xs" : "bg-white hover:bg-white/90 text-black px-6"
                 }`}
               >
@@ -254,10 +243,12 @@ export function Navigation() {
             </div>
 
             {/* Mobile Menu Button */}
+            <DialogPrimitive.Trigger asChild>
             <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className={`md:hidden p-2 transition-colors duration-500 relative z-[60] ${isScrolled || isMobileMenuOpen ? "text-foreground" : "text-white"}`}
+              className={`md:hidden min-h-11 min-w-11 p-2 transition-colors duration-200 relative z-[60] ${isScrolled || isMobileMenuOpen ? "text-foreground" : "text-white"}`}
               aria-label="Toggle menu"
+              aria-expanded={isMobileMenuOpen}
+              aria-haspopup="dialog"
             >
               {isMobileMenuOpen ? (
                 <X className="w-6 h-6" />
@@ -265,9 +256,10 @@ export function Navigation() {
                 <Menu className="w-6 h-6" />
               )}
             </button>
+            </DialogPrimitive.Trigger>
           </div>
         </nav>
       </header>
-    </>
+    </DialogPrimitive.Root>
   );
 }

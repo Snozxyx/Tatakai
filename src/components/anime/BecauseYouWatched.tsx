@@ -86,7 +86,7 @@ export function BecauseYouWatched({ className }: BecauseYouWatchedProps) {
       </div>
 
       {/* Grid of Cards */}
-      <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-x-4 gap-y-8">
+      <div data-mobile-home-rail className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-x-4 gap-y-8">
         {items.map((rec, i) => (
           <motion.div
             key={rec.anime?.id || i}

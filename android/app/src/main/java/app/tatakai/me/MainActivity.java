@@ -19,6 +19,7 @@ public class MainActivity extends BridgeActivity {
         // This must happen before BridgeActivity builds its Capacitor bridge.
         registerPlugin(TatakaiTorrentPlugin.class);
         registerPlugin(NativePlayerPlugin.class);
+        registerPlugin(app.tatakai.me.download.TatakaiDownloadsPlugin.class);
         // Loopback media proxy (anime HLS/MP4 + subtitles + manga images +
         // download assets) — native counterpart to the desktop LocalProxyServer.
         registerPlugin(TatakaiLocalProxyPlugin.class);
@@ -46,6 +47,10 @@ public class MainActivity extends BridgeActivity {
                 // gated media, unpredictable text zoom, software rendering).
                 try {
                     android.webkit.WebSettings settings = webView.getSettings();
+                    // Route target=_blank/window.open to our rejecting Chrome client,
+                    // rather than letting WebView replace the current app document.
+                    settings.setSupportMultipleWindows(true);
+                    settings.setJavaScriptCanOpenWindowsAutomatically(false);
                     settings.setDomStorageEnabled(true);
                     settings.setDatabaseEnabled(true);
                     settings.setMediaPlaybackRequiresUserGesture(false);

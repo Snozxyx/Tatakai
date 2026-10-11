@@ -241,6 +241,8 @@ export function AccountPanel() {
         <div className="space-y-4">
           <div className="flex items-center gap-4">
             <AvatarPickerSheet
+              overlayClassName="z-[90]"
+              contentClassName="z-[100]"
               type="avatar"
               currentImage={avatarUrl}
               trigger={
@@ -257,6 +259,8 @@ export function AccountPanel() {
               }
             />
             <AvatarPickerSheet
+              overlayClassName="z-[90]"
+              contentClassName="z-[100]"
               type="banner"
               currentImage={bannerUrl}
               trigger={

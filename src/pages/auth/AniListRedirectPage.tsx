@@ -3,7 +3,7 @@ import { useEffect, useState, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSettingsModal } from '@/contexts/SettingsModalContext';
 import { exchangeAniListCode } from '@/lib/externalIntegrations';
-import { buildDesktopDeepLink, isDesktopApp, isDesktopOAuthState } from '@/lib/desktopOAuth';
+import { buildDesktopDeepLink, isNativeOAuthApp, isDesktopOAuthState } from '@/lib/desktopOAuth';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Loader2, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-react';
@@ -33,7 +33,7 @@ export default function AniListRedirectPage() {
         // the browser's session. Must run before any login check — the system
         // browser may not be logged into Tatakai at all.
         const stateParam = searchParams.get('state');
-        if (stateParam && isDesktopOAuthState(stateParam) && !isDesktopApp()) {
+        if (stateParam && isDesktopOAuthState(stateParam) && !isNativeOAuthApp()) {
             hasRun.current = true;
             setStatus('forwarding');
             window.location.href = desktopDeepLink;
@@ -100,7 +100,7 @@ export default function AniListRedirectPage() {
                         </h1>
                         <p className="text-muted-foreground">
                             {status === 'forwarding'
-                                ? 'Login approved. Opening the Tatakai desktop app to finish linking.'
+                                ? 'Login approved. Opening the Tatakai app to finish linking.'
                                 : 'Please wait while we complete the authentication process.'}
                         </p>
                         {status === 'forwarding' && (
@@ -109,7 +109,7 @@ export default function AniListRedirectPage() {
                                 className="inline-flex items-center gap-2 mt-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
                             >
                                 <ExternalLink className="w-4 h-4" />
-                                Open desktop app
+                                Open Tatakai app
                             </a>
                         )}
                     </>

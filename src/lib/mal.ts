@@ -5,13 +5,10 @@
  */
 
 import { resolveApiV3Base } from '@/lib/api/backendOrigin';
+import { getWebMalRedirectUri, isNativeOAuthApp } from '@/lib/desktopOAuth';
 
 const MAL_CLIENT_ID = import.meta.env.VITE_MAL_CLIENT_ID;
-const REDIRECT_URI = import.meta.env.VITE_MAL_REDIRECT_URI || (
-    typeof window !== 'undefined'
-        ? `${window.location.origin}/integration/mal/redirect`
-        : ""
-);
+const REDIRECT_URI = getWebMalRedirectUri();
 
 function getMalAuthFunctionUrl(): string {
     const explicit = import.meta.env.VITE_MAL_AUTH_FUNCTION_URL;
@@ -28,8 +25,12 @@ function getMalAuthFunctionUrl(): string {
 function generateRandomString(length: number) {
     let text = "";
     const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
-    for (let i = 0; i < length; i++) {
-        text += possible.charAt(Math.floor(Math.random() * possible.length));
+    // Rejection sampling keeps all PKCE characters equally likely.
+    while (text.length < length) {
+        for (const byte of crypto.getRandomValues(new Uint8Array(length))) {
+            if (byte < 256 - (256 % possible.length)) text += possible[byte % possible.length];
+            if (text.length === length) break;
+        }
     }
     return text;
 }
@@ -40,24 +41,49 @@ function generateRandomString(length: number) {
  */
 const MAL_REDIRECT_STORAGE_KEY = 'mal_redirect_uri';
 const MAL_STATE_STORAGE_KEY = 'mal_oauth_state';
+const MAL_OAUTH_STARTED_AT_KEY = 'mal_oauth_started_at';
+/** A login that never reached the callback page within this window still counts as pending. */
+const MAL_PENDING_FLOW_TTL_MS = 10 * 60 * 1000;
+
+/**
+ * MAL treats the registered redirect URI as one literal string: a
+ * comma-separated pair (e.g. prod + localhost) is NOT two valid URIs — the
+ * authorize call answers 401 with `WWW-Authenticate: Basic`, so Chromium /
+ * Electron pops a native "Please Sign In — https://myanimelist.net" HTTP-auth
+ * dialog. Entering MAL credentials there can never succeed and loops forever.
+ * Guard here so a misconfigured env surfaces a readable error instead.
+ */
+function assertSingleRedirectUri(redirectUri: string): string {
+    const value = String(redirectUri || '').trim();
+    if (!value) {
+        throw new Error('Missing VITE_MAL_REDIRECT_URI or window location context');
+    }
+    if (value.includes(',')) {
+        throw new Error(
+            'Invalid MAL redirect URI: register exactly one URL in MAL (https://tatakai.me/api/mal/redirect). ' +
+            'A comma-separated pair is treated as one literal URL by MAL and triggers an HTTP login prompt that loops forever.',
+        );
+    }
+    return value;
+}
 
 export function getMalAuthUrl(redirectUriOverride?: string, stateOverride?: string) {
     if (!MAL_CLIENT_ID) {
         throw new Error('Missing VITE_MAL_CLIENT_ID');
     }
-    const redirectUri = redirectUriOverride || REDIRECT_URI;
-    if (!redirectUri) {
-        throw new Error('Missing VITE_MAL_REDIRECT_URI or window location context');
-    }
+    const redirectUri = assertSingleRedirectUri(redirectUriOverride || REDIRECT_URI);
     // Persist so exchangeMalCode sends the identical redirect_uri (required by MAL).
     localStorage.setItem(MAL_REDIRECT_STORAGE_KEY, redirectUri);
+    // Marks a login in flight. Starting a second flow overwrites the verifier,
+    // which permanently invalidates any code issued for the first challenge
+    // (MAL answers `invalid_grant`), so callers check isMalLoginPendingFresh()
+    // before silently restarting.
+    localStorage.setItem(MAL_OAUTH_STARTED_AT_KEY, String(Date.now()));
 
     const codeVerifier = generateRandomString(128);
     localStorage.setItem('mal_code_verifier', codeVerifier);
 
-    // For MAL, the code_challenge is simply the code_verifier if not using S256
-    // But MAL supports plain or S256. We'll use plain for simplicity as allowed by MAL docs
-    // if S256 is not explicitly required.
+    // MAL uses the plain PKCE challenge method.
     const codeChallenge = codeVerifier;
 
     // Desktop passes its bridge marker here so the https redirect page can
@@ -78,6 +104,72 @@ export function getMalAuthUrl(redirectUriOverride?: string, stateOverride?: stri
 }
 
 /**
+ * True when a login was started recently but its callback never ran — i.e. the
+ * user still has a MAL tab open for the previous challenge. Starting a new
+ * flow now would overwrite the stored verifier and doom the old tab to
+ * `invalid_grant`. Terminal callback states (success / exchange failure) clear
+ * the marker, so a fresh `true` here always means "in flight".
+ */
+export function isMalLoginPendingFresh(): boolean {
+    try {
+        const startedAt = Number(localStorage.getItem(MAL_OAUTH_STARTED_AT_KEY) || 0);
+        return Number.isFinite(startedAt) && startedAt > 0 && Date.now() - startedAt < MAL_PENDING_FLOW_TTL_MS;
+    } catch {
+        return false;
+    }
+}
+
+/** Clears a pending/in-flight login so a brand-new flow can start. */
+export function clearMalOAuthStorage(): void {
+    try {
+        localStorage.removeItem('mal_code_verifier');
+        localStorage.removeItem(MAL_REDIRECT_STORAGE_KEY);
+        localStorage.removeItem(MAL_STATE_STORAGE_KEY);
+        localStorage.removeItem(MAL_OAUTH_STARTED_AT_KEY);
+    } catch {
+        /* ignore */
+    }
+}
+
+/** Clears just the in-flight marker (the flow reached the callback page and is over). */
+export function clearMalPendingMarker(): void {
+    try {
+        localStorage.removeItem(MAL_OAUTH_STARTED_AT_KEY);
+    } catch {
+        /* ignore */
+    }
+}
+
+/**
+ * Pre-flight for pure-web logins: the PKCE verifier + state live in the
+ * CURRENT origin's localStorage, so the redirect URI MAL sends the user back
+ * to MUST share this origin. Developing on `http://localhost:8090` while MAL
+ * registers `https://tatakai.me/api/mal/redirect` can never complete — MAL
+ * either 401s (unregistered URI) or drops the user on production without the
+ * verifier. Throws a setup-oriented error instead of navigating into that.
+ *
+ * Native apps are exempt: the https page forwards to `tatakai://` and the
+ * desktop session owns the verifier.
+ */
+export function assertWebMalRedirectMatchesOrigin(redirectUri: string): void {
+    if (isNativeOAuthApp()) return;
+    if (typeof window === 'undefined') return;
+    let redirectOrigin: string;
+    try {
+        redirectOrigin = new URL(redirectUri).origin;
+    } catch {
+        return; // Malformed URL — let the authorize call surface the error.
+    }
+    if (redirectOrigin !== window.location.origin) {
+        throw new Error(
+            `MAL login can't complete from ${window.location.origin}: this build sends redirect URI ${redirectUri}, ` +
+            `which points at a different origin. For local development, register a second MAL app with redirect URI ` +
+            `${window.location.origin}/api/mal/redirect and use its client ID here — or connect from the deployed site instead.`,
+        );
+    }
+}
+
+/**
  * Completes the MAL authentication by exchanging the code for tokens.
  * Calls our Supabase Edge Function to keep the client_secret secure.
  */
@@ -86,7 +178,9 @@ export async function exchangeMalCode(code: string) {
     if (!codeVerifier) {
         throw new Error('Missing code_verifier');
     }
-    const redirectUri = localStorage.getItem(MAL_REDIRECT_STORAGE_KEY) || REDIRECT_URI;
+    const redirectUri = assertSingleRedirectUri(
+        localStorage.getItem(MAL_REDIRECT_STORAGE_KEY) || REDIRECT_URI,
+    );
 
     const { supabase } = await import('@/integrations/supabase/client');
     const { data: { session } } = await supabase.auth.getSession();
@@ -108,6 +202,10 @@ export async function exchangeMalCode(code: string) {
             code,
             codeVerifier,
             redirectUri,
+            // Public (non-secret) app id used at authorize time. The server
+            // compares it with its own exchange credentials to diagnose the
+            // classic dev/prod app mismatch ("issued to another client").
+            clientId: MAL_CLIENT_ID,
         })
     });
 
@@ -133,9 +231,7 @@ export async function exchangeMalCode(code: string) {
     const data = await response.json();
     console.debug('[MAL Auth] TatakaiAPI exchange success:', data);
 
-    localStorage.removeItem('mal_code_verifier');
-    localStorage.removeItem(MAL_REDIRECT_STORAGE_KEY);
-    try { localStorage.removeItem(MAL_STATE_STORAGE_KEY); } catch { /* ignore */ }
+    clearMalOAuthStorage();
     return data;
 }
 

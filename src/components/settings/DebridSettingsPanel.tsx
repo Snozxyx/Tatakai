@@ -80,12 +80,15 @@ export function DebridSettingsPanel() {
         </div>
         <Input
           type="password"
+          aria-label="Real-Debrid API Token"
           placeholder="Real-Debrid API Token"
           value={rdKey}
           onChange={(e) => setRdKey(e.target.value)}
           autoComplete="off"
+          autoCapitalize="none"
+          autoCorrect="off"
           spellCheck={false}
-          className="flex-1 h-9"
+          className="min-w-0 flex-1 h-9"
         />
         <Button
           onClick={() => handleVerify('realdebrid', rdKey)}
@@ -103,12 +106,15 @@ export function DebridSettingsPanel() {
         </div>
         <Input
           type="password"
+          aria-label="TorBox API Token"
           placeholder="TorBox API Token"
           value={tbKey}
           onChange={(e) => setTbKey(e.target.value)}
           autoComplete="off"
+          autoCapitalize="none"
+          autoCorrect="off"
           spellCheck={false}
-          className="flex-1 h-9"
+          className="min-w-0 flex-1 h-9"
         />
         <Button
           onClick={() => handleVerify('torbox', tbKey)}
@@ -119,7 +125,7 @@ export function DebridSettingsPanel() {
       </div>
 
       <p className="text-xs text-muted-foreground bg-primary/5 p-3 rounded-md border border-primary/10">
-        Tokens stay on this device and are never synced to your Tatakai account. The selected service is used for torrent releases without joining a peer-to-peer swarm.
+        Paste the full API key, including dashes. Tokens stay on this device and are never synced to your Tatakai account. The selected service is used for torrent releases without joining a peer-to-peer swarm.
       </p>
 
       {/* P2P kill-switch — hard guarantee, not a preference hint */}
@@ -142,7 +148,7 @@ export function DebridSettingsPanel() {
         <Switch checked={p2pDisabled} onCheckedChange={setP2PDisabled} aria-label="Disable P2P torrents" />
       </div>
       {message && (
-        <p className="text-xs text-muted-foreground" role="status">
+        <p className="break-words text-xs text-muted-foreground" role="status">
           {message}
         </p>
       )}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useReducedMotion } from "framer-motion";
+import { useMotionPreference } from "@/hooks/ui/useMotionPreference";
 import { animate, stagger } from "animejs";
 import { Reveal } from "@/components/ui/Reveal";
 import { ShowcaseMedia } from "@/components/landing/ShowcaseMedia";
@@ -16,16 +16,16 @@ interface Ext {
   accent: string;
 }
 
-// The extension model, shown as an "installed sources" strip beneath the demo.
+// The extension model, shown as an installed add-ons strip beneath the demo.
 const sources: Ext[] = [
-  { icon: Boxes, name: "Multi-source library", kind: "Anime · Manga", accent: "text-violet-300" },
+  { icon: Boxes, name: "Community add-ons", kind: "Anime · Manga", accent: "text-violet-300" },
   { icon: Palette, name: "Custom themes", kind: "Appearance", accent: "text-cyan-300" },
   { icon: ShieldCheck, name: "Moderated & trusted", kind: "Safety gate", accent: "text-emerald-300" },
-  { icon: Layers, name: "Stack several at once", kind: "Priority routing", accent: "text-pink-300" },
+  { icon: Layers, name: "Mix several at once", kind: "Your setup", accent: "text-pink-300" },
 ];
 
 export function Extensions() {
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = useMotionPreference();
   const listRef = useRef<HTMLDivElement>(null);
 
   // anime.js: slide the source cards in once, when the strip scrolls into view.
@@ -44,11 +44,12 @@ export function Extensions() {
     }
 
     let played = false;
+    let entrance: ReturnType<typeof animate> | undefined;
     const io = new IntersectionObserver(
       ([entry]) => {
         if (!entry.isIntersecting || played) return;
         played = true;
-        animate(rows, {
+        entrance = animate(rows, {
           opacity: [0, 1],
           translateY: [20, 0],
           delay: stagger(90),
@@ -60,7 +61,7 @@ export function Extensions() {
       { threshold: 0.3 },
     );
     io.observe(el);
-    return () => io.disconnect();
+    return () => { io.disconnect(); entrance?.revert(); };
   }, [reduceMotion]);
 
   return (
@@ -77,15 +78,15 @@ export function Extensions() {
               <span className="text-xs font-medium text-white/70">Extensions</span>
             </div>
             <h2 className="mb-4 font-display text-[clamp(1.6rem,3vw,2.5rem)] font-medium leading-[1.05] tracking-[-0.03em] text-white">
-              Your sources, your way
+              Make it yours
             </h2>
             <p className="mb-6 max-w-md text-base leading-relaxed text-white/60">
-              Tatakai is built around extensions. Add the sources you want, theme the app to
+              Tatakai is built around extensions. Add community-made extras, theme the app to
               taste, and run several at once — nothing is hard-wired, and everything stays in your
               hands.
             </p>
             <ul className="flex flex-wrap gap-2">
-              {["Custom sources", "Themeable", "Community-built", "Multi-source"].map((p) => (
+              {["Add-ons", "Themeable", "Community-built", "Mix & match"].map((p) => (
                 <li key={p} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70">{p}</li>
               ))}
             </ul>
@@ -100,7 +101,7 @@ export function Extensions() {
             <div
               key={s.name}
               data-ext
-              style={reduceMotion ? undefined : { opacity: 0 }}
+
               className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-md transition-colors duration-300 hover:border-white/25 hover:bg-white/[0.05]"
             >
               <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5">

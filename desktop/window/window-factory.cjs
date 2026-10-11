@@ -255,6 +255,17 @@ function createMainWindow(deps) {
     // Network-level ad/tracker filter — drops ad scripts and ad iframes inside
     // third-party embeds before they load, without modifying the embed itself.
     adBlocker.attachToSession(mainWindow.webContents.session);
+    // MAL/AniList answer 401 + `WWW-Authenticate: Basic` when the OAuth
+    // redirect_uri doesn't exactly match the registered single URL (a
+    // comma-separated pair is one literal URL to them). Chromium then pops a
+    // native "Please Sign In — https://myanimelist.net" HTTP-auth dialog, and
+    // entering MAL credentials there loops forever. Cancel the prompt and log
+    // so the renderer can surface the real fix (single registered URL).
+    mainWindow.webContents.on('login', (event, _request, authInfo, callback) => {
+        event.preventDefault();
+        logger.warn(`[Security] Blocked HTTP-auth prompt for ${authInfo?.host || 'unknown host'} (realm: ${authInfo?.realm || 'n/a'}) — OAuth redirect_uri mismatch. No credentials sent.`);
+        callback('', '');
+    });
     mainWindow.webContents.session.setPermissionRequestHandler((_wc, permission, callback) => {
         callback(['clipboard-read', 'clipboard-write'].includes(permission));
     });

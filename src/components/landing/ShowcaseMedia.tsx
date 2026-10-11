@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useReducedMotion } from "framer-motion";
+import { useMotionPreference } from "@/hooks/ui/useMotionPreference";
 
 interface ShowcaseMediaProps {
   type: "video" | "image";
@@ -33,7 +33,7 @@ export function ShowcaseMedia({
   ratio = "16 / 9",
   focus = "center top",
 }: ShowcaseMediaProps) {
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = useMotionPreference();
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [shouldLoad, setShouldLoad] = useState(type !== "video");
@@ -62,7 +62,8 @@ export function ShowcaseMedia({
   // Play while visible, pause when not. Skip autoplay under reduced motion.
   useEffect(() => {
     const v = videoRef.current;
-    if (!v || type !== "video" || reduceMotion) return;
+    if (!v || type !== "video") return;
+    if (reduceMotion) { v.pause(); return; }
     if (inView && shouldLoad) {
       const p = v.play();
       if (p && typeof p.catch === "function") p.catch(() => {});
@@ -74,7 +75,7 @@ export function ShowcaseMedia({
   return (
     <div
       ref={containerRef}
-      className={`group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] shadow-[0_24px_70px_-24px_rgba(0,0,0,0.85)] backdrop-blur-md transition-transform duration-500 will-change-transform hover:scale-[1.015] ${className}`}
+      className={`group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] shadow-[0_24px_70px_-24px_rgba(0,0,0,0.85)] backdrop-blur-md transition-transform duration-200 motion-safe:[@media(hover:hover)]:hover:scale-[1.015] ${className}`}
       style={{ aspectRatio: ratio }}
     >
       {/* Soft gradient glow, strengthens on hover */}

@@ -6,6 +6,7 @@ import type { WatchRoom } from '@/hooks/media/useWatchRoom';
 import { WATCH_ROOM_COLUMNS } from '@/hooks/media/useWatchRoom';
 import { tallyPoll, type PostPoll } from './usePostPolls';
 import { resolveBadges, type BadgeDef } from '@/lib/badges';
+import type { ReactionCounts } from './useReactions';
 import { deriveIsAdmin, deriveIsModerator } from '@/lib/roles';
 
 export type FeedTab = 'foryou' | 'following' | 'news';
@@ -31,6 +32,11 @@ export interface FeedPost extends ForumPost {
   author_is_official?: boolean;
   /** Source label for News posts (metadata.source), e.g. "Anime News Network". */
   news_source?: string | null;
+  /**
+   * Batched reaction tallies for the page. Seeds each card's `useReactions`
+   * so first paint costs no per-post request (the N+1 this replaced).
+   */
+  reaction_counts?: ReactionCounts | null;
 }
 
 export type FeedItem =
@@ -100,9 +106,16 @@ export function useFeed(tab: FeedTab, opts: FeedOptions = {}) {
         if (postIds.length === 0) return [];
       }
 
+      // Explicit columns: `select('*')` hauls full content/metadata blobs per
+      // row. Every field below is read by PostCard or the mapping beneath
+      // (column existence verified against generated Supabase types +
+      // soft-delete migration; `deleted_by_role`/`is_deleted` come from the
+      // tombstones migration whose types are stale).
       let postQuery = supabase
         .from('forum_posts')
-        .select('*')
+        .select(
+          'id, user_id, community_id, title, content, image_url, flair, metadata, anime_id, anime_name, anime_poster, playlist_id, tierlist_id, is_pinned, is_approved, is_deleted, is_spoiler, deleted_by_role, comments_count, created_at',
+        )
         .eq('is_approved', true)
         .order('created_at', { ascending: false })
         .limit(PAGE_SIZE);
@@ -132,41 +145,175 @@ export function useFeed(tab: FeedTab, opts: FeedOptions = {}) {
         : { data: [] as any[] };
       const profileMap = new Map((authorProfiles || []).map((p: any) => [p.user_id, p]));
 
+      // ---- Enrichment wave ----
+      // Everything below derives only from `posts`/`authorIds`, so it fans out
+      // in one concurrent wave instead of ~10 sequential round-trips. Each
+      // guarded fetch keeps its pre-migration try/catch and resolves to empty
+      // rows on failure, exactly as the sequential version did.
+      const communityIds = [...new Set(posts.map((p) => p.community_id).filter(Boolean))] as string[];
+      const wantsRooms =
+        firstPage && tab !== 'news' && !tag && !communityId && !postType && !searchTerm;
+      const wantsInterests = tab === 'foryou' && !!user && ids.length > 0;
+      const [
+        communityRows,
+        badgeBundle,
+        officialRows,
+        voteRows,
+        pollBundle,
+        repostRows,
+        bookmarkRows,
+        reactionRows,
+        interestBundle,
+        roomsBundle,
+      ] = await Promise.all([
+        (async (): Promise<any[]> => {
+          if (!communityIds.length) return [];
+          try {
+            const { data, error } = await db
+              .from('communities')
+              .select('id, name, slug, icon_url, banner_url, is_verified')
+              .in('id', communityIds);
+            if (error) throw error;
+            return (data as any[]) || [];
+          } catch { return []; /* pre-migration */ }
+        })(),
+        (async (): Promise<{ badgeRows: any[]; roleRows: any[]; watchRows: any[] }> => {
+          if (!authorIds.length) return { badgeRows: [], roleRows: [], watchRows: [] };
+          const [{ data: badgeRows }, { data: roleRows }, { data: watchRows }] = await Promise.all([
+            supabase.from('user_badges' as any).select('user_id, badge_key').in('user_id', authorIds),
+            supabase.from('profiles').select('user_id, is_admin, is_moderator, role').in('user_id', authorIds),
+            supabase.from('watch_history').select('user_id').in('user_id', authorIds),
+          ]);
+          return {
+            badgeRows: (badgeRows as any[]) || [],
+            roleRows: (roleRows as any[]) || [],
+            watchRows: (watchRows as any[]) || [],
+          };
+        })(),
+        (async (): Promise<any[]> => {
+          if (!authorIds.length) return [];
+          try {
+            const { data, error } = await db
+              .from('profiles')
+              .select('user_id, is_official')
+              .in('user_id', authorIds);
+            if (error) throw error;
+            return (data as any[]) || [];
+          } catch { return []; /* pre-migration */ }
+        })(),
+        (async (): Promise<any[]> => {
+          if (!user || !ids.length) return [];
+          const { data } = await supabase
+            .from('forum_votes')
+            .select('post_id, vote_type')
+            .eq('user_id', user.id)
+            .in('post_id', ids);
+          return (data as any[]) || [];
+        })(),
+        (async (): Promise<{ polls: any[]; pollVotes: any[] }> => {
+          if (!ids.length) return { polls: [], pollVotes: [] };
+          try {
+            const { data: polls, error } = await db.from('post_polls').select('*').in('post_id', ids);
+            if (error) throw error;
+            const pollList = (polls || []) as any[];
+            if (!pollList.length) return { polls: [], pollVotes: [] };
+            const { data: pollVotes } = await db
+              .from('post_poll_votes')
+              .select('poll_id, user_id, option_index')
+              .in('poll_id', pollList.map((p) => p.id));
+            return { polls: pollList, pollVotes: (pollVotes as any[]) || [] };
+          } catch { return { polls: [], pollVotes: [] }; /* pre-migration */ }
+        })(),
+        (async (): Promise<any[]> => {
+          if (!ids.length) return [];
+          try {
+            const { data, error } = await db.from('post_reposts').select('post_id, user_id').in('post_id', ids);
+            if (error) throw error;
+            return (data as any[]) || [];
+          } catch { return []; /* pre-migration */ }
+        })(),
+        (async (): Promise<any[]> => {
+          if (!user || !ids.length) return [];
+          try {
+            const { data, error } = await db
+              .from('post_bookmarks')
+              .select('post_id')
+              .eq('user_id', user.id)
+              .in('post_id', ids);
+            if (error) throw error;
+            return (data as any[]) || [];
+          } catch { return []; /* pre-migration */ }
+        })(),
+        // Batched reactions: one query for the whole page instead of one per
+        // PostCard (the ~20-query N+1 on first paint).
+        (async (): Promise<any[]> => {
+          if (!ids.length) return [];
+          try {
+            const { data, error } = await supabase
+              .from('reactions')
+              .select('entity_id, reaction_type, user_id')
+              .eq('entity_type', 'forum_post')
+              .in('entity_id', ids);
+            if (error) throw error;
+            return (data as any[]) || [];
+          } catch { return []; }
+        })(),
+        (async (): Promise<{ interests: any[]; tagRows: any[] }> => {
+          if (!wantsInterests) return { interests: [], tagRows: [] };
+          try {
+            const [{ data: interests }, { data: tagRows }] = await Promise.all([
+              db.from('user_tag_interests').select('tag, weight').eq('user_id', user!.id),
+              db.from('post_hashtags').select('post_id, tag').in('post_id', ids),
+            ]);
+            return { interests: (interests as any[]) || [], tagRows: (tagRows as any[]) || [] };
+          } catch { return { interests: [], tagRows: [] }; /* pre-migration */ }
+        })(),
+        (async (): Promise<{ rooms: any[]; participants: any[]; hostProfiles: any[] }> => {
+          if (!wantsRooms) return { rooms: [], participants: [], hostProfiles: [] };
+          const { data: rawRooms } = await supabase
+            .from('watch_rooms')
+            .select(WATCH_ROOM_COLUMNS)
+            .eq('is_active', true)
+            .in('access_type', ['public', 'password'])
+            .order('created_at', { ascending: false })
+            .limit(20);
+          let rooms = (rawRooms || []) as any[];
+          if (tab === 'following') rooms = rooms.filter((r) => followingIds.includes(r.host_id));
+          if (!rooms.length) return { rooms: [], participants: [], hostProfiles: [] };
+          const roomIds = rooms.map((r) => r.id);
+          const hostIds = [...new Set(rooms.map((r) => r.host_id))];
+          const [{ data: participants }, { data: hostProfiles }] = await Promise.all([
+            supabase.from('watch_room_participants').select('room_id').in('room_id', roomIds),
+            supabase.from('profiles').select('user_id, username, display_name, avatar_url').in('user_id', hostIds),
+          ]);
+          return {
+            rooms,
+            participants: (participants as any[]) || [],
+            hostProfiles: (hostProfiles as any[]) || [],
+          };
+        })(),
+      ]);
+
       // Community summaries for attribution chips (posts made inside a community
       // surface in the global feed labeled with their community + a join card).
       const communityMap = new Map<string, { id: string; name: string; slug: string; icon_url: string | null; banner_url: string | null; is_verified: boolean }>();
-      const communityIds = [...new Set(posts.map((p) => p.community_id).filter(Boolean))] as string[];
-      if (communityIds.length) {
-        try {
-          const { data: comm, error } = await db
-            .from('communities')
-            .select('id, name, slug, icon_url, banner_url, is_verified')
-            .in('id', communityIds);
-          if (error) throw error;
-          ((comm as any[]) || []).forEach((c: any) =>
-            communityMap.set(c.id, { id: c.id, name: c.name, slug: c.slug, icon_url: c.icon_url ?? null, banner_url: c.banner_url ?? null, is_verified: !!c.is_verified }),
-          );
-        } catch { /* pre-migration */ }
-      }
+      communityRows.forEach((c: any) =>
+        communityMap.set(c.id, { id: c.id, name: c.name, slug: c.slug, icon_url: c.icon_url ?? null, banner_url: c.banner_url ?? null, is_verified: !!c.is_verified }),
+      );
 
       // Author badges (stored grants + derived admin/mod) + episode-count rank proxy.
       const badgeMap = new Map<string, BadgeDef[]>();
       const rankScoreMap = new Map<string, number>();
-      if (authorIds.length) {
-        const [{ data: badgeRows }, { data: roleRows }, { data: watchRows }] = await Promise.all([
-          supabase.from('user_badges' as any).select('user_id, badge_key').in('user_id', authorIds),
-          supabase.from('profiles').select('user_id, is_admin, is_moderator, role').in('user_id', authorIds),
-          supabase.from('watch_history').select('user_id').in('user_id', authorIds),
-        ]);
+      {
         const keysByUser = new Map<string, string[]>();
-        ((badgeRows as any[]) || []).forEach((r: any) => {
+        badgeBundle.badgeRows.forEach((r: any) => {
           const list = keysByUser.get(r.user_id) || [];
           list.push(r.badge_key);
           keysByUser.set(r.user_id, list);
         });
         const roleByUser = new Map<string, any>();
-        ((roleRows as any[]) || []).forEach((r: any) => roleByUser.set(r.user_id, r));
-        ((watchRows as any[]) || []).forEach((w: any) =>
+        badgeBundle.roleRows.forEach((r: any) => roleByUser.set(r.user_id, r));
+        badgeBundle.watchRows.forEach((w: any) =>
           rankScoreMap.set(w.user_id, (rankScoreMap.get(w.user_id) || 0) + 1),
         );
         for (const id of authorIds) {
@@ -183,78 +330,55 @@ export function useFeed(tab: FeedTab, opts: FeedOptions = {}) {
 
       // Official/verified authors (guarded — is_official ships with community_phase_b).
       const officialSet = new Set<string>();
-      if (authorIds.length) {
-        try {
-          const { data: offRows, error } = await db
-            .from('profiles')
-            .select('user_id, is_official')
-            .in('user_id', authorIds);
-          if (error) throw error;
-          ((offRows as any[]) || []).forEach((r: any) => {
-            if (r.is_official) officialSet.add(r.user_id);
-          });
-        } catch { /* pre-migration */ }
-      }
+      officialRows.forEach((r: any) => {
+        if (r.is_official) officialSet.add(r.user_id);
+      });
 
       // Viewer votes
       const voteMap = new Map<string, 1 | -1>();
-      if (user && ids.length) {
-        const { data: votes } = await supabase
-          .from('forum_votes')
-          .select('post_id, vote_type')
-          .eq('user_id', user.id)
-          .in('post_id', ids);
-        (votes || []).forEach((v: any) => v.post_id && voteMap.set(v.post_id, v.vote_type));
-      }
+      voteRows.forEach((v: any) => v.post_id && voteMap.set(v.post_id, v.vote_type));
 
       // Polls (guarded)
       const pollMap = new Map<string, PostPoll>();
-      if (ids.length) {
-        try {
-          const { data: polls, error } = await db.from('post_polls').select('*').in('post_id', ids);
-          if (error) throw error;
-          const pollList = (polls || []) as any[];
-          if (pollList.length) {
-            const { data: pollVotes } = await db
-              .from('post_poll_votes')
-              .select('poll_id, user_id, option_index')
-              .in('poll_id', pollList.map((p) => p.id));
-            const byPoll = new Map<string, any[]>();
-            (pollVotes || []).forEach((v: any) => {
-              const arr = byPoll.get(v.poll_id) || [];
-              arr.push(v);
-              byPoll.set(v.poll_id, arr);
-            });
-            pollList.forEach((poll: any) => pollMap.set(poll.post_id, tallyPoll(poll, byPoll.get(poll.id) || [], user?.id)));
-          }
-        } catch { /* pre-migration */ }
+      {
+        const byPoll = new Map<string, any[]>();
+        pollBundle.pollVotes.forEach((v: any) => {
+          const arr = byPoll.get(v.poll_id) || [];
+          arr.push(v);
+          byPoll.set(v.poll_id, arr);
+        });
+        pollBundle.polls.forEach((poll: any) => pollMap.set(poll.post_id, tallyPoll(poll, byPoll.get(poll.id) || [], user?.id)));
       }
 
       // Reposts + bookmarks (guarded)
       const repostCount = new Map<string, number>();
       const repostedSet = new Set<string>();
       const bookmarkedSet = new Set<string>();
-      if (ids.length) {
-        try {
-          const { data: reposts, error } = await db.from('post_reposts').select('post_id, user_id').in('post_id', ids);
-          if (error) throw error;
-          (reposts || []).forEach((r: any) => {
-            repostCount.set(r.post_id, (repostCount.get(r.post_id) || 0) + 1);
-            if (user && r.user_id === user.id) repostedSet.add(r.post_id);
-          });
-        } catch { /* pre-migration */ }
-        if (user) {
-          try {
-            const { data: bms, error } = await db
-              .from('post_bookmarks')
-              .select('post_id')
-              .eq('user_id', user.id)
-              .in('post_id', ids);
-            if (error) throw error;
-            (bms || []).forEach((b: any) => bookmarkedSet.add(b.post_id));
-          } catch { /* pre-migration */ }
+      repostRows.forEach((r: any) => {
+        repostCount.set(r.post_id, (repostCount.get(r.post_id) || 0) + 1);
+        if (user && r.user_id === user.id) repostedSet.add(r.post_id);
+      });
+      bookmarkRows.forEach((b: any) => bookmarkedSet.add(b.post_id));
+
+      // Reaction tallies for the page (seeds each card — no per-post fetch).
+      const reactionMap = new Map<string, ReactionCounts>();
+      const emptyReactionCounts = (): ReactionCounts => ({
+        like: 0, love: 0, laugh: 0, wow: 0, sad: 0, angry: 0, user_reaction: null,
+      });
+      reactionRows.forEach((r: any) => {
+        if (!r?.entity_id) return;
+        let counts = reactionMap.get(r.entity_id);
+        if (!counts) {
+          counts = emptyReactionCounts();
+          reactionMap.set(r.entity_id, counts);
         }
-      }
+        if (r.reaction_type === 'like' || r.reaction_type === 'love' || r.reaction_type === 'laugh' || r.reaction_type === 'wow' || r.reaction_type === 'sad' || r.reaction_type === 'angry') {
+          counts[r.reaction_type] += 1;
+        }
+        if (user && r.user_id === user.id) {
+          counts.user_reaction = r.reaction_type as ReactionCounts['user_reaction'];
+        }
+      });
 
       const feedPosts: FeedItem[] = posts.map((p) => {
         const metadata = (p.metadata || {}) as Record<string, any>;
@@ -281,6 +405,7 @@ export function useFeed(tab: FeedTab, opts: FeedOptions = {}) {
           author_rank_score: rankScoreMap.get(p.user_id) || 0,
           author_is_official: officialSet.has(p.user_id),
           news_source: (metadata.source as string) || null,
+          reaction_counts: reactionMap.get(p.id) || null,
         };
         return { kind: 'post', sortAt: new Date(p.created_at).getTime(), post };
       });
@@ -290,20 +415,14 @@ export function useFeed(tab: FeedTab, opts: FeedOptions = {}) {
       // re-ranks by recency + Σ(interest.weight for matching tags). Falls back to
       // pure recency pre-migration or when the viewer has no recorded interests.
       const boostByPost = new Map<string, number>();
-      if (tab === 'foryou' && user && ids.length) {
-        try {
-          const [{ data: interests }, { data: tagRows }] = await Promise.all([
-            db.from('user_tag_interests').select('tag, weight').eq('user_id', user.id),
-            db.from('post_hashtags').select('post_id, tag').in('post_id', ids),
-          ]);
-          const weightByTag = new Map<string, number>(
-            ((interests as any[]) || []).map((r: any) => [String(r.tag).toLowerCase(), Number(r.weight) || 0]),
-          );
-          ((tagRows as any[]) || []).forEach((r: any) => {
-            const w = weightByTag.get(String(r.tag).toLowerCase());
-            if (w) boostByPost.set(r.post_id, (boostByPost.get(r.post_id) || 0) + w);
-          });
-        } catch { /* pre-migration */ }
+      {
+        const weightByTag = new Map<string, number>(
+          (interestBundle.interests || []).map((r: any) => [String(r.tag).toLowerCase(), Number(r.weight) || 0]),
+        );
+        (interestBundle.tagRows || []).forEach((r: any) => {
+          const w = weightByTag.get(String(r.tag).toLowerCase());
+          if (w) boostByPost.set(r.post_id, (boostByPost.get(r.post_id) || 0) + w);
+        });
       }
       // Each interest point floats a post ~6h up the recency axis.
       const INTEREST_MS = 6 * 60 * 60 * 1000;
@@ -325,41 +444,15 @@ export function useFeed(tab: FeedTab, opts: FeedOptions = {}) {
         item.kind === 'post' && !!item.post.is_pinned && (communityId ? true : !item.post.community_id);
 
       // ---- Watchrooms (first page only, not on news/tag/community/type views) ----
-      let feedRooms: FeedItem[] = [];
-      if (firstPage && tab !== 'news' && !tag && !communityId && !postType && !searchTerm) {
-        const { data: rawRooms } = await supabase
-          .from('watch_rooms')
-          .select(WATCH_ROOM_COLUMNS)
-          .eq('is_active', true)
-          .in('access_type', ['public', 'password'])
-          .order('created_at', { ascending: false })
-          .limit(20);
-        let rooms = (rawRooms || []) as any[];
-        if (tab === 'following') rooms = rooms.filter((r) => followingIds.includes(r.host_id));
-
-        if (rooms.length) {
-          const roomIds = rooms.map((r) => r.id);
-          const { data: participants } = await supabase
-            .from('watch_room_participants')
-            .select('room_id')
-            .in('room_id', roomIds);
-          const countMap = new Map<string, number>();
-          (participants || []).forEach((p: any) => countMap.set(p.room_id, (countMap.get(p.room_id) || 0) + 1));
-
-          const hostIds = [...new Set(rooms.map((r) => r.host_id))];
-          const { data: hostProfiles } = await supabase
-            .from('profiles')
-            .select('user_id, username, display_name, avatar_url')
-            .in('user_id', hostIds);
-          const hostMap = new Map((hostProfiles || []).map((p: any) => [p.user_id, p]));
-
-          feedRooms = rooms.map((room) => ({
-            kind: 'watchroom' as const,
-            sortAt: new Date(room.created_at).getTime(),
-            room: { ...room, participant_count: countMap.get(room.id) || 0, host_profile: hostMap.get(room.host_id) } as WatchRoom,
-          }));
-        }
-      }
+      // Rows arrive from the enrichment wave above; only the shaping stays here.
+      const countMap = new Map<string, number>();
+      roomsBundle.participants.forEach((p: any) => countMap.set(p.room_id, (countMap.get(p.room_id) || 0) + 1));
+      const hostMap = new Map((roomsBundle.hostProfiles || []).map((p: any) => [p.user_id, p]));
+      const feedRooms: FeedItem[] = (roomsBundle.rooms || []).map((room: any) => ({
+        kind: 'watchroom' as const,
+        sortAt: new Date(room.created_at).getTime(),
+        room: { ...room, participant_count: countMap.get(room.id) || 0, host_profile: hostMap.get(room.host_id) } as WatchRoom,
+      }));
 
       return [...feedPosts, ...feedRooms].sort((a, b) => {
         // Pinned posts always float to the top; then rank score (recency + interest).

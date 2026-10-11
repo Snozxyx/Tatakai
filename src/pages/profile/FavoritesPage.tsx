@@ -68,7 +68,7 @@ import {
   type WatchlistItem,
   type WatchlistStatus,
 } from '@/hooks/user/useWatchlist';
-import { useIsNativeApp } from '@/hooks/ui/useIsNativeApp';
+import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 import {
   fetchAniListDiscover,
   fetchAniListMediaById,
@@ -204,7 +204,7 @@ function suggestionToPosterItem(
 export default function FavoritesPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const isNative = useIsNativeApp();
+  const isDesktopApp = useIsDesktopApp();
   const [activeTab, setActiveTab] = useState<TabType>('for-you');
   const [sortBy, setSortBy] = useState<SortBy>('recent');
   const [selectMode, setSelectMode] = useState(false);
@@ -399,7 +399,7 @@ export default function FavoritesPage() {
 
   const shellClass = cn(
     'relative z-10 mx-auto max-w-[1800px] py-4 pb-24 pr-4 md:py-6 md:pb-6 md:pr-6',
-    isNative ? 'pl-4' : 'pl-4 md:pl-32',
+    isDesktopApp ? 'pl-4' : 'pl-4 md:pl-32',
   );
 
   if (!user) {

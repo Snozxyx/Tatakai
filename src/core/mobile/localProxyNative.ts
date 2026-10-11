@@ -29,6 +29,9 @@ type LocalProxyPlugin = {
   setEmbedActive(options: { active: boolean }): Promise<{ success: boolean }>;
   setWatchActive(options: { active: boolean }): Promise<{ success: boolean }>;
   getStats(): Promise<{ success: boolean; entries?: number; baseUrl?: string }>;
+  configurePlayback(options: { source: string; dataSaver: boolean }): Promise<{ metered: boolean }>;
+  cancelPrefetch(): Promise<void>;
+  setCloudflareConfig(options: { enabled: boolean; flaresolverrUrl: string }): Promise<{ success: boolean }>;
 };
 
 let plugin: LocalProxyPlugin | null = null;
@@ -70,6 +73,22 @@ function loadPlugin(): LocalProxyPlugin | null {
 
 export function isLocalProxyPluginAvailable(): boolean {
   return loadPlugin() != null;
+}
+
+export async function configureMobileCloudflare(enabled: boolean, flaresolverrUrl: string): Promise<void> {
+  const native = loadPlugin();
+  if (native) await native.setCloudflareConfig({ enabled, flaresolverrUrl });
+}
+
+export async function configureMobilePlayback(source: string, dataSaver: boolean): Promise<{ metered: boolean }> {
+  const native = loadPlugin();
+  if (!native) return { metered: true };
+  try { return await native.configurePlayback({ source, dataSaver }); }
+  catch { return { metered: true }; }
+}
+
+export function cancelMobilePrefetch(): void {
+  void loadPlugin()?.cancelPrefetch().catch(() => {});
 }
 
 export function getNativeProxyBaseUrl(): string | null {

@@ -18,6 +18,7 @@
  */
 
 import { Capacitor } from '@capacitor/core';
+import { hasNativeDownloads, isNativeDownloadJob, enqueueNativeDownload, cancelNativeDownload, retryNativeDownload } from './nativeDownloads';
 import { hasTorrentService, isCapacitor } from '@/lib/platform/platform';
 import { markProgress, markCompleted, markError } from '@/core/download/download-monitor';
 import {
@@ -34,6 +35,8 @@ import {
 } from './mobileDownloadService';
 
 export interface MobileDownloadInput {
+  animeId?: string;
+  posterUrl?: string;
   episodeId: string;
   url: string;
   animeName: string;
@@ -867,6 +870,11 @@ export async function startMobileDownload(
   if (!isCapacitor()) return { ok: false, reason: 'not_mobile' };
   if (!input.url) return { ok: false, reason: 'missing_stream_url' };
   if (!isDownloadableOnMobile(input.url)) return { ok: false, reason: 'unsupported_source_type' };
+  if (!isTorrentUrl(input.url)) {
+    if (!hasNativeDownloads()) return { ok: false, reason: 'Update the mobile app to enable reliable native downloads.' };
+    try { await enqueueNativeDownload(input); return { ok: true }; }
+    catch (error) { return { ok: false, reason: error instanceof Error ? error.message : String(error) }; }
+  }
   if (isTorrentUrl(input.url) && !hasTorrentService()) {
     return { ok: false, reason: 'torrent_unavailable' };
   }
@@ -898,6 +906,7 @@ export async function startMobileDownload(
 }
 
 export function cancelMobileDownload(episodeId: string): void {
+  if (hasNativeDownloads()) void cancelNativeDownload(episodeId).catch(() => {});
   const running = active.get(episodeId);
   if (running) running.cancel();
   else if (starting.has(episodeId)) pendingCancels.add(episodeId);
@@ -1042,6 +1051,10 @@ export async function retryMobileDownload(
   episodeId: string,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   if (!isCapacitor()) return { ok: false, reason: 'not_mobile' };
+  if (hasNativeDownloads() && isNativeDownloadJob(episodeId)) {
+    try { await retryNativeDownload(episodeId); return { ok: true }; }
+    catch (error) { return { ok: false, reason: error instanceof Error ? error.message : String(error) }; }
+  }
   const meta = readRetryMeta(episodeId);
   const url = String(meta?.url || '').trim();
   if (!url) return { ok: false, reason: 'missing_stream_url' };

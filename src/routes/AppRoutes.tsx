@@ -192,6 +192,7 @@ export function GlobalListeners() {
   }, []);
 
   useEffect(() => {
+    if (location.pathname === '/api/mal/redirect' || location.pathname.startsWith('/integration/')) return;
     if (isNative && !isSetupComplete && location.pathname !== '/setup') {
       navigate('/setup');
     }
@@ -299,6 +300,7 @@ export function GlobalListeners() {
 
   useEffect(() => {
     if (isLoading) return;
+    if (location.pathname === '/api/mal/redirect' || location.pathname.startsWith('/integration/')) return;
     const onboardingComplete = localStorage.getItem('tatakai_onboarding_complete') === 'true';
     const themeSelected = localStorage.getItem('tatakai_theme_selected_v2') === 'true';
     const needsOnboarding = user && (!onboardingComplete || !themeSelected);
@@ -362,6 +364,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     '/onboarding',
     '/setup',
     '/integration/mal/redirect',
+    '/api/mal/redirect',
     '/integration/anilist/redirect',
   ];
   const requiresStrictBootstrap = strictLoadingPaths.some((path) =>
@@ -478,6 +481,7 @@ const AppRoutes = () => {
         <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
         <Route path="/social/:username" element={<ProtectedRoute><FollowConnectionsPage /></ProtectedRoute>} />
         <Route path="/integration/mal/redirect" element={<ProtectedRoute><MalRedirectPage /></ProtectedRoute>} />
+        <Route path="/api/mal/redirect" element={<ProtectedRoute><MalRedirectPage /></ProtectedRoute>} />
         <Route path="/integration/anilist/redirect" element={<ProtectedRoute><AniListRedirectPage /></ProtectedRoute>} />
         <Route path="/recommendations" element={<ProtectedRoute><RecommendationsPage /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute><AdminRoute><AdminPage /></AdminRoute></ProtectedRoute>} />

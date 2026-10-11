@@ -24,6 +24,7 @@ import Hls from "hls.js";
 import { toast } from "sonner";
 import { useVideoSettings } from "@/hooks/media/useVideoSettings";
 import { useAniskip } from "@/hooks/media/useAniskip";
+import { mergeSkipSegments } from "@/core/player/skip-segments";
 import { getProxiedImageUrl, getProxiedVideoUrl, getProxiedSubtitleUrl, trackEvent } from "@/lib/api";
 import { ScreenOrientation } from '@capacitor/screen-orientation';
 import { StatusBar } from '@capacitor/status-bar';
@@ -41,6 +42,8 @@ import { buildSubtitleCueStyle } from "@/lib/video/subtitleStyle";
 import { ensureCustomSubtitleFontLoaded } from "@/lib/video/customSubtitleFont";
 import { triggerHaptic } from "@/lib/haptics";
 import { useActiveCues } from "./hooks/useActiveCues";
+import { useAmbientMode } from "./hooks/usePlayerEnhancements";
+import "./mobile-player.css";
 import {
   isAnyProxyUrl,
   isMobileProxyUrl,
@@ -49,9 +52,13 @@ import {
   reregisterMobileSource,
   resolveMobileProxy,
   unwrapMobileProxyUrl,
+  fetchMobileProxyText,
 } from "@/core/extensions/mobile/mobileProxy";
 import { createNativeHlsLoader } from "@/core/extensions/mobile/nativeHlsLoader";
 import { DownloadButton } from "./controls/DownloadButton";
+import { lockFullscreenAncestors } from "./fullscreenAncestors";
+import { loadMobileConfig } from '@/hooks/ui/useMobileConfig';
+import { configureMobilePlayback, cancelMobilePrefetch } from '@/core/mobile/localProxyNative';
 
 interface MobileVideoPlayerProps {
   sources: Array<{ url: string; isM3U8: boolean; quality?: string }>;
@@ -207,12 +214,62 @@ export function MobileVideoPlayer({
   torrentUrl,
 }: MobileVideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const resolutionStarted = useRef<number | null>(null);
+  const sourceReadyAt = useRef<number>(performance.now());
+  const playbackPolicy = useRef({ metered: true, dataSaver: false });
   const containerRef = useRef<HTMLDivElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const { settings } = useVideoSettings();
-  const { skipTimes, fetchSkipTimes } = useAniskip();
+  useEffect(() => {
+    if (isLoading) { resolutionStarted.current ??= performance.now(); return; }
+    if (sources.length && resolutionStarted.current != null) {
+      window.dispatchEvent(new CustomEvent('tatakai-mobile-playback-metric', { detail: {
+        phase: 'source-resolution', milliseconds: performance.now() - resolutionStarted.current,
+      } }));
+      resolutionStarted.current = null;
+    }
+  }, [isLoading, sources.length]);
+  useEffect(() => {
+    sourceReadyAt.current = performance.now();
+    let disposed = false;
+    const video = videoRef.current;
+    const source = selectPreferredSource(sources, capQualityForDataSaver(settings.defaultQuality))?.url || '';
+    const applyPolicy = async () => {
+      const dataSaver = loadMobileConfig().dataSaver;
+      const { metered } = await configureMobilePlayback(source, dataSaver || !!isOffline);
+      if (disposed) return;
+      playbackPolicy.current = { metered, dataSaver };
+      if (hlsRef.current) {
+        const profile = getProfileKnobs(getEffectiveMemoryProfile()).hls;
+        hlsRef.current.config.maxBufferLength = Math.min(profile.maxBufferLength, dataSaver ? 5 : metered ? 10 : 30);
+        hlsRef.current.config.maxMaxBufferLength = Math.min(profile.maxMaxBufferLength, dataSaver ? 10 : metered ? 20 : 60);
+      }
+    };
+    void applyPolicy();
+    const seek = () => { cancelMobilePrefetch(); };
+    let frameToken: number | undefined;
+    const firstFrame = () => {
+      const record = () => window.dispatchEvent(new CustomEvent('tatakai-mobile-playback-metric', { detail: {
+        phase: 'first-frame', milliseconds: performance.now() - sourceReadyAt.current,
+        metered: playbackPolicy.current.metered, offline: !!isOffline,
+      } }));
+      if (video?.requestVideoFrameCallback) frameToken = video.requestVideoFrameCallback(record);
+      else record();
+    };
+    video?.addEventListener('seeking', seek);
+    video?.addEventListener('loadeddata', firstFrame, { once: true });
+    window.addEventListener('tatakai-mobile-config-updated', applyPolicy);
+    return () => {
+      disposed = true; cancelMobilePrefetch();
+      video?.removeEventListener('seeking', seek); video?.removeEventListener('loadeddata', firstFrame);
+      if (frameToken != null) video?.cancelVideoFrameCallback?.(frameToken);
+      window.removeEventListener('tatakai-mobile-config-updated', applyPolicy);
+    };
+  }, [sources.map((item) => item.url).join('|'), isOffline, isLoading, settings.defaultQuality]);
+  const { skipTimes, fetchSkipTimes, resetSkipTimes } = useAniskip();
+  useEffect(() => { resetSkipTimes(); }, [malId, episodeNumber, resetSkipTimes]);
 
   const tatakaiSkipSegments = useMemo<SkipSegment[]>(() => {
     const segments: SkipSegment[] = [];
@@ -238,8 +295,8 @@ export function MobileVideoPlayer({
       }));
   }, [skipTimes]);
 
-  const hasTatakaiSkipSegments = tatakaiSkipSegments.length > 0;
-  const effectiveSkipSegments = hasTatakaiSkipSegments ? tatakaiSkipSegments : aniskipSegments;
+  const hasCompleteSkipSegments = tatakaiSkipSegments.some(skip => skip.type === 'op') && tatakaiSkipSegments.some(skip => skip.type === 'ed');
+  const effectiveSkipSegments = useMemo(() => mergeSkipSegments(tatakaiSkipSegments, aniskipSegments, skip => skip.type), [tatakaiSkipSegments, aniskipSegments]);
 
   const nativeMobile = Capacitor.isNativePlatform();
   const resolvedPoster = useMemo(() => {
@@ -273,6 +330,11 @@ export function MobileVideoPlayer({
   const [showSubtitleMenu, setShowSubtitleMenu] = useState(false);
   const [showFullSettings, setShowFullSettings] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
+  const [videoZoom, setVideoZoom] = useState(1);
+  const ambientCanvasRef = useRef<HTMLCanvasElement>(null);
+  const gestureRef = useRef({ x: 0, y: 0, moved: false, pinching: false, distance: 0, zoom: 1 });
+  const [controlsActivity, setControlsActivity] = useState(0);
+  useAmbientMode(videoRef, ambientCanvasRef, settings.ambientMode, isPlaying);
   const [activeSkip, setActiveSkip] = useState<SkipSegment | null>(null);
   const [, setPlaybackRate] = useState(settings.playbackSpeed);
   const [subtitleBlobs, setSubtitleBlobs] = useState<Record<string, string>>({});
@@ -310,12 +372,10 @@ export function MobileVideoPlayer({
   // Double-tap seek
   const [doubleTapSide, setDoubleTapSide] = useState<'left' | 'right' | null>(null);
   const [seekAmount, setSeekAmount] = useState(0);
-  const [hoverTime, setHoverTime] = useState<number>(0);
-  const [showHoverTime, setShowHoverTime] = useState(false);
-  const [hoverPercent, setHoverPercent] = useState(0);
   const lastTapRef = useRef<{ time: number; x: number }>({ time: 0, x: 0 });
   const doubleTapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seekAccumulatorRef = useRef(0);
+  const seekFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Progress tracking
   const lastSavedProgressRef = useRef<number>(0);
@@ -325,6 +385,14 @@ export function MobileVideoPlayer({
     [sources, settings.defaultQuality],
   );
   const sourceUrlKey = currentSource?.url || '';
+  const currentSourceRef = useRef(currentSource);
+  currentSourceRef.current = currentSource;
+  const onPlaybackErrorRef = useRef(onError);
+  onPlaybackErrorRef.current = onError;
+  const sourceHeadersKey = JSON.stringify(Object.entries((currentSource as any)?.headers || {}).sort());
+  const subtitleRequestKey = JSON.stringify(subtitles);
+  const subtitlesRef = useRef(subtitles);
+  subtitlesRef.current = subtitles;
   const sourceTypeKey = currentSource?.isM3U8 || (currentSource as any)?.sourceType === 'hls' || /\.m3u8(?:$|[?#/])/i.test(currentSource?.url || '') ? 'm3u8' : 'file';
   const sourceHeaders = (currentSource as any)?.headers as Record<string, string> | undefined;
   const playbackReferer = sourceHeaders?.Referer || sourceHeaders?.referer || headers?.Referer || '';
@@ -351,11 +419,11 @@ export function MobileVideoPlayer({
 
   // Fetch skip times for intro/outro
   useEffect(() => {
-    if (hasTatakaiSkipSegments) return;
+    if (hasCompleteSkipSegments) return;
     if (malId && episodeNumber && duration > 0) {
       fetchSkipTimes(malId, episodeNumber, Math.floor(duration));
     }
-  }, [malId, episodeNumber, duration, fetchSkipTimes, hasTatakaiSkipSegments]);
+  }, [malId, episodeNumber, duration, fetchSkipTimes, hasCompleteSkipSegments]);
 
   // Check for active skip
   useEffect(() => {
@@ -404,17 +472,17 @@ export function MobileVideoPlayer({
 
   // Hide controls after inactivity
   useEffect(() => {
-    if (showControls && isPlaying && !isLocked) {
+    if (showControls && (isPlaying || isLocked) && !showFullSettings && !showSubtitleMenu) {
       controlsTimeoutRef.current = setTimeout(() => {
         setShowControls(false);
-      }, 4000);
+      }, isLocked ? 1800 : 4000);
     }
     return () => {
       if (controlsTimeoutRef.current) {
         clearTimeout(controlsTimeoutRef.current);
       }
     };
-  }, [showControls, isPlaying, isLocked]);
+  }, [showControls, isPlaying, isLocked, controlsActivity, showFullSettings, showSubtitleMenu]);
 
   useEffect(() => {
     if (videoRef.current) {
@@ -537,9 +605,9 @@ export function MobileVideoPlayer({
   // Initialize HLS
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !currentSource?.url) return;
+    if (!video || !currentSourceRef.current?.url) return;
 
-    const source = currentSource;
+    const source = currentSourceRef.current;
     // Android receives desktop-shaped loopback URLs from the extension host.
     // Keep them intact: unwrapping here forced every manifest and segment back
     // through the hosted proxy, which was the mobile/desktop speed gap. A
@@ -683,18 +751,22 @@ export function MobileVideoPlayer({
     recoverRef.current = null;
 
     function giveUp(statusCode?: number, reason?: string): void {
+      if (disposed || terminalFailure) return;
+      terminalFailure = true;
+      try { hlsRef.current?.stopLoad(); video.pause(); } catch { /* detached */ }
       setVideoError("Failed to load video. Please try another server.");
-      onError?.({ statusCode, reason });
+      onPlaybackErrorRef.current?.({ statusCode, reason });
     }
 
     let mounted = false;
     let disposed = false;
+    let terminalFailure = false;
 
     // Shared recovery ladder, reachable from both the hls.js error handler and
     // the media-element stall watchdog (the "server works but the video froze"
     // case never hit either until now).
     function recover(): void {
-      if (disposed) return;
+      if (disposed || terminalFailure) return;
       if (recoveringRef.current) return;
       recoveringRef.current = true;
       try {
@@ -788,8 +860,8 @@ export function MobileVideoPlayer({
           // Mobile-tuned: enough forward buffer to avoid immediate rebuffering,
           // without making startup wait on a large memory target.
           backBufferLength,
-          maxBufferLength,
-          maxMaxBufferLength,
+          maxBufferLength: Math.min(maxBufferLength, playbackPolicy.current.dataSaver ? 5 : playbackPolicy.current.metered ? 10 : 30),
+          maxMaxBufferLength: Math.min(maxMaxBufferLength, playbackPolicy.current.dataSaver ? 10 : playbackPolicy.current.metered ? 20 : 60),
           // capping to player size made fullscreen rotation re-evaluate levels
           // mid-episode and rebuffer; the ABR defaults handle mobile well enough.
           capLevelToPlayerSize: false,
@@ -857,8 +929,13 @@ export function MobileVideoPlayer({
         });
 
         hls.on(Hls.Events.ERROR, (_, data) => {
+          if (disposed || terminalFailure || hlsRef.current !== hls) return;
           if (!data?.fatal) return;
           const status = Number((data as any)?.response?.code || (data as any)?.networkDetails?.status || 0);
+          if ([401, 403, 404, 410].includes(status)) {
+            giveUp(status, `hls-http-${status}`);
+            return;
+          }
 
           if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
             if (mediaRetryRef.current < MAX_MEDIA_RECOVERIES) {
@@ -981,14 +1058,16 @@ export function MobileVideoPlayer({
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
+      try { video.pause(); video.removeAttribute('src'); video.load(); } catch { /* detached */ }
     };
-  }, [currentSource, sourceUrlKey, sourceTypeKey, initialSeekSeconds, isOffline, nativeMobile, playbackReferer, playbackUserAgent, headers?.Origin, settings.autoplay, onError, debridResolvedUrl]);
+  }, [sourceUrlKey, sourceTypeKey, sourceHeadersKey, initialSeekSeconds, isOffline, nativeMobile, playbackReferer, playbackUserAgent, headers?.Origin, settings.autoplay, debridResolvedUrl]);
 
   // Load subtitles — parallel + incremental so the first (English) track mounts
   // in ~1s instead of after every track serially times out. Each resolved track
   // merges into state immediately, so `<track>` elements appear progressively
   // and the selected subtitle shows even while the rest still fetch.
   useEffect(() => {
+    const subtitles = subtitlesRef.current;
     if (!subtitles.length) {
       setSubtitleBlobs({});
       return;
@@ -996,6 +1075,7 @@ export function MobileVideoPlayer({
 
     let mounted = true;
     const createdBlobUrls: string[] = [];
+    const requests = new Set<AbortController>();
 
     const fetchOne = async (sub: (typeof subtitles)[number], i: number) => {
       const subtitleKey = getSubtitleSelectionKey(sub, i);
@@ -1007,7 +1087,14 @@ export function MobileVideoPlayer({
       }
 
       try {
-        const candidates = buildSubtitleFetchCandidates(
+        const subMetadata = sub as typeof sub & { originalUrl?: string; headers?: unknown };
+        const nativeSubtitleUrl = !nativeMobile || isOffline ? subtitleSourceUrl : isAnyProxyUrl(subtitleSourceUrl)
+          ? reregisterMobileSource({ url: subtitleSourceUrl, originalUrl: subMetadata.originalUrl, headers: subMetadata.headers })
+          : registerMobileSource({ url: subtitleSourceUrl, headers: subMetadata.headers || {
+              ...(playbackReferer ? { Referer: playbackReferer } : {}),
+              ...(playbackUserAgent ? { 'User-Agent': playbackUserAgent } : {}),
+            } });
+        const candidates = nativeMobile && !isOffline ? [nativeSubtitleUrl] : buildSubtitleFetchCandidates(
           subtitleSourceUrl,
           playbackReferer,
           Boolean(isOffline),
@@ -1024,7 +1111,16 @@ export function MobileVideoPlayer({
 
         let normalizedText = '';
         for (const candidateUrl of candidates) {
+          if (!mounted || !candidateUrl) break;
+          const request = new AbortController();
+          requests.add(request);
+          const timeout = setTimeout(() => request.abort(), 8000);
           try {
+            if (isMobileProxyUrl(candidateUrl)) {
+              normalizedText = normalizeSubtitleToVtt((await fetchMobileProxyText(candidateUrl, { originalUrl: subMetadata.originalUrl, headers: subMetadata.headers, timeoutMs: 8000 })) || '');
+              if (normalizedText) break;
+              continue;
+            }
             // Candidates are [raw, backend subtitle proxy]: raw first for
             // open CDNs, then the backend fetch (server-side Referer replay
             // + CORS) for gated ones.
@@ -1032,7 +1128,7 @@ export function MobileVideoPlayer({
               headers: {
                 Accept: 'text/vtt, text/plain, */*',
               },
-              signal: AbortSignal.timeout(8000),
+              signal: request.signal,
             });
 
             if (!response.ok) {
@@ -1045,6 +1141,9 @@ export function MobileVideoPlayer({
             }
           } catch {
             // Try next subtitle URL candidate.
+          } finally {
+            clearTimeout(timeout);
+            requests.delete(request);
           }
         }
 
@@ -1053,6 +1152,7 @@ export function MobileVideoPlayer({
           return null;
         }
 
+        if (!mounted) return null;
         const blob = new Blob([normalizedText], { type: 'text/vtt' });
         const blobUrl = URL.createObjectURL(blob);
         createdBlobUrls.push(blobUrl);
@@ -1092,13 +1192,14 @@ export function MobileVideoPlayer({
 
     return () => {
       mounted = false;
+      for (const request of requests) request.abort();
       createdBlobUrls.forEach((blobUrl) => {
         try {
           if (!blobUrl.startsWith('asset://')) URL.revokeObjectURL(blobUrl);
         } catch { /* ignore */ }
       });
     };
-  }, [subtitles, playbackReferer, playbackUserAgent, isOffline, nativeMobile]);
+  }, [subtitleRequestKey, playbackReferer, playbackUserAgent, isOffline, nativeMobile]);
 
   useEffect(() => {
     if (!subtitles.length || currentSubtitle === 'off') return;
@@ -1137,7 +1238,9 @@ export function MobileVideoPlayer({
       const t = Math.floor(video.currentTime || 0);
       if (t > 0) onProgressUpdate?.(t, Math.floor(video.duration || 0) || 0, false, true);
     };
+    let bufferingStarted: number | null = null;
     const handleWaiting = () => {
+      if (video.currentTime > 0 && !video.seeking && !video.paused) bufferingStarted ??= performance.now();
       setIsBuffering(true);
 
       // Stall watchdog: without this, a stream that stops delivering keeps the
@@ -1155,6 +1258,13 @@ export function MobileVideoPlayer({
       }, STALL_TIMEOUT_MS);
     };
     const handlePlaying = () => {
+      if (bufferingStarted != null) {
+        window.dispatchEvent(new CustomEvent('tatakai-mobile-playback-metric', { detail: {
+          phase: 'rebuffer', milliseconds: performance.now() - bufferingStarted,
+          metered: playbackPolicy.current.metered, offline: !!isOffline,
+        } }));
+        bufferingStarted = null;
+      }
       setIsBuffering(false);
       if (stallTimeoutRef.current) {
         clearTimeout(stallTimeoutRef.current);
@@ -1174,6 +1284,7 @@ export function MobileVideoPlayer({
       }
     };
     const handleError = () => {
+      if (recoverRef.current) { recoverRef.current(); return; }
       // The recovery ladder in the mount effect owns retries/failover; a bare
       // media-element error here means the current candidate is spent.
       setVideoError("Error loading video");
@@ -1290,6 +1401,7 @@ export function MobileVideoPlayer({
   // traps the player's fixed positioning on some devices. A window event
   // with the same payload lets portaled chrome hide without polling.
   const originalBodyOverflowRef = useRef<string | null>(null);
+  const unlockAncestorsRef = useRef<(() => void) | null>(null);
   const isFullscreenRef = useRef(false);
   isFullscreenRef.current = isFullscreen;
 
@@ -1316,11 +1428,20 @@ export function MobileVideoPlayer({
     }
     const container = containerRef.current;
     if (container) {
+      // A transformed/filtered/contained ancestor reparents `position: fixed`
+      // to its own box (player shifted right + clipped). Neutralize those
+      // ancestors in JS — the CSS `:has()` fallback alone misses old WebViews.
+      try {
+        unlockAncestorsRef.current?.();
+      } catch { /* ignore */ }
+      unlockAncestorsRef.current = lockFullscreenAncestors(container);
       container.style.position = 'fixed';
       container.style.top = '0';
       container.style.left = '0';
-      container.style.width = '100vw';
-      container.style.height = '100vh';
+      container.style.width = '';
+      container.style.height = '';
+      container.style.margin = '0';
+      container.style.transform = 'none';
       container.style.zIndex = '99999';
       container.style.backgroundColor = 'black';
       container.classList.add('is-player-fullscreen');
@@ -1339,6 +1460,10 @@ export function MobileVideoPlayer({
       /* ignore */
     }
     originalBodyOverflowRef.current = null;
+    try {
+      unlockAncestorsRef.current?.();
+    } catch { /* ignore */ }
+    unlockAncestorsRef.current = null;
     const container = containerRef.current;
     if (container) {
       container.style.position = '';
@@ -1346,6 +1471,8 @@ export function MobileVideoPlayer({
       container.style.left = '';
       container.style.width = '';
       container.style.height = '';
+      container.style.margin = '';
+      container.style.transform = '';
       container.style.zIndex = '';
       container.style.backgroundColor = '';
       container.classList.remove('is-player-fullscreen');
@@ -1415,6 +1542,31 @@ export function MobileVideoPlayer({
     };
   }, [clearFullscreenStyles, unlockOrientation]);
 
+  // WKWebView can report a layout viewport wider than the visible landscape
+  // surface. Keep the fixed box aligned to the visual viewport after rotation.
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const container = containerRef.current;
+    if (!container) return;
+    const viewport = window.visualViewport;
+    const syncViewport = () => {
+      container.style.setProperty('--player-viewport-width', `${viewport?.width ?? window.innerWidth}px`);
+      container.style.setProperty('--player-viewport-height', `${viewport?.height ?? window.innerHeight}px`);
+      container.style.setProperty('--player-viewport-left', `${viewport?.offsetLeft ?? 0}px`);
+      container.style.setProperty('--player-viewport-top', `${viewport?.offsetTop ?? 0}px`);
+    };
+    syncViewport();
+    window.addEventListener('resize', syncViewport);
+    viewport?.addEventListener('resize', syncViewport);
+    viewport?.addEventListener('scroll', syncViewport);
+    return () => {
+      window.removeEventListener('resize', syncViewport);
+      viewport?.removeEventListener('resize', syncViewport);
+      viewport?.removeEventListener('scroll', syncViewport);
+      for (const property of ['width', 'height', 'left', 'top']) container.style.removeProperty(`--player-viewport-${property}`);
+    };
+  }, [isFullscreen]);
+
   useEffect(() => {
     return () => {
       clearFullscreenStyles();
@@ -1441,7 +1593,7 @@ export function MobileVideoPlayer({
 
   const seek = (time: number) => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || isLocked || !Number.isFinite(duration) || duration <= 0) return;
     const newTime = Math.max(0, Math.min(time, duration));
     video.currentTime = newTime;
     // Update UI immediately for responsive feedback
@@ -1454,9 +1606,58 @@ export function MobileVideoPlayer({
     }
   };
 
-  // Handle double-tap to seek
+  const clearPendingTap = () => {
+    if (doubleTapTimeoutRef.current) clearTimeout(doubleTapTimeoutRef.current);
+    lastTapRef.current = { time: 0, x: 0 };
+  };
+
+  const touchDistance = (touches: React.TouchList) => Math.hypot(
+    touches[0].clientX - touches[1].clientX,
+    touches[0].clientY - touches[1].clientY,
+  );
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setControlsActivity(value => value + 1);
+    if ((e.target as Element).closest('button, input, [role="slider"], [data-player-interactive="true"]')) {
+      clearPendingTap();
+      return;
+    }
+    const touch = e.touches[0];
+    gestureRef.current = {
+      x: touch.clientX, y: touch.clientY, moved: false,
+      pinching: e.touches.length > 1,
+      distance: e.touches.length > 1 ? touchDistance(e.touches) : 0,
+      zoom: videoZoom,
+    };
+    if (e.touches.length > 1) clearPendingTap();
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const gesture = gestureRef.current;
+    if (e.touches.length > 1 && gesture.pinching && !isLocked && gesture.distance > 0) {
+      setVideoZoom(Math.max(1, Math.min(4, gesture.zoom * touchDistance(e.touches) / gesture.distance)));
+    }
+    if (Math.hypot(e.touches[0].clientX - gesture.x, e.touches[0].clientY - gesture.y) > 12) {
+      gesture.moved = true;
+      clearPendingTap();
+    }
+  };
+
+  useEffect(() => () => {
+    if (doubleTapTimeoutRef.current) clearTimeout(doubleTapTimeoutRef.current);
+    if (seekFeedbackTimeoutRef.current) clearTimeout(seekFeedbackTimeoutRef.current);
+  }, []);
+
+  useEffect(() => {
+    setVideoZoom(1);
+    clearPendingTap();
+  }, [sourceUrlKey]);
+
+  useEffect(() => { clearPendingTap(); }, [isLocked]);
+
+  // Only a pair of stationary taps in the same outer third seeks.
   const handleTap = (e: React.TouchEvent) => {
-    if (isLocked) return;
+    if (gestureRef.current.pinching || gestureRef.current.moved || e.touches.length > 0) return;
 
     // Control taps bubble to the player container after the button's click.
     // Treating those as canvas taps schedules a second state change 300 ms
@@ -1466,21 +1667,30 @@ export function MobileVideoPlayer({
     const target = e.target;
     if (
       target instanceof Element &&
-      target.closest('button, [role="button"], [data-player-interactive="true"]')
+      target.closest('button, input, [role="slider"], [role="button"], [data-player-interactive="true"]')
     ) {
+      return;
+    }
+    if (isLocked) {
+      clearPendingTap();
+      setShowControls(true);
+      setControlsActivity(value => value + 1);
       return;
     }
     
     const now = Date.now();
     const { clientX } = e.changedTouches[0];
     const containerRect = containerRef.current?.getBoundingClientRect();
-    const containerMidpoint = containerRect
-      ? containerRect.left + containerRect.width / 2
-      : window.innerWidth / 2;
-    const isLeftSide = clientX < containerMidpoint;
+    if (!containerRect) return;
+    const zone = (x: number) => {
+      const ratio = (x - containerRect.left) / containerRect.width;
+      return ratio < 1 / 3 ? 'left' : ratio > 2 / 3 ? 'right' : 'center';
+    };
+    const side = zone(clientX);
+    const isLeftSide = side === 'left';
     
     const timeDiff = now - lastTapRef.current.time;
-    const isDoubleTap = timeDiff < 300;
+    const isDoubleTap = timeDiff < 300 && side !== 'center' && side === zone(lastTapRef.current.x);
     
     if (isDoubleTap) {
       // Clear single tap timeout
@@ -1493,16 +1703,18 @@ export function MobileVideoPlayer({
       const direction = isLeftSide ? -1 : 1;
       seekAccumulatorRef.current += seekSeconds;
       
-      seek(currentTime + (seekSeconds * direction));
+      seek((videoRef.current?.currentTime ?? currentTime) + (seekSeconds * direction));
       setDoubleTapSide(isLeftSide ? 'left' : 'right');
       setSeekAmount(seekAccumulatorRef.current);
       
       // Reset after animation
-      setTimeout(() => {
+      if (seekFeedbackTimeoutRef.current) clearTimeout(seekFeedbackTimeoutRef.current);
+      seekFeedbackTimeoutRef.current = setTimeout(() => {
         setDoubleTapSide(null);
         seekAccumulatorRef.current = 0;
       }, 800);
     } else {
+      if (doubleTapTimeoutRef.current) clearTimeout(doubleTapTimeoutRef.current);
       // Single tap - toggle controls
       doubleTapTimeoutRef.current = setTimeout(() => {
         setShowControls(prev => !prev);
@@ -1510,30 +1722,6 @@ export function MobileVideoPlayer({
     }
     
     lastTapRef.current = { time: now, x: clientX };
-  };
-
-  // Handle progress bar seek
-  const handleProgressSeek = (e: React.TouchEvent) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.changedTouches[0].clientX - rect.left;
-    const percent = x / rect.width;
-    seek(percent * duration);
-  };
-
-  // Handle progress bar hover (for mouse/pointer events)
-  const handleProgressBarHover = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clientX = e.clientX;
-    const percent = (clientX - rect.left) / rect.width;
-    const clampedPercent = Math.max(0, Math.min(1, percent));
-    const time = clampedPercent * duration;
-    setHoverPercent(clampedPercent * 100);
-    setHoverTime(time);
-    setShowHoverTime(true);
-  };
-
-  const handleProgressBarLeave = () => {
-    setShowHoverTime(false);
   };
 
   // Subtitle change
@@ -1649,15 +1837,24 @@ export function MobileVideoPlayer({
     <div
       ref={containerRef}
       className={cn(
-        'video-player-container relative w-full aspect-video bg-black select-none touch-none',
+        'video-player-container tatakai-mobile-player relative w-full aspect-video bg-black select-none touch-none',
         isFullscreen && 'is-player-fullscreen',
       )}
       onTouchEnd={handleTap}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchCancel={() => { gestureRef.current.moved = true; clearPendingTap(); }}
+      onClickCapture={() => setControlsActivity(value => value + 1)}
     >
+      {settings.ambientMode && (
+        <canvas ref={ambientCanvasRef} className="mobile-player-ambient" aria-hidden="true" />
+      )}
+      <div className="absolute inset-0 overflow-hidden rounded-[inherit]">
       {/* Video Element */}
       <video
         ref={videoRef}
         className="w-full h-full object-contain"
+        style={{ transform: `scale(${videoZoom})` }}
         poster={resolvedPoster}
         preload="auto"
         playsInline
@@ -1685,6 +1882,7 @@ export function MobileVideoPlayer({
           />
         )})}
       </video>
+      </div>
 
       {/* Custom styled subtitles — desktop parity (size/font/color/BG/position). */}
       {activeCueLines.length > 0 && currentSubtitle !== 'off' && (
@@ -1745,24 +1943,27 @@ export function MobileVideoPlayer({
       {isLocked && showControls && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/20">
           <button
-            onClick={() => setIsLocked(false)}
-            className="p-8 rounded-full bg-white/10 backdrop-blur-md border border-white/20"
+            onClick={() => { setIsLocked(false); setShowControls(true); }}
+            aria-label="Unlock player"
+            className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-black/70 border border-white/20"
           >
-            <Unlock className="w-12 h-12 text-white drop-shadow-lg" />
+            <Unlock className="w-7 h-7 text-white" />
+            <span className="text-white text-sm">Tap to unlock</span>
           </button>
         </div>
       )}
 
       {/* Controls Overlay */}
       {showControls && !isLocked && (
-        <div className="absolute inset-0 z-30 bg-gradient-to-b from-black/80 via-transparent to-black/90">
+        <div className="mobile-player-controls absolute inset-0 z-30 bg-gradient-to-b from-black/80 via-transparent to-black/90">
           {/* Top Bar */}
-          <div className="absolute top-0 left-0 right-0 p-3 safe-area-top">
+          <div className="mobile-player-top absolute top-0 left-0 right-0 p-4 pt-[max(1rem,env(safe-area-inset-top))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 {onBack && (
                   <button
                     onClick={onBack}
+                    aria-label="Back to anime"
                     className="p-2.5 rounded-full bg-white/10 backdrop-blur-md active:bg-white/20 border border-white/10"
                   >
                     <ChevronLeft className="w-6 h-6 text-white" />
@@ -1779,9 +1980,15 @@ export function MobileVideoPlayer({
               </div>
               
               <div className="flex items-center gap-2">
+                {videoZoom > 1.01 && (
+                  <button aria-label="Reset video zoom" onClick={() => setVideoZoom(1)} className="px-3 rounded-full bg-white/10 text-white text-sm tabular-nums">
+                    {videoZoom.toFixed(1)}×
+                  </button>
+                )}
                 {/* Lock button */}
                 <button
-                  onClick={() => setIsLocked(true)}
+                  onClick={() => { clearPendingTap(); setIsLocked(true); setShowSubtitleMenu(false); setShowControls(true); setDoubleTapSide(null); }}
+                  aria-label="Lock player"
                   className="p-2.5 rounded-full bg-white/10 backdrop-blur-md active:bg-white/20 border border-white/10"
                 >
                   <Lock className="w-5 h-5 text-white" />
@@ -1791,10 +1998,11 @@ export function MobileVideoPlayer({
           </div>
 
           {/* Center Controls */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-8">
+          <div className="mobile-player-center absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-8">
             {/* Skip Back */}
             <button
               onClick={() => seek(currentTime - 10)}
+              aria-label="Rewind 10 seconds"
               className="p-3 rounded-full bg-white/10 backdrop-blur-md active:bg-white/20 border border-white/10"
             >
               <SkipBack className="w-7 h-7 text-white drop-shadow-lg" />
@@ -1803,6 +2011,7 @@ export function MobileVideoPlayer({
             {/* Play/Pause */}
             <button
               onClick={togglePlay}
+              aria-label={isPlaying ? 'Pause' : 'Play'}
               className="p-5 rounded-full bg-primary backdrop-blur-md active:scale-95 transition-transform shadow-2xl border-2 border-white/20"
             >
               {isPlaying ? (
@@ -1815,6 +2024,7 @@ export function MobileVideoPlayer({
             {/* Skip Forward */}
             <button
               onClick={() => seek(currentTime + 10)}
+              aria-label="Forward 10 seconds"
               className="p-3 rounded-full bg-white/10 backdrop-blur-md active:bg-white/20 border border-white/10"
             >
               <SkipForward className="w-7 h-7 text-white drop-shadow-lg" />
@@ -1825,56 +2035,35 @@ export function MobileVideoPlayer({
           {activeSkip && (
             <button
               onClick={skipIntro}
-              className="absolute right-4 bottom-32 px-8 py-4 bg-white/95 backdrop-blur-md rounded-2xl text-black font-bold text-base shadow-2xl border-2 border-white/20 active:scale-95 transition-transform"
+              className="mobile-player-skip absolute right-[max(1rem,env(safe-area-inset-right))] bottom-32 px-4 py-2 bg-white/95 rounded-xl text-black font-bold text-sm shadow-lg active:scale-95 transition-transform"
             >
               Skip {activeSkip.type === 'op' || activeSkip.type === 'mixed-op' ? 'Intro' : activeSkip.type === 'recap' ? 'Recap' : 'Outro'}
             </button>
           )}
 
           {/* Bottom Controls */}
-          <div className="absolute bottom-0 left-0 right-0 p-3 pb-4 safe-area-bottom">
+          <div className="mobile-player-bottom absolute bottom-0 left-0 right-0 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
             {/* Progress Bar */}
-            <div 
-              className="relative h-1.5 bg-white/20 rounded-full mb-3 touch-none"
+            <input
+              type="range"
+              aria-label="Seek video"
+              min={0}
+              max={Number.isFinite(duration) && duration > 0 ? duration : 0}
+              step={0.1}
+              value={Number.isFinite(currentTime) ? currentTime : 0}
+              onChange={event => seek(Number(event.target.value))}
+              className="mobile-player-seek relative block w-full h-8 mb-2 accent-primary touch-none"
+              style={{ '--seek-progress': `${duration > 0 ? currentTime / duration * 100 : 0}%`, '--seek-buffered': `${duration > 0 ? buffered / duration * 100 : 0}%` } as React.CSSProperties}
               data-player-interactive="true"
-              onTouchStart={handleProgressSeek}
-              onTouchMove={handleProgressSeek}
-              onMouseMove={handleProgressBarHover}
-              onMouseLeave={handleProgressBarLeave}
-            >
-              {/* Hover Time Tooltip */}
-              {showHoverTime && (
-                <div
-                  className="absolute bottom-full mb-2 bg-black/90 text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none z-50 font-medium"
-                  style={{ left: `calc(${hoverPercent}% - 24px)` }}
-                >
-                  {formatTime(hoverTime)}
-                </div>
-              )}
-              {/* Buffered */}
-              <div 
-                className="absolute h-full bg-white/30 rounded-full"
-                style={{ width: `${(buffered / duration) * 100}%` }}
-              />
-              {/* Progress */}
-              <div 
-                className="absolute h-full bg-primary rounded-full shadow-lg"
-                style={{ width: `${(currentTime / duration) * 100}%` }}
-              />
-              {/* Thumb */}
-              <div 
-                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-xl border-2 border-primary"
-                style={{ left: `calc(${(currentTime / duration) * 100}% - 8px)` }}
-              />
-            </div>
+            />
 
             {/* Time & Actions */}
-            <div className="flex items-center justify-between">
-              <span className="text-white text-sm font-semibold drop-shadow-lg">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="shrink-0 text-white text-sm font-semibold drop-shadow-lg">
                 {formatTime(currentTime)} <span className="text-white/60">/</span> {formatTime(duration)}
               </span>
 
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
                 {/* Subtitles — quick switch; full styling lives in the settings sheet */}
                 <div className="relative">
                   <button
@@ -1936,6 +2125,8 @@ export function MobileVideoPlayer({
                 {/* Fullscreen */}
                 <button
                   onClick={toggleFullscreen}
+                  aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+                  data-player-fullscreen={isFullscreen ? 'active' : undefined}
                   className="p-2.5 rounded-full bg-white/10 backdrop-blur-md active:scale-95 transition-transform border border-white/10"
                 >
                   {isFullscreen ? (
@@ -1948,6 +2139,7 @@ export function MobileVideoPlayer({
                 {/* Screenshot */}
                 <button
                   onClick={handleScreenshot}
+                  aria-label="Take screenshot"
                   className="p-2.5 rounded-full bg-white/10 backdrop-blur-md active:scale-95 transition-transform border border-white/10"
                   title="Take Screenshot"
                 >
@@ -1965,6 +2157,7 @@ export function MobileVideoPlayer({
                     episodeNumber={episodeNumber}
                     posterUrl={animePoster ?? poster}
                     sourceUrl={currentSource?.url}
+                    originalUrl={(currentSource as any)?.originalUrl}
                     sourceType={(currentSource as any)?.sourceType ?? sourceType}
                     torrentUrl={
                       String((currentSource as any)?.sourceType ?? sourceType ?? '').toLowerCase() === 'torrent' ||
@@ -1991,7 +2184,7 @@ export function MobileVideoPlayer({
 
       {/* Server Info Badge */}
       {serverName && showControls && !isLocked && (
-        <div className="pointer-events-none absolute top-20 right-3 z-40 px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-full border border-white/10">
+        <div className="mobile-player-server pointer-events-none absolute top-20 right-3 z-40 px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-full border border-white/10">
           <span className="text-white/80 text-xs font-medium">{serverName}</span>
         </div>
       )}

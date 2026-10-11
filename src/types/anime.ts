@@ -11,6 +11,9 @@ export interface SpotlightAnime {
   jname: string;
   poster: string;
   banner?: string;
+  /** Optional transparent title lockup supplied by the content API. */
+  logo?: string;
+  titleLogo?: string;
   description: string;
   rank: number;
   otherInfo: string[];
@@ -149,7 +152,7 @@ export interface EpisodeData {
   runtime?: number;
   /** Localized episode titles keyed by language tag (`en`, `x-jat`, `ja`, …). */
   titles?: Record<string, string>;
-  /** False only when a known air date is still in the future. */
+  /** False for future-dated episodes or undated episodes beyond a known upcoming boundary. */
   hasAired?: boolean;
   isSpecial?: boolean;
   absoluteNumber?: number;

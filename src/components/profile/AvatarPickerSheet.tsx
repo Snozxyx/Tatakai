@@ -23,16 +23,18 @@ import { Loader2, RefreshCw, Check, ImageIcon, Sparkles, Search, Info, Upload, L
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { supabase } from '@/integrations/supabase/client';
+import { uploadUserMedia, validateProfileImage } from '@/lib/userMedia';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface AvatarPickerSheetProps {
   type: 'avatar' | 'banner';
   trigger: React.ReactNode;
+  overlayClassName?: string;
+  contentClassName?: string;
   currentImage?: string;
 }
 
-export function AvatarPickerSheet({ type, trigger, currentImage }: AvatarPickerSheetProps) {
+export function AvatarPickerSheet({ type, trigger, currentImage, overlayClassName, contentClassName }: AvatarPickerSheetProps) {
   const { user } = useAuth();
   const reduceMotion = useReducedMotion();
   const [open, setOpen] = useState(false);
@@ -45,7 +47,7 @@ export function AvatarPickerSheet({ type, trigger, currentImage }: AvatarPickerS
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const { data: profileImages, isLoading: loadingProfile, refetch: refetchProfile } = useRandomProfileImages(12, genderFilter);
+  const { data: profileImages, isLoading: loadingProfile, isError: profileGalleryError, refetch: refetchProfile } = useRandomProfileImages(12, genderFilter);
   const { data: bannerImages, isLoading: loadingBanner, refetch: refetchBanner } = useRandomBannerImages(8);
   const { data: searchResults, isLoading: loadingSearch } = useAniListCharacterSearch(searchQuery, activeTab === 'search');
   const { data: gifImages, isLoading: loadingGifs, refetch: refetchGifs } = useRandomAvatarGifs(12);
@@ -74,16 +76,12 @@ export function AvatarPickerSheet({ type, trigger, currentImage }: AvatarPickerS
 
   const handleUpload = async (file: File) => {
     if (!user) { toast.error('Sign in first'); return; }
-    if (!file.type.startsWith('image/')) { toast.error('Please choose an image file'); return; }
-    if (file.size > 8 * 1024 * 1024) { toast.error('Image must be 8MB or smaller'); return; }
+    try { validateProfileImage(file); }
+    catch (e) { toast.error((e as Error).message); return; }
     setUploading(true);
     try {
-      const ext = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
-      const path = `${type === 'avatar' ? 'avatars' : 'banners'}/${user.id}-${Date.now()}.${ext}`;
-      const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true, contentType: file.type });
-      if (error) throw error;
-      const { data } = supabase.storage.from('avatars').getPublicUrl(path);
-      setSelectedImage(data.publicUrl);
+      const { url } = await uploadUserMedia(file, user.id, type);
+      setSelectedImage(url);
       toast.success('Uploaded — press Apply to save');
     } catch (e: any) {
       toast.error(e?.message || 'Upload failed');
@@ -106,14 +104,15 @@ export function AvatarPickerSheet({ type, trigger, currentImage }: AvatarPickerS
 
   const selectAnim = reduceMotion
     ? {}
-    : { scale: [1, 1.05, 1], transition: { duration: 0.4, ease: "easeOut" } };
+    : { scale: [1, 1.05, 1], transition: { duration: 0.4, ease: "easeOut" as const } };
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>{trigger}</SheetTrigger>
       <SheetContent
         side="right"
-        className="flex w-full flex-col gap-0 overflow-hidden border-l border-white/[0.08] bg-background/60 p-0 backdrop-blur-[40px] sm:max-w-md md:max-w-lg shadow-[-20px_0_40px_rgba(0,0,0,0.5)]"
+        overlayClassName={overlayClassName}
+        className={cn("flex w-full flex-col gap-0 overflow-hidden border-l border-white/[0.08] bg-background/60 p-0 backdrop-blur-[40px] sm:max-w-md md:max-w-lg shadow-[-20px_0_40px_rgba(0,0,0,0.5)]", contentClassName)}
       >
         {/* ── Ambient Background Glow ── */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10">
@@ -236,6 +235,11 @@ export function AvatarPickerSheet({ type, trigger, currentImage }: AvatarPickerS
                   {Array.from({ length: 12 }).map((_, i) => (
                     <div key={i} className="aspect-square animate-pulse rounded-2xl bg-white/[0.04] border border-white/[0.02]" />
                   ))}
+                </div>
+              ) : !galleryImages?.length ? (
+                <div className="space-y-3 py-6 text-center text-sm text-muted-foreground" role="status">
+                  <p>{type === 'avatar' && profileGalleryError ? 'Could not load avatars.' : 'No images available for this selection.'}</p>
+                  <Button variant="outline" onClick={() => refetchGallery()}>Retry gallery</Button>
                 </div>
               ) : (
                 <div className={cn('grid gap-4', type === 'avatar' ? 'grid-cols-3 sm:grid-cols-4' : 'grid-cols-2')}>
@@ -544,7 +548,7 @@ export function AvatarPickerSheet({ type, trigger, currentImage }: AvatarPickerS
                 )}
                 <div className="text-center">
                   <p className="font-bold text-sm text-foreground/90 mb-1">Click to upload image</p>
-                  <p className="text-xs font-medium text-muted-foreground/60">PNG, JPG, WebP · Up to 8MB</p>
+                  <p className="text-xs font-medium text-muted-foreground/60">PNG, JPG, GIF, WebP · Up to 8MB</p>
                 </div>
               </button>
               <input

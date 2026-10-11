@@ -1,13 +1,14 @@
 import { useMemo, useRef, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
+import { CardSkeleton } from '@/components/ui/skeleton-custom';
 import { UnifiedMediaCard } from '@/components/UnifiedMediaCard';
 import { useInfiniteMangaSections, useMangaSectionItems, type MangaSection, type SectionLayout } from '@/hooks/api/useInfiniteMangaSections';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useContentSafetySettings } from '@/hooks/user/useContentSafetySettings';
 
-import { ChevronLeft, ChevronRight, ArrowRight, BookOpen, Layers } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ArrowRight, BookOpen, Layers, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { HomeSectionHeading } from '@/components/home/HomeSectionHeading';
 
@@ -27,10 +28,8 @@ function SectionSkeleton({ layout }: { layout: SectionLayout }) {
 
       <div className="flex gap-4 overflow-hidden px-1">
         {Array.from({ length: 7 }).map((_, i) => (
-          <div key={i} className="w-36 sm:w-44 md:w-48 flex-shrink-0 space-y-3">
-            <div className="aspect-[2/3] w-full rounded-2xl bg-white/[0.04] border border-white/5" />
-            <div className="h-3.5 w-3/4 rounded bg-white/[0.05]" />
-            <div className="h-3 w-1/2 rounded bg-white/[0.03]" />
+          <div key={i} className="media-card-rail-item space-y-3">
+            <CardSkeleton />
           </div>
         ))}
       </div>
@@ -60,6 +59,7 @@ function SectionContent({ section, isMobile }: { section: MangaSection; isMobile
   const genreSlug = section.genre
     ? section.genre.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
     : '';
+  const genreUrl = genreSlug ? `/manga/genre/${genreSlug}` : '/manga/discover';
 
   return (
     <div className="space-y-4 group/section">
@@ -87,19 +87,39 @@ function SectionContent({ section, isMobile }: { section: MangaSection; isMobile
 
         <div
           ref={scrollRef}
+          data-mobile-home-rail
           className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 scroll-smooth"
         >
           {listItems.map((item, i) => (
             <motion.div
               key={`${item.id}-${i}`}
-              className="w-36 sm:w-44 md:w-48 flex-shrink-0"
+              className="media-card-rail-item"
               initial={isMobile ? false : { opacity: 0, y: 10 }}
               animate={isMobile ? {} : { opacity: 1, y: 0 }}
               transition={{ delay: Math.min(i * 0.03, 0.3), duration: 0.3 }}
             >
-              <UnifiedMediaCard item={item} variant="poster" />
+              <UnifiedMediaCard item={item} />
             </motion.div>
           ))}
+
+          {/* Poster-size "Show more" card to the genre page */}
+          <Link
+            to={genreUrl}
+            aria-label={`Show more ${section.genre}`}
+            className="media-card-rail-item"
+          >
+            <span className="flex aspect-[2/3] w-full flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-white/15 bg-white/[0.02] transition-colors hover:border-primary/50 hover:bg-primary/[0.06]">
+              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 text-primary">
+                <Plus className="h-6 w-6" />
+              </span>
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Show more
+              </span>
+            </span>
+            <span className="mt-2.5 block px-0.5 text-sm font-bold leading-snug text-white/45">
+              {section.genre}
+            </span>
+          </Link>
 
           {/* Inline Loading / Sentinel Indicator */}
           {hasMore && (

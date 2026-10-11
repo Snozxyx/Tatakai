@@ -11,7 +11,7 @@
  *
  * These helpers fan out to both: Electron IPC when present, and the native
  * `TatakaiLocalProxyPlugin.setEmbedActive/setWatchActive` (which flips
- * `SecurityState`) on Android. Safe on web — no-ops there.
+ * `SecurityState`) on Android and iOS. Safe on web — no-ops there.
  */
 
 import { Capacitor, registerPlugin } from '@capacitor/core';
@@ -24,7 +24,7 @@ type SecurityPlugin = {
 let securityPlugin: SecurityPlugin | null | undefined;
 
 function getSecurityPlugin(): SecurityPlugin | null {
-  if (securityPlugin !== undefined) return securityPlugin;
+  if (securityPlugin) return securityPlugin;
   securityPlugin = null;
   try {
     if (typeof window !== 'undefined' && Capacitor.isPluginAvailable('TatakaiLocalProxy')) {

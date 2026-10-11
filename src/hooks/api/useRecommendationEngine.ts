@@ -13,8 +13,8 @@ import { useWatchlist, type WatchlistItem } from '@/hooks/user/useWatchlist';
 import { useWatchHistory } from '@/hooks/user/useWatchHistory';
 import { contentGraph } from '@/core/content/content-graph';
 import type { TatakaiMedia } from '@/core/content/types';
-import { buildTasteProfile } from '@/core/recommendations/tasteProfile';
-import { rankCandidates } from '@/core/recommendations/scoring';
+import { buildRatingProfile, dedupeFranchiseSignals } from '@/core/recommendations/ratingProfile';
+import { computeAccuracy, rankCandidates, scoreCandidate } from '@/core/recommendations/scoring';
 import { enrichAnimeMeta, toAnimeMeta } from '@/core/recommendations/metadataEnrich';
 import { isCapacitor } from '@/lib/platform/platform';
 import type {
@@ -26,7 +26,7 @@ import type {
 } from '@/core/recommendations/types';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const MODEL_VERSION = 'v1';
+const MODEL_VERSION = 'v2';
 const MAX_SEEDS = 60; // cap metadata enrichment for the profile
 const MAX_STORED = 60; // how many recs to persist
 
@@ -63,6 +63,7 @@ export interface EngineRecommendation {
   confidence: number;
   reasons: string[];
   factors: RecommendationFactors;
+  tier?: import('@/core/recommendations/types').RecommendationTier;
 }
 
 export interface RecommendationEngineData {
@@ -70,6 +71,8 @@ export interface RecommendationEngineData {
   candidates: AnimeMeta[];
   collaborativeById: Record<string, number>;
   excludeIds: string[];
+  /** Step 8 accuracy (in-sample MAE as % of the 10-point scale), if rated seeds exist. */
+  accuracy: number | null;
 }
 
 // ── Signal assembly ──────────────────────────────────────────────────────────
@@ -208,7 +211,28 @@ async function computeEngine(userId: string): Promise<RecommendationEngineData> 
     .map((s) => s.animeId);
   const seedMeta = await enrichAnimeMeta(seedIds);
 
-  const profile = buildTasteProfile(signals, seedMeta);
+  // Step 1: collapse franchise duplicates (series + spin-off both rated ->
+  // only the most representative entry shapes the profile).
+  const deduped = dedupeFranchiseSignals(signals, seedMeta);
+  // Steps 2–4: rating-weighted genre/tag profile with uncertainty pruning
+  // and optional year/community trend lines.
+  const profile = buildRatingProfile(deduped, seedMeta);
+
+  // Step 8: in-sample accuracy — re-score rated seeds against their own
+  // profile and compare with the user's actual ratings.
+  let accuracy: number | null = null;
+  try {
+    const ratedSeeds = deduped.filter((s) => s.userRating != null && seedMeta.has(s.animeId));
+    if (ratedSeeds.length >= 3) {
+      const maxPop = Math.max(1, ...Array.from(seedMeta.values()).map((m) => m.popularity ?? 0));
+      const predicted = ratedSeeds.map((s) => {
+        const meta = seedMeta.get(s.animeId)!;
+        return scoreCandidate(meta, profile, { maxPopularity: maxPop }).score;
+      });
+      accuracy = computeAccuracy(predicted, ratedSeeds.map((s) => s.userRating!));
+    }
+  } catch { /* accuracy is best-effort */ }
+  profile.accuracy = accuracy;
 
   // Collaborative scores from the global model (aggregate; RLS-safe RPC).
   const collaborativeById: Record<string, number> = {};
@@ -250,6 +274,7 @@ async function computeEngine(userId: string): Promise<RecommendationEngineData> 
     candidates: Array.from(candidateMap.values()),
     collaborativeById,
     excludeIds: Array.from(excludeIds),
+    accuracy,
   };
 
   await persist(userId, data);
@@ -265,7 +290,9 @@ async function persist(userId: string, data: RecommendationEngineData): Promise<
       collaborativeById: collabMap,
       nicheBoost: 0.3,
       limit: MAX_STORED,
+      userScoredMean: data.profile.userScoredMean,
     });
+
     const metaById = new Map(data.candidates.map((c) => [c.id, c]));
 
     void metaById;
@@ -275,7 +302,7 @@ async function persist(userId: string, data: RecommendationEngineData): Promise<
       anime_id: r.animeId,
       score: r.score,
       confidence: r.confidence,
-      factors: r.factors,
+      factors: { ...r.factors, tier: r.tier },
       reasons: r.reasons,
       source: 'hybrid',
       model_version: MODEL_VERSION,
@@ -327,11 +354,12 @@ export function useRecommendationEngine(opts: { nicheBoost?: number; limit?: num
       collaborativeById: new Map(Object.entries(collaborativeById)),
       nicheBoost,
       limit,
+      userScoredMean: profile.userScoredMean,
     });
     return ranked
-      .map((r) => {
+      .map((r): EngineRecommendation | null => {
         const anime = metaById.get(r.animeId);
-        return anime ? { anime, score: r.score, confidence: r.confidence, reasons: r.reasons, factors: r.factors } : null;
+        return anime ? { anime, score: r.score, confidence: r.confidence, reasons: r.reasons, factors: r.factors, tier: r.tier } : null;
       })
       .filter((x): x is EngineRecommendation => x !== null);
   }, [query.data, nicheBoost, limit]);
@@ -339,6 +367,7 @@ export function useRecommendationEngine(opts: { nicheBoost?: number; limit?: num
   return {
     recommendations,
     profile: query.data?.profile ?? null,
+    accuracy: query.data?.accuracy ?? null,
     isLoading: query.isLoading,
     isError: query.isError,
     refetch: query.refetch,

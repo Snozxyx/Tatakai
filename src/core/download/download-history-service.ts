@@ -27,7 +27,9 @@ import { db, type DownloadHistoryEntry } from '../db/tatakai-db';
 export async function recordDownload(
   entry: Omit<DownloadHistoryEntry, 'id'>,
 ): Promise<void> {
-  const id = `${entry.animeId}:${entry.episodeNumber}:${entry.startedAt}`;
+  const id = entry.mediaType === 'manga'
+    ? `manga:${entry.animeId}:${entry.chapterKey}:${entry.startedAt}`
+    : `${entry.animeId}:${entry.episodeNumber}:${entry.startedAt}`;
   try {
     await db.downloadHistory.put({ ...entry, id });
   } catch (err) {

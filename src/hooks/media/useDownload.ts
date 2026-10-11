@@ -26,6 +26,7 @@ export type StartDownloadPayload = {
   episodeNumber: number;
   url: string;
   originalUrl?: string;
+  anilistId?: number | null;
   headers?: Record<string, string>;
   downloadPath?: string;
   posterUrl?: string;
@@ -120,6 +121,7 @@ export function useDownload() {
           originalUrl: payload.originalUrl,
           subtitles: payload.subtitles as MobileDownloadInput['subtitles'],
         });
+        if (!res.ok) markFailedStart(payload.episodeId, 'reason' in res ? res.reason : 'Mobile download failed');
         return res.ok
           ? { ok: true as const }
           : {
@@ -185,6 +187,10 @@ export function useDownload() {
         downloadPath,
         posterUrl: payload.posterUrl,
         subtitles: payload.subtitles,
+        originalUrl: payload.originalUrl,
+        anilistId: payload.anilistId ?? payload.animeId,
+        animeId: payload.animeId,
+        resolvedLanguage: payload.resolvedLanguage,
       });
 
       if (!res?.success) {

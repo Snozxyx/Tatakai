@@ -26,6 +26,9 @@ export type OrientationLock = 'auto' | 'portrait' | 'landscape';
 export type KeyboardResizeMode = 'native' | 'body' | 'ionic' | 'none';
 
 export interface MobileConfig {
+  mobileLayout: 'refreshed' | 'classic';
+  cloudflareBypass: boolean;
+  flaresolverrUrl: string;
   // General
   hapticFeedback: boolean; // honored by lib/haptics.ts (single global gate)
   reduceMotion: boolean; // mirror of useTheme's reduce-motion preference
@@ -48,6 +51,9 @@ export interface MobileConfig {
 }
 
 export const DEFAULT_MOBILE_CONFIG: MobileConfig = {
+  mobileLayout: 'refreshed',
+  cloudflareBypass: true,
+  flaresolverrUrl: '',
   hapticFeedback: true,
   reduceMotion: false,
   keepScreenAwake: false,
@@ -78,6 +84,9 @@ function normalizeConfig(raw: Partial<MobileConfig> | null | undefined): MobileC
   return {
     ...DEFAULT_MOBILE_CONFIG,
     ...raw,
+    mobileLayout: raw?.mobileLayout === 'classic' ? 'classic' : 'refreshed',
+    cloudflareBypass: asBool(raw?.cloudflareBypass, true),
+    flaresolverrUrl: typeof raw?.flaresolverrUrl === 'string' ? raw.flaresolverrUrl.trim() : '',
     hapticFeedback: asBool(raw?.hapticFeedback, DEFAULT_MOBILE_CONFIG.hapticFeedback),
     reduceMotion: asBool(raw?.reduceMotion, DEFAULT_MOBILE_CONFIG.reduceMotion),
     keepScreenAwake: asBool(raw?.keepScreenAwake, DEFAULT_MOBILE_CONFIG.keepScreenAwake),

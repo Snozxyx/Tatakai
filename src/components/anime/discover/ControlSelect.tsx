@@ -56,7 +56,7 @@ export function ControlSelect<T extends string>({
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label={label}
-        className={cn(controlTriggerClass, !isNeutral && 'border-primary/40 text-white', className)}
+        className={cn(controlTriggerClass, !isNeutral && 'border-primary/40 text-foreground', className)}
       >
         {Icon ? <Icon className="h-3.5 w-3.5 opacity-60" /> : null}
         {isNeutral || !active ? label : active.label}

@@ -44,7 +44,7 @@ export function MangaRecommendationGrid({
               name: rec.anime.title,
               poster: rec.anime.poster,
               type: rec.anime.format,
-              rating: rec.anime.score != null ? rec.anime.score : undefined,
+              rating: rec.anime.averageScore != null ? rec.anime.averageScore : undefined,
             },
             `/manga/${rec.anime.id}`,
           )}
@@ -66,6 +66,12 @@ export function MangaRecommendationGrid({
               {rec.anime.format && rec.anime.format !== 'manga' && (
                 <div className="absolute top-3 left-3 px-2 py-1 rounded-md text-[10px] font-bold uppercase bg-black/60 text-white">
                   {rec.anime.format}
+                </div>
+              )}
+              {rec.tier && (
+                <div className={`absolute bottom-3 left-3 px-2 py-1 rounded-md text-[10px] font-bold flex items-center gap-1.5 bg-black/60 text-white`} title={rec.tier === 'strong' ? 'Strong match' : rec.tier === 'possible' ? 'Possible match' : 'Weak match'}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${rec.tier === 'strong' ? 'bg-green-500' : rec.tier === 'possible' ? 'bg-yellow-500' : 'bg-gray-500'}`} />
+                  {rec.tier === 'strong' ? 'Strong' : rec.tier === 'possible' ? 'Possible' : 'Weak'}
                 </div>
               )}
             </div>

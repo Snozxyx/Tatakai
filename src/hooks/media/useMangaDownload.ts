@@ -36,6 +36,8 @@ export function useMangaDownload() {
 
   const optimisticQueue = useCallback((series: MangaDownloadSeries, chapter: MangaDownloadChapter) => {
     const jobId = mangaJobId(series.anilistId, chapter.chapterKey);
+    try { localStorage.setItem(`tatakai:manga:retry:${jobId}`, JSON.stringify({ series, chapter })); }
+    catch { /* Retrying is optional when local storage is unavailable. */ }
     const numLabel = chapter.chapterNumber != null ? `Ch. ${chapter.chapterNumber}` : 'Chapter';
     const chapterLabel = `${chapter.volume != null ? `Vol ${chapter.volume} · ` : ''}${numLabel}`;
     rememberMangaJobMeta(jobId, {
@@ -81,7 +83,12 @@ export function useMangaDownload() {
       const downloadPath = resolveDownloadPath(series.downloadPath);
       const jobId = optimisticQueue(series, chapter);
       console.log('[MangaDL] enqueueChapter →', { jobId, provider: chapter.provider, chapterKey: chapter.chapterKey, downloadPath });
-      const res = await window.electron.manga.enqueueChapter({ ...series, downloadPath, chapter });
+      let res;
+      try { res = await window.electron.manga.enqueueChapter({ ...series, downloadPath, chapter }); }
+      catch (error) {
+        markMangaFailedStart(jobId, error instanceof Error ? error.message : 'start_failed');
+        return { ok: false as const, reason: 'ipc_error' as const };
+      }
       console.log('[MangaDL] enqueueChapter IPC response', res);
       if (!res?.success) {
         markMangaFailedStart(jobId, typeof res?.error === 'string' ? res.error : 'start_failed');
@@ -118,7 +125,12 @@ export function useMangaDownload() {
       const downloadPath = resolveDownloadPath(series.downloadPath);
       for (const chapter of chapters) optimisticQueue(series, chapter);
       console.log('[MangaDL] enqueueAll →', { anilistId: series.anilistId, title: series.title, count: chapters.length, downloadPath });
-      const res = await window.electron.manga.enqueueAll({ ...series, downloadPath, chapters });
+      let res;
+      try { res = await window.electron.manga.enqueueAll({ ...series, downloadPath, chapters }); }
+      catch (error) {
+        for (const chapter of chapters) markMangaFailedStart(mangaJobId(series.anilistId, chapter.chapterKey), error instanceof Error ? error.message : 'start_failed');
+        return { ok: false as const, reason: 'ipc_error' as const };
+      }
       console.log('[MangaDL] enqueueAll IPC response', res);
       if (!res?.success) {
         for (const chapter of chapters) {

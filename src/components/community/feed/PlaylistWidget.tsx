@@ -85,9 +85,9 @@ export function PlaylistWidget({
               </p>
             </div>
 
-            <button className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.3)] transition-transform duration-300 group-hover:scale-110 group-hover:bg-emerald-400 group-active:scale-95">
+            <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.3)] transition-transform duration-300 group-hover:scale-110 group-hover:bg-emerald-400 group-active:scale-95">
               <Play className="ml-0.5 h-4 w-4 fill-current" />
-            </button>
+            </span>
           </div>
         </div>
       </div>

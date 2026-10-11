@@ -18,6 +18,8 @@ import { cn } from '@/lib/utils';
 import { handlePosterFallback, rankBadgeClass, rankRingClass, type PosterItem } from './types';
 import { Peekable } from '@/components/media/MediaQuickPeek';
 import { peekFromHref } from '@/components/media/quickPeekStore';
+import { MediaCardFrame } from '@/components/MediaCardFrame';
+import { AdultBadge } from '@/components/MediaCardBadges';
 
 interface PosterCardProps {
   item: PosterItem;
@@ -37,16 +39,32 @@ interface PosterCardProps {
 
 export function PosterCard({ item, rank, eager, footer, preview, className }: PosterCardProps) {
   const showScoreOnPoster = rank !== undefined && rank <= 3;
-  const previewEnabled = Boolean(preview && item.anilistId);
+  const previewEnabled = Boolean(preview && !item.href.startsWith('/manga/'));
   const hover = useHoverPreview({
     anilistId: item.anilistId,
     title: item.title,
     enabled: previewEnabled,
   });
 
+  if (rank === undefined) return <Peekable media={peekFromHref(item.href, item)}>
+    <MediaCardFrame title={item.title} href={item.href} className={className}
+      onMouseEnter={previewEnabled ? hover.onEnter : undefined} onMouseLeave={previewEnabled ? hover.onLeave : undefined}
+      poster={<>
+        <img src={getHighQualityPoster(item.poster, item.anilistId)} alt="" aria-hidden loading={eager ? 'eager' : 'lazy'} decoding="async"
+          className={cn('media-card-image h-full w-full object-cover', hover.isActive ? 'opacity-0' : 'opacity-100')}
+          onError={event => handlePosterFallback(event, item.poster)} />
+        {previewEnabled && <video ref={hover.videoRef} className={cn('absolute inset-0 h-full w-full object-cover transition-opacity duration-150', hover.isActive ? 'opacity-100' : 'opacity-0')}
+          muted loop playsInline crossOrigin="anonymous" onError={hover.onError} />}
+        {hover.unavailable && <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center"><span className="rounded-lg bg-black/75 px-3 py-2 text-xs text-white">Preview unavailable</span></div>}
+      </>}
+      badges={<>{item.isAdult && <AdultBadge className="absolute left-2 top-2 z-20" />}{item.score && <span className="media-card-score absolute right-2 top-2 z-20 inline-flex items-center gap-1 rounded-lg bg-black/75 px-2 py-1 text-xs font-semibold text-white"><Star aria-hidden className="h-3 w-3 fill-amber text-amber" />{item.score}</span>}</>}
+      metadata={<>{item.meta}{footer}</>} />
+  </Peekable>;
+
   return (
     <Peekable media={peekFromHref(item.href, item)}>
     <div
+      data-mobile-poster-card
       className={cn('group relative', className)}
       // Only wired when a preview is possible: the handlers set state, and on a
       // fifty-card board that is a render per pointer crossing for nothing.
@@ -56,7 +74,7 @@ export function PosterCard({ item, rank, eager, footer, preview, className }: Po
       <Link to={item.href} className="block focus-visible:outline-none" aria-label={item.title}>
         <div
           className={cn(
-            'relative aspect-[2/3] w-full overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.04] transition-all duration-300 group-hover:border-white/20 group-hover:shadow-xl group-hover:shadow-black/50 group-focus-visible:ring-2 group-focus-visible:ring-ring',
+            'relative aspect-[2/3] w-full overflow-hidden rounded-2xl border border-border bg-muted transition-[border-color] duration-150 group-hover:border-primary/50 group-focus-within:ring-2 group-focus-within:ring-ring',
             rankRingClass(rank),
           )}
         >
@@ -67,8 +85,8 @@ export function PosterCard({ item, rank, eager, footer, preview, className }: Po
             loading={eager ? 'eager' : 'lazy'}
             decoding="async"
             className={cn(
-              'h-full w-full object-cover transition-all duration-500',
-              hover.isActive ? 'opacity-0' : 'opacity-100 group-hover:scale-[1.06]',
+              'h-full w-full object-cover transition-[opacity,transform] duration-200',
+              hover.isActive ? 'opacity-0' : 'opacity-100 motion-safe:group-hover:scale-[1.025]',
             )}
             onError={(event) => handlePosterFallback(event, item.poster)}
           />
@@ -113,16 +131,16 @@ export function PosterCard({ item, rank, eager, footer, preview, className }: Po
           )}
         </div>
 
-        <h3 className="mt-3 line-clamp-1 text-sm font-bold text-white/90 transition-colors group-hover:text-white">
+        <h3 data-mobile-poster-title className="mt-3 line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-foreground transition-colors group-hover:text-primary">
           {item.title}
         </h3>
 
         {(item.meta || (item.score && !showScoreOnPoster)) && (
-          <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-white/40">
+          <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs font-medium text-muted-foreground">
             {item.meta}
             {item.meta && item.score && !showScoreOnPoster && <span aria-hidden>·</span>}
             {item.score && !showScoreOnPoster && (
-              <span className="inline-flex items-center gap-1 text-white/55">
+              <span className="inline-flex items-center gap-1 text-muted-foreground">
                 <Star className="h-3 w-3 fill-amber text-amber" />
                 {item.score}
               </span>

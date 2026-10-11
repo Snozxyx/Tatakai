@@ -120,6 +120,17 @@ export default defineConfig(({ mode }) => {
         ...(hmrClientPort ? { clientPort: hmrClientPort } : {}),
       },
       proxy: {
+        // Local counterpart of TatakaiAPI's fixed MangaBaka catalog adapter.
+        "^/api/v3/mapping/mangabaka/(tags|search)(\\?|$)": {
+          target: "https://api.mangabaka.org",
+          changeOrigin: true,
+          configure: (proxy) => proxy.on('proxyReq', (request) => {
+            for (const header of ['origin', 'referer', 'sec-fetch-site', 'sec-fetch-mode', 'sec-fetch-dest']) request.removeHeader(header);
+            request.setHeader('User-Agent', 'Tatakai/6.0');
+            request.setHeader('Accept', 'application/json');
+          }),
+          rewrite: (url) => url.replace('/api/v3/mapping/mangabaka/search', '/v1/series/search').replace('/api/v3/mapping/mangabaka/tags', '/v1/tags'),
+        },
         "/api/v3": {
           target: apiV3Origin,
           changeOrigin: true,

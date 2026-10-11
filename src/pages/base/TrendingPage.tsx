@@ -34,7 +34,7 @@ import {
   RAIL_LENGTH,
   type PosterItem,
 } from '@/components/anime/discover/types';
-import { useIsNativeApp } from '@/hooks/ui/useIsNativeApp';
+import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 import { useScrollRestoration } from '@/hooks/ui/useScrollRestoration';
 import { formatViewCount, useTrendingAnime, type TrendingAnime } from '@/hooks/user/useViews';
 import { fetchHome, type AnimeCard, type TrendingAnime as ApiTrendingAnime } from '@/lib/api';
@@ -172,7 +172,7 @@ interface MetricEntry {
 export default function TrendingPage() {
   const [timeFrame, setTimeFrame] = useState<TimeFrame>('week');
   const [showExtendedDiscover, setShowExtendedDiscover] = useState(false);
-  const isNative = useIsNativeApp();
+  const isDesktopApp = useIsDesktopApp();
   useScrollRestoration('trending', { useWindow: true });
 
   const frame = TIME_FRAMES.find((entry) => entry.id === timeFrame) ?? TIME_FRAMES[1];
@@ -443,7 +443,7 @@ export default function TrendingPage() {
       <main
         className={cn(
           'relative z-10 mx-auto max-w-[1800px] py-4 pb-24 pr-4 md:py-6 md:pb-6 md:pr-6',
-          isNative ? 'pl-4' : 'pl-4 md:pl-32',
+          isDesktopApp ? 'pl-4' : 'pl-4 md:pl-32',
         )}
       >
         <BoardHero

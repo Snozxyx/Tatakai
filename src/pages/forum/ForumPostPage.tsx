@@ -9,7 +9,7 @@ import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { cn } from '@/lib/utils';
-import { useIsNativeApp, useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
+import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 import { useAuth } from '@/contexts/AuthContext';
 import { useForumPost, useDeleteForumPost, usePinForumPost } from '@/hooks/community/useForum';
 import { usePostPoll } from '@/hooks/community/usePostPolls';
@@ -26,7 +26,6 @@ import { Seo } from '@/components/seo/Seo';
 export default function ForumPostPage() {
   const { postId } = useParams<{ postId: string }>();
   const navigate = useNavigate();
-  const isNative = useIsNativeApp();
   const isDesktopApp = useIsDesktopApp();
   const { user, isAdmin } = useAuth();
   const { data: post, isLoading } = useForumPost(postId!);
@@ -90,7 +89,7 @@ export default function ForumPostPage() {
 
       <CommunitySidebar />
 
-      <main className={cn('relative z-10 w-full transition-all duration-300', isDesktopApp ? 'pl-24 lg:pl-28' : isNative ? 'pl-0' : 'pl-0 md:pl-20 lg:pl-24')}>
+      <main className={cn('relative z-10 w-full transition-all duration-300', isDesktopApp ? 'pl-24 lg:pl-28' : 'pl-0 md:pl-20 lg:pl-24')}>
         <div className="mx-auto max-w-[1536px] px-4 pt-6 md:px-8 md:pt-10">
           <div className="mb-6 flex items-center justify-between">
             <Button variant="ghost" onClick={() => navigate('/community')} className="gap-2">

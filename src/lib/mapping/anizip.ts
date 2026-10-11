@@ -23,6 +23,7 @@
  */
 
 import { clearMappingCache, fetchMapping } from "./client";
+import { applyEpisodeAvailability, episodeAirTime } from '../episodeAvailability';
 
 /** Air dates change rarely but are read constantly. */
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -52,7 +53,7 @@ export interface AniZipEpisode {
   rating: number | null;
   tvdbId: number | null;
   anidbEid: number | null;
-  /** True once `airDateUtc` is in the past. Unknown dates count as aired. */
+  /** Undated regular episodes after a known upcoming episode are also unaired. */
   hasAired: boolean;
 }
 
@@ -131,12 +132,25 @@ export async function fetchAniZipMapping(
   });
   if (!wire) return null;
 
+  // Refresh cached date-derived flags and correct the API's undated future
+  // placeholders without waiting for the upstream mapping cache to expire.
+  const now = Date.now();
+  const episodes = applyEpisodeAvailability(wire.episodes ?? [], undefined, now);
+  const specials = applyEpisodeAvailability(wire.specials ?? [], undefined, now);
+  const dated = [...episodes, ...specials].filter(episode => episodeAirTime(episode) !== null)
+    .sort((a, b) => episodeAirTime(a)! - episodeAirTime(b)!);
+  const aired = dated.filter(episode => episode.hasAired);
+
   // Rebuilt per call rather than cached: it is an index over `episodes`, which the
   // cache already holds, and building it is a single pass over a few dozen rows.
   const byNumber = new Map<number, AniZipEpisode>();
-  for (const episode of wire.episodes ?? []) byNumber.set(episode.number, episode);
+  for (const episode of episodes) byNumber.set(episode.number, episode);
 
-  return { ...wire, byNumber };
+  return {
+    ...wire, episodes, specials, byNumber,
+    nextEpisode: dated.find(episode => !episode.hasAired) ?? null,
+    lastAiredEpisode: aired.length ? aired[aired.length - 1] : null,
+  };
 }
 
 /** Drop cached mappings — used by manual refresh paths. */

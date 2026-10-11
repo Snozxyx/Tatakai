@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/hooks/ui/useTheme";
 import { usePageTracking } from "@/hooks/api/useAnalytics";
+import { useClientPresence } from "@/hooks/api/usePresence";
 import { useActiveSession } from "@/hooks/auth/useActiveSession";
 import { useClientId, setCachedClientId } from "@/hooks/ui/useClientId";
 import { useIsNativeApp, useIsDesktopApp, useIsMobileApp, useIsMacOS } from "@/hooks/ui/useIsNativeApp";
@@ -60,6 +61,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
   useMobileUpdateOrchestrator();
   const [deferredStartupReady, setDeferredStartupReady] = useState(false);
   usePageTracking(deferredStartupReady);
+  useClientPresence(deferredStartupReady);
   useActiveSession(deferredStartupReady);
   const restoredTorrentSessionsRef = useRef(false);
   const navigate = useNavigate();
@@ -243,6 +245,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
         isDesktopApp && !titlebarHidden && !isMac && "pt-8"
       )}
     >
+      <a href="#main-content" className="skip-link">Skip to content</a>
       <Toaster />
       <Sonner />
       <MobileUpdateBanner />
@@ -282,7 +285,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
             {/* Long-press quick peek for anime/manga cards (global sheet). */}
             <MediaQuickPeekHost />
 
-            <main className="flex-1 w-full relative z-10">
+            <main id="main-content" tabIndex={-1} className="flex-1 min-w-0 w-full relative z-10">
               {children}
             </main>
 

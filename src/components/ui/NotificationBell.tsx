@@ -19,14 +19,14 @@ export function NotificationBell() {
   }
 
   return (
-    <div className="relative">
+    <div className="relative flex items-center justify-center">
       {/* Bell Button */}
       <button
         onClick={() => setIsOpen(true)}
-        className="relative p-2 rounded-xl hover:bg-muted/50 transition-colors"
+        className="relative flex h-10 w-10 items-center justify-center rounded-full hover:bg-muted/50 transition-colors"
         aria-label="Notifications"
       >
-        <Bell className="w-5 h-5 text-muted-foreground hover:text-foreground transition-colors" />
+        <Bell className="h-5 w-5 shrink-0 text-muted-foreground hover:text-foreground transition-colors" />
         {totalUnreadCount > 0 && (
           <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-primary-foreground text-xs font-bold rounded-full flex items-center justify-center animate-pulse">
             {totalUnreadCount > 9 ? '9+' : totalUnreadCount}

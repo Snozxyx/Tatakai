@@ -12,12 +12,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Loader2, Settings, Sparkles, Palette, User, Eye, Globe, Lock, Check } from 'lucide-react';
+import { Loader2, Settings, Sparkles, Palette, User, Eye, Globe, Lock, Check, Crown } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUpdateProfileSettings } from '@/hooks/user/useProfileFeatures';
+import { useUserBadges } from '@/hooks/community/useUserBadges';
+import { ProfileCosmeticsPicker } from '@/components/profile/ProfileCosmeticsPicker';
+import { hasPremiumCosmetics, type AvatarDecorationKey, type ProfileCosmeticEffectKey, type ProfileNameplateKey } from '@/lib/profileCosmetics';
 import {
   AMBIENT_PRESETS,
   EFFECT_OPTIONS,
@@ -28,15 +31,19 @@ import {
 
 interface ProfileSettingsSheetProps {
   trigger: React.ReactNode;
+  overlayClassName?: string;
+  contentClassName?: string;
 }
 
-export function ProfileSettingsSheet({ trigger }: ProfileSettingsSheetProps) {
+export function ProfileSettingsSheet({ trigger, overlayClassName, contentClassName }: ProfileSettingsSheetProps) {
   const { user, profile, refreshProfile } = useAuth();
   const reduceMotion = useReducedMotion();
   const updateSettings = useUpdateProfileSettings();
 
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const { data: badges = [], isLoading: loadingBadges } = useUserBadges(open ? user?.id : undefined);
+  const canUsePremium = hasPremiumCosmetics(profile, badges);
 
   // Identity fields
   const [displayName, setDisplayName] = useState('');
@@ -52,6 +59,9 @@ export function ProfileSettingsSheet({ trigger }: ProfileSettingsSheetProps) {
   // Customization
   const [ambientColor, setAmbientColor] = useState<string | null>(null);
   const [backgroundEffect, setBackgroundEffect] = useState<BackgroundEffectKey>('none');
+  const [avatarDecoration, setAvatarDecoration] = useState<AvatarDecorationKey>('none');
+  const [profileEffect, setProfileEffect] = useState<ProfileCosmeticEffectKey>('none');
+  const [nameplate, setNameplate] = useState<ProfileNameplateKey>('none');
 
   // Seed local state whenever the sheet opens or the profile changes.
   useEffect(() => {
@@ -64,10 +74,13 @@ export function ProfileSettingsSheet({ trigger }: ProfileSettingsSheetProps) {
     setShowWatchlist(p.show_watchlist ?? true);
     setShowHistory(p.show_history ?? true);
     setShowCalendar(p.show_calendar ?? true);
-    const custom = readProfileCustomization(profile);
+    const custom = readProfileCustomization(profile, canUsePremium);
     setAmbientColor(custom.ambientColor);
     setBackgroundEffect(custom.backgroundEffect);
-  }, [profile, open]);
+    setAvatarDecoration(custom.avatarDecoration);
+    setProfileEffect(custom.profileEffect);
+    setNameplate(custom.nameplate);
+  }, [profile, open, canUsePremium]);
 
   const handleSave = async () => {
     if (!user) {
@@ -101,7 +114,7 @@ export function ProfileSettingsSheet({ trigger }: ProfileSettingsSheetProps) {
       }
 
       // 2. Customization — single merged app_settings write (avoids read-modify-write race).
-      await updateSettings.mutateAsync({ ambientColor: ambientColor ?? undefined, backgroundEffect });
+      await updateSettings.mutateAsync({ ambientColor: ambientColor ?? undefined, backgroundEffect, avatarDecoration, profileEffect, nameplate });
 
       await refreshProfile();
       toast.success('Profile settings saved');
@@ -118,7 +131,8 @@ export function ProfileSettingsSheet({ trigger }: ProfileSettingsSheetProps) {
       <SheetTrigger asChild>{trigger}</SheetTrigger>
       <SheetContent
         side="right"
-        className="flex w-full flex-col gap-0 overflow-hidden border-l border-white/[0.08] bg-background/60 p-0 backdrop-blur-[40px] sm:max-w-md md:max-w-lg shadow-[-20px_0_40px_rgba(0,0,0,0.5)]"
+        overlayClassName={overlayClassName}
+        className={cn("flex w-full flex-col gap-0 overflow-hidden border-l border-white/[0.08] bg-background/60 p-0 backdrop-blur-[40px] sm:max-w-md md:max-w-lg shadow-[-20px_0_40px_rgba(0,0,0,0.5)]", contentClassName)}
       >
         {/* Ambient glow */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10">
@@ -231,17 +245,23 @@ export function ProfileSettingsSheet({ trigger }: ProfileSettingsSheetProps) {
               {EFFECT_OPTIONS.map((opt) => {
                 const Icon = opt.icon;
                 const active = backgroundEffect === opt.key;
+                const locked = opt.premium && !canUsePremium;
                 return (
                   <button
                     key={opt.key}
+                    type="button"
+                    aria-pressed={active}
+                    disabled={locked}
+                    title={locked ? 'Requires a Premium Go, Pro, or Ultra badge, or admin access' : opt.description}
                     onClick={() => setBackgroundEffect(opt.key)}
                     className={cn(
-                      'flex flex-col items-center gap-1.5 rounded-xl border p-3 transition-all',
+                      'relative flex flex-col items-center gap-1.5 rounded-xl border p-3 transition-colors disabled:cursor-not-allowed disabled:opacity-60',
                       active
                         ? 'border-primary bg-primary/10 shadow-[0_0_15px_rgba(var(--primary),0.25)]'
                         : 'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05]',
                     )}
                   >
+                    {opt.premium && <span className="absolute right-1.5 top-1.5 text-amber-200">{locked ? <Lock className="h-3 w-3" /> : <Crown className="h-3 w-3" />}</span>}
                     <Icon className={cn('h-5 w-5', active ? 'text-primary' : 'text-muted-foreground')} />
                     <span className={cn('text-[11px] font-semibold', active ? 'text-white' : 'text-muted-foreground')}>
                       {opt.label}
@@ -250,8 +270,19 @@ export function ProfileSettingsSheet({ trigger }: ProfileSettingsSheetProps) {
                 );
               })}
             </div>
+            <p className="text-xs leading-relaxed text-muted-foreground">The four crown-marked scenes are included with Premium Go, Pro, and Ultra badges, or admin access.</p>
           </section>
 
+          <ProfileCosmeticsPicker
+            custom={{ ambientColor, backgroundEffect, avatarDecoration, profileEffect, nameplate }}
+            name={displayName || username || 'You'}
+            avatarUrl={profile?.avatar_url}
+            entitled={canUsePremium}
+            loading={loadingBadges}
+            onDecoration={setAvatarDecoration}
+            onEffect={setProfileEffect}
+            onNameplate={setNameplate}
+          />
           {/* Privacy */}
           <section className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 space-y-4">
             <h3 className="flex items-center gap-2 text-sm font-bold text-white">

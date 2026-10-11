@@ -13,10 +13,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
 import { usePreviewSource } from './usePreviewSource';
+import { useMotionPreference } from './ui/useMotionPreference';
 
 interface UseHoverPreviewOptions {
-  /** The resolver keys off AniList ids; without one there is nothing to fetch. */
+  /** Known AniList identity; missing ids are resolved lazily during hover. */
   anilistId?: number | null;
+  malId?: number | null;
   /** Fallback title for the resolver's search. */
   title: string;
   /** Off for surfaces that should never fetch — pickers, manga, list rows. */
@@ -31,6 +33,7 @@ export interface HoverPreview {
   isLoading: boolean;
   /** The video has actually started moving — the fade-in gate. */
   isPlaying: boolean;
+  unavailable: boolean;
   /** No usable stream, so the card keeps its play affordance. */
   showFallback: boolean;
   onEnter: () => void;
@@ -41,17 +44,21 @@ export interface HoverPreview {
 
 export function useHoverPreview({
   anilistId,
+  malId,
   title,
   enabled = true,
 }: UseHoverPreviewOptions): HoverPreview {
+  const reduced = useMotionPreference();
+  enabled = enabled && !reduced;
   const [isHovering, setIsHovering] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   // Local in-app proxy is preferred; on playback failure we retry once through
   // the cloud proxy (`source.fallbackStreamUrl`) before surfacing an error.
   const [useFallback, setUseFallback] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
-  const { source, loading, startHover, cancelHover } = usePreviewSource();
+  const { source, loading, unavailable, startHover, cancelHover } = usePreviewSource();
 
   const primaryUrl = enabled ? source?.streamUrl ?? null : null;
   const fallbackUrl = enabled ? source?.fallbackStreamUrl ?? null : null;
@@ -71,13 +78,24 @@ export function useHoverPreview({
   }, [fallbackUrl, useFallback]);
 
   useEffect(() => {
-    if (!isHovering || !enabled || !anilistId) {
-      if (!isHovering) cancelHover();
+    if (!isHovering || !enabled) {
+      cancelHover();
       return;
     }
 
-    startHover(anilistId, [title]);
-  }, [anilistId, cancelHover, enabled, isHovering, startHover, title]);
+    startHover(anilistId ?? null, [title], undefined, malId);
+  }, [anilistId, malId, cancelHover, enabled, isHovering, startHover, title]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const sync = () => setIsPlaying(enabled && isHovering && !video.paused && video.readyState >= 2);
+    video.addEventListener('playing', sync);
+    video.addEventListener('pause', sync);
+    video.addEventListener('waiting', sync);
+    sync();
+    return () => { video.removeEventListener('playing', sync); video.removeEventListener('pause', sync); video.removeEventListener('waiting', sync); };
+  }, [enabled, isHovering]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -88,12 +106,11 @@ export function useHoverPreview({
     hlsRef.current?.destroy();
     hlsRef.current = null;
 
-    if (!isHovering || !streamUrl) {
+    if (!enabled || !isHovering || !streamUrl) {
       // `usePreviewSource` caches its hit, so `streamUrl` survives the pointer
       // leaving — the element has to be paused explicitly or a progressive
       // source keeps downloading behind a faded-out video.
       video.pause();
-      if (!streamUrl) setHasError(true);
       return;
     }
 
@@ -111,15 +128,15 @@ export function useHoverPreview({
     };
 
     const play = () => {
-      void video.play().catch(() => {});
+      if (enabled) void video.play().catch(() => {});
     };
 
-    if (source?.isHls) {
-      if (!Hls.isSupported()) {
+    if (source?.isHls && !Hls.isSupported() && !video.canPlayType('application/vnd.apple.mpegurl')) {
         setHasError(true);
         return;
-      }
+    }
 
+    if (source?.isHls && Hls.isSupported()) {
       const hls = new Hls();
       hlsRef.current = hls;
       hls.loadSource(streamUrl);
@@ -131,20 +148,15 @@ export function useHoverPreview({
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) handleFailure();
       });
-      return;
+      return () => { hls.destroy(); if (hlsRef.current === hls) hlsRef.current = null; video.pause(); };
     }
 
     video.src = streamUrl;
-    video.addEventListener(
-      'loadedmetadata',
-      () => {
-        seekToPreview();
-        play();
-      },
-      { once: true },
-    );
+    const loaded = () => { seekToPreview(); play(); };
+    video.addEventListener('loadedmetadata', loaded, { once: true });
     play();
-  }, [isHovering, source, streamUrl, handleFailure]);
+    return () => { video.removeEventListener('loadedmetadata', loaded); video.pause(); };
+  }, [enabled, isHovering, source, streamUrl, handleFailure]);
 
   useEffect(() => {
     return () => {
@@ -168,8 +180,10 @@ export function useHoverPreview({
 
   return {
     videoRef,
-    isActive: isHovering && Boolean(streamUrl),
-    isLoading: isHovering && loading,
+    isActive: enabled && isHovering && isPlaying && !hasError,
+    isPlaying,
+    unavailable: enabled && isHovering && (unavailable || hasError),
+    isLoading: enabled && isHovering && loading,
     showFallback: !streamUrl || hasError || (isHovering && loading),
     onEnter,
     onLeave,

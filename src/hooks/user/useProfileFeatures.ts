@@ -1,9 +1,12 @@
+import { fetchAvatarGallery } from '@/lib/avatarGallery';
+import { fetchWatchHistory } from '@/lib/watchHistoryQuery';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { ANILIST_GRAPHQL_ENDPOINT } from '@/lib/api/backendOrigin';
 import { getProxiedJsonUrl } from '@/lib/api/proxy-utils';
-import type { ProfileAppSettings } from '@/lib/profileSettings';
+import { PREMIUM_BACKGROUND_EFFECTS, type ProfileAppSettings } from '@/lib/profileSettings';
+import { hasPremiumCosmetics } from '@/lib/profileCosmetics';
 
 // ── API Providers (all verified working) ────────────────────────────────────
 // Every request goes through the backend's /api/proxy/json passthrough: these
@@ -404,7 +407,7 @@ export function useWaifuLandscapeBanners(limit = 8) {
 export function useRandomProfileImages(limit = 6, gender: 'male' | 'female' | 'any' = 'any') {
   return useQuery({
     queryKey: ['anime_profile_images', limit, gender],
-    queryFn: () => fetchRandomAnimeImage({ limit, type: 'avatar', gender }),
+    queryFn: () => fetchAvatarGallery(ANILIST_GRAPHQL_ENDPOINT, gender, limit),
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -487,6 +490,21 @@ export function useUpdateProfileSettings() {
     mutationFn: async (patch: NonNullable<ProfileAppSettings['profile']>) => {
       if (!user) throw new Error('Not logged in');
 
+      const premiumSelection = (patch.backgroundEffect && PREMIUM_BACKGROUND_EFFECTS.includes(patch.backgroundEffect))
+        || (patch.avatarDecoration && patch.avatarDecoration !== 'none')
+        || (patch.profileEffect && patch.profileEffect !== 'none')
+        || (patch.nameplate && patch.nameplate !== 'none');
+      if (premiumSelection) {
+        const [roleResult, badgeResult] = await Promise.all([
+          supabase.from('profiles').select('is_admin, role').eq('user_id', user.id).maybeSingle(),
+          supabase.from('user_badges' as any).select('badge_key').eq('user_id', user.id),
+        ]);
+        if (roleResult.error || badgeResult.error) throw new Error('Could not verify premium access. Try again.');
+        if (!hasPremiumCosmetics(roleResult.data, ((badgeResult.data ?? []) as unknown as { badge_key: string }[]).map(badge => ({ key: badge.badge_key })))) {
+          throw new Error('These cosmetics require a Premium Go, Pro, or Ultra badge, or admin access.');
+        }
+      }
+
       const current = ((profile as any)?.app_settings ?? {}) as ProfileAppSettings;
       const merged: ProfileAppSettings = {
         ...current,
@@ -515,6 +533,7 @@ export function useUpdateProfileSettings() {
       refreshProfile();
       queryClient.invalidateQueries({ queryKey: ['profile'] });
       queryClient.invalidateQueries({ queryKey: ['public_profile'] });
+      queryClient.invalidateQueries({ queryKey: ['profile_widget'] });
     },
   });
 }
@@ -565,19 +584,7 @@ export function usePublicWatchlist(userId: string, isPublic: boolean, showWatchl
 export function usePublicWatchHistory(userId: string, isPublic: boolean, showHistory: boolean = true) {
   return useQuery({
     queryKey: ['public_history', userId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('watch_history')
-        .select('*')
-        .eq('user_id', userId)
-        .order('watched_at', { ascending: false })
-        // Bounded but high enough that a viewed user's derived rank/episode count
-        // isn't capped (was 50, which undercounted ranks past the first 50 eps).
-        .limit(2000);
-
-      if (error) throw error;
-      return data;
-    },
+    queryFn: ({ signal }) => fetchWatchHistory(supabase, userId, undefined, signal),
     enabled: !!userId && isPublic && showHistory,
   });
 }

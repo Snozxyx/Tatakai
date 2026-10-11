@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react';
 import { triggerHaptic } from '@/lib/haptics';
 import { db } from '@/core/db/tatakai-db';
 import type { MangaKind } from '@/types/electron-bridge';
+import { recordDownload } from './download-history-service';
 
 /**
  * Global manga-chapter download monitor — a single app-lifetime subscription to
@@ -81,7 +82,27 @@ function upsert(jobId: string, patch: Partial<MangaDownloadEntry>) {
   };
   states = { ...states, [jobId]: next };
   notify();
+  if (next.status === 'completed' || next.status === 'failed' || next.status === 'cancelled') {
+    const attempt = attempts.get(jobId);
+    if (attempt && !attempt.recorded) {
+      attempt.recorded = true;
+      const meta = jobMeta.get(jobId);
+      void recordDownload({
+        mediaType: 'manga', animeId: next.anilistId, animeTitle: next.title || meta?.title || 'Untitled',
+        posterUrl: next.posterUrl || meta?.posterUrl || undefined,
+        episodeNumber: meta?.chapterNumber ?? 0, episodeId: jobId,
+        chapterKey: next.chapterKey, chapterNumber: meta?.chapterNumber,
+        chapterLabel: next.chapterLabel, volume: meta?.volume,
+        status: next.status, sourceType: 'images', resolvedLanguage: 'unknown',
+        extensionName: meta?.provider || undefined, fileSizeBytes: next.sizeBytes,
+        localPath: next.localDir, errorMessage: next.error,
+        startedAt: attempt.startedAt, completedAt: new Date().toISOString(), retryCount: 0,
+      });
+    }
+  }
 }
+
+const attempts = new Map<string, { startedAt: string; recorded: boolean }>();
 
 /** Metadata cached at enqueue so the completed row can carry title/number/volume. */
 const jobMeta = new Map<
@@ -123,6 +144,7 @@ async function persistOfflineChapter(data: {
       provider: data.provider ?? meta.provider ?? null,
       downloadedAt: new Date().toISOString(),
     });
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('tatakai:offline-manga-updated'));
   } catch (e) {
     console.error('[manga-download-monitor] Failed to persist offline chapter:', e);
   }
@@ -147,6 +169,10 @@ export function ensureMangaDownloadMonitor() {
   bridge.onProgress((data: any) => {
     const jobId = String(data?.jobId || '');
     if (!jobId) return;
+    if ((!attempts.has(jobId) || attempts.get(jobId)?.recorded) && data.startedAt) {
+      attempts.set(jobId, { startedAt: data.startedAt, recorded: false });
+      rememberMangaJobMeta(jobId, { title: data.title, posterUrl: data.posterUrl, chapterNumber: data.chapterNumber, volume: data.volume, provider: data.provider });
+    }
     if (Number(data.page) === 1 || Number(data.page) === Number(data.totalPages)) {
       console.debug('[MangaDL] progress', jobId, `${data.page}/${data.totalPages} (${data.percent}%)`);
     }
@@ -154,6 +180,8 @@ export function ensureMangaDownloadMonitor() {
       anilistId: Number(data.anilistId) || 0,
       chapterKey: String(data.chapterKey || ''),
       status: 'downloading',
+      title: data.title, posterUrl: data.posterUrl, kind: data.kind,
+      chapterLabel: data.chapterNumber != null ? `${data.volume != null ? `Vol ${data.volume} · ` : ''}Ch. ${data.chapterNumber}` : undefined,
       progress: typeof data.percent === 'number' ? data.percent : Number(data.percent) || 0,
       page: typeof data.page === 'number' ? data.page : undefined,
       totalPages: typeof data.totalPages === 'number' ? data.totalPages : undefined,
@@ -205,6 +233,12 @@ export function ensureMangaDownloadMonitor() {
 
 // ── Optimistic actions (called by useMangaDownload) ─────────────────────────
 export function markMangaQueued(jobId: string, meta: Partial<MangaDownloadEntry>) {
+  const previous = attempts.get(jobId);
+  // A retry is a new attempt even when it starts within the same millisecond.
+  const started = Math.max(Date.now(), previous ? Date.parse(previous.startedAt) + 1 : 0);
+  attempts.set(jobId, { startedAt: new Date(started).toISOString(), recorded: false });
+  const { [jobId]: _oldAttempt, ...remaining } = states;
+  states = remaining;
   upsert(jobId, { status: 'queued', progress: 0, ...meta });
 }
 export function markMangaFailedStart(jobId: string, error: string) {

@@ -133,7 +133,7 @@ function RowShelf({
         <div
           key={pageIndex}
           className={cn(
-            'shrink-0 snap-start rounded-[1.25rem] border border-white/[0.07] bg-white/[0.02] p-2',
+            'shrink-0 snap-start rounded-[1.25rem] border border-border bg-muted/30 p-2',
             pages.length > 1 ? 'w-[min(100%,30rem)]' : 'w-full',
           )}
         >
@@ -154,7 +154,7 @@ function RowShelf({
 
 function TileSkeleton() {
   return (
-    <div className="h-[11.5rem] animate-pulse rounded-[1.25rem] border border-white/[0.07] bg-white/[0.03]" />
+    <div className="h-[11.5rem] animate-pulse rounded-[1.25rem] border border-border bg-white/[0.03]" />
   );
 }
 
@@ -209,7 +209,7 @@ export default function ExtensionHubPage() {
         <Link
           to="/"
           aria-label="Back to home"
-          className="mb-4 inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-white/15 px-3 py-2 text-sm font-semibold active:scale-95 hover:bg-white/10"
+          className="mb-4 inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-sm font-semibold active:scale-95 hover:bg-white/10"
         >
           <ArrowLeft className="h-4 w-4" /> Home
         </Link>
@@ -221,7 +221,7 @@ export default function ExtensionHubPage() {
             <h1 className="font-display mt-1.5 text-3xl font-black tracking-tight text-foreground sm:text-4xl">
               Extensions
             </h1>
-            <p className="mt-2 max-w-2xl text-sm text-white/50">
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
               {isIos
                 ? 'Streaming sources and utilities that plug into the player.'
                 : 'Streaming sources, torrent providers and utilities that plug into the player.'}
@@ -233,19 +233,20 @@ export default function ExtensionHubPage() {
 
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
+                aria-label="Search extensions"
                 placeholder="Search extensions"
-                className="h-10 w-full rounded-full border-white/10 bg-white/[0.04] pl-9 pr-9 text-sm sm:w-72"
+                className="h-10 w-full rounded-full border-border bg-muted/30 pl-9 pr-9 text-sm sm:w-72"
               />
               {isSearching ? (
                 <button
                   type="button"
                   onClick={() => setSearch('')}
                   aria-label="Clear search"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
+                  className="absolute right-1 top-1/2 flex h-9 w-9 items-center justify-center rounded-full -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -255,7 +256,7 @@ export default function ExtensionHubPage() {
               <Button
                 variant="outline"
                 onClick={() => setSideloadOpen(true)}
-                className="h-10 gap-2 rounded-full border-white/10 bg-white/[0.04]"
+                className="h-10 gap-2 rounded-full border-border bg-muted/30"
               >
                 <FolderUp className="h-4 w-4" />
                 Sideload
@@ -293,7 +294,7 @@ export default function ExtensionHubPage() {
                   ? 'Extension service unreachable'
                   : 'Extension service not configured'}
               </p>
-              <p className="mt-0.5 text-white/55">
+              <p className="mt-0.5 text-muted-foreground">
                 {catalogue.isServiceConfigured
                   ? 'Showing sideloaded extensions only. The catalogue will fill in once the service responds.'
                   : 'Set VITE_EXTENSION_API_URL to browse the published catalogue. Sideloaded extensions still work.'}
@@ -303,11 +304,11 @@ export default function ExtensionHubPage() {
         ) : null}
 
         {!isNative ? (
-          <div className="mt-6 flex items-start gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4">
+          <div className="mt-6 flex items-start gap-3 rounded-2xl border border-border bg-muted/30 p-4">
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
             <div className="text-sm">
-              <p className="font-bold text-white/85">Browsing on the web</p>
-              <p className="mt-0.5 text-white/55">
+              <p className="font-bold text-foreground">Browsing on the web</p>
+              <p className="mt-0.5 text-muted-foreground">
                 Extensions run inside the desktop app's sandbox. You can browse and install here,
                 but nothing loads until you open Tatakai on desktop.
               </p>
@@ -331,12 +332,12 @@ export default function ExtensionHubPage() {
             ))}
           </div>
         ) : visibleItems.length === 0 ? (
-          <div className="mt-8 rounded-3xl border border-white/[0.07] bg-white/[0.02] py-24 text-center">
-            <Puzzle className="mx-auto h-10 w-10 text-white/20" />
-            <p className="mt-4 font-bold text-white/80">
+          <div className="mt-8 rounded-3xl border border-border bg-muted/30 py-24 text-center">
+            <Puzzle className="mx-auto h-10 w-10 text-muted-foreground" />
+            <p className="mt-4 font-bold text-foreground">
               {isSearching ? `Nothing matches “${search.trim()}”` : 'No extensions yet'}
             </p>
-            <p className="mt-1 text-sm text-white/45">
+            <p className="mt-1 text-sm text-muted-foreground">
               {isSearching
                 ? 'Try a shorter search, or clear it to browse everything.'
                 : 'Published extensions will appear here.'}

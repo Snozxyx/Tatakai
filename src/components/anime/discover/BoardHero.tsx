@@ -55,7 +55,7 @@ export function BoardHero({
   return (
     <section
       className={cn(
-        'relative overflow-hidden rounded-[2rem] border border-white/[0.07] bg-card',
+        'relative w-full max-w-full overflow-hidden rounded-[2rem] border border-white/[0.07] bg-card',
         className,
       )}
     >
@@ -78,8 +78,8 @@ export function BoardHero({
       <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-card/60" />
       <div className="absolute inset-0 bg-[radial-gradient(120%_90%_at_15%_110%,hsl(var(--primary)/0.28),transparent_60%)]" />
 
-      <div className="relative grid gap-10 p-6 sm:p-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-center lg:gap-6 lg:p-14">
-        <div className="max-w-xl">
+      <div className="relative grid w-full max-w-full grid-cols-[minmax(0,1fr)] gap-6 p-5 sm:gap-10 sm:p-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-center lg:gap-6 lg:p-14">
+        <div className="w-full min-w-0 max-w-xl">
           <AnimatePresence mode="wait">
             <motion.div
               key={heading}
@@ -87,26 +87,30 @@ export function BoardHero({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.35, ease: 'easeOut' }}
+              className="w-full min-w-0 max-w-full"
             >
               <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-primary">
                 {eyebrow}
               </p>
-              <h1 className="font-display mt-3 text-4xl font-black leading-[1.05] tracking-tight text-foreground sm:text-5xl xl:text-[3.75rem]">
+              {/* 320px screens have ~250px of text width after card + page
+                  padding: step down from text-3xl so long headings wrap
+                  instead of clipping past the card edge. */}
+              <h1 className="font-display mt-3 max-w-full break-words text-[1.7rem] font-black leading-[1.05] tracking-tight text-foreground min-[400px]:text-3xl sm:text-5xl xl:text-[3.75rem]">
                 {heading}
               </h1>
 
               {leader && (
-                <p className="mt-4 flex items-baseline gap-2 text-lg font-bold text-white/85">
+                <p className="mt-4 flex w-full min-w-0 max-w-full items-baseline gap-2 text-lg font-bold text-white/85">
                   {leaderPrefix && (
-                    <span className="text-sm font-black uppercase tracking-wider text-primary">
+                    <span className="shrink-0 text-sm font-black uppercase tracking-wider text-primary">
                       {leaderPrefix}
                     </span>
                   )}
-                  <span className="line-clamp-1">{leader.title}</span>
+                  <span className="min-w-0 flex-1 truncate">{leader.title}</span>
                 </p>
               )}
 
-              <p className="mt-3 max-w-lg text-sm leading-relaxed text-white/55 sm:text-base">
+              <p className="mt-3 max-w-lg break-words text-sm leading-relaxed text-white/55 sm:text-base">
                 {description}
               </p>
 
@@ -135,13 +139,13 @@ export function BoardHero({
             </motion.div>
           </AnimatePresence>
 
-          {children && <div className="mt-8">{children}</div>}
+          {children && <div className="mt-8 w-full min-w-0 max-w-full">{children}</div>}
         </div>
 
         {/* Stretched, not `justify-self-end`: the rail sizes its posters as a
             share of this column, which needs a definite width to resolve
             against. The rail right-aligns its own fan instead. */}
-        <div className="min-w-0">
+        <div className="w-full min-w-0 max-w-full">
           <RankedPosterRail items={items} isLoading={isLoading} />
         </div>
       </div>

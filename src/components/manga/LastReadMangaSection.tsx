@@ -8,7 +8,7 @@
  * how far through) stays here, because only this section knows it.
  */
 import { Link } from 'react-router-dom';
-import { BookMarked, BookOpen, Layers } from 'lucide-react';
+import { BookMarked, BookOpen, History, Layers } from 'lucide-react';
 import { HomeSectionHeading } from '@/components/home/HomeSectionHeading';
 import {
   RESUME_GRID_CLASS,
@@ -37,16 +37,26 @@ export function LastReadMangaSection() {
             ? `${continueRows.length} ${continueRows.length === 1 ? 'title' : 'titles'} in progress`
             : undefined
         }
+        action={
+          <Link
+            to="/profile?tab=manga-readlist"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border/70 bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            aria-label="View full manga reading history"
+          >
+            <History className="h-3.5 w-3.5" aria-hidden="true" />
+            History
+          </Link>
+        }
       />
 
       {isLoading ? (
-        <div className={RESUME_GRID_CLASS}>
+        <div data-mobile-home-rail="resume" className={RESUME_GRID_CLASS}>
           {Array.from({ length: 3 }).map((_, index) => (
             <ResumeCardSkeleton key={index} />
           ))}
         </div>
       ) : continueRows.length > 0 ? (
-        <div className={RESUME_GRID_CLASS}>
+        <div data-mobile-home-rail="resume" className={RESUME_GRID_CLASS}>
           {continueRows.map((item) => {
             const chapterLabel =
               item.last_chapter_number != null
@@ -118,10 +128,10 @@ export function LastReadMangaSection() {
             <BookMarked className="h-6 w-6 text-primary" />
           </div>
           
-          <h3 className="text-base font-semibold text-white/90">
+          <h3 className="text-base font-semibold text-foreground">
             {user ? 'No reading history' : 'Track your reading'}
           </h3>
-          <p className="mt-2 max-w-sm text-sm text-white/50 leading-relaxed">
+          <p className="mt-2 max-w-sm text-sm text-muted-foreground leading-relaxed">
             {user
               ? 'Open a manga chapter and your progress will automatically appear here.'
               : 'Sign in to automatically track and resume your manga, manhwa, and comics from where you left off.'}

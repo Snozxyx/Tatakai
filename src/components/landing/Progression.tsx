@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useReducedMotion } from "framer-motion";
+import { useMotionPreference } from "@/hooks/ui/useMotionPreference";
 import { animate, stagger } from "animejs";
 import { gsap } from "gsap";
 import { Reveal } from "@/components/ui/Reveal";
@@ -21,7 +21,7 @@ import {
 const PREVIEW_SCORE = 1500;
 
 export function Progression() {
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = useMotionPreference();
   const rootRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
 
@@ -48,22 +48,24 @@ export function Progression() {
     }
 
     let played = false;
+    const ctx = gsap.context(() => {}, root);
+    let entrance: ReturnType<typeof animate> | undefined;
     const io = new IntersectionObserver(
       ([entry]) => {
         if (!entry.isIntersecting || played) return;
         played = true;
         if (bar) {
-          gsap.fromTo(
+          ctx.add(() => gsap.fromTo(
             bar,
             { scaleX: 0, transformOrigin: "left" },
-            { scaleX: 1, transformOrigin: "left", duration: 1.4, ease: "power3.out" },
-          );
+            { scaleX: 1, transformOrigin: "left", duration: 0.5, ease: "power3.out" },
+          ));
         }
         if (chips.length) {
-          animate(chips, {
+          entrance = animate(chips, {
             opacity: [0, 1],
             translateY: [16, 0],
-            scale: [0.7, 1],
+            scale: [0.95, 1],
             delay: stagger(45),
             duration: 520,
             ease: "out(4)",
@@ -74,7 +76,7 @@ export function Progression() {
       { threshold: 0.3 },
     );
     io.observe(root);
-    return () => io.disconnect();
+    return () => { io.disconnect(); entrance?.revert(); ctx.revert(); };
   }, [reduceMotion]);
 
   return (
@@ -159,7 +161,7 @@ export function Progression() {
                     key={tier.rank}
                     data-badge
                     title={`${tier.name} — ${tier.minScore.toLocaleString()} RP`}
-                    style={reduceMotion ? undefined : { opacity: 0 }}
+
                     className={cn(
                       "group relative flex items-center justify-center rounded-lg border p-1.5 transition-colors duration-300",
                       unlocked

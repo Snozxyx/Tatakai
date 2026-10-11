@@ -61,10 +61,15 @@ export function useActiveSession(enabled: boolean = true) {
                 if (typeof navigator !== 'undefined' && !navigator.onLine) return;
 
                 if (user) {
-                    // Update authenticated user last_seen
+                    // Update authenticated user last_seen + reported app version
+                    // (feeds PerformanceInsightsPanel version distribution; the
+                    // column + UPDATE grant come from 20261009000001).
                     await supabase
                         .from('profiles')
-                        .update({ last_seen: new Date().toISOString() })
+                        .update({
+                            last_seen: new Date().toISOString(),
+                            app_version: __APP_VERSION__,
+                        })
                         .eq('user_id', user.id);
                 } else {
                     // Track guest session via events

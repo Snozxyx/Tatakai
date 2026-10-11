@@ -33,6 +33,38 @@ function esc(value) {
     .replace(/"/g, "&quot;");
 }
 
+/** schema.org type for each share-blob kind (kept in sync with src/components/seo/Seo.tsx). */
+function schemaTypeFor(kind) {
+  switch (kind) {
+    case "anime":
+      return "TVSeries";
+    case "manga":
+      return "Book";
+    case "post":
+      return "Article";
+    case "profile":
+      return "ProfilePage";
+    default:
+      return "WebPage";
+  }
+}
+
+/** Minimal valid JSON-LD for the entity — mirrors entityJsonLd() client-side. */
+function renderJsonLd(meta, canonical, image) {
+  const desc = String(meta.description || "").replace(/\s+/g, " ").trim().slice(0, 5000);
+  const node = {
+    "@context": "https://schema.org",
+    "@type": schemaTypeFor(meta.kind),
+    name: meta.title || "Tatakai",
+    url: canonical,
+    isPartOf: { "@type": "WebSite", name: "Tatakai", url: SITE_ORIGIN },
+  };
+  if (desc) node.description = desc;
+  if (image) node.image = image;
+  // JSON inside <script>: escape `<` so a `</script>` in entity text can't break out.
+  return JSON.stringify(node).replace(/</g, "\\u003c");
+}
+
 /** og:type best suited to each entity kind. */
 function ogTypeFor(kind) {
   switch (kind) {
@@ -117,6 +149,9 @@ export function renderTags(meta, fallbackImage) {
     `<meta name="twitter:description" content="${esc(description)}" />`,
   );
   if (image) lines.push(`<meta name="twitter:image" content="${esc(image)}" />`);
+  lines.push(
+    `<script type="application/ld+json">${renderJsonLd(meta, canonical, image)}</script>`,
+  );
 
   return lines.map((l) => `    ${l}`).join("\n");
 }

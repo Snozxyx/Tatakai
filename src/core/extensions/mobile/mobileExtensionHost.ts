@@ -237,10 +237,61 @@ async function callMethod(
 }
 
 /**
+ * In-memory source-result cache — the mobile counterpart of the desktop
+ * host's `resultCache` (same 10-minute TTL, non-empty only, capped size).
+ * Entries expire strictly inside the proxy-token TTL, so replayed URLs are
+ * always still valid.
+ */
+const SOURCE_CACHE_TTL_MS = 10 * 60 * 1000;
+const SOURCE_CACHE_MAX = 200;
+const sourceCache = new Map<string, { at: number; results: any[] }>();
+
+function sourceCacheKey(
+  namespace: string,
+  route: string,
+  options: Record<string, unknown>,
+): string {
+  const titles = (options as any)?.titles;
+  const firstTitle = Array.isArray(titles) ? titles[0] : titles;
+  return [
+    namespace,
+    route,
+    (options as any)?.anilistId ?? '',
+    firstTitle ?? '',
+    (options as any)?.episode ?? '',
+    (options as any)?.resolution ?? '',
+    (options as any)?.preferredLanguage ?? '',
+  ].join('::');
+}
+
+function readSourceCache(key: string): any[] | null {
+  const hit = sourceCache.get(key);
+  if (!hit || hit.results.length === 0) return null;
+  if (Date.now() - hit.at > SOURCE_CACHE_TTL_MS) {
+    sourceCache.delete(key);
+    return null;
+  }
+  return hit.results;
+}
+
+function writeSourceCache(key: string, results: any[]): void {
+  if (!results || results.length === 0) return;
+  sourceCache.set(key, { at: Date.now(), results: [...results] });
+  while (sourceCache.size > SOURCE_CACHE_MAX) {
+    const oldest = sourceCache.keys().next();
+    if (oldest.done) break;
+    sourceCache.delete(oldest.value);
+  }
+}
+
+/**
  * The public dispatch surface, mirroring the host router's route families.
  * Each returns the same JSON body the HTTP host would, so client callers only
  * swap transport (EventSource/fetch → these calls), not parsing.
  */
+type SourceChunk = { results?: any[]; diagnostic?: any };
+const sourceRequests = new Map<string, { promise: Promise<any[]>; chunks: SourceChunk[]; listeners: Set<(chunk: SourceChunk) => void> }>();
+
 export const mobileExtensionDispatch = {
   isMounted: (namespace: string) => registry.has(namespace),
   listNamespaces: listMobileNamespaces,
@@ -259,10 +310,75 @@ export const mobileExtensionDispatch = {
     namespace: string,
     route: 'sources' | 'stream' | 'torrent',
     options: Record<string, unknown>,
+    onChunk?: (chunk: SourceChunk) => void,
+  ): Promise<any[]> {
+    const key = sourceCacheKey(namespace, route, options) + (options.refresh === true ? '::refresh' : '');
+    let request = sourceRequests.get(key);
+    if (!request) {
+      const listeners = new Set<(chunk: SourceChunk) => void>();
+      const chunks: SourceChunk[] = [];
+      const promise = mobileExtensionDispatch.resolveSourcesUnshared(namespace, route, options, (chunk) => {
+        chunks.push(chunk);
+        for (const listener of listeners) { try { listener(chunk); } catch { /* consumer */ } }
+      }).finally(() => { sourceRequests.delete(key); });
+      request = { promise, chunks, listeners };
+      sourceRequests.set(key, request);
+    }
+    if (onChunk) {
+      request.listeners.add(onChunk);
+      for (const chunk of request.chunks) { try { onChunk(chunk); } catch { /* consumer */ } }
+    }
+    try { return await request.promise; }
+    finally { if (onChunk) request.listeners.delete(onChunk); }
+  },
+
+  async resolveSourcesUnshared(
+    namespace: string,
+    route: 'sources' | 'stream' | 'torrent',
+    options: Record<string, unknown>,
     onChunk?: (chunk: { results?: any[]; diagnostic?: any }) => void,
   ): Promise<any[]> {
     const method =
       route === 'stream' ? 'streamAll' : route === 'torrent' ? 'torrentAll' : 'sourcesAll';
+
+    // Don't race extension init: the first resolution awaits the deduped
+    // hydrate (bounded) instead of failing into the consumer retry loop.
+    // Steady-state cost is zero (`initialized` short-circuits).
+    let initTimer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const { initMobileExtensions } = await import('./mobileExtensionInstaller');
+      await Promise.race([
+        initMobileExtensions(),
+        new Promise<never>((_, reject) => {
+          initTimer = setTimeout(() => reject(new Error('extension-init-timeout')), 10000);
+        }),
+      ]);
+    } catch {
+      /* proceed unresolved — providers simply yield nothing */
+    } finally { if (initTimer) clearTimeout(initTimer); }
+
+    // Desktop parity: the loopback host replays cached results in milliseconds
+    // (`resultCache`, 10m TTL, non-empty only). Mobile had no equivalent, so
+    // every cold episode re-scraped all providers. Keyed pre-enrichment so
+    // title-synonym churn can't fork buckets. Safe for proxied URLs: entries
+    // expire at 10m, inside the 15m proxy-token TTL.
+    const cacheKey = sourceCacheKey(namespace, route, options);
+    if (options.refresh === true) sourceCache.delete(cacheKey);
+    const cached = readSourceCache(cacheKey);
+    if (cached) {
+      const restored = cached.map((source) => applyMobileProxyToSource(source)).filter((source) => source?.url);
+      if (typeof onChunk === 'function') {
+        try {
+          onChunk({
+            results: restored,
+            diagnostic: { provider: 'cache', status: 'ok', resultCount: restored.length, durationMs: 0, attempts: 1 },
+          });
+        } catch (err) {
+          console.warn('[mobileExtensionHost] onChunk consumer threw', err);
+        }
+      }
+      return restored;
+    }
 
     // Parity with the desktop host: enrich the single caller title with the
     // show's AniList english/romaji/native titles + filtered synonyms, so
@@ -294,7 +410,10 @@ export const mobileExtensionDispatch = {
         : undefined;
 
     const out = await callMethod(namespace, method, relay ? [enriched, relay] : [enriched]);
-    if (streamed) return collected;
+    if (streamed) {
+      writeSourceCache(cacheKey, collected);
+      return collected;
+    }
 
     const rawArr = Array.isArray(out) ? out : (out as any)?.sources ?? [];
     const arr = Array.isArray(rawArr) ? rawArr.map((r) => applyMobileProxyToSource(r)) : [];
@@ -311,6 +430,7 @@ export const mobileExtensionDispatch = {
         console.warn('[mobileExtensionHost] onChunk consumer threw', err);
       }
     }
+    writeSourceCache(cacheKey, arr);
     return arr;
   },
 

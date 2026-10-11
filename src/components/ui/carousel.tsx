@@ -99,6 +99,7 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
 
       return () => {
         api?.off("select", onSelect);
+        api?.off("reInit", onSelect);
       };
     }, [api, onSelect]);
 

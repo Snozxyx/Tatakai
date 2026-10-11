@@ -81,7 +81,7 @@ function isRetryableImageError(err) {
 async function downloadImage(url, dir, baseName, headers, signal) {
     if (!fsMod.existsSync(dir)) fsMod.mkdirSync(dir, { recursive: true });
 
-    const existing = fsMod.readdirSync(dir).find((f) => f.startsWith(`${baseName}.`));
+    const existing = fsMod.readdirSync(dir).find((f) => f.startsWith(`${baseName}.`) && !f.endsWith('.part'));
     if (existing) {
         const size = fsMod.statSync(pathMod.join(dir, existing)).size;
         if (size > 0) return { file: existing, size };
@@ -109,16 +109,17 @@ async function downloadImage(url, dir, baseName, headers, signal) {
             const ext = extFromUrl(url, response.headers?.['content-type']);
             const file = `${baseName}.${ext}`;
             const outputPath = pathMod.join(dir, file);
-            const writer = fsMod.createWriteStream(outputPath);
+            const partialPath = `${outputPath}.part`;
+            const writer = fsMod.createWriteStream(partialPath);
             response.data.pipe(writer);
 
             return await new Promise((resolve, reject) => {
                 writer.on('finish', () => {
                     try {
-                        const size = fsMod.statSync(outputPath).size;
-                        if (size > 0) resolve({ file, size });
+                        const size = fsMod.statSync(partialPath).size;
+                        if (size > 0) { require('../runtime/download/atomic-file.cjs').renameAtomic(partialPath, outputPath); resolve({ file, size }); }
                         else {
-                            fsMod.unlinkSync(outputPath);
+                            fsMod.unlinkSync(partialPath);
                             reject(new Error('Downloaded image is empty'));
                         }
                     } catch (e) {
@@ -128,7 +129,7 @@ async function downloadImage(url, dir, baseName, headers, signal) {
                 writer.on('error', reject);
                 response.data.on('error', (err) => {
                     try { writer.destroy(); } catch (_) { /* empty */ }
-                    try { if (fsMod.existsSync(outputPath)) fsMod.unlinkSync(outputPath); } catch (_) { /* empty */ }
+                    try { if (fsMod.existsSync(partialPath)) fsMod.unlinkSync(partialPath); } catch (_) { /* empty */ }
                     reject(err);
                 });
             });
@@ -143,6 +144,7 @@ async function downloadImage(url, dir, baseName, headers, signal) {
 }
 
 module.exports = function registerMangaDownloadManager(ipcMain, app, fs, path, logger, getMainWindow, runtimeApi) {
+    const recovery = require('../runtime/download/recovery-store.cjs').getRecoveryStore(app);
     const storageManager = new DownloadStorageManager({ app, fs, path });
     const { registry, workerPool, ensureExtensionFetchProxy } = runtimeApi || {};
 
@@ -296,6 +298,9 @@ module.exports = function registerMangaDownloadManager(ipcMain, app, fs, path, l
 
         const state = { cancelled: false, abort: new AbortController() };
         activeDownloads.set(jobId, state);
+        send('manga-download-progress', { jobId, anilistId: series.anilistId, chapterKey: chapter.chapterKey, percent: 0,
+            title: series.title, posterUrl: series.posterUrl, chapterNumber: chapter.chapterNumber, volume: chapter.volume,
+            provider: chapter.provider, kind: series.kind, startedAt: recovery.jobs[jobId]?.startedAt });
 
         const root = resolveDownloadRoot(series);
         const title = sanitizeName(series.title);
@@ -327,6 +332,7 @@ module.exports = function registerMangaDownloadManager(ipcMain, app, fs, path, l
 
             for (const source of sources) {
                 if (state.cancelled) throw new Error('cancelled');
+
                 let candidatePages = [];
                 try {
                     candidatePages = await resolveSingleSourcePages(source, chapterWithAnilist, mangaExts);
@@ -336,6 +342,16 @@ module.exports = function registerMangaDownloadManager(ipcMain, app, fs, path, l
                     continue;
                 }
                 if (state.cancelled) throw new Error('cancelled');
+
+                const sourceIdentity = JSON.stringify([source.provider, source.chapterKey, source.providerChapterId,
+                    candidatePages.map(page => { try { return require('../runtime/download/resource-identity.cjs')(page.imageUrl); } catch (_) { return page.imageUrl; } })]);
+                const sourceCheckpoint = path.join(chapDir, 'resume-source.json');
+                let previousIdentity;
+                try { previousIdentity = fs.readFileSync(sourceCheckpoint, 'utf8'); } catch (_) {}
+                if (previousIdentity && previousIdentity !== sourceIdentity) {
+                    for (const file of fs.readdirSync(chapDir)) if (/^\d+\./.test(file)) fs.unlinkSync(path.join(chapDir, file));
+                }
+                fs.writeFileSync(sourceCheckpoint, sourceIdentity);
 
                 // Clean partial files from a previous dead source attempt so
                 // extensions/stale pages never mix across scanlators.
@@ -377,6 +393,7 @@ module.exports = function registerMangaDownloadManager(ipcMain, app, fs, path, l
                 }
 
                 if (attemptEntries.length > 0) {
+                    if (attemptEntries.length !== candidatePages.length) throw new Error(`Downloaded ${attemptEntries.length}/${candidatePages.length} pages. Resume to retry missing pages.`);
                     pages = candidatePages;
                     usedSource = source;
                     downloadedFromSource = source;
@@ -430,6 +447,7 @@ module.exports = function registerMangaDownloadManager(ipcMain, app, fs, path, l
             });
 
             activeDownloads.delete(jobId);
+            recovery.finish(jobId);
             send('manga-download-completed', {
                 jobId,
                 anilistId: series.anilistId,
@@ -448,6 +466,7 @@ module.exports = function registerMangaDownloadManager(ipcMain, app, fs, path, l
         } catch (err) {
             activeDownloads.delete(jobId);
             const cancelled = state.cancelled || err.message === 'cancelled';
+            if (cancelled) recovery.finish(jobId); else recovery.fail(jobId, err.message);
             if (cancelled) {
                 // Best-effort: drop the partial chapter folder.
                 try { fs.rmSync(chapDir, { recursive: true, force: true }); } catch (_) { /* empty */ }
@@ -490,12 +509,15 @@ module.exports = function registerMangaDownloadManager(ipcMain, app, fs, path, l
     /** Queue a single chapter behind the concurrency cap. */
     function enqueueChapter(series, chapter) {
         const jobId = `manga:${series.anilistId}:${chapter.chapterKey}`;
-        if (activeDownloads.has(jobId)) return { success: false, error: 'already_downloading' };
+        if (activeDownloads.has(jobId) || downloadQueue.some(task => task.jobId === jobId)) return { success: false, error: 'already_downloading' };
+        recovery.save(jobId, 'manga', { series, chapter });
         const start = () => { void runChapterDownload(series, chapter); };
+        start.jobId = jobId;
         if (activeDownloads.size < 3) start();
         else downloadQueue.push(start);
         return { success: true, jobId, status: 'queued' };
     }
+    recovery.register('manga', ({ series, chapter }) => enqueueChapter(series, chapter));
 
     // ── IPC channels ──────────────────────────────────────────────────────────
     ipcMain.handle('manga-download:enqueue-chapter', async (_event, payload) => {
@@ -523,6 +545,13 @@ module.exports = function registerMangaDownloadManager(ipcMain, app, fs, path, l
 
     ipcMain.handle('manga-download:cancel', async (_event, params) => {
         const { jobId } = params || {};
+        const queuedIndex = downloadQueue.findIndex(task => task.jobId === jobId);
+        if (queuedIndex >= 0) {
+            downloadQueue.splice(queuedIndex, 1);
+            recovery.finish(jobId);
+            send('manga-download-error', { jobId, error: 'cancelled' });
+            return { success: true };
+        }
         const state = activeDownloads.get(jobId);
         if (state) {
             state.cancelled = true;

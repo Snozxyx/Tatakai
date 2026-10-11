@@ -75,7 +75,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { fetchCombinedSources } from "@/lib/api";
+import { fetchCombinedSources, isEpisodeUnaired } from "@/lib/api";
 import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from '@/hooks/ui/useIsNativeApp';
 import { setViewingRpc, clearDiscordRpc } from '@/lib/discordRpc';
 import { useIsMobile } from '@/hooks/ui/use-mobile';
@@ -484,14 +484,21 @@ export default function AnimePage() {
   // Use HiAnime seasons directly - they have proper season titles like "Season 1", "Season 2", etc.
   const allSeasons = Array.isArray(seasonsData) ? seasonsData : [];
 
-  // Auto-select episode 1 when clicking watch
+  // Start at the first aired episode (unaired entries are schedule-only).
   const handleWatchNow = () => {
-    if (episodesData?.episodes[0]) {
-      navigate(`/watch/${encodeURIComponent(episodesData.episodes[0].episodeId)}`);
+    const firstAired = episodesData?.episodes.find((e) => !isEpisodeUnaired(e));
+    const target = firstAired ?? episodesData?.episodes[0];
+    if (target) {
+      navigate(`/watch/${encodeURIComponent(target.episodeId)}`);
     }
   };
 
   const handleEpisodeClick = (episodeId: string) => {
+    // Unaired entries are listed for schedule visibility but must never reach
+    // the player: with no legitimate streams, resolution can fall back to an
+    // unrelated title's sources (reported as another show playing instead).
+    const ep = episodesData?.episodes.find((e) => e.episodeId === episodeId);
+    if (isEpisodeUnaired(ep)) return;
     navigate(`/watch/${encodeURIComponent(episodeId)}`);
   };
 
@@ -760,11 +767,23 @@ export default function AnimePage() {
         <meta property="og:image" content={info.poster} />
         <meta property="og:type" content="video.other" />
         <meta property="og:url" content={`${window.location.origin}/anime/${contentAnimeId}`} />
+        <meta property="og:site_name" content="Tatakai" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={`${info.name} — Anime on Tatakai`} />
         <meta name="twitter:description" content={info.description?.slice(0, 100) || `${info.name} on Tatakai`} />
         <meta name="twitter:image" content={info.poster} />
         <link rel="canonical" href={`${window.location.origin}/anime/${contentAnimeId}`} />
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "TVSeries",
+            name: info.name,
+            url: `${window.location.origin}/anime/${contentAnimeId}`,
+            ...(info.description ? { description: info.description.slice(0, 5000) } : {}),
+            ...(info.poster ? { image: info.poster } : {}),
+            isPartOf: { "@type": "WebSite", name: "Tatakai", url: "https://tatakai.me" },
+          })}
+        </script>
       </Helmet>
 
       <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
@@ -1270,9 +1289,11 @@ export default function AnimePage() {
                     <ContextMenuTrigger>
                       <button
                         onClick={() => handleEpisodeClick(ep.episodeId)}
-                        title={ep.title}
+                        title={ep.hasAired === false ? `${ep.title} — not yet aired` : ep.title}
+                        disabled={ep.hasAired === false}
+                        aria-disabled={ep.hasAired === false}
                         className={cn(
-                          "group w-full text-left rounded-xl overflow-hidden border bg-muted/30 transition-all hover:border-primary/60 hover:bg-muted/60",
+                          "group w-full text-left rounded-xl overflow-hidden border bg-muted/30 transition-all hover:border-primary/60 hover:bg-muted/60 disabled:cursor-not-allowed disabled:hover:border-white/15 disabled:hover:bg-muted/30",
                           ep.isFiller
                             ? "border-orange/40"
                             : ep.hasAired === false
@@ -1305,16 +1326,17 @@ export default function AnimePage() {
                               Filler
                             </span>
                           )}
-                          {ep.hasAired === false && (
+                          {ep.hasAired === false ? (
                             <span className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-primary/90 text-primary-foreground text-[10px] font-bold uppercase tracking-wide">
                               Upcoming
                             </span>
-                          )}
-                          <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <span className="w-11 h-11 rounded-full bg-primary/90 flex items-center justify-center shadow-lg">
-                              <Play className="w-5 h-5 text-primary-foreground ml-0.5" />
+                          ) : (
+                            <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <span className="w-11 h-11 rounded-full bg-primary/90 flex items-center justify-center shadow-lg">
+                                <Play className="w-5 h-5 text-primary-foreground ml-0.5" />
+                              </span>
                             </span>
-                          </span>
+                          )}
                         </div>
                         <div className="p-3 space-y-1.5">
                           <p className="text-sm font-semibold leading-snug line-clamp-2 group-hover:text-primary transition-colors">
@@ -1345,10 +1367,11 @@ export default function AnimePage() {
                     <ContextMenuContent>
                       <ContextMenuItem
                         onClick={() => handleEpisodeClick(ep.episodeId)}
+                        disabled={ep.hasAired === false}
                         className="gap-2 cursor-pointer"
                       >
                         <Play className="w-4 h-4" />
-                        Play Episode
+                        {ep.hasAired === false ? "Not yet aired" : "Play Episode"}
                       </ContextMenuItem>
                     </ContextMenuContent>
                   </ContextMenu>
@@ -1363,7 +1386,9 @@ export default function AnimePage() {
                         <HoverCardTrigger asChild>
                           <button
                             onClick={() => handleEpisodeClick(ep.episodeId)}
-                            className={`h-12 w-full rounded-lg font-medium transition-all hover:scale-105 relative ${ep.isFiller
+                            disabled={ep.hasAired === false}
+                            aria-disabled={ep.hasAired === false}
+                            className={`h-12 w-full rounded-lg font-medium transition-all hover:scale-105 relative disabled:cursor-not-allowed disabled:hover:scale-100 ${ep.isFiller
                               ? "bg-orange/20 text-orange hover:bg-orange/30"
                               : ep.hasAired === false
                                 // Dated in the future: still listed (ani.zip knows
@@ -1371,7 +1396,7 @@ export default function AnimePage() {
                                 ? "bg-muted/40 text-muted-foreground border border-dashed border-white/15 hover:bg-muted/60"
                                 : "bg-muted hover:bg-primary hover:text-primary-foreground"
                               }`}
-                            title={ep.title}
+                            title={ep.hasAired === false ? `${ep.title} — not yet aired` : ep.title}
                           >
                             {ep.number}
                           </button>
@@ -1426,10 +1451,11 @@ export default function AnimePage() {
                       {/* Download Episode removed from context menu */}
                       <ContextMenuItem
                         onClick={() => handleEpisodeClick(ep.episodeId)}
+                        disabled={ep.hasAired === false}
                         className="gap-2 cursor-pointer"
                       >
                         <Play className="w-4 h-4" />
-                        Play Episode
+                        {ep.hasAired === false ? "Not yet aired" : "Play Episode"}
                       </ContextMenuItem>
                     </ContextMenuContent>
                   </ContextMenu>

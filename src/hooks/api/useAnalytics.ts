@@ -88,14 +88,77 @@ async function fetchVisitorInfo(): Promise<{ ip?: string; country?: string; city
   }
 }
 
+// ---------------------------------------------------------------------------
+// Traffic attribution — shared by the tracker (stored per visit) and the admin
+// dashboard (fallback for rows written before the attribution columns existed).
+// ---------------------------------------------------------------------------
+
+export type TrafficChannel =
+  | 'Direct'
+  | 'Organic Search'
+  | 'Social'
+  | 'Referral'
+  | 'Internal'
+  | 'Paid';
+
+const SEARCH_HOSTS = ['google', 'bing', 'yahoo', 'duckduckgo', 'baidu', 'yandex', 'ecosia', 'brave', 'ask.com', 'aol'];
+const SOCIAL_HOSTS = [
+  'facebook', 'twitter', 'x.com', 't.co', 'instagram', 'reddit', 'tiktok',
+  'youtube', 'youtu.be', 'discord', 'telegram', 't.me', 'tumblr', 'pinterest',
+  'linkedin', 'twitch', 'whatsapp',
+];
+const SITE_HOSTS = ['tatakai.me', 'api.tatakai.me'];
+
+/** Extract the hostname of a referrer URL (lowercased), or null. */
+export function referrerHostOf(referrer?: string | null): string | null {
+  if (!referrer) return null;
+  try {
+    return new URL(referrer).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+/** Classify a visit into a traffic channel from referrer + utm_medium. */
+export function classifyChannel(referrer?: string | null, utmMedium?: string | null): TrafficChannel {
+  const medium = (utmMedium || '').toLowerCase();
+  if (['cpc', 'ppc', 'paid', 'cpm', 'cpa', 'display', 'paid-social', 'paidsocial'].includes(medium)) {
+    return 'Paid';
+  }
+  const host = referrerHostOf(referrer);
+  if (!host) return 'Direct';
+  if (SITE_HOSTS.some((h) => host === h || host.endsWith(`.${h}`))) return 'Internal';
+  if (SEARCH_HOSTS.some((h) => host.includes(h))) return 'Organic Search';
+  if (SOCIAL_HOSTS.some((h) => host.includes(h))) return 'Social';
+  return 'Referral';
+}
+
+/** Read ?utm_* params from the current URL (single source of truth). */
+function readUtm(): { utm_source?: string; utm_medium?: string; utm_campaign?: string } {
+  if (typeof window === 'undefined') return {};
+  try {
+    const q = new URLSearchParams(window.location.search);
+    const out: Record<string, string> = {};
+    for (const k of ['utm_source', 'utm_medium', 'utm_campaign'] as const) {
+      const v = q.get(k)?.trim().slice(0, 120);
+      if (v) out[k] = v;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
 // Track page visit
 export async function trackPageVisit(pagePath: string, userId?: string): Promise<void> {
   // Skip tracking when offline
   if (!isOnline()) return;
-  
+
   try {
     const sessionId = getSessionId();
     const visitorInfo = await fetchVisitorInfo();
+    const referrer = (typeof document !== 'undefined' && document.referrer) || null;
+    const utm = readUtm();
 
     await supabase.from('page_visits').insert({
       user_id: userId || null,
@@ -105,7 +168,11 @@ export async function trackPageVisit(pagePath: string, userId?: string): Promise
       city: visitorInfo.city,
       user_agent: navigator.userAgent,
       page_path: pagePath,
-      referrer: document.referrer || null,
+      referrer,
+      referrer_host: referrerHostOf(referrer),
+      channel: classifyChannel(referrer, utm.utm_medium),
+      page_title: typeof document !== 'undefined' ? document.title.slice(0, 300) : null,
+      ...utm,
     });
   } catch (error) {
     if (import.meta.env.DEV) {

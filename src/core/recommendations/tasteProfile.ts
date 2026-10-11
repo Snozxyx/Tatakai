@@ -89,6 +89,7 @@ export function buildTasteProfile(
   return {
     genres: normGenres,
     tags: normalizeMap(tags),
+    tagGroups: {},
     studios: normStudios,
     formats: normalizeMap(formats),
     eras: normalizeMap(eras),

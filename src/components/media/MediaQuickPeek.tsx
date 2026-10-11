@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { BookMarked, Bookmark, BookOpen, ChevronRight, Play, Plus, Check, Star, Loader2 } from "lucide-react";
+import { BookMarked, Bookmark, BookOpen, ChevronRight, Play, Plus, Check, Star, Loader2, RefreshCw } from "lucide-react";
 import { PeekSheet } from "@/components/media/PeekSheet";
 import { getProxiedImageUrl } from "@/lib/api";
 import { splitRating } from "@/lib/mediaRating";
@@ -80,8 +80,8 @@ export function MediaQuickPeekHost() {
 
   // Lazy enrichment — same queries the detail pages use, so results are
   // usually already cached. Disabled until the sheet actually opens.
-  const { data: animeInfo, isLoading: animeLoading } = useAnimeInfo(open ? animeId : undefined);
-  const { data: mangaResp, isLoading: mangaLoading } = useMangaDetail(open ? mangaId : undefined);
+  const { data: animeInfo, isLoading: animeLoading, isFetching: animeFetching, isError: animeError, refetch: retryAnime } = useAnimeInfo(open ? animeId : undefined);
+  const { data: mangaResp, isLoading: mangaLoading, isFetching: mangaFetching, isError: mangaError, refetch: retryManga } = useMangaDetail(open ? mangaId : undefined);
   const mangaDetail = mangaResp?.detail ?? null;
 
   // Wide banner art: card-supplied first, else AniList (numeric id required).
@@ -100,6 +100,10 @@ export function MediaQuickPeekHost() {
   const { data: readlistItem, isLoading: readlistLoading } = useMangaReadlistItem(open ? mangaId : undefined);
   const upsertReadlist = useUpsertMangaReadlist();
   const removeFromReadlist = useRemoveFromMangaReadlist();
+  const saving = useRef(false);
+  const [saveMessage, setSaveMessage] = useState('');
+  const [saveFailed, setSaveFailed] = useState(false);
+  useEffect(() => { setSaveMessage(''); setSaveFailed(false); }, [visible?.id, visible?.kind]);
 
   // Dismiss on route change (a peek must never survive navigation).
   useEffect(() => {
@@ -134,6 +138,8 @@ export function MediaQuickPeekHost() {
     : (mangaDetail?.synopsis ?? "");
   const description = rawDescription ? stripHtml(rawDescription) : "";
   const detailLoading = isAnime ? animeLoading : mangaLoading;
+  const detailFetching = isAnime ? animeFetching : mangaFetching;
+  const detailError = isAnime ? animeError : mangaError;
   const status = media.status || (isAnime ? animeInfo?.moreInfo?.status : mangaDetail?.status) || null;
   const metaLine = [media.type || (isAnime ? "Anime" : "Manga"), status, media.year].filter(Boolean).join(" · ");
 
@@ -153,11 +159,16 @@ export function MediaQuickPeekHost() {
     : readlistLoading || upsertReadlist.isPending || removeFromReadlist.isPending;
 
   const toggleSave = async () => {
+    if (saveLoading || saving.current) return;
     if (!user) {
       go("/auth");
       return;
     }
     void triggerHaptic("toggle");
+    saving.current = true;
+    setSaveMessage(''); setSaveFailed(false);
+    const savingId = media.id;
+    const savingKind = media.kind;
     try {
       if (isAnime) {
         if (watchlistItem) await removeFromWatchlist.mutateAsync(media.id);
@@ -178,8 +189,11 @@ export function MediaQuickPeekHost() {
             status: "plan_to_read",
           });
       }
+      if (getMediaQuickPeekSnapshot()?.id === savingId && getMediaQuickPeekSnapshot()?.kind === savingKind) setSaveMessage(saved ? 'Removed from your list.' : 'Saved to your list.');
     } catch {
-      /* hook toasts the failure */
+      if (getMediaQuickPeekSnapshot()?.id === savingId && getMediaQuickPeekSnapshot()?.kind === savingKind) { setSaveFailed(true); setSaveMessage('Couldn’t update your list. Try again.'); }
+    } finally {
+      saving.current = false;
     }
   };
 
@@ -189,7 +203,7 @@ export function MediaQuickPeekHost() {
         {/* Banner header — real banner art when the row carries (or resolves)
             one, blurred poster otherwise. Same language as the heroes. */}
         {banner ? (
-          <div className="relative mb-4 h-32 shrink-0 overflow-hidden" aria-hidden>
+          <div className="relative mb-4 h-28 shrink-0 overflow-hidden" aria-hidden>
             <img
               src={getProxiedImageUrl(banner)}
               alt=""
@@ -221,7 +235,7 @@ export function MediaQuickPeekHost() {
 
         <div className="px-5">
           <div className="flex gap-4">
-            <div className="w-24 shrink-0 overflow-hidden rounded-2xl border border-white/15 shadow-2xl shadow-black/50 ring-1 ring-white/10">
+            <div className="w-24 shrink-0 overflow-hidden rounded-2xl border border-border bg-muted">
               <img
                 src={getProxiedImageUrl(media.poster || "")}
                 alt={media.name}
@@ -253,19 +267,19 @@ export function MediaQuickPeekHost() {
             </div>
           </div>
 
-          {/* Genres — skeleton while the detail query warms up */}
+          <div className="peek-details mt-4 min-h-[160px]" aria-busy={detailLoading || detailFetching}>
           {detailLoading && genres.length === 0 ? (
-            <div className="mt-4 flex gap-2" aria-hidden>
+            <div className="flex min-h-8 flex-wrap gap-2" aria-hidden>
               {[0, 1, 2].map((i) => (
-                <span key={i} className="h-8 w-20 animate-pulse rounded-full bg-white/[0.06]" />
+                <span key={i} className="h-8 w-20 animate-pulse rounded-full bg-muted" />
               ))}
             </div>
           ) : genres.length > 0 ? (
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="flex min-h-8 flex-wrap gap-2">
               {genres.map((g) => (
                 <span
                   key={g}
-                  className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-[13px] font-medium text-foreground/85"
+                  className="rounded-full border border-border bg-muted/60 px-3 py-1 text-[13px] font-medium text-foreground"
                 >
                   {g}
                 </span>
@@ -273,33 +287,46 @@ export function MediaQuickPeekHost() {
             </div>
           ) : null}
 
-          {description ? (
+          {detailLoading && !description ? <div className="mt-3 space-y-2" aria-label="Loading details" role="status">
+            <span className="sr-only">Loading details…</span>
+            {[100, 95, 70].map(width => <div key={width} aria-hidden className="h-3 animate-pulse rounded bg-muted" style={{ width: `${width}%` }} />)}
+          </div> : description ? (
             <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground line-clamp-3">{description}</p>
-          ) : null}
+          ) : !detailError ? <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">No synopsis available. You can still open the full page.</p> : null}
+          {detailError && <div role="status" className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-muted/40 px-3 py-2">
+            <p className="text-xs text-muted-foreground">Additional details couldn’t load.</p>
+            <button type="button" disabled={detailFetching} onClick={() => { void (isAnime ? retryAnime() : retryManga()); }}
+              className="ui-button inline-flex min-h-9 items-center gap-2 rounded-lg px-2 text-xs font-semibold text-primary disabled:opacity-60">
+              <RefreshCw aria-hidden className={cn('h-3.5 w-3.5', detailFetching && 'animate-spin')} />{detailFetching ? 'Retrying…' : 'Retry details'}
+            </button>
+          </div>}
+          </div>
         </div>
 
         {/* Sticky actions — always visible and tappable, even on small phones */}
-        <div className="sticky bottom-0 -mb-1 mt-4 border-t border-white/10 bg-background/95 px-5 pb-3 pt-3 backdrop-blur-xl">
+        <div className="sticky bottom-0 -mb-1 mt-4 border-t border-border bg-background/95 px-5 pb-3 pt-3 backdrop-blur-xl">
           <div className="flex gap-2.5">
             {canSave ? (
               <button
                 type="button"
                 onClick={toggleSave}
                 disabled={saveLoading}
+                aria-busy={saveLoading}
+                aria-pressed={saved}
                 className={cn(
-                  "flex h-[52px] min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl border px-3 text-[15px] font-bold transition-all active:scale-[0.98] disabled:opacity-60",
+                  "ui-button flex h-[52px] min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl border px-3 text-[15px] font-semibold transition-[background-color,border-color,color,transform] motion-safe:active:scale-[0.98] disabled:opacity-60",
                   saved
                     ? "border-primary/40 bg-primary/15 text-primary"
-                    : "border-white/12 bg-white/[0.06] text-foreground hover:bg-white/[0.1]",
+                    : "border-border bg-muted/50 text-foreground hover:bg-muted",
                 )}
               >
                 {saveLoading ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
                 ) : saved ? (
                   isAnime ? (
-                    <Check className="h-5 w-5" />
+                    <Check className="ui-save-check h-5 w-5" />
                   ) : (
-                    <BookMarked className="h-5 w-5" />
+                    <BookMarked className="ui-save-check h-5 w-5" />
                   )
                 ) : (
                   <Bookmark className="h-5 w-5" />
@@ -310,7 +337,7 @@ export function MediaQuickPeekHost() {
             <button
               type="button"
               onClick={() => go(media.routeTo)}
-              className="flex h-[52px] min-w-0 flex-[1.2] items-center justify-center gap-2 rounded-2xl bg-primary px-3 text-[15px] font-bold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:brightness-110 active:scale-[0.98]"
+              className="ui-button flex h-[52px] min-w-0 flex-[1.2] items-center justify-center gap-2 rounded-2xl bg-primary px-3 text-[15px] font-semibold text-primary-foreground transition-[background-color,transform] hover:bg-primary/90 motion-safe:active:scale-[0.98]"
             >
               {isAnime ? <Play className="h-5 w-5 fill-primary-foreground" /> : <BookOpen className="h-5 w-5" />}
               <span className="truncate">{isAnime ? "Start watching" : "Start reading"}</span>
@@ -319,18 +346,23 @@ export function MediaQuickPeekHost() {
               type="button"
               onClick={() => go(media.routeTo)}
               aria-label={`View ${media.name}`}
-              className="flex h-[52px] w-[52px] shrink-0 items-center justify-center gap-0.5 rounded-2xl border border-white/12 bg-white/[0.06] text-[15px] font-bold text-foreground transition-all hover:bg-white/[0.1] active:scale-95"
+              className="ui-button flex h-[52px] w-[52px] shrink-0 items-center justify-center gap-0.5 rounded-2xl border border-border bg-muted/50 text-[15px] font-semibold text-foreground transition-[background-color,transform] hover:bg-muted motion-safe:active:scale-[.97]"
             >
               <span className="hidden min-[380px]:inline">View</span>
               <ChevronRight className="h-5 w-5" />
             </button>
           </div>
+          {canSave && <p role="status" className={cn('mt-2 min-h-5 text-center text-xs', saveFailed ? 'text-destructive' : 'text-muted-foreground')}>
+            {saveLoading ? 'Updating your list…' : saveMessage}
+            {saveFailed && <button type="button" onClick={toggleSave} className="ml-2 rounded px-1 font-semibold underline underline-offset-4">Retry</button>}
+          </p>}
 
           {/* Extra save affordance for anime parity with card hover actions */}
           {canSave && isAnime && !saved ? (
             <button
               type="button"
               onClick={toggleSave}
+              disabled={saveLoading}
               className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-white/10 px-3 py-2.5 text-[13px] font-semibold text-muted-foreground transition-colors hover:bg-white/[0.04] hover:text-foreground"
             >
               <Plus className="h-4 w-4" /> Add to watchlist

@@ -3,7 +3,7 @@ import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { triggerHaptic } from '@/lib/haptics';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 import { RARITY_STYLES, type BadgeDef, type BadgeMetricKey, currentTier, pickFeaturedBadge } from '@/lib/badges';
 
@@ -302,19 +302,24 @@ export function UserBadges({
             : 100;
 
           return (
-            <DialogContent className={cn('max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-sm overflow-y-auto rounded-3xl border-white/10 bg-[#0b0b0d]/95 p-0 shadow-[0_24px_80px_-12px_rgba(0,0,0,0.9)] backdrop-blur-xl custom-scrollbar', '[&>button.absolute.right-4]:hidden')}>
+            <DialogContent className={cn('max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-sm overflow-y-auto rounded-3xl border-white/10 bg-[#0b0b0d]/95 p-0 shadow-[0_24px_80px_-12px_rgba(0,0,0,0.9)] backdrop-blur-xl custom-scrollbar', '[&>button]:hidden')}>
               <div className="relative overflow-hidden rounded-3xl bg-[#0b0b0d]">
                 <span aria-hidden className="pointer-events-none absolute -inset-12 opacity-30 blur-3xl" style={{ background: rarity.ambient }} />
                 <span aria-hidden className="pointer-events-none absolute inset-x-8 top-0 z-20 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-                {/* Single refined close — default Radix close is hidden via the selector above */}
-                <button
-                  type="button"
-                  aria-label="Close badge details"
-                  onClick={() => { void triggerHaptic('tap'); setSelectedBadge(null); }}
-                  className="absolute left-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-black/50 text-white/80 shadow-lg backdrop-blur-md transition-colors hover:bg-black/70 hover:text-white"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                {/* Single refined close. The selector above hides Radix's default
+                    close (the only direct-child button — this one is nested and
+                    survives). Wrapped in DialogClose so the tap closes through
+                    Radix's own machinery AND the state setter independently. */}
+                <DialogClose asChild>
+                  <button
+                    type="button"
+                    aria-label="Close badge details"
+                    onClick={() => { void triggerHaptic('tap'); setSelectedBadge(null); }}
+                    className="absolute left-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-black/50 text-white/80 shadow-lg backdrop-blur-md transition-colors hover:bg-black/70 hover:text-white"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </DialogClose>
                 <DialogHeader className="relative z-10 items-center border-b border-white/[0.06] px-6 pb-5 pt-8 text-center">
                   <div className={cn('relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-3xl bg-[linear-gradient(180deg,rgba(255,255,255,0.10),rgba(0,0,0,0.55))] ring-1 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.10)]', rarity.ring)}>
                     <span aria-hidden className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.16),transparent_50%)]" />

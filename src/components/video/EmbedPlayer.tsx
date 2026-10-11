@@ -1,7 +1,9 @@
+import { useDesktopPlayerFullscreen } from "./hooks/useDesktopPlayerFullscreen";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, AlertCircle, RefreshCw, Maximize, Minimize } from "lucide-react";
 import { probeUrlReachable } from "@/hooks/media/useExtensionSourceStream";
 import { isMobileNative } from "@/lib/platform/platform";
+import { lockFullscreenAncestors } from "./fullscreenAncestors";
 
 /**
  * Capacitor mobile fullscreen helpers. The native plugins are dynamically
@@ -96,6 +98,9 @@ export function EmbedPlayer({ url, poster, language, referer, onError }: EmbedPl
   const [reloadKey, setReloadKey] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const desktop = useDesktopPlayerFullscreen(containerRef, setIsFullscreen);
+  const fullscreenPendingRef = useRef(false);
+  const unlockAncestorsRef = useRef<(() => void) | null>(null);
 
   // On touch (Capacitor) there is no hover, so a hover-revealed control needs a
   // first tap just to appear and a second to activate — the "fullscreen needs
@@ -107,15 +112,23 @@ export function EmbedPlayer({ url, poster, language, referer, onError }: EmbedPl
   // own onError can all fire for the same dead host, and each report pushes the
   // page's failover another server along — so the first one wins.
   const reportedRef = useRef(false);
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
 
-  // Tell the main process an untrusted embed is on screen, so window.open from
-  // any frame is treated as a popunder rather than an in-app external link.
+  // Tell every shell an untrusted embed is on screen, so window.open from any
+  // frame is treated as a popunder rather than an in-app external link. The
+  // shared bridge fans out to Electron IPC and the native
+  // TatakaiLocalProxyPlugin on Android/iOS — the previous Electron-only check
+  // left native `isEmbedActive` false forever, so only hard-listed ad hosts
+  // were ever blocked on mobile.
   useEffect(() => {
-    const security = (window as any).electron?.security;
-    if (!security?.setEmbedActive) return;
-    security.setEmbedActive(true);
+    void import('@/core/mobile/securityBridge').then(({ setEmbedActiveBridge }) => {
+      setEmbedActiveBridge(true);
+    });
     return () => {
-      security.setEmbedActive(false);
+      void import('@/core/mobile/securityBridge').then(({ setEmbedActiveBridge }) => {
+        setEmbedActiveBridge(false);
+      });
     };
   }, []);
 
@@ -125,9 +138,9 @@ export function EmbedPlayer({ url, poster, language, referer, onError }: EmbedPl
       reportedRef.current = true;
       setIsLoading(false);
       setError({ reason, statusCode });
-      onError?.({ reason, statusCode });
+      onErrorRef.current?.({ reason, statusCode });
     },
-    [onError]
+    []
   );
 
   useEffect(() => {
@@ -223,59 +236,61 @@ export function EmbedPlayer({ url, poster, language, referer, onError }: EmbedPl
     const node = containerRef.current;
     if (!node) return;
 
-    // In Electron the browser Fullscreen API on a DOM element is unreliable
-    // (frequently rejected), so drive the real window via IPC and use a
-    // position:fixed CSS class as the visual fullscreen. Mirrors the main
-    // VideoPlayer's approach so the embed behaves the same on desktop.
-    const bridge = (window as unknown as { electron?: { setFullscreen?: (v: boolean) => Promise<void> } }).electron;
-    const isElectron = !!bridge?.setFullscreen;
-    const isMobile = isMobileNative();
-    const currentlyFull = node.classList.contains("is-player-fullscreen") || document.fullscreenElement === node;
+    if (desktop.isDesktop) return desktop.toggle();
+    if (fullscreenPendingRef.current) return;
+    fullscreenPendingRef.current = true;
+    try {
+      const isMobile = isMobileNative();
+      const currentlyFull = node.classList.contains("is-player-fullscreen") || document.fullscreenElement === node;
 
-    if (!currentlyFull) {
-      if (isMobile) {
-        // Capacitor WebView: the element Fullscreen API is flaky inside the
-        // WebView, so use the CSS fixed-position fullscreen and rotate the
-        // device to landscape + hide the status bar (mirrors MobileVideoPlayer).
-        node.classList.add("is-player-fullscreen");
-        setIsFullscreen(true);
-        await hideStatusBar();
-        await lockLandscapeOrientation();
-      } else if (isElectron) {
-        node.classList.add("is-player-fullscreen");
-        setIsFullscreen(true);
+      // A transformed/filtered/contained ancestor reparents `position: fixed`
+      // (player shifted right + clipped). Neutralize them for every CSS-fallback
+      // entry, restore on exit.
+      const lockAncestors = () => {
         try {
-          await bridge!.setFullscreen!(true);
-          document.documentElement.classList.add("app-fullscreen");
-        } catch {
-          // CSS fullscreen still applies even if the IPC call fails.
-        }
-      } else {
+          unlockAncestorsRef.current?.();
+        } catch { /* ignore */ }
+        unlockAncestorsRef.current = lockFullscreenAncestors(node);
+      };
+      const releaseAncestors = () => {
         try {
-          await node.requestFullscreen();
-        } catch {
+          unlockAncestorsRef.current?.();
+        } catch { /* ignore */ }
+        unlockAncestorsRef.current = null;
+      };
+
+      if (!currentlyFull) {
+        if (isMobile) {
+          // Capacitor WebView: the element Fullscreen API is flaky inside the
+          // WebView, so use the CSS fixed-position fullscreen and rotate the
+          // device to landscape + hide the status bar (mirrors MobileVideoPlayer).
+          lockAncestors();
           node.classList.add("is-player-fullscreen");
           setIsFullscreen(true);
+          await hideStatusBar();
+          await lockLandscapeOrientation();
+        } else {
+          try {
+            await node.requestFullscreen();
+          } catch {
+            lockAncestors();
+            node.classList.add("is-player-fullscreen");
+            setIsFullscreen(true);
+          }
+        }
+      } else {
+        releaseAncestors();
+        node.classList.remove("is-player-fullscreen");
+        setIsFullscreen(false);
+        if (isMobile) {
+          await showStatusBar();
+          await unlockOrientation();
+        } else if (document.fullscreenElement) {
+          void document.exitFullscreen().catch(() => undefined);
         }
       }
-    } else {
-      node.classList.remove("is-player-fullscreen");
-      setIsFullscreen(false);
-      if (isMobile) {
-        await showStatusBar();
-        await unlockOrientation();
-      } else if (isElectron) {
-        document.documentElement.classList.remove("app-fullscreen");
-        try {
-          await bridge!.setFullscreen!(false);
-        } catch {
-          // Ignore.
-        }
-      } else if (document.fullscreenElement) {
-        void document.exitFullscreen().catch(() => undefined);
-      }
-    }
-  }, []);
+    } finally { fullscreenPendingRef.current = false; }
+  }, [desktop.isDesktop, desktop.toggle]);
 
   // On unmount, restore the device if we left it rotated / status bar hidden.
   useEffect(() => {
@@ -288,37 +303,29 @@ export function EmbedPlayer({ url, poster, language, referer, onError }: EmbedPl
   }, []);
 
   useEffect(() => {
+    if (desktop.isDesktop) return;
     const onChange = () => setIsFullscreen(document.fullscreenElement === containerRef.current);
     document.addEventListener("fullscreenchange", onChange);
 
     // Esc / OS chrome leaving fullscreen must clear the CSS-class fallback too.
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" && containerRef.current?.classList.contains("is-player-fullscreen")) {
+        try { unlockAncestorsRef.current?.(); } catch { /* ignore */ }
+        unlockAncestorsRef.current = null;
         containerRef.current.classList.remove("is-player-fullscreen");
         document.documentElement.classList.remove("app-fullscreen");
         setIsFullscreen(false);
-        const bridge = (window as unknown as { electron?: { setFullscreen?: (v: boolean) => Promise<void> } }).electron;
-        void bridge?.setFullscreen?.(false).catch(() => undefined);
       }
     };
-    const bridge = (window as unknown as {
-      electron?: { onFullscreenChanged?: (cb: (v: boolean) => void) => (() => void) | undefined };
-    }).electron;
-    const unsub = bridge?.onFullscreenChanged?.((isFull: boolean) => {
-      if (!isFull && containerRef.current?.classList.contains("is-player-fullscreen")) {
-        containerRef.current.classList.remove("is-player-fullscreen");
-        document.documentElement.classList.remove("app-fullscreen");
-        setIsFullscreen(false);
-      }
-    });
-
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("fullscreenchange", onChange);
       document.removeEventListener("keydown", onKey);
-      unsub?.();
+      try { unlockAncestorsRef.current?.(); } catch { /* ignore */ }
+      unlockAncestorsRef.current = null;
+      containerRef.current?.classList.remove("is-player-fullscreen");
     };
-  }, []);
+  }, [desktop.isDesktop]);
 
   if (error) {
     const detail = error.statusCode
@@ -350,7 +357,7 @@ export function EmbedPlayer({ url, poster, language, referer, onError }: EmbedPl
   return (
     <div
       ref={containerRef}
-      className={`video-player-container relative w-full bg-black ${isFullscreen ? "h-full" : "aspect-video"}`}
+      className={`video-player-container relative w-full bg-black ${isFullscreen ? "h-full is-player-fullscreen" : "aspect-video"}`}
     >
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-black z-10">

@@ -76,7 +76,7 @@ export function rankBadgeClass(rank: number): string {
     return 'bg-gradient-to-br from-secondary via-secondary to-accent text-secondary-foreground ring-1 ring-secondary/60';
   if (rank === 3)
     return 'bg-gradient-to-br from-accent via-accent to-accent/70 text-accent-foreground ring-1 ring-accent/50';
-  return 'bg-black/70 text-white/70 ring-1 ring-white/15 backdrop-blur-sm';
+  return 'bg-black/70 text-muted-foreground ring-1 ring-white/15 backdrop-blur-sm';
 }
 
 /**
@@ -112,13 +112,13 @@ export function animeCardToPosterItem(anime: AnimeCard, index = 0): PosterItem {
  * `DropdownMenuTrigger`, a plain `button`) around the same look.
  */
 export const controlTriggerClass =
-  'inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-white/70 transition-colors hover:border-white/20 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary data-[state=open]:border-primary/40 data-[state=open]:text-white';
+  'inline-flex items-center gap-1.5 rounded-full border border-border bg-white/[0.04] px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:border-muted-foreground/50 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary data-[state=open]:border-primary/40 data-[state=open]:text-foreground';
 
 export const controlMenuClass =
-  'max-h-[19rem] w-52 overflow-y-auto border-white/10 bg-popover/95 p-1.5 backdrop-blur-xl';
+  'max-h-[19rem] w-52 overflow-y-auto border-border bg-popover/95 p-1.5 backdrop-blur-xl';
 
 export const controlItemClass =
-  'flex cursor-pointer items-center justify-between rounded-lg px-3 py-2 text-sm text-white/70 focus:bg-white/10 focus:text-white';
+  'flex cursor-pointer items-center justify-between rounded-lg px-3 py-2 text-sm text-muted-foreground focus:bg-white/10 focus:text-foreground';
 
 /**
  * The pager/"load more" button. Shared by the anime genre page's numbered pager
@@ -126,7 +126,7 @@ export const controlItemClass =
  * same way.
  */
 export const PAGER_CLASS =
-  'inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-5 py-2.5 text-sm font-semibold text-white/75 transition-colors hover:border-white/25 hover:text-white disabled:pointer-events-none disabled:opacity-35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40';
+  'inline-flex items-center gap-1.5 rounded-full border border-border bg-white/[0.04] px-5 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:border-white/25 hover:text-foreground disabled:pointer-events-none disabled:opacity-35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40';
 
 /** The podium posters get an accent ring; nothing else does. */
 export function rankRingClass(rank?: number): string | undefined {

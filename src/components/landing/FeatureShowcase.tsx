@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Reveal } from "@/components/ui/Reveal";
 import { ShowcaseMedia } from "@/components/landing/ShowcaseMedia";
+import { MobileShowcase } from "@/components/landing/MobileShowcase";
 import { MoreFeatures } from "@/components/landing/MoreFeatures";
 import { Extensions } from "@/components/landing/Extensions";
 import { Progression } from "@/components/landing/Progression";
@@ -16,7 +17,7 @@ import {
   Clapperboard,
   BookOpen,
   BarChart3,
-  Magnet,
+  Archive,
   DownloadCloud,
   Users,
   MessageSquare,
@@ -60,8 +61,8 @@ const flagships: Flagship[] = [
     icon: Clapperboard,
     kicker: "Video player",
     title: "Built for how you watch",
-    body: "Drop in your own subtitles, switch tracks mid-scene, and keep an episode running in the background while you browse.",
-    points: ["Custom subtitles", "Adaptive quality", "Background playback"],
+    body: "A clean player for episodes you own — custom subtitles, mid-scene track switching, and background playback while you browse.",
+    points: ["Custom subtitles", "Background playback", "Remembers progress"],
     media: `https://res.cloudinary.com/hgytxblu/video/upload/v1791138043/Videoplayer.mp4`,
     accent: "text-cyan-200",
     glow: "bg-cyan-500/20",
@@ -93,29 +94,33 @@ interface OfflineCard {
   title: string;
   body: string;
   media: string;
+  kind: "video" | "image";
   tag: string;
 }
 
 const offline: OfflineCard[] = [
   {
-    icon: Magnet,
-    title: "Torrent streaming",
-    body: "Stream torrents straight through the app — no separate client to manage.",
-    media: `https://res.cloudinary.com/hgytxblu/video/upload/v1791138030/Torrent.mp4`,
-    tag: "Stream instantly",
+    icon: Archive,
+    title: "Offline library",
+    body: "Everything you've saved, organized in one place — ready with or without a connection.",
+    media: `${BRAND}/mobile_download.jpg`,
+    kind: "image",
+    tag: "Always ready",
   },
   {
     icon: DownloadCloud,
     title: "Download anime",
-    body: "Save episodes for the flight, the commute, or unreliable Wi-Fi.",
+    body: "Keep episodes on your device for the flight, the commute, or unreliable Wi-Fi.",
     media: `https://res.cloudinary.com/hgytxblu/video/upload/v1791138041/Animedownload.mp4`,
-    tag: "Watch offline",
+    kind: "video",
+    tag: "Offline ready",
   },
   {
     icon: DownloadCloud,
     title: "Download manga",
     body: "Take whole series offline and read directly from your library.",
     media: `https://res.cloudinary.com/hgytxblu/video/upload/v1791138041/Mangadownload.mp4`,
+    kind: "video",
     tag: "Read anywhere",
   },
 ];
@@ -277,7 +282,7 @@ export function FeatureShowcase() {
               id="flagship-features-heading"
               eyebrow="The complete experience"
               title="Everything anime & manga, done right"
-              sub="One app for discovering, watching, reading, and keeping track — designed to stay out of your way."
+              sub="One app for discovering, tracking, and sharing the anime & manga you love — designed to stay out of your way."
             />
           </Reveal>
 
@@ -378,7 +383,14 @@ export function FeatureShowcase() {
         </section>
 
         {/* ============================================================
-            OFFLINE / TORRENT
+            MOBILE APP
+        ============================================================ */}
+        <div className="border-t border-white/[0.08]">
+          <MobileShowcase />
+        </div>
+
+        {/* ============================================================
+            OFFLINE LIBRARY
         ============================================================ */}
         <section
           className="border-t border-white/[0.08] py-16 lg:py-28"
@@ -388,8 +400,8 @@ export function FeatureShowcase() {
             <SectionHeading
               id="offline-heading"
               eyebrow="Take it with you"
-              title="Watch and read anywhere — even offline"
-              sub="Stream from torrents, or download whole series and take them with you."
+              title="Your library, anywhere — even offline"
+              sub="Keep your lists on-device for commutes, flights, and dead zones — your library travels with you."
             />
           </Reveal>
 
@@ -403,7 +415,7 @@ export function FeatureShowcase() {
                     <div className="relative overflow-hidden border-b border-white/[0.08] p-2.5">
                       <div className="transition-transform duration-700 group-hover:scale-[1.025]">
                         <ShowcaseMedia
-                          type="video"
+                          type={card.kind}
                           src={card.media}
                           label={`${card.title} — preview`}
                           ratio="16 / 10"
@@ -753,7 +765,7 @@ export function FeatureShowcase() {
 
                 <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-white/60 lg:text-lg">
                   Install the app, sign in, and pick up right where you left
-                  off. Everything after setup is just watching and reading.
+                  off. Everything after setup is just tracking and enjoying.
                 </p>
 
                 <div className="mx-auto mt-8 grid max-w-lg grid-cols-3 divide-x divide-white/10 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-3 py-3 text-center">
@@ -762,11 +774,11 @@ export function FeatureShowcase() {
                   </div>
 
                   <div className="px-2 text-xs font-medium text-white/60">
-                    Watch
+                    Track
                   </div>
 
                   <div className="px-2 text-xs font-medium text-white/60">
-                    Read
+                    Enjoy
                   </div>
                 </div>
 

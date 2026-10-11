@@ -10,11 +10,12 @@ import { cn } from '@/lib/utils';
 import { AnimeCardWithPreview } from './AnimeCardWithPreview';
 import { useIsMobile } from '@/hooks/ui/use-mobile';
 import { HomeSectionHeading } from '@/components/home/HomeSectionHeading';
+import { CardSkeleton } from '@/components/ui/skeleton-custom';
+import { UnifiedMediaCard } from '@/components/UnifiedMediaCard';
 import { Peekable } from '@/components/media/MediaQuickPeek';
 import { peekFromAnime } from '@/components/media/quickPeekStore';
-
-const shouldEnablePreview = (anime: AnimeCard): boolean =>
-  !/^(mal|anilist)-/i.test(String(anime?.id || '').trim());
+import { buildPreferredAnimeRouteId } from '@/lib/animeIdMapping';
+import { inferAnimeAdultFlag } from '@/lib/contentSafety';
 
 // Hard cap so the DOM can't grow forever. Adjust to taste.
 const MAX_SECTIONS = 30;
@@ -23,53 +24,8 @@ const MAX_SECTIONS = 30;
 // Mobile Card — no backdrop-blur, no transition-all
 // ----------------------------------------------------------------------
 const MobileAnimeCard = memo(function MobileAnimeCard({ anime }: { anime: AnimeCard }) {
-  return (
-    <Peekable
-      media={peekFromAnime(
-        anime,
-        anime.id ? `/anime/${anime.id}` : `/search?q=${encodeURIComponent(anime.name || 'anime')}`,
-      )}
-    >
-    <div
-      className="relative overflow-hidden rounded-xl border border-white/5 bg-neutral-900 active:scale-[0.98] transition-transform duration-200"
-      style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 260px' }}
-    >
-      <div className="relative aspect-[2/3] w-full">
-        <img
-          src={getHighQualityPoster(anime.poster, anime.anilistId)}
-          alt={anime.name}
-          loading="lazy"
-          decoding="async"
-          fetchPriority="low"
-          className="absolute inset-0 h-full w-full object-cover"
-          onError={(event) => {
-            const image = event.currentTarget;
-            if (image.dataset.fallbackStage === 'placeholder') return;
-            if (image.dataset.fallbackStage !== 'direct' && anime.poster) {
-              image.dataset.fallbackStage = 'direct';
-              image.src = anime.poster;
-              return;
-            }
-            image.dataset.fallbackStage = 'placeholder';
-            image.src = '/placeholder.svg';
-          }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 p-3">
-          <h4 className="text-sm font-semibold leading-tight text-white line-clamp-2 mb-2">{anime.name}</h4>
-          <div className="flex flex-wrap gap-1.5 text-[9px] font-black uppercase tracking-widest text-white/90">
-            {(anime.episodes?.sub || 0) > 0 && (
-              <span className="rounded-sm bg-white/25 px-1.5 py-0.5">CC {anime.episodes?.sub}</span>
-            )}
-            {(anime.episodes?.dub || 0) > 0 && (
-              <span className="rounded-sm bg-primary/60 px-1.5 py-0.5 text-primary-foreground">Mic {anime.episodes?.dub}</span>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-    </Peekable>
-  );
+  const routeId = buildPreferredAnimeRouteId({ ...anime }) || anime.id;
+  return <UnifiedMediaCard item={{ ...anime, id: routeId, mediaType: 'anime', isAdult: inferAnimeAdultFlag(anime), href: routeId ? `/anime/${routeId}` : `/search?q=${encodeURIComponent(anime.name)}` }} />;
 });
 
 // ----------------------------------------------------------------------
@@ -94,9 +50,8 @@ function SectionSkeleton({ layout }: { layout: SectionLayout }) {
         layout === 'masonry' && "grid-cols-2 md:grid-cols-4 lg:grid-cols-6"
       )}>
         {[...Array(layout === 'compact' ? 8 : 6)].map((_, i) => (
-          <div key={i} className={cn(
-            "rounded-xl bg-white/5 animate-pulse",
-            layout === 'carousel' ? "flex-shrink-0 w-36 md:w-52 aspect-[2/3]" : "aspect-[2/3]",
+          <CardSkeleton key={i} className={cn(
+            layout === 'carousel' ? "media-card-rail-item" : "w-full",
           )} />
         ))}
       </div>
@@ -115,7 +70,7 @@ type LayoutProps = { animes: AnimeCard[]; isMobile: boolean };
 const Card = ({ anime, isMobile }: { anime: AnimeCard; isMobile: boolean }) =>
   isMobile
     ? <MobileAnimeCard anime={anime} />
-    : <AnimeCardWithPreview anime={anime} showPreview={shouldEnablePreview(anime)} />;
+    : <AnimeCardWithPreview anime={anime} showPreview={true} />;
 
 const GridLayout = memo(function GridLayout({ animes, isMobile }: LayoutProps) {
   const items = animes.slice(0, isMobile ? 4 : 6);
@@ -131,7 +86,7 @@ const CarouselLayout = memo(function CarouselLayout({ animes, isMobile }: Layout
   return (
     <div className={scrollContainerStyles}>
       {items.map((anime) => (
-        <div key={anime.id} className="flex-shrink-0 w-36 md:w-52 snap-start">
+        <div key={anime.id} className="media-card-rail-item snap-start">
           <Card anime={anime} isMobile={isMobile} />
         </div>
       ))}

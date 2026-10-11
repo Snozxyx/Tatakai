@@ -12,7 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMangaReadlist, type MangaReadlistItem } from '@/hooks/user/useMangaReadlist';
 import { getMangaByGenre, getMangaDetail, getTrendingManga, getTrendingManhwa, getTrendingManhua, type MangaCard } from '@/core/content/manga-client';
-import { buildTasteProfile } from '@/core/recommendations/tasteProfile';
+import { buildRatingProfile, dedupeFranchiseSignals } from '@/core/recommendations/ratingProfile';
 import { rankCandidates, clamp } from '@/core/recommendations/scoring';
 import { mangaCardToMeta, mangaDetailToMeta, mangaStatusToWatchlist } from '@/core/recommendations/mangaMeta';
 import { isCapacitor } from '@/lib/platform/platform';
@@ -21,6 +21,7 @@ import type { EngineRecommendation } from './useRecommendationEngine';
 
 const MAX_SEEDS = 40;
 const MAX_STORED = 60;
+const MODEL_VERSION = 'v2';
 
 function mangaRecommendationBudget() {
   if (!isCapacitor()) return { seeds: MAX_SEEDS, concurrency: 5, genres: 5, primary: 30, secondary: 24 };
@@ -88,8 +89,14 @@ async function computeMangaEngine(userId: string, readlist: MangaReadlistItem[])
       seedMeta.set(id, mangaDetailToMeta(id, detail));
     } catch { /* skip unresolved manga */ }
   });
+  // MangaBaka enrichment: layer weighted tags/groups/creators over the seeds.
+  try {
+    const { enrichMangaSeeds } = await import('@/core/recommendations/mangaBakaEnrich');
+    await enrichMangaSeeds(seedMeta, budget.concurrency);
+  } catch { /* enrichment is best-effort; AniList-only seeds still score */ }
 
-  const profile = buildTasteProfile(signals, seedMeta);
+  // Step 1: franchise dedup, then Steps 2–4 rating-weighted profile.
+  const profile = buildRatingProfile(dedupeFranchiseSignals(signals, seedMeta), seedMeta);
 
   const cards = await gatherMangaCandidates(profile.topGenres.map((g) => g.genre), budget);
   const candidateMap = new Map<string, AnimeMeta>();
@@ -97,6 +104,11 @@ async function computeMangaEngine(userId: string, readlist: MangaReadlistItem[])
     if (!card.id) continue;
     candidateMap.set(card.id, mangaCardToMeta(card));
   }
+  // MangaBaka enrichment for the top candidates by pre-score (bounded cost).
+  try {
+    const { enrichMangaCandidates } = await import('@/core/recommendations/mangaBakaEnrich');
+    await enrichMangaCandidates(candidateMap, profile, budget.concurrency);
+  } catch { /* candidates without MangaBaka data still score on AniList meta */ }
 
   const excludeIds = new Set(signals.map((s) => s.animeId));
   const data: MangaEngineData = {
@@ -115,6 +127,7 @@ async function persistManga(userId: string, data: MangaEngineData): Promise<void
       excludeIds: new Set(data.excludeIds),
       nicheBoost: 0.3,
       limit: MAX_STORED,
+      userScoredMean: data.profile.userScoredMean,
     });
     const rows = ranked.map((r) => ({
       user_id: userId,
@@ -122,10 +135,10 @@ async function persistManga(userId: string, data: MangaEngineData): Promise<void
       anime_id: r.animeId,
       score: r.score,
       confidence: r.confidence,
-      factors: r.factors,
+      factors: { ...r.factors, tier: r.tier },
       reasons: r.reasons,
       source: 'content',
-      model_version: 'v1',
+      model_version: MODEL_VERSION,
       generated_at: new Date().toISOString(),
     }));
     if (rows.length) {
@@ -156,11 +169,12 @@ export function useMangaRecommendationEngine(opts: { nicheBoost?: number; limit?
       excludeIds: new Set(excludeIds),
       nicheBoost,
       limit,
+      userScoredMean: profile.userScoredMean,
     });
     return ranked
-      .map((r) => {
+      .map((r): EngineRecommendation | null => {
         const anime = metaById.get(r.animeId);
-        return anime ? { anime, score: r.score, confidence: r.confidence, reasons: r.reasons, factors: r.factors } : null;
+        return anime ? { anime, score: r.score, confidence: r.confidence, reasons: r.reasons, factors: r.factors, tier: r.tier } : null;
       })
       .filter((x): x is EngineRecommendation => x !== null);
   }, [query.data, nicheBoost, limit]);

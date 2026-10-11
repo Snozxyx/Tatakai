@@ -127,6 +127,8 @@ export function QuotedPostEmbed({ postId, preview = false }: { postId: string; p
           <img
             src={getProxiedImageUrl(post.profile.avatar_url)}
             alt=""
+            loading="lazy"
+            decoding="async"
             className="h-5 w-5 flex-shrink-0 rounded-full object-cover"
           />
         ) : (
@@ -206,6 +208,7 @@ export function PostImageEmbed({ url, alt }: { url: string; alt?: string }) {
         src={getProxiedImageUrl(url)}
         alt={alt || ''}
         loading="lazy"
+        decoding="async"
         onClick={(e) => { e.stopPropagation(); open([{ url, alt }], 0); }}
         className="max-h-[32rem] w-full cursor-zoom-in object-contain"
       />
@@ -242,7 +245,7 @@ export function PostPlaylistEmbed({ playlistId, size = 'default' }: { playlistId
           {covers.length > 0 ? (
             <div className={cn('grid h-full w-full', covers.length >= 2 ? 'grid-cols-2' : 'grid-cols-1')}>
               {covers.slice(0, 4).map((img, idx) => (
-                <img key={idx} src={getProxiedImageUrl(img)} alt="" className="h-full w-full object-cover" />
+                <img key={idx} src={getProxiedImageUrl(img)} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
               ))}
             </div>
           ) : (
@@ -386,7 +389,6 @@ export function PostMediaEmbed({
     return (
       <div className="max-w-[190px]" onClick={(e) => e.stopPropagation()}>
         <UnifiedMediaCard
-          variant="poster"
           item={{ id, name, poster: poster || '', type: kind, mediaType, href }}
         />
       </div>
@@ -401,7 +403,7 @@ export function PostMediaEmbed({
     >
       <div className="h-5 w-5 flex-shrink-0 overflow-hidden rounded bg-muted">
         {poster ? (
-          <img src={getProxiedImageUrl(poster)} alt={name} className="h-full w-full object-cover" />
+          <img src={getProxiedImageUrl(poster)} alt={name} loading="lazy" decoding="async" className="h-full w-full object-cover" />
         ) : (
           <Layers className="h-3 w-3 m-1 text-muted-foreground" />
         )}

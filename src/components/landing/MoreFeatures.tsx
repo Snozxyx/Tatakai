@@ -1,19 +1,19 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { useReducedMotion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { useMotionPreference } from "@/hooks/ui/useMotionPreference";
 import { animate, stagger } from "animejs";
 import { gsap } from "gsap";
 import {
   Palette,
-  Languages,
+  Bell,
   ScanSearch,
   PartyPopper,
   Trophy,
   MessagesSquare,
   ListOrdered,
   MonitorSmartphone,
-  Server,
+  Bookmark,
   type LucideIcon,
 } from "lucide-react";
 
@@ -27,25 +27,26 @@ interface Extra {
 // Features the media showcase above doesn't cover — the "there's more" list.
 const extras: Extra[] = [
   { icon: Palette, title: "25+ themes", body: "Light, dark, and accented looks — plus a Lite mode that keeps low-end devices smooth.", accent: "text-violet-300" },
-  { icon: Languages, title: "Dubs in 13 languages", body: "German, French, Hindi, Telugu, Malayalam and more, pulled from 30+ servers.", accent: "text-cyan-300" },
+  { icon: Bell, title: "Airing calendar", body: "Seasonal charts and airing schedules with reminders, so you never miss a premiere.", accent: "text-cyan-300" },
   { icon: ScanSearch, title: "Search by screenshot", body: "Recognize any scene with image search powered by trace.moe.", accent: "text-pink-300" },
   { icon: PartyPopper, title: "Watch2Together", body: "Host sync watch parties and react in real time with friends.", accent: "text-amber-300" },
   { icon: Trophy, title: "Ranks & leaderboards", body: "Climb the ranks, collect badges, and top the contributor board.", accent: "text-emerald-300" },
   { icon: MessagesSquare, title: "Forums & threads", body: "Reddit-style threaded discussions for every corner of anime.", accent: "text-violet-300" },
   { icon: ListOrdered, title: "Tier lists", body: "Build, rank, and share your definitive takes.", accent: "text-cyan-300" },
-  { icon: MonitorSmartphone, title: "Web, desktop & mobile", body: "Pick up on the browser, the desktop app, or Android (soon).", accent: "text-pink-300" },
-  { icon: Server, title: "Community servers", body: "Add moderated, fan-run video servers to widen your sources.", accent: "text-amber-300" },
+  { icon: MonitorSmartphone, title: "Web, desktop & mobile", body: "Pick up on the browser, the desktop app and Android or IOS  .", accent: "text-pink-300" },
+  { icon: Bookmark, title: "Plan to watch", body: "A dedicated backlog for everything you plan to watch and read next.", accent: "text-amber-300" },
 ];
 
 // Breadth strip — scrolled by GSAP, kept honest against the feature list.
 const marquee = [
-  "13 dub languages", "30+ servers", "25+ themes", "Web", "Desktop",
+  "Airing calendar", "Plan to watch", "25+ themes", "Web", "Desktop",
   "Android soon", "trace.moe search", "Watch parties", "Tier lists",
   "Forums", "Leaderboards", "Playlists", "MAL & AniList sync", "Lite mode",
 ];
 
 export function MoreFeatures() {
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = useMotionPreference();
+  const [marqueePaused, setMarqueePaused] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
   const marqueeRef = useRef<HTMLDivElement>(null);
 
@@ -65,11 +66,12 @@ export function MoreFeatures() {
     }
 
     let played = false;
+    let entrance: ReturnType<typeof animate> | undefined;
     const io = new IntersectionObserver(
       ([entry]) => {
         if (!entry.isIntersecting || played) return;
         played = true;
-        animate(cards, {
+        entrance = animate(cards, {
           opacity: [0, 1],
           translateY: [28, 0],
           scale: [0.96, 1],
@@ -82,18 +84,18 @@ export function MoreFeatures() {
       { threshold: 0.2 },
     );
     io.observe(el);
-    return () => io.disconnect();
+    return () => { io.disconnect(); entrance?.revert(); };
   }, [reduceMotion]);
 
   // GSAP: seamless auto-scrolling breadth strip. Static under reduced motion.
   useEffect(() => {
     const track = marqueeRef.current;
-    if (!track || reduceMotion) return;
+    if (!track || reduceMotion || marqueePaused) return;
     const ctx = gsap.context(() => {
       gsap.to(track, { xPercent: -50, ease: "none", duration: 28, repeat: -1 });
-    });
+    }, track);
     return () => ctx.revert();
-  }, [reduceMotion]);
+  }, [reduceMotion, marqueePaused]);
 
   return (
     <section className="py-16 lg:py-24">
@@ -113,7 +115,7 @@ export function MoreFeatures() {
             <div
               key={f.title}
               data-extra
-              style={reduceMotion ? undefined : { opacity: 0 }}
+
               className="group rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-md transition-colors duration-300 hover:border-white/25 hover:bg-white/[0.05]"
             >
               <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5">
@@ -127,6 +129,11 @@ export function MoreFeatures() {
       </div>
 
       {/* GSAP marquee — the breadth, at a glance */}
+      {!reduceMotion && (
+        <button type="button" onClick={() => setMarqueePaused(value => !value)} aria-pressed={marqueePaused} className="mt-8 min-h-11 rounded-xl border border-white/20 px-4 text-sm text-white hover:bg-white/10">
+          {marqueePaused ? "Resume feature strip" : "Pause feature strip"}
+        </button>
+      )}
       <div className="relative mt-12 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] py-4">
         <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-24 bg-gradient-to-r from-black to-transparent" />
         <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-24 bg-gradient-to-l from-black to-transparent" />

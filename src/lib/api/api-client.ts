@@ -1,4 +1,5 @@
 import { contentGraph, toAnimeCard, toHomeData } from "@/core";
+import { applyEpisodeAvailability } from '@/lib/episodeAvailability';
 import type { EpisodeData, EpisodeServer, HomeData, StreamingData } from "@/types/anime";
 import { getHighQualityImage } from "@/lib/api/proxy-utils";
 import { fetchJikanEpisodes } from "@/core/content/jikan-client";
@@ -174,6 +175,20 @@ export async function fetchJikanCover(malId?: number | null, fallbackPoster = ""
   }
 }
 
+/**
+ * Known future dates and episode-order/schedule evidence set `hasAired` false.
+ *
+ * Episodes from the DB/Jikan/count fallbacks carry no air-date signal
+ * (`hasAired` undefined) remain playable unless a known upcoming episode puts
+ * them beyond the current airing boundary. Never invert this to `!== true`: that would
+ * brick playback for every fallback-tier episode.
+ */
+export function isEpisodeUnaired(
+  episode: { hasAired?: boolean } | null | undefined,
+): boolean {
+  return !!episode && episode.hasAired === false;
+}
+
 /** Legacy adapter for fetchEpisodes */
 export async function fetchEpisodes(animeId: string) {
   // In v6, episodes are usually part of the media object or fetched via content graph
@@ -194,6 +209,7 @@ export async function fetchEpisodes(animeId: string) {
       overview: entry.overview ?? undefined,
       image: entry.image ?? undefined,
       airDate: entry.airDate ?? undefined,
+      airDateUtc: entry.airDateUtc ?? undefined,
       runtime: entry.runtime ?? undefined,
       hasAired: entry.hasAired,
     }));
@@ -234,7 +250,7 @@ export async function fetchEpisodes(animeId: string) {
   }
 
   return {
-    episodes,
+    episodes: applyEpisodeAvailability(episodes, media.nextAiringEpisode),
     totalEpisodes: mapping?.episodeCount ?? media.episodeSubCount ?? media.episodes ?? episodes.length,
   };
 }

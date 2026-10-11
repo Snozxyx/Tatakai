@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { readableMutedColor } from '@/lib/themeContrast';
 import { useAuth } from '@/contexts/AuthContext';
 import { extensionRegistry, type RegisteredTheme } from '@/core/extensions/ExtensionRegistry';
 import {
@@ -43,6 +44,7 @@ interface ThemeColors {
   secondary: string;
   secondaryForeground?: string;
   accent: string;
+  accentForeground?: string;
   background: string;
   foreground: string;
   card: string;
@@ -991,10 +993,15 @@ export function useTheme() {
 
       Object.entries(colors).forEach(([key, value]) => {
         if (typeof value === 'string') {
-          root.style.setProperty(`--${key}`, value);
+          const token = key.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
+          root.style.setProperty(`--${token}`, value);
         }
       });
       root.style.setProperty('--ring', colors.primary);
+      root.style.setProperty('--accent-foreground', colors.accentForeground || (colors as unknown as Record<string, string>)['accent-foreground'] || (colors.isLight ? colors.foreground : '0 0% 100%'));
+      root.style.colorScheme = colors.isLight ? 'light' : 'dark';
+      const muted = colors.mutedForeground || (colors as unknown as Record<string, string>)['muted-foreground'];
+      if (muted) root.style.setProperty('--muted-foreground', readableMutedColor(muted, [colors.background, colors.card, colors.muted, colors.surface]));
 
       document.body.classList.toggle('light-theme', colors.isLight);
       document.body.classList.toggle('dark-theme', !colors.isLight);

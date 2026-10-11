@@ -49,7 +49,7 @@ export function GenreCloud({ genres }: GenreCloudProps) {
         </h3>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+      <div data-mobile-home-rail="genres" className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
         {mergedGenres.map((genre) => {
           const accent = getAccent(genre);
           return (

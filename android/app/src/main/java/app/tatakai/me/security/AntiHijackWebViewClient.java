@@ -100,6 +100,11 @@ public class AntiHijackWebViewClient extends BridgeWebViewClient {
                 Uri uri = request.getUrl();
                 String url = uri != null ? uri.toString() : null;
                 String host = AdHosts.hostnameOf(url);
+                // Reject document escapes, while iframe/media requests remain usable.
+                if (WatchNavigationPolicy.shouldBlock(SecurityState.isFilteringActive(), view.getUrl(), url, true)) {
+                    Logger.debug("AntiHijack blocked watch-page escape: " + host);
+                    return true;
+                }
                 if (AdHosts.isHardBlockedHost(host)) {
                     // Top-frame redirect hijack to an ad network — swallow it so the
                     // app frame is never navigated away from the player.

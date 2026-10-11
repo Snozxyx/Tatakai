@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useIsMobile } from '@/hooks/ui/use-mobile';
+import { useMotionPreference } from '@/hooks/ui/useMotionPreference';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { RankBadge } from '@/components/ui/RankBadge';
@@ -20,6 +21,11 @@ import { getRankNameStyle } from '@/lib/rankUtils';
 import { getProxiedImageUrl } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { triggerHaptic } from '@/lib/haptics';
+import { ProfileBackgroundEffects } from '@/components/profile/ProfileBackgroundEffects';
+import { AvatarDecoration } from '@/components/profile/AvatarDecoration';
+import { ProfileCosmeticEffect, ProfileNameplate } from '@/components/profile/ProfileCosmeticEffect';
+import { hasPremiumCosmetics } from '@/lib/profileCosmetics';
+import { profileSurfaceStyle, readProfileCustomization } from '@/lib/profileSettings';
 
 interface ProfileWidgetCardProps {
   /** Auth user id (= profiles.user_id). Drives badges, follow counts, bio fetch. */
@@ -45,7 +51,7 @@ function useWidgetProfile(userId?: string | null, enabled = false) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('username, display_name, avatar_url, banner_url, bio, is_public, created_at')
+        .select('username, display_name, avatar_url, banner_url, bio, is_public, created_at, app_settings, is_admin, role')
         .eq('user_id', userId!)
         .maybeSingle();
       if (error) throw error;
@@ -101,7 +107,7 @@ function useWidgetStats(userId?: string | null, enabled = false) {
  * gradient under `prefers-reduced-motion`.
  */
 function WidgetAmbient() {
-  const reduce = useReducedMotion();
+  const reduce = useMotionPreference();
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
       {/* Base radial tint */}
@@ -109,12 +115,13 @@ function WidgetAmbient() {
         className="absolute inset-0 opacity-70"
         style={{
           background:
-            'radial-gradient(120% 90% at 50% 0%, hsl(var(--primary) / 0.18) 0%, transparent 55%)',
+            'radial-gradient(120% 90% at 50% 0%, hsl(var(--profile-accent) / 0.18) 0%, transparent 55%)',
         }}
       />
       {/* Drifting accent orbs */}
       <motion.div
-        className="absolute -left-10 -top-10 h-40 w-40 rounded-full bg-primary/25 blur-3xl"
+        className="absolute -left-10 -top-10 h-40 w-40 rounded-full blur-3xl"
+        style={{ background: 'hsl(var(--profile-accent) / 0.25)' }}
         animate={reduce ? undefined : { x: [0, 24, 0], y: [0, 16, 0], opacity: [0.5, 0.75, 0.5] }}
         transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
       />
@@ -194,6 +201,8 @@ export function ProfileWidgetCard({
   const banner = fetched?.banner_url || undefined;
   const bio = fetched?.is_public ? fetched?.bio : null;
   const rankStyle = getRankNameStyle(rankScore);
+  const customization = readProfileCustomization(fetched, hasPremiumCosmetics(fetched, badges));
+  const { backgroundEffect, avatarDecoration, profileEffect, nameplate } = customization;
 
   // Bounded reputation (0–100) from the cheap signals the widget already has.
   // Mirrors ProfilePage's computeReputation call; the streak/upvote terms aren't
@@ -225,8 +234,10 @@ export function ProfileWidgetCard({
   };
 
   const cardBody = (
-    <div className="relative">
-      <WidgetAmbient />
+    <div className="relative isolate overflow-hidden" style={profileSurfaceStyle(customization)}>
+      {backgroundEffect === 'none' && <WidgetAmbient />}
+      {open && <ProfileBackgroundEffects effect={backgroundEffect} variant="widget" />}
+      {open && <ProfileCosmeticEffect effect={profileEffect} />}
       {/* hairline top highlight — consistent glass edge */}
       <span aria-hidden className="pointer-events-none absolute inset-x-8 top-0 z-20 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
 
@@ -257,6 +268,7 @@ export function ProfileWidgetCard({
             {/* Banner — falls back to an accent gradient so the header always has depth */}
             <div
               className="h-20 w-full shrink-0 cursor-pointer overflow-hidden bg-gradient-to-br from-primary/30 via-secondary/20 to-transparent"
+              style={{ maskImage: 'linear-gradient(to bottom, black 35%, transparent 100%)' }}
               onClick={goToProfile}
             >
               {banner && (
@@ -270,15 +282,18 @@ export function ProfileWidgetCard({
 
             {/* Header */}
             <div className="-mt-8 flex items-start gap-3 px-4 pb-3">
-              <Avatar
-                className="h-16 w-16 shrink-0 cursor-pointer ring-4 ring-background transition-shadow hover:ring-primary/40"
-                onClick={goToProfile}
-              >
-                <AvatarImage src={avatar} className="object-cover" />
-                <AvatarFallback className="bg-gradient-to-br from-primary/60 to-secondary/60 text-lg font-bold text-primary-foreground">
-                  {name[0]?.toUpperCase() || 'U'}
-                </AvatarFallback>
-              </Avatar>
+              <div className="relative h-16 w-16 shrink-0">
+                <Avatar
+                  className="h-16 w-16 shrink-0 cursor-pointer ring-4 ring-background transition-shadow hover:ring-primary/40"
+                  onClick={goToProfile}
+                >
+                  <AvatarImage src={avatar} className="object-cover" />
+                  <AvatarFallback className="bg-gradient-to-br from-primary/60 to-secondary/60 text-lg font-bold text-primary-foreground">
+                    {name[0]?.toUpperCase() || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <AvatarDecoration decoration={avatarDecoration} />
+              </div>
               <div className="min-w-0 flex-1 pt-8">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <button
@@ -286,7 +301,7 @@ export function ProfileWidgetCard({
                     className={cn('truncate text-sm font-bold transition-opacity hover:opacity-80', rankStyle.className)}
                     style={rankStyle.style}
                   >
-                    {name}
+                    <ProfileNameplate nameplate={nameplate}>{name}</ProfileNameplate>
                   </button>
                   <UserBadges
                     badges={badges}

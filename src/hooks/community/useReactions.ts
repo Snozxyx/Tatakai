@@ -18,7 +18,7 @@ interface Reaction {
   created_at: string;
 }
 
-interface ReactionCounts {
+export interface ReactionCounts {
   like: number;
   love: number;
   laugh: number;
@@ -29,16 +29,22 @@ interface ReactionCounts {
 }
 
 /**
- * Get reaction counts for an entity
+ * Get reaction counts for an entity.
+ *
+ * `initial` seeds the query (batched feed fetch) so the first paint costs no
+ * request; the data stays fresh for 2 minutes and any react mutation still
+ * invalidates + refetches. Callers without seeded data behave exactly as before.
  */
 export function useReactions(
   entityType: 'comment' | 'forum_post' | 'tier_list',
-  entityId: string | undefined
+  entityId: string | undefined,
+  initial?: ReactionCounts | null,
 ) {
   const { user } = useAuth();
 
   return useQuery({
     queryKey: ['reactions', entityType, entityId, user?.id],
+    ...(initial ? { initialData: initial, staleTime: 2 * 60 * 1000 } : {}),
     queryFn: async (): Promise<ReactionCounts> => {
       if (!entityId) {
         return { like: 0, love: 0, laugh: 0, wow: 0, sad: 0, angry: 0 };

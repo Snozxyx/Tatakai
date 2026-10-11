@@ -9,6 +9,7 @@ import { useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
 
 import { VideoSettingsPanel } from "./VideoSettingsPanel";
 import { useAniskip } from "@/hooks/media/useAniskip";
+import { mergeSkipSegments } from "@/core/player/skip-segments";
 import { sourceAdapterRegistry } from "@/core/player/SourceAdapterRegistry";
 import { registerGlobalVideo, updateGlobalVideoTime } from "@/core/player/global-video-ref";
 import { getSubtitleSelectionKey } from "@/core/player/subtitle-utils";
@@ -284,7 +285,8 @@ export function VideoPlayer({
   // AniSkip
   // ---------------------------------------------------------------------------
 
-  const { skipTimes, fetchSkipTimes, getSkipLabel } = useAniskip();
+  const { skipTimes, fetchSkipTimes, getSkipLabel, resetSkipTimes } = useAniskip();
+  useEffect(() => { resetSkipTimes(); }, [malId, episodeNumber, resetSkipTimes]);
 
   const tatakaiSkipTimes = useMemo(() => {
     const windows: ActiveSkip[] = [];
@@ -307,10 +309,8 @@ export function VideoPlayer({
     return windows;
   }, [introWindow?.start, introWindow?.end, outroWindow?.start, outroWindow?.end, episodeId, episodeNumber]);
 
-  const hasTatakaiSkipWindows = tatakaiSkipTimes.length > 0;
-  const effectiveSkipTimes = hasTatakaiSkipWindows ? tatakaiSkipTimes : skipTimes;
-  const hasTatakaiSkipWindowsRef = useRef(hasTatakaiSkipWindows);
-  useEffect(() => { hasTatakaiSkipWindowsRef.current = hasTatakaiSkipWindows; }, [hasTatakaiSkipWindows]);
+  const hasCompleteSkipWindows = tatakaiSkipTimes.some(skip => skip.skipType === 'op') && tatakaiSkipTimes.some(skip => skip.skipType === 'ed');
+  const effectiveSkipTimes = useMemo(() => mergeSkipSegments(tatakaiSkipTimes, skipTimes, skip => skip.skipType), [tatakaiSkipTimes, skipTimes]);
 
   const resolvedPoster = poster ? getProxiedImageUrl(poster) : undefined;
 
@@ -834,26 +834,9 @@ export function VideoPlayer({
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
-    if (hasTatakaiSkipWindows) return;
-    if (!malId || !episodeNumber) return;
-
-    const onManifestParsed = () => {
-      const length = videoRef.current?.duration;
-      fetchSkipTimes(malId, episodeNumber, isFinite(length!) && length! > 0 ? Math.floor(length!) : undefined);
-    };
-
-    if (videoRef.current?.duration && isFinite(videoRef.current.duration) && videoRef.current.duration > 0) {
-      onManifestParsed();
-    }
-
-    const handler = () => onManifestParsed();
-    const hls = hlsRef.current;
-    if (hls) hls.on(Hls.Events.MANIFEST_PARSED, handler);
-
-    return () => {
-      if (hls) hls.off(Hls.Events.MANIFEST_PARSED, handler);
-    };
-  }, [malId, episodeNumber, fetchSkipTimes, hasTatakaiSkipWindows]);
+    if (hasCompleteSkipWindows || !malId || !episodeNumber || !Number.isFinite(duration) || duration <= 0) return;
+    void fetchSkipTimes(malId, episodeNumber, Math.floor(duration));
+  }, [malId, episodeNumber, duration, fetchSkipTimes, hasCompleteSkipWindows]);
 
   // Active skip detection
   useEffect(() => {
@@ -870,7 +853,9 @@ export function VideoPlayer({
       return;
     }
     if (activeSkip && videoRef.current) {
-      videoRef.current.currentTime = activeSkip.interval.endTime;
+      const target = Math.min(activeSkip.interval.endTime, videoRef.current.duration || activeSkip.interval.endTime);
+      videoRef.current.currentTime = target;
+      setCurrentTime(target);
       setActiveSkip(null);
     }
   }, [activeSkip, showTimelineLockHint]);
@@ -885,6 +870,7 @@ export function VideoPlayer({
     if (autoSkippedWindowRef.current === windowKey) return;
 
     videoRef.current.currentTime = activeSkip.interval.endTime;
+    setCurrentTime(activeSkip.interval.endTime);
     autoSkippedWindowRef.current = windowKey;
     setActiveSkip(null);
   }, [activeSkip, settings.autoSkipIntro, timelineSeekingLocked]);
@@ -1015,6 +1001,7 @@ export function VideoPlayer({
     };
     const handleDurationChange = () => setDuration(video.duration);
     const handleLoadedMetadata = () => {
+      setDuration(video.duration);
       // Metadata means the mounted source is genuinely readable — any earlier
       // transient error (empty-src from a switch, a first-segment stall that
       // later resolved) is stale. Clear it so the overlay never covers a

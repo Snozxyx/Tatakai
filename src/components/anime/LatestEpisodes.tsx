@@ -1,11 +1,11 @@
-import { memo, useRef, useEffect } from "react";
+import { memo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Play, Zap } from "lucide-react";
 
-import { GlassPanel } from "@/components/ui/GlassPanel";
 import { HomeSectionHeading } from "@/components/home/HomeSectionHeading";
 import { AnimeCard, getHighQualityPoster } from "@/lib/api";
-import { usePreviewSource } from "@/hooks/usePreviewSource";
+import { fetchAniZipMapping } from "@/lib/mapping/anizip";
 import { Peekable } from "@/components/media/MediaQuickPeek";
 import { peekFromAnime } from "@/components/media/quickPeekStore";
 
@@ -13,98 +13,129 @@ interface LatestEpisodesProps {
   animes: AnimeCard[];
 }
 
+function resolveCardAnilistId(anime: AnimeCard): number | null {
+  if (anime.anilistId && Number.isFinite(anime.anilistId) && anime.anilistId > 0) {
+    return anime.anilistId;
+  }
+  const raw = String(anime.id || "").trim();
+  const prefixed = raw.match(/^anilist[:_-]?(\d+)$/i);
+  if (prefixed?.[1]) return Number(prefixed[1]);
+  if (/^\d+$/.test(raw)) return Number(raw);
+  return null;
+}
+
 function LatestEpisodeCard({ anime }: { anime: AnimeCard }) {
   const navigate = useNavigate();
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const { startHover, cancelHover, source } = usePreviewSource();
-  const canHover = typeof window !== 'undefined' && window.matchMedia?.('(hover: hover)').matches;
+  const anilistId = resolveCardAnilistId(anime);
 
-  // Attach video src when source resolves (req 9.2)
-  useEffect(() => {
-    if (!videoRef.current) return;
-    if (source?.streamUrl && !source.isHls) {
-      videoRef.current.src = source.streamUrl;
-      videoRef.current.play().catch(() => {});
-    } else if (!source?.streamUrl) {
-      videoRef.current.pause();
-      videoRef.current.removeAttribute('src');
-    }
-  }, [source]);
+  // Latest aired episode (title + screencap) — cached 10min, so the 10-card
+  // rail costs at most 10 cached mapping reads on first paint.
+  const { data: latest } = useQuery({
+    queryKey: ["anizip-latest", anilistId ?? anime.id],
+    queryFn: async () => {
+      if (!anilistId) return null;
+      try {
+        const mapping = await fetchAniZipMapping(anilistId);
+        return mapping?.lastAiredEpisode ?? null;
+      } catch {
+        return null;
+      }
+    },
+    enabled: anilistId != null,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+    retry: false,
+  });
 
-  const anilistId = anime.anilistId ?? 0;
-  const titles = [anime.name].filter(Boolean);
+  const poster = getHighQualityPoster(anime.poster, anime.anilistId);
+  const thumb = latest?.image || poster || "/placeholder.svg";
+  const epNumber = latest?.number ?? anime.episodes.sub ?? null;
+  const epTitle = latest?.title ?? null;
+
+  // Open that exact episode in the watch page. The episode identity is
+  // `<baseId>?ep=<n>` (see buildEpisodeId / WatchPage decodedEpisodeId).
+  const watchHref =
+    epNumber != null
+      ? `/watch/${encodeURIComponent(`${anime.id}?ep=${epNumber}`)}`
+      : `/anime/${anime.id}`;
 
   return (
     <Peekable media={peekFromAnime(anime, `/anime/${anime.id}`)}>
-    <GlassPanel
-      hoverEffect={false}
-      className="group relative flex w-[260px] md:w-[300px] shrink-0 snap-start cursor-pointer items-stretch gap-3 md:gap-4 rounded-2xl border border-white/[0.05] bg-white/[0.02] p-3 active:scale-[0.98]"
-      style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 144px' }}
-      onClick={() => navigate(`/anime/${anime.id}`)}
-      onMouseEnter={() => { if (canHover) startHover(anilistId, titles); }}
-      onMouseLeave={() => { if (canHover) cancelHover(); }}
-    >
-      <div className="relative h-[110px] md:h-[120px] w-[80px] md:w-[88px] shrink-0 overflow-hidden rounded-xl bg-white/[0.05]">
-        {/* Static poster */}
-        <img
-          src={
-            (anime.poster || '')
-              .replace('/cover/medium/', '/cover/large/')
-              .replace(/\/banner\/(small|medium)\//, '/banner/large/') ||
-            getHighQualityPoster(anime.poster, anime.anilistId)
-          }
-          alt={anime.name}
-          loading="lazy"
-          decoding="async"
-          fetchPriority="low"
-          className="h-full w-full object-cover"
-          {...(!source?.streamUrl ? { 'data-preview-unavailable': 'true' } : {})}
-        />
-
-        {/* Video Preview — hover-capable desktop only */}
-        {canHover && source?.streamUrl && !source.isHls && (
-          <video
-            ref={videoRef}
-            className="absolute inset-0 h-full w-full object-cover opacity-100 transition-opacity duration-300"
-            muted
-            loop
-            playsInline
-            preload="none"
+      <article
+        onClick={() => navigate(watchHref)}
+        data-mobile-poster-card
+        className="group relative w-[240px] shrink-0 cursor-pointer snap-start overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.02] transition-all duration-300 hover:border-primary/40 hover:bg-white/[0.04] active:scale-[0.98] md:w-[280px]"
+        style={{ contentVisibility: "auto", containIntrinsicSize: "auto 220px" }}
+      >
+        {/* Episode thumbnail — 16:9 screencap when ani.zip has one, else poster */}
+        <div className="relative aspect-video w-full overflow-hidden bg-white/[0.04]">
+          <img
+            src={thumb}
+            alt={epTitle ? `Episode ${epNumber}: ${epTitle}` : anime.name}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+            onError={(e) => {
+              const img = e.currentTarget;
+              if (img.dataset.fallback === "1") return;
+              img.dataset.fallback = "1";
+              img.src = "/placeholder.svg";
+            }}
           />
-        )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
 
-        {/* Play overlay when no preview — desktop hover only */}
-        {!source?.streamUrl && (
-          <div className="absolute inset-0 hidden items-center justify-center bg-black/40 opacity-0 transition-all duration-300 group-hover:opacity-100 md:flex">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm ring-1 ring-white/20">
-              <Play className="ml-1 h-4 w-4 fill-current" />
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="flex min-w-0 flex-1 flex-col justify-between py-0.5">
-        <div>
-          <h4 className="line-clamp-2 text-sm font-semibold leading-snug text-white/90 transition-colors group-hover:text-white">
-            {anime.name}
-          </h4>
-          <p className="mt-1 text-[11px] font-medium text-white/40">
-            {anime.type} • {anime.duration}
-          </p>
-        </div>
-        
-        <div className="mt-auto flex flex-wrap gap-1.5 pt-2">
-          <span className="inline-flex items-center gap-1 rounded bg-white/[0.08] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white/70">
-            Sub <span className="tabular-nums text-white/40">{anime.episodes.sub}</span>
-          </span>
-          {anime.episodes.dub > 0 && (
-            <span className="inline-flex items-center gap-1 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
-              Dub <span className="tabular-nums text-primary/60">{anime.episodes.dub}</span>
+          {epNumber != null && (
+            <span className="absolute left-2 top-2 rounded-md bg-black/70 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-white backdrop-blur-sm">
+              EP {epNumber}
             </span>
           )}
+
+          <span className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl">
+              <Play className="ml-0.5 h-5 w-5 fill-current" />
+            </span>
+          </span>
+
+          {epTitle && (
+            <p className="absolute inset-x-2 bottom-2 line-clamp-1 text-[11px] font-semibold text-white/90 drop-shadow-md">
+              {epTitle}
+            </p>
+          )}
         </div>
-      </div>
-    </GlassPanel>
+
+        <div className="flex items-center gap-2.5 p-3">
+          <img
+            src={poster}
+            alt=""
+            loading="lazy"
+            className="h-10 w-8 shrink-0 rounded-md object-cover"
+          />
+          <div className="min-w-0 flex-1">
+            <h4
+              data-mobile-poster-title
+              className="line-clamp-1 text-[13px] font-bold leading-tight text-white/90 transition-colors group-hover:text-primary"
+            >
+              {anime.name}
+            </h4>
+            <div className="mt-1 flex items-center gap-1.5 text-[11px] text-white/50">
+              {epNumber != null && (
+                <span className="font-semibold text-white/70">Episode {epNumber}</span>
+              )}
+              {anime.type && <span className="truncate">• {anime.type}</span>}
+            </div>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              <span className="inline-flex items-center gap-1 rounded bg-white/[0.08] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white/70">
+                Sub <span className="tabular-nums text-white/40">{anime.episodes.sub}</span>
+              </span>
+              {anime.episodes.dub > 0 && (
+                <span className="inline-flex items-center gap-1 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+                  Dub <span className="tabular-nums text-primary/60">{anime.episodes.dub}</span>
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </article>
     </Peekable>
   );
 }

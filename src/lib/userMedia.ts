@@ -1,4 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
+import { uploadProfileImage } from '@/lib/profileMedia';
+export { validateProfileImage } from '@/lib/profileMedia';
 
 /**
  * Central helper for user-uploaded media.
@@ -17,12 +19,13 @@ import { supabase } from '@/integrations/supabase/client';
 export const USER_MEDIA_BUCKET = 'user-media';
 
 /** Where a given category used to live before the unified bucket. */
-const LEGACY: Record<UserMediaCategory, { bucket: string; prefix: (uid: string) => string }> = {
+const LEGACY: Partial<Record<UserMediaCategory, { bucket: string; prefix: (uid: string) => string }>> = {
   comment: { bucket: 'comment-media', prefix: (uid) => `comments/${uid}` },
   forum_image: { bucket: 'forum', prefix: () => 'forum_images' },
 };
 
-export type UserMediaCategory = 'comment' | 'forum_image';
+export type UserMediaCategory = 'comment' | 'forum_image' | 'avatar' | 'banner';
+
 
 export interface UploadedMedia {
   url: string;
@@ -80,6 +83,9 @@ export async function uploadUserMedia(
   userId: string,
   category: UserMediaCategory,
 ): Promise<UploadedMedia> {
+  if (category === 'avatar' || category === 'banner') {
+    return uploadProfileImage(supabase, file, userId, category);
+  }
   const filename = randomName(file);
 
   if (await resolveUserMediaBucket()) {
@@ -95,6 +101,7 @@ export async function uploadUserMedia(
   }
 
   const legacy = LEGACY[category];
+  if (!legacy) throw new Error('Profile uploads are unavailable. Please try again later.');
   // Legacy comment attachments are foldered per-user; legacy forum art is a flat
   // prefix, so it embeds the uid in the filename the way the old code did.
   const path =
@@ -146,6 +153,8 @@ export async function listUserMedia(userId: string): Promise<UserMediaFile[]> {
   const groups = await Promise.all([
     listFolder(USER_MEDIA_BUCKET, `${userId}/comment`, 'comment'),
     listFolder(USER_MEDIA_BUCKET, `${userId}/forum_image`, 'forum_image'),
+    listFolder(USER_MEDIA_BUCKET, `${userId}/avatar`, 'avatar'),
+    listFolder(USER_MEDIA_BUCKET, `${userId}/banner`, 'banner'),
     listFolder('comment-media', `comments/${userId}`, 'comment'),
   ]);
   const seen = new Set<string>();

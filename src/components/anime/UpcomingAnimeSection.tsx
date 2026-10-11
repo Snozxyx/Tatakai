@@ -32,7 +32,7 @@ function UpcomingAnimeCard({ anime }: { anime: JikanAnime }) {
       hoverEffect
       className="group flex-shrink-0 w-[180px] sm:w-[200px] cursor-pointer overflow-hidden snap-start"
     >
-      <div className="relative aspect-[2/3]">
+      <div data-mobile-poster-image className="relative aspect-[2/3]">
         <img
           src={imageUrl}
           alt={title}
@@ -59,7 +59,7 @@ function UpcomingAnimeCard({ anime }: { anime: JikanAnime }) {
         )}
 
         <div className="absolute bottom-0 left-0 right-0 p-3.5 pt-10">
-          <h4 className="font-bold text-sm leading-tight line-clamp-2 drop-shadow-md group-hover:text-purple-300 transition-colors duration-300">
+          <h4 data-mobile-poster-title className="font-bold text-sm leading-tight line-clamp-2 drop-shadow-md group-hover:text-purple-300 transition-colors duration-300">
             {title}
           </h4>
 
@@ -159,6 +159,7 @@ export function UpcomingAnimeSection() {
 
         <div
           ref={scrollRef}
+          data-mobile-home-rail
           className="flex gap-4 overflow-x-auto pb-4 px-2 scrollbar-hide scroll-smooth snap-x snap-mandatory"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >

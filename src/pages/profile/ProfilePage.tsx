@@ -21,7 +21,10 @@ import { ProfileOverviewTab } from '@/components/profile/overview';
 import { WatchlistTab, MangaReadlistTab, HistoryTab, VaultTab } from '@/components/profile/tabs';
 import { ProfileSettingsSheet } from '@/components/profile/ProfileSettingsSheet';
 import { ProfileBackgroundEffects } from '@/components/profile/ProfileBackgroundEffects';
-import { readProfileCustomization, ambientAccentStyle } from '@/lib/profileSettings';
+import { AvatarDecoration } from '@/components/profile/AvatarDecoration';
+import { ProfileCosmeticEffect, ProfileNameplate } from '@/components/profile/ProfileCosmeticEffect';
+import { hasPremiumCosmetics } from '@/lib/profileCosmetics';
+import { readProfileCustomization, profileSurfaceStyle } from '@/lib/profileSettings';
 import { Seo } from '@/components/seo/Seo';
 import { useWatchlist } from '@/hooks/user/useWatchlist';
 import { useWatchHistory } from '@/hooks/user/useWatchHistory';
@@ -58,7 +61,7 @@ import {
   Play, Trash2, Clock, CheckCircle, Eye, Pause, XCircle, ArrowLeft, Camera, Shield, Sparkles, Globe, Lock, Share2, Library, AlertCircle, UserPlus, UserMinus, Bell, Check,
   Loader2, Flame, BookOpen, LayoutGrid
 } from 'lucide-react';
-import { useNotifications } from '@/hooks/community/useNotifications';
+
 import { motion } from 'framer-motion';
 import { RankBadge } from '@/components/ui/RankBadge';
 import { getRankNameStyle, computeRankScore } from '@/lib/rankUtils';
@@ -92,7 +95,6 @@ export default function ProfilePage() {
   const isMobileApp = useIsMobileApp();
   const isMobile = useIsMobile();
   const showSidebar = !isMobile;
-  const { data: notifications = [], unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
 
   const viewingUsername = usernameParam ||
     (atUsername?.startsWith('@') ? atUsername.slice(1) : atUsername) ||
@@ -108,10 +110,12 @@ export default function ProfilePage() {
   const { data: publicProfile, isLoading: loadingPublicProfile, error: publicProfileError } = usePublicProfile(viewingUsername || '');
 
   const profile = isViewingOther ? publicProfile : ownProfile;
+  const { data: profileBadges = [] } = useUserBadges(profile?.user_id);
 
   // Per-profile customization (ambient accent + background effect) — read from the
   // resolved profile so it applies for own AND other viewers.
-  const { ambientColor, backgroundEffect } = readProfileCustomization(profile);
+  const customization = readProfileCustomization(profile, hasPremiumCosmetics(profile, profileBadges));
+  const { backgroundEffect, avatarDecoration, profileEffect, nameplate } = customization;
 
   const { data: ownWatchlist, isLoading: loadingOwnWatchlist } = useWatchlist();
   const { data: ownHistory, isLoading: loadingOwnHistory } = useWatchHistory();
@@ -229,7 +233,6 @@ export default function ProfilePage() {
   const achievements = isViewingOther ? publicAchievements : ownAchievements;
   const viewedStreakStats = isViewingOther ? publicStreakStats : ownStreakStats;
 
-  const { data: profileBadges = [] } = useUserBadges(profile?.user_id);
 
   const { data: commentsCount = 0 } = useQuery({
     queryKey: ['user_comments_count', profile?.user_id],
@@ -396,8 +399,8 @@ export default function ProfilePage() {
 
   return (
     <div
-      className="min-h-screen bg-background text-foreground overflow-x-hidden relative"
-      style={ambientAccentStyle(ambientColor)}
+      className="min-h-screen bg-background text-foreground overflow-x-hidden relative isolate"
+      style={profileSurfaceStyle(customization)}
     >
       {profile?.username && (
         <Seo
@@ -419,7 +422,9 @@ export default function ProfilePage() {
           <img
             src={profile.banner_url}
             alt=""
-            className="w-full h-full object-cover opacity-[0.15] md:opacity-[0.25] blur-[100px] saturate-[2.5] transform scale-125"
+            loading="lazy"
+            decoding="async"
+            className="w-full h-full object-cover opacity-[0.15] md:opacity-[0.25] blur-3xl md:blur-[100px] saturate-[2.5] transform scale-125"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/80 to-background/95" />
         </div>
@@ -432,19 +437,25 @@ export default function ProfilePage() {
         
         {/* ── Cinematic Hero Banner ── */}
         <div className="h-[360px] md:h-[500px] relative w-full overflow-hidden group select-none">
-          {profile?.banner_url ? (
-            <img
-              src={profile.banner_url}
-              alt="Profile banner"
-              className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-[2s] ease-out group-hover:scale-[1.02]"
-            />
-          ) : (
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-background to-background" />
-          )}
+          <ProfileCosmeticEffect effect={profileEffect} />
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{ maskImage: 'linear-gradient(to bottom, black 35%, rgba(0,0,0,0.85) 60%, rgba(0,0,0,0.25) 85%, transparent 100%)' }}
+          >
+            {profile?.banner_url ? (
+              <img
+                src={profile.banner_url}
+                alt="Profile banner"
+                className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-[2s] ease-out group-hover:scale-[1.02]"
+              />
+            ) : (
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-background to-background" />
+            )}
 
-          {/* Cinematic blending overlays */}
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent opacity-90 pointer-events-none" />
+            {/* Fade the artwork into the selected effect instead of a solid theme color. */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent opacity-90 pointer-events-none" />
+          </div>
           
           {/* Banner Picker Button - Only show for own profile */}
           {!isViewingOther && (
@@ -452,7 +463,7 @@ export default function ProfilePage() {
               type="banner"
               currentImage={profile?.banner_url || undefined}
               trigger={
-                <button className="absolute top-6 right-6 px-4 py-2 rounded-full bg-black/40 hover:bg-black/60 text-white/90 text-xs font-bold flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 backdrop-blur-xl border border-white/20 shadow-2xl hover:scale-105 z-10">
+                <button className="absolute top-6 right-6 px-4 py-2 rounded-full bg-black/40 hover:bg-black/60 text-white/90 text-xs font-bold flex items-center gap-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-all duration-300 backdrop-blur-xl border border-white/20 shadow-2xl hover:scale-105 z-10">
                   <Camera className="w-3.5 h-3.5" />
                   Change Cover
                 </button>
@@ -477,7 +488,7 @@ export default function ProfilePage() {
         <div className="max-w-7xl mx-auto px-4 md:px-8 relative z-20 pb-20">
           
           <motion.div
-            initial={{ y: 20, opacity: 0 }}
+            initial={isMobile ? false : { y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             className="flex flex-col xl:flex-row justify-between items-start xl:items-end gap-6 md:gap-10 -mt-20 md:-mt-24 mb-10"
           >
@@ -494,13 +505,14 @@ export default function ProfilePage() {
                     </AvatarFallback>
                   </Avatar>
                 </div>
+                <AvatarDecoration decoration={avatarDecoration} />
 
                 {!isViewingOther && (
                   <AvatarPickerSheet
                     type="avatar"
                     currentImage={profile?.avatar_url || undefined}
                     trigger={
-                      <button className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-110 border-2 border-background z-20">
+                      <button aria-label="Change profile picture" className="absolute bottom-2 right-2 w-11 h-11 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-110 border-2 border-background z-20">
                         <Sparkles className="w-4 h-4" />
                       </button>
                     }
@@ -517,9 +529,11 @@ export default function ProfilePage() {
                     const rankStyle = getRankNameStyle(profileRankScore);
                     return (
                       <h1 className="text-3xl md:text-5xl font-black tracking-tight drop-shadow-xl font-display">
-                        <span className={rankStyle.className} style={rankStyle.style}>
-                          {profile?.display_name || (profile?.username && profile?.username !== 'null' ? profile?.username : 'User')}
-                        </span>
+                        <ProfileNameplate nameplate={nameplate}>
+                          <span className={rankStyle.className} style={rankStyle.style}>
+                            {profile?.display_name || (profile?.username && profile?.username !== 'null' ? profile?.username : 'User')}
+                          </span>
+                        </ProfileNameplate>
                       </h1>
                     );
                   })()}

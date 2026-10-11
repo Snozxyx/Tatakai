@@ -10,6 +10,8 @@ import {
   markMangaCancelled,
 } from '@/core/download/manga-download-monitor';
 import { cancelMobileDownload } from '@/core/download/mobile/mobileDownloader';
+import { startMobileDownload, type MobileDownloadInput } from '@/core/download/mobile/mobileDownloader';
+import { useNativeDownloadJobs, deleteNativeDownload } from '@/core/download/mobile/nativeDownloads';
 
 export type MobileDownloadQueueItem = {
   id: string;
@@ -137,9 +139,7 @@ export function useMobileDownload() {
     isNative: isMobileNative(),
     queue,
     activeDownloads,
-    startDownload: async (_payload: unknown) => {
-      return { ok: false, reason: 'mobile_download_rebuild_pending' as const };
-    },
+    startDownload: (payload: MobileDownloadInput) => startMobileDownload(payload),
     cancelDownload,
     retryDownload,
   };
@@ -158,10 +158,25 @@ export type OfflineEpisode = {
 };
 
 export function useOfflineLibrary() {
+  const { jobs, error, available, ready } = useNativeDownloadJobs();
+  const episodes: OfflineEpisode[] = jobs.filter((job) => job.status === 'completed').map((job) => ({
+    animeId: job.animeId || job.episodeId,
+    animeTitle: job.animeName,
+    poster: job.posterUrl,
+    episodeId: job.episodeId,
+    episode: job.episodeNumber,
+    season: 1,
+    localPath: `native-offline://${encodeURIComponent(job.episodeId)}`,
+    downloadedAt: new Date(job.completedAt || 0).toISOString(),
+  }));
   return {
     isNative: isMobileNative(),
-    loading: false,
-    episodes: [] as OfflineEpisode[],
-    deleteEpisode: async (_animeId: string, _season: number, _episode: number) => ({ ok: false, reason: 'offline_library_rebuild_pending' as const }),
+    loading: available && !ready,
+    episodes, error, available,
+    deleteEpisode: async (animeId: string, season: number, episode: number) => {
+      const item = episodes.find((entry) => entry.animeId === animeId && entry.season === season && entry.episode === episode);
+      if (!item) return { ok: false, reason: 'episode_not_found' };
+      await deleteNativeDownload(item.episodeId); return { ok: true };
+    },
   };
 }

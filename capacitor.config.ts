@@ -8,9 +8,7 @@ const config: CapacitorConfig = {
     androidScheme: 'https',
     cleartext: true,
     hostname: 'tatakai.me',
-    allowNavigation: [
-      '*'
-    ]
+    allowNavigation: []
   },
   android: {
     allowMixedContent: false,
@@ -25,7 +23,8 @@ const config: CapacitorConfig = {
     }
   },
   ios: {
-    contentInset: 'always',
+    // CSS owns safe areas. UIKit insets shift 100vw fullscreen content in landscape.
+    contentInset: 'never',
     allowsLinkPreview: false,
     scrollEnabled: true,
     backgroundColor: '#09090b',

@@ -1,51 +1,33 @@
-import { type ReactNode, useEffect, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { type ReactNode, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
+import { useMotionPreference } from '@/hooks/ui/useMotionPreference';
 
-interface RevealProps {
-  children: ReactNode;
-  /** Stagger helper — delays the reveal slightly for a smoother cascade. */
-  delay?: number;
-  className?: string;
-}
+interface RevealProps { children: ReactNode; delay?: number; className?: string; }
 
-/**
- * Fades + lifts its children in the first time they scroll into view. Purely
- * cosmetic: honours `prefers-reduced-motion` (renders statically) and only
- * animates once so scrolling back up doesn't re-trigger it. Used to give the
- * home page a smoother, less "pop-in" feel.
- *
- * Mobile fast-path: on narrow viewports (<768px) motion is skipped entirely.
- * Framer's per-section whileInView observers + transforms caused visible jank
- * scrolling from Top-10 into the infinite feed on phones.
- */
+/** One-shot marketing fade. Frequently used browsing content stays visible. */
 export function Reveal({ children, delay = 0, className }: RevealProps) {
-  const reduceMotion = useReducedMotion();
-  const [isMobileViewport, setIsMobileViewport] = useState(
-    () => typeof window !== 'undefined' && window.innerWidth < 768,
-  );
-
+  const ref = useRef<HTMLDivElement>(null);
+  const played = useRef(false);
+  const reduced = useMotionPreference();
+  const { pathname } = useLocation();
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const mq = window.matchMedia('(max-width: 767px)');
-    const sync = () => setIsMobileViewport(mq.matches);
-    sync();
-    mq.addEventListener?.('change', sync);
-    return () => mq.removeEventListener?.('change', sync);
-  }, []);
-
-  if (reduceMotion || isMobileViewport) {
-    return <div className={className}>{children}</div>;
-  }
-
-  return (
-    <motion.div
-      className={className}
-      initial={{ opacity: 0, y: 24 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "0px 0px -10% 0px" }}
-      transition={{ duration: 0.5, delay, ease: [0.22, 1, 0.36, 1] }}
-    >
-      {children}
-    </motion.div>
-  );
+    const el = ref.current;
+    if (!el || played.current || reduced || window.innerWidth < 768
+      || !['/welcome', '/download'].includes(pathname)
+      || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      played.current = true;
+      el.style.animationDelay = Math.min(delay, 0.15) + 's';
+      el.classList.add('marketing-reveal');
+      observer.disconnect();
+    }, { threshold: 0.1 });
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      el.classList.remove('marketing-reveal');
+      el.style.removeProperty('animation-delay');
+    };
+  }, [delay, pathname, reduced]);
+  return <div ref={ref} className={className}>{children}</div>;
 }

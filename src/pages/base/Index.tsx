@@ -9,6 +9,9 @@ import { useIsMobile } from "@/hooks/ui/use-mobile";
 import { Capacitor } from '@capacitor/core';
 import { cn } from "@/lib/utils";
 import { HeroSection } from "@/components/anime/HeroSection";
+import { CinematicHeroSkeleton, MobileHomeBackdrop } from '@/components/anime/CinematicHero';
+import { useMobileAppearance } from '@/hooks/ui/useMobileAppearance';
+import type { SpotlightAnime } from '@/lib/api';
 import { TrendingGrid } from "@/components/anime/TrendingGrid";
 import { LatestEpisodes } from "@/components/anime/LatestEpisodes";
 import { TopAnimeSection } from "@/components/anime/TopAnimeSection";
@@ -33,6 +36,8 @@ import { DownloadSection } from "@/components/home/DownloadSection";
 import { AppDownloadBanner } from "@/components/layout/AppDownloadBanner";
 import { useEffect, useState, type ReactNode } from "react";
 import { BecauseYouWatched } from "@/components/anime/BecauseYouWatched";
+import { FollowedAnimeEpisodes } from "@/components/anime/FollowedAnimeEpisodes";
+import { FollowedMangaUpdates } from "@/components/manga/FollowedMangaUpdates";
 import { TorrentSessionBanner } from "@/components/home/TorrentSessionBanner";
 import { ExtensionSlot } from "@/core/extensions/ExtensionSlot";
 
@@ -53,6 +58,8 @@ const Index = () => {
   const isNative = useIsNativeApp();
   const isDesktopApp = useIsDesktopApp(); // Only Electron/Tauri
   const isMobile = useIsMobile();
+  const refreshed = useMobileAppearance();
+  const [activeSpotlight, setActiveSpotlight] = useState<SpotlightAnime | null>(null);
   const isMobileApp = Capacitor.isNativePlatform();
   const showInfiniteEarly = isMobile || isMobileApp;
   const [showDeferredSections, setShowDeferredSections] = useState(false);
@@ -91,12 +98,13 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
+    <div className="relative min-h-screen bg-background text-foreground overflow-x-clip">
+      {refreshed && <MobileHomeBackdrop anime={data?.spotlightAnimes.find(anime => anime.id === activeSpotlight?.id) || data?.spotlightAnimes[0]} />}
       {!isMobile && <Background />}
       {showSidebar && <Sidebar />}
 
-      <main className={cn(
-        "relative z-10 pr-6 py-6 max-w-[1800px] mx-auto pb-24 md:pb-6",
+      <main data-mobile-home className={cn(
+        "app-page relative z-10 pr-6 py-6 max-w-[1800px] mx-auto pb-24 md:pb-6",
         isDesktopApp ? "pl-24" : "pl-6 md:pl-32" // Desktop app sidebar is fixed w-20, so content needs larger offset
       )}>
         <Header />
@@ -107,7 +115,7 @@ const Index = () => {
 
         {isLoading ? (
           <>
-            <HeroSkeleton />
+            {refreshed ? <CinematicHeroSkeleton /> : <HeroSkeleton />}
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-24">
               {Array.from({ length: 6 }).map((_, i) => (
                 <CardSkeleton key={i} />
@@ -115,22 +123,27 @@ const Index = () => {
             </div>
           </>
         ) : data ? (
-          <div className="space-y-14 md:space-y-20 [&>section]:!mb-0 [&>div]:!mb-0">
+          <div data-home-sections className="space-y-14 md:space-y-20 [&>section]:!mb-0 [&>div]:!mb-0">
             {/* Hero — Spotlight */}
             {data.spotlightAnimes.length > 0 && (
               <HeroSection
                 spotlight={data.spotlightAnimes[0]}
                 spotlights={data.spotlightAnimes}
+                onActiveSpotlightChange={setActiveSpotlight}
               />
             )}
 
-            <ReleaseV6Banner />
+            {/* <ReleaseV6Banner /> */}
 
             {/* ── Pick up where you left off ── */}
             <ContinueWatching />
             <LocalContinueWatching />
             <TorrentSessionBanner />
             <LastReadMangaSection />
+
+            {/* ── New from what you follow — exact EP/CH deep-links ── */}
+            <RevealSection><FollowedAnimeEpisodes /></RevealSection>
+            <RevealSection><FollowedMangaUpdates /></RevealSection>
 
             {/* ── Fresh & trending ── */}
             <RevealSection><LatestEpisodes animes={data.latestEpisodeAnimes} /></RevealSection>

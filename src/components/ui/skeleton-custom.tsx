@@ -1,3 +1,4 @@
+import { MediaCardFrame } from "@/components/MediaCardFrame";
 import { cn } from "@/lib/utils";
 
 interface SkeletonProps {
@@ -22,13 +23,9 @@ export function Skeleton({ className }: SkeletonProps) {
  * Callers pass width through `className`, which it used not to accept.
  */
 export function CardSkeleton({ className }: SkeletonProps) {
-  return (
-    <div className={cn("glass-panel p-3 space-y-3", className)}>
-      <Skeleton className="w-full aspect-[2/3] rounded-2xl" />
-      <Skeleton className="h-4 w-3/4" />
-      <Skeleton className="h-3 w-1/2" />
-    </div>
-  );
+  return <MediaCardFrame title="" className={className} aria-hidden
+    poster={<Skeleton className="h-full w-full rounded-2xl" />}
+    metadata={<Skeleton className="h-3 w-1/2" />} />;
 }
 
 export function HeroSkeleton() {

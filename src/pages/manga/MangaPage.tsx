@@ -95,7 +95,7 @@ function RelationTree({ relations }: { relations: MediaRelation[] }) {
 }
 
 import { Helmet } from "react-helmet-async";
-import { useIsNativeApp } from '@/hooks/ui/useIsNativeApp';
+import { useIsNativeApp, useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 import { useIsMobile } from '@/hooks/ui/use-mobile';
 import { setViewingMangaRpc, clearDiscordRpc } from '@/lib/discordRpc';
 import { useContentSafetySettings } from "@/hooks/user/useContentSafetySettings";
@@ -198,6 +198,7 @@ export default function MangaPage() {
   const { mangaId } = useParams<{ mangaId: string }>();
   const navigate = useNavigate();
   const isNative = useIsNativeApp();
+  const isDesktopApp = useIsDesktopApp();
   const isMobileViewport = useIsMobile();
   const { user, profile, isAdmin } = useAuth();
   const { settings: contentSafetySettings, updateSettings: updateContentSafetySettings } = useContentSafetySettings();
@@ -250,6 +251,7 @@ export default function MangaPage() {
       .map((t: any) => ({
         id: t.id || t.name,
         name: t.name,
+        source: 'anilist' as const,
         rank: t.rank,
         weight: t.rank && t.rank >= 80 ? 'defining' : t.rank && t.rank >= 60 ? 'core' : 'normal',
       }));
@@ -262,6 +264,7 @@ export default function MangaPage() {
       .map((t: any) => ({
         id: t.id ?? t.name,
         name: t.name,
+        source: 'mangabaka' as const,
         rank: t.weight === 'defining' ? 90 : t.weight === 'core' ? 70 : undefined,
         weight: t.weight,
       }));
@@ -999,7 +1002,7 @@ export default function MangaPage() {
       <div className="min-h-screen bg-background text-foreground">
         {!isNative && <Background />}
         {showSidebar && <Sidebar />}
-        <main className={cn("relative z-10 py-6 max-w-[1800px] mx-auto", isNative ? "p-6" : "pl-6 md:pl-32 pr-6")}>
+        <main className={cn("relative z-10 py-6 max-w-[1800px] mx-auto", isDesktopApp ? "p-6" : "pl-6 md:pl-32 pr-6")}>
           <div className="space-y-8">
             <Skeleton className="h-8 w-32" />
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -1048,7 +1051,7 @@ export default function MangaPage() {
 
         <main className={cn(
           "relative z-10 py-8 max-w-[980px] mx-auto pb-24",
-          isNative ? "px-4" : "pl-6 md:pl-32 pr-6"
+          isDesktopApp ? "px-4" : "pl-6 md:pl-32 pr-6"
         )}>
           <AdultWarningGate
             title={info.canonicalTitle || info.title?.english || info.title?.romaji || 'Unknown'}
@@ -1184,7 +1187,24 @@ export default function MangaPage() {
         <meta property="og:description" content={info.synopsis?.slice(0, 160) || `Track and discuss ${displayTitle} on Tatakai — the otaku community.`} />
         <meta property="og:image" content={info.coverImage || ""} />
         <meta property="og:type" content="book" />
+        <meta property="og:url" content={`https://tatakai.me/manga/${mangaId}`} />
+        <meta property="og:site_name" content="Tatakai" />
         <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={`${displayTitle} — Manga on Tatakai`} />
+        <meta name="twitter:description" content={info.synopsis?.slice(0, 160) || `Track and discuss ${displayTitle} on Tatakai.`} />
+        {info.coverImage ? <meta name="twitter:image" content={info.coverImage} /> : null}
+        <link rel="canonical" href={`https://tatakai.me/manga/${mangaId}`} />
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Book",
+            name: displayTitle,
+            url: `https://tatakai.me/manga/${mangaId}`,
+            ...(info.synopsis ? { description: info.synopsis.slice(0, 5000) } : {}),
+            ...(info.coverImage ? { image: info.coverImage } : {}),
+            isPartOf: { "@type": "WebSite", name: "Tatakai", url: "https://tatakai.me" },
+          })}
+        </script>
       </Helmet>
 
       <div className="min-h-screen bg-background text-foreground overflow-x-hidden selection:bg-primary/30">
@@ -1193,7 +1213,7 @@ export default function MangaPage() {
 
         <main className={cn(
           "relative z-10 py-6 max-w-[1800px] mx-auto pb-24 lg:pb-6",
-          isNative ? "px-4 pt-4" : "pl-6 md:pl-32 pr-6 pt-10"
+          isDesktopApp ? "px-4 pt-4" : "pl-6 md:pl-32 pr-6 pt-10"
         )}>
           {/* Banner Image Background */}
           {bannerUrl && (
@@ -1388,7 +1408,7 @@ export default function MangaPage() {
                       <button
                         key={`hero-tag-${tag.id || tag.name}`}
                         type="button"
-                        onClick={() => navigate(`/search?mangaTag=${encodeURIComponent(tag.name)}&type=manga`)}
+                        onClick={() => navigate(`/search?mangaTag=${encodeURIComponent(tag.name)}&mangaTagSource=${tag.source}&type=manga`)}
                         className="px-2.5 py-0.5 rounded-full bg-white/5 hover:bg-primary/20 border border-white/10 hover:border-primary/40 text-xs text-muted-foreground hover:text-primary transition-all flex items-center gap-1 group"
                         title={tag.rank ? `${tag.name} (${tag.rank}%) • Click to search` : `${tag.name} • Click to search`}
                       >
@@ -1509,7 +1529,7 @@ export default function MangaPage() {
                         <button
                           key={`tag-${tag.id ?? tag.name}`}
                           type="button"
-                          onClick={() => navigate(`/search?mangaTag=${encodeURIComponent(tag.name)}&type=manga`)}
+                          onClick={() => navigate(`/search?mangaTag=${encodeURIComponent(tag.name)}&mangaTagSource=${tag.source}&type=manga`)}
                           className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors hover:border-primary/40 hover:text-primary flex items-center gap-1 ${
                             tag.weight === 'defining'
                               ? 'bg-primary/10 border-primary/20 text-primary/80'
@@ -1993,7 +2013,7 @@ export default function MangaPage() {
                           key={tag.name}
                           type="button"
                           title={tag.isAdult ? "Adult AniList tag" : "Search this AniList tag"}
-                          onClick={() => navigate(`/search?mangaTag=${encodeURIComponent(tag.name)}&type=manga`)}
+                          onClick={() => navigate(`/search?mangaTag=${encodeURIComponent(tag.name)}&mangaTagSource=anilist&type=manga`)}
                           className="rounded-md border border-primary/20 bg-primary/5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary/80 transition-colors hover:border-primary/40 hover:bg-primary/15"
                         >
                           #{tag.name}

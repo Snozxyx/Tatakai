@@ -1,3 +1,4 @@
+import { usePersistentState } from '@/hooks/ui/usePersistentState';
 import { useRef, useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Textarea } from '@/components/ui/textarea';
@@ -68,6 +69,8 @@ interface RichCommentComposerProps {
   onCancel?: () => void;
   /** Prefill the draft (e.g. an `@mention` when replying to a reply). */
   initialContent?: string;
+  /** Stable thread/reply identity. Drafts are scoped to the signed-in user. */
+  draftKey?: string;
   /**
    * Show an "insert current time" button that stamps the on-page player's
    * position (mm:ss / h:mm:ss) into the draft. Only useful where a video is
@@ -108,6 +111,7 @@ export function RichCommentComposer({
   showSpoiler = true,
   onCancel,
   initialContent = '',
+  draftKey,
   allowTimestamp = false,
   allowEmbeds = false,
   initialEmbeds,
@@ -115,9 +119,11 @@ export function RichCommentComposer({
   const { user } = useAuth();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const [content, setContent] = useState(initialContent);
-  const [attachments, setAttachments] = useState<CommentAttachment[]>([]);
-  const [isSpoiler, setIsSpoiler] = useState(false);
+  const draftPrefix = user && draftKey ? `tatakai_comment_draft:${user.id}:${draftKey}` : null;
+  const fieldKey = (field: string) => draftPrefix ? `${draftPrefix}:${field}` : null;
+  const [content, setContent] = usePersistentState(fieldKey('content'), initialContent);
+  const [attachments, setAttachments] = usePersistentState<CommentAttachment[]>(fieldKey('attachments'), []);
+  const [isSpoiler, setIsSpoiler] = usePersistentState(fieldKey('spoiler'), false);
   const [dropActive, setDropActive] = useState(false);
   const [intakeBusy, setIntakeBusy] = useState(false);
 
@@ -126,22 +132,18 @@ export function RichCommentComposer({
   // Rich embeds — single slot per type, assembled into the embeds[] array on
   // submit (matches the feed composer's model). Only loaded when allowEmbeds.
   // Slots are seeded once from initialEmbeds so re-editing keeps existing embeds.
-  const [media, setMedia] = useState<SelectedMedia | null>(() => {
-    const e = (initialEmbeds ?? []).find((x) => x.kind === 'media');
-    return e && e.kind === 'media'
-      ? { id: e.id, name: e.name, poster: e.poster ?? null, type: e.mediaType }
-      : null;
-  });
-  const [playlistId, setPlaylistId] = useState<string | null>(
-    () => (initialEmbeds ?? []).find((e) => e.kind === 'playlist')?.id ?? null,
-  );
-  const [tierlistId, setTierlistId] = useState<string | null>(
-    () => (initialEmbeds ?? []).find((e) => e.kind === 'tierlist')?.id ?? null,
-  );
-  const [postId, setPostId] = useState<string | null>(
-    () => (initialEmbeds ?? []).find((e) => e.kind === 'post')?.id ?? null,
-  );
-  const [poll, setPoll] = useState<PollState>(null);
+  const initialMedia = (initialEmbeds ?? []).find(e => e.kind === 'media');
+  const [media, setMedia] = usePersistentState<SelectedMedia | null>(fieldKey('media'),
+    initialMedia?.kind === 'media'
+      ? { id: initialMedia.id, name: initialMedia.name, poster: initialMedia.poster ?? null, type: initialMedia.mediaType }
+      : null);
+  const [playlistId, setPlaylistId] = usePersistentState<string | null>(fieldKey('playlist'),
+    (initialEmbeds ?? []).find(e => e.kind === 'playlist')?.id ?? null);
+  const [tierlistId, setTierlistId] = usePersistentState<string | null>(fieldKey('tierlist'),
+    (initialEmbeds ?? []).find(e => e.kind === 'tierlist')?.id ?? null);
+  const [postId, setPostId] = usePersistentState<string | null>(fieldKey('post'),
+    (initialEmbeds ?? []).find(e => e.kind === 'post')?.id ?? null);
+  const [poll, setPoll] = usePersistentState<PollState>(fieldKey('poll'), null);
 
   const { data: playlists = [] } = usePlaylists();
   const { data: tierlists = [] } = useUserTierLists(user?.id);
@@ -347,6 +349,15 @@ export function RichCommentComposer({
     };
     const result = await onSubmit(payload);
     if (result === false) return; // caller signalled failure — keep the draft
+    // Clear synchronously too: a successful submit may close/unmount a reply
+    // before React processes the state resets below.
+    if (draftPrefix) {
+      try {
+        for (const field of ['content', 'attachments', 'spoiler', 'media', 'playlist', 'tierlist', 'post', 'poll']) {
+          sessionStorage.removeItem(`${draftPrefix}:${field}`);
+        }
+      } catch { /* storage unavailable */ }
+    }
     void triggerHaptic('comment');
     setContent('');
     setAttachments([]);

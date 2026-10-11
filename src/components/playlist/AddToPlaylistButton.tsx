@@ -63,6 +63,7 @@ export function AddToPlaylistButton({
   if (!user) {
     return (
       <Button 
+        aria-label="Add to playlist"
         variant="outline" 
         size={variant === 'icon' ? 'icon' : variant === 'mini' ? 'sm' : 'default'}
         className={className}
@@ -124,6 +125,7 @@ export function AddToPlaylistButton({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button 
+          aria-label="Add to playlist"
           variant="outline" 
           size={variant === 'icon' ? 'icon' : variant === 'mini' ? 'sm' : 'default'}
           className={cn(

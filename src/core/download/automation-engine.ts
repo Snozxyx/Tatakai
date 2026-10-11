@@ -3,6 +3,8 @@ import { contentGraph } from '../content/content-graph';
 import { extensionRegistry } from '../extensions/ExtensionRegistry';
 import { toast } from 'sonner';
 import { scoreAutoDownloadCandidate } from './automation-matcher';
+import { fetchEpisodes } from '@/lib/api/api-client';
+import { availableDownloadEpisodes } from '@/lib/episodeAvailability';
 import {
   resolveExtensionForEpisode,
   normalizeLanguage,
@@ -69,14 +71,10 @@ export async function checkAndRunAutomation() {
         ].filter((t): t is string => typeof t === 'string' && !!t.trim());
 
         // 3. Determine latest available episode number
-        let latestEpisode = media.episodes || 0;
-        if (media.nextAiringEpisode?.episode) {
-          latestEpisode = media.nextAiringEpisode.episode - 1;
-        }
-
-        if (latestEpisode <= rule.lastCheckedEpisode && media.status === 'RELEASING') {
-          latestEpisode = rule.lastCheckedEpisode + 1;
-        }
+        const episodeList = await fetchEpisodes(String(rule.animeId));
+        const available = availableDownloadEpisodes(episodeList.episodes);
+        const availableNumbers = new Set(available.map(episode => episode.number));
+        const latestEpisode = Math.max(0, ...availableNumbers);
 
         if (latestEpisode <= rule.lastCheckedEpisode) {
           continue;
@@ -89,6 +87,7 @@ export async function checkAndRunAutomation() {
         console.log(`[AutomationEngine] Checked "${rule.animeTitle}": Needs episodes ${startEp} to ${endEp}`);
 
         for (let ep = startEp; ep <= endEp; ep++) {
+          if (!availableNumbers.has(ep)) continue;
           let downloaded = false;
 
           // ── Build the ordered extension provider list ──────────────────────

@@ -1,5 +1,7 @@
 import { memo, Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { CapacitorHttp } from '@capacitor/core';
+import { DownloadResumeSetting } from '@/components/settings/DownloadResumeSetting';
 import {
   Bell,
   Code2,
@@ -415,6 +417,19 @@ export function MobileAppSettingsPanel(_props: { section?: string }) {
       >
         <div className="flex flex-col divide-y divide-white/5">
           <SettingRow
+            title="Mobile layout"
+            description="Refreshed adds a cinematic spotlight, glass header, and consistent posters. Also available in Appearance."
+            control={
+              <Select value={config.mobileLayout} onValueChange={(value) => updateConfig({ mobileLayout: value === 'classic' ? 'classic' : 'refreshed' })}>
+                <SelectTrigger className="h-11 w-36 rounded-lg text-sm" aria-label="Mobile layout"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="refreshed">Refreshed</SelectItem>
+                  <SelectItem value="classic">Classic</SelectItem>
+                </SelectContent>
+              </Select>
+            }
+          />
+          <SettingRow
             title="Reduce motion"
             description="Minimize animations and transitions."
             control={<Switch checked={reduceMotion} onCheckedChange={handleReduceMotion} aria-label="Reduce motion" />}
@@ -527,6 +542,36 @@ export function MobileAppSettingsPanel(_props: { section?: string }) {
         <DebridSettingsPanel />
       </Suspense>
 
+      <SettingsSection title="Cloudflare" description="Try to resolve provider challenges before retrying playback. Interactive CAPTCHAs may still require visiting the provider.">
+        <SettingRow title="Resolve challenges" description="Reuse clearance cookies from an on-device browser session."
+          control={<Switch checked={config.cloudflareBypass} onCheckedChange={(cloudflareBypass) => updateConfig({ cloudflareBypass })} aria-label="Resolve Cloudflare challenges" />} />
+        <label className="mt-3 block text-sm">
+          FlareSolverr server (optional)
+          <input type="url" defaultValue={config.flaresolverrUrl} key={config.flaresolverrUrl}
+            placeholder="http://192.168.1.10:8191" aria-label="FlareSolverr server URL"
+            className="mt-2 w-full rounded-lg border border-border bg-background px-3 py-2"
+            onBlur={(event) => {
+              const value = event.target.value.trim();
+              try {
+                if (value && !['http:', 'https:'].includes(new URL(value).protocol)) throw new Error('protocol');
+                updateConfig({ flaresolverrUrl: value });
+              } catch { toast.error('Enter a valid HTTP or HTTPS server URL'); }
+            }} />
+        </label>
+        {config.flaresolverrUrl && <Button variant="outline" size="sm" className="mt-3" onClick={async (event) => {
+          const button = event.currentTarget;
+          button.disabled = true;
+          try {
+            const endpoint = config.flaresolverrUrl.replace(/\/v1\/?$/, '').replace(/\/$/, '');
+            const response = await CapacitorHttp.get({ url: endpoint, connectTimeout: 5000, readTimeout: 5000 });
+            if (response.status !== 200 || !JSON.stringify(response.data).toLowerCase().includes('flaresolverr')) throw new Error('unreachable');
+            toast.success('FlareSolverr is reachable');
+          } catch { toast.error('Could not reach FlareSolverr. Check the server URL and network.'); }
+          finally { button.disabled = false; }
+        }}>Test connection</Button>}
+        <p className="mt-2 text-xs text-muted-foreground">Leave blank to use the on-device browser. A configured server receives the provider URL; if it fails, the app tries the browser.</p>
+      </SettingsSection>
+
       <SettingsSection
         title="Data saver"
         description="Cap quality to 720p, force low-memory buffers, disable autoplay and heavy preloading."
@@ -582,6 +627,7 @@ export function MobileAppSettingsPanel(_props: { section?: string }) {
         </div>
       </SettingsSection>
 
+      <DownloadResumeSetting />
       <SettingsSection title="Storage" description="Free up space used by cached pages and images.">
         <SettingRow
           icon={HardDrive}

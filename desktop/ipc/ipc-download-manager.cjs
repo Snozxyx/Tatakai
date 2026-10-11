@@ -80,64 +80,9 @@ async function downloadFile(url, outputPath, options = {}) {
     });
 }
 
-/**
- * hls.js picks the top rendition adaptively for playback, but ffmpeg given a
- * MASTER playlist selects a variant by its own default (often the first-listed,
- * i.e. the LOWEST quality) → the player-button download looks worse than what
- * was on screen. So when the input is a master m3u8, resolve it to the
- * highest-bandwidth variant media playlist and hand ffmpeg *that*. Best-effort:
- * any failure falls back to the original URL (ffmpeg still downloads, just at
- * its default rendition), so this never regresses a working download.
- */
-async function resolveBestHlsVariant(url, headers = {}) {
-    try {
-        if (!/\.m3u8(\?|$)/i.test(url)) return url;
-        const res = await axios.get(url, {
-            timeout: 15000,
-            responseType: 'text',
-            transformResponse: [(d) => d],
-            maxRedirects: 5,
-            headers: {
-                'User-Agent': headers['User-Agent'] || headers['user-agent'] ||
-                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Accept': '*/*',
-                ...headers,
-            },
-            validateStatus: (s) => s >= 200 && s < 400,
-        });
-        const text = String(res.data || '');
-        if (!text.includes('#EXT-X-STREAM-INF')) return url; // already a media playlist
-        const finalUrl = res.request?.res?.responseUrl || url; // resolve relative URIs against the redirected master
-        const lines = text.split(/\r?\n/);
-        let best = null; // { bandwidth, height, uri }
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if (!line.startsWith('#EXT-X-STREAM-INF:')) continue;
-            const bw = Number((line.match(/[,:]BANDWIDTH=(\d+)/) || [])[1] || 0);
-            const height = Number((line.match(/RESOLUTION=\d+x(\d+)/) || [])[1] || 0);
-            // The URI is the next non-comment, non-empty line.
-            let uri = '';
-            for (let j = i + 1; j < lines.length; j++) {
-                const cand = lines[j].trim();
-                if (!cand || cand.startsWith('#')) continue;
-                uri = cand;
-                break;
-            }
-            if (!uri) continue;
-            if (!best || bw > best.bandwidth || (bw === best.bandwidth && height > best.height)) {
-                best = { bandwidth: bw, height, uri };
-            }
-        }
-        if (!best) return url;
-        const resolved = new URL(best.uri, finalUrl).href;
-        console.log(`[download] HLS master → best variant ${best.height || '?'}p (${Math.round(best.bandwidth / 1000)}kbps)`);
-        return resolved;
-    } catch (_) {
-        return url; // network/parse failure → let ffmpeg handle the master directly
-    }
-}
-
 function cancelFfmpeg(episodeId) {
+    activeTransfers.get(episodeId)?.abort();
+    activeTransfers.delete(episodeId);
     const proc = activeProcesses.get(episodeId);
     if (proc) {
         try {
@@ -150,6 +95,10 @@ function cancelFfmpeg(episodeId) {
 }
 
 async function downloadEpisode({ url, output, headers = {}, onProgress, episodeId }) {
+    if (output && fsMod.existsSync(output) && fsMod.statSync(output).size > 1024) {
+        onProgress?.(100);
+        return output;
+    }
     // Fail fast on a bad input/output rather than letting ffmpeg emit the
     // opaque "Unable to find a suitable output format for ''" (empty output).
     const inputUrlRaw = typeof url === 'string' ? url.trim() : '';
@@ -159,9 +108,21 @@ async function downloadEpisode({ url, output, headers = {}, onProgress, episodeI
     if (!output || !String(output).trim()) {
         throw new Error('Internal error: empty download output path');
     }
-    // Upgrade a master HLS playlist to its highest-quality variant before ffmpeg
-    // sees it (best-effort; falls back to the original URL on any failure).
-    const inputUrl = await resolveBestHlsVariant(inputUrlRaw, headers);
+    const transfer = new AbortController();
+    activeTransfers.set(episodeId, transfer);
+    let checkpoint = null;
+    let inputUrl = inputUrlRaw;
+    try {
+        const input = await require('../runtime/download/resolve-media-input.cjs').resolveMediaInput(inputUrlRaw, headers, transfer.signal);
+        inputUrl = input.url;
+        if (input.isHls) {
+            checkpoint = await require('../runtime/download/hls-checkpoint.cjs').prepareHlsCheckpoint(inputUrl, output, headers, transfer.signal, onProgress);
+            if (checkpoint) inputUrl = checkpoint;
+        } else if (/^https?:/i.test(inputUrl)) {
+            checkpoint = await require('../runtime/download/file-checkpoint.cjs').prepareFileCheckpoint(inputUrl, output, headers, transfer.signal, onProgress);
+            inputUrl = checkpoint;
+        }
+    } catch (error) { activeTransfers.delete(episodeId); throw error; }
 
     return new Promise((resolve, reject) => {
         const dir = pathMod.dirname(output);
@@ -188,6 +149,7 @@ async function downloadEpisode({ url, output, headers = {}, onProgress, episodeI
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
 
         const inputOptions = ['-user_agent', userAgent, '-analyzeduration', '10000000', '-probesize', '10000000'];
+        if (checkpoint?.endsWith('.m3u8')) inputOptions.push('-allowed_extensions', 'ALL');
         // Referer gets ffmpeg's dedicated option; only the *remaining* headers go
         // into the -headers blob (a Referer inside -headers is redundant and the
         // CRLF blob is the fiddlier path, so keep it minimal).
@@ -303,7 +265,7 @@ async function downloadEpisode({ url, output, headers = {}, onProgress, episodeI
                 lastProgressTime = now;
                 if (onProgress) {
                     onProgress({
-                        percent,
+                        percent: checkpoint ? 95 + Math.floor(percent * 0.05) : percent,
                         speed: speedText,
                         eta,
                         downloaded: formatBytes(currentBytes),
@@ -314,6 +276,7 @@ async function downloadEpisode({ url, output, headers = {}, onProgress, episodeI
         });
 
         command.on('error', (err) => {
+            activeTransfers.delete(episodeId);
             if (fsMod.existsSync(tempOutput)) {
                 try {
                     fsMod.unlinkSync(tempOutput);
@@ -336,6 +299,7 @@ async function downloadEpisode({ url, output, headers = {}, onProgress, episodeI
         });
 
         command.on('end', () => {
+            activeTransfers.delete(episodeId);
             if (!fsMod.existsSync(tempOutput)) {
                 reject(new Error('Download failed: No output file created'));
                 return;
@@ -348,6 +312,7 @@ async function downloadEpisode({ url, output, headers = {}, onProgress, episodeI
             }
             try {
                 fsMod.renameSync(tempOutput, normalizedOutput);
+                if (checkpoint) fsMod.rmSync(pathMod.dirname(checkpoint), { recursive: true, force: true });
                 if (onProgress) onProgress(100);
                 activeProcesses.delete(episodeId);
                 resolve(normalizedOutput);
@@ -369,8 +334,13 @@ async function downloadEpisode({ url, output, headers = {}, onProgress, episodeI
     });
 }
 
-module.exports = function registerDownloadManager(ipcMain, app, fs, path, logger, getMainWindow) {
+const activeTransfers = new Map();
+
+module.exports = function registerDownloadManager(ipcMain, app, fs, path, logger, getMainWindow, runtimeApi) {
     const autoDownloader = require('../services/auto-downloader.cjs').init(logger);
+    const recovery = require('../runtime/download/recovery-store.cjs').getRecoveryStore(app);
+    const resolveSource = require('../services/auto-download-sources.cjs');
+    autoDownloader.sourceResolver = (id, title, episode) => resolveSource(runtimeApi?.extensionApiHost, id, title, episode);
     const storageManager = new DownloadStorageManager({ app, fs, path });
     const torrentFacade = new TorrentFacade({ app, fs, path, logger, getMainWindow });
 
@@ -427,10 +397,16 @@ module.exports = function registerDownloadManager(ipcMain, app, fs, path, logger
         const animeDir = path.join(resolvedDownloadPath, animeName.replace(/[<>:"/\\|?*]/g, ''));
         const outputFilePath = path.join(animeDir, `Episode_${episodeNumber}.mp4`);
 
-        if (activeDownloads.has(episodeId)) {
+        if (activeDownloads.has(episodeId) || downloadQueue.some(task => task.episodeId === episodeId)) {
             return { success: false, error: 'Download already in progress' };
         }
 
+        recovery.save(episodeId, 'anime', payload);
+        const restoreWindow = getMainWindow();
+        if (restoreWindow && !restoreWindow.isDestroyed()) restoreWindow.webContents.send('download-progress', {
+            episodeId, percent: 0, recoveryMeta: { animeId: payload.animeId || payload.anilistId || 0, animeTitle: animeName,
+                episodeNumber, posterUrl, sourceType, resolvedLanguage: payload.resolvedLanguage || 'unknown', startedAt: recovery.jobs[episodeId].startedAt },
+        });
         try {
             if (!fs.existsSync(animeDir)) fs.mkdirSync(animeDir, { recursive: true });
 
@@ -614,6 +590,8 @@ module.exports = function registerDownloadManager(ipcMain, app, fs, path, logger
                             await torrentFacade.stop(torrentSessionId, { destroyStore: false });
                         } catch (_) {}
                         cleanup();
+                        recovery.finish(episodeId);
+                        autoDownloader.notifyDownloadCompleted(episodeId);
                         const win = getMainWindow();
                         if (win && !win.isDestroyed()) {
                             win.webContents.send('download-completed', {
@@ -660,6 +638,8 @@ module.exports = function registerDownloadManager(ipcMain, app, fs, path, logger
                     startPromise
                         .then((result) => {
                             if (!result || result.success === false) {
+                                recovery.fail(episodeId, result?.error || 'Torrent start failed');
+                                autoDownloader.notifyDownloadFailed(episodeId);
                                 // Start failed (e.g. blocked, invalid buffer, timeout)
                                 cleanup();
                                 logger.error(`[Download] Torrent start failed for ${episodeId}:`, result && result.error);
@@ -681,6 +661,8 @@ module.exports = function registerDownloadManager(ipcMain, app, fs, path, logger
                         })
                         .catch((err) => {
                             cleanup();
+                            recovery.fail(episodeId, err.message);
+                            autoDownloader.notifyDownloadFailed(episodeId);
                             logger.error(`[Download] Torrent start error for ${episodeId}:`, err.message);
                             const win = getMainWindow();
                             if (win && !win.isDestroyed()) {
@@ -708,6 +690,8 @@ module.exports = function registerDownloadManager(ipcMain, app, fs, path, logger
                     activeDownloads.set(episodeId, promise);
                     promise
                         .then((filePath) => {
+                            recovery.finish(episodeId);
+                            autoDownloader.notifyDownloadCompleted(episodeId);
                             activeDownloads.delete(episodeId);
                             const win = getMainWindow();
                             if (win && !win.isDestroyed()) {
@@ -720,22 +704,26 @@ module.exports = function registerDownloadManager(ipcMain, app, fs, path, logger
                             processQueue();
                         })
                         .catch((err) => {
+                            recovery.fail(episodeId, err.message);
+                            autoDownloader.notifyDownloadFailed(episodeId);
                             activeDownloads.delete(episodeId);
                             logger.error(`[Download] Failed for ${episodeId}:`, err.message);
                             const win = getMainWindow();
                             if (win && !win.isDestroyed()) {
-                                win.webContents.send('download-error', { episodeId, error: err.message });
+                                win.webContents.send('download-error', { episodeId, error: recovery.jobs[episodeId] ? err.message : 'cancelled' });
                             }
                             processQueue();
                         });
                 }
             };
 
+            startConversion.episodeId = episodeId;
             if (activeDownloads.size < 3) startConversion();
             else downloadQueue.push(startConversion);
 
             return { success: true, status: 'queued' };
         } catch (err) {
+            recovery.fail(episodeId, err.message);
             logger.error('[Download] Initiation failed:', err.message);
             return { success: false, error: err.message };
         }
@@ -748,6 +736,9 @@ module.exports = function registerDownloadManager(ipcMain, app, fs, path, logger
 
     const cancelHandler = async (_event, params) => {
         const { episodeId, animePath } = params || {};
+        recovery.finish(episodeId);
+        const queuedIndex = downloadQueue.findIndex(task => task.episodeId === episodeId);
+        if (queuedIndex >= 0) downloadQueue.splice(queuedIndex, 1);
         try {
             if (activeDownloads.has(episodeId)) {
                 cancelFfmpeg(episodeId);
@@ -787,8 +778,8 @@ module.exports = function registerDownloadManager(ipcMain, app, fs, path, logger
     ipcMain.handle('download:clear-completed', async () => ({ success: true }));
 
     // Auto Downloader IPC
-    ipcMain.handle('auto-download:subscribe', async (_event, animeId, title, nextEpisode) => {
-        return autoDownloader.subscribe(animeId, title, nextEpisode);
+    ipcMain.handle('auto-download:subscribe', async (_event, animeId, title, nextEpisode, anilistId) => {
+        return autoDownloader.subscribe(animeId, title, nextEpisode, anilistId);
     });
     ipcMain.handle('auto-download:unsubscribe', async (_event, animeId) => {
         return autoDownloader.unsubscribe(animeId);
@@ -799,4 +790,11 @@ module.exports = function registerDownloadManager(ipcMain, app, fs, path, logger
 
     // Start auto downloader service
     autoDownloader.start(runEpisodeDownload);
+    recovery.register('anime', async payload => {
+        const fresh = payload.anilistId ? await resolveSource(runtimeApi?.extensionApiHost, payload.anilistId, payload.animeName, payload.episodeNumber, payload.resolvedLanguage) : null;
+        return runEpisodeDownload({ ...payload, ...(fresh || {}), url: fresh?.url || payload.originalUrl || payload.url });
+    });
+    ipcMain.handle('download:recovery', async () => recovery.summary());
+    ipcMain.handle('download:recovery-config', async (_event, enabled) => { recovery.autoResume = enabled === true; recovery.persist(); return recovery.summary(); });
+    ipcMain.handle('download:resume-interrupted', async () => recovery.resume());
 };

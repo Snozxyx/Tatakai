@@ -4,12 +4,14 @@ import { NavIcon } from '@/components/ui/NavIcon';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsDesktopApp, useIsMobileApp } from '@/hooks/ui/useIsNativeApp';
+import { useIsPhone } from '@/hooks/ui/use-mobile';
 import { cn } from '@/lib/utils';
 
 /**
  * X-style vertical rail shown in place of the global {@link Sidebar} on
  * `/community` (and sub-routes). Uses the same fixed positioning so the page's
- * `md:pl-20 lg:pl-24` content padding still aligns. Mobile keeps `MobileNav`.
+ * `md:pl-20 lg:pl-24` content padding still aligns. Narrow phones keep
+ * `MobileNav`; wide native viewports (tablets, foldables) keep this rail.
  *
  * Fixed icon-only rail — it does not expand (labels are surfaced via tooltips
  * on each {@link NavIcon}).
@@ -20,8 +22,12 @@ export function CommunitySidebar() {
   const { user, profile } = useAuth();
   const isDesktopApp = useIsDesktopApp();
   const isMobileApp = useIsMobileApp();
+  const isPhoneWidth = useIsPhone();
 
-  if (isMobileApp) return null;
+  // Same contract as the global Sidebar: narrow phones keep MobileNav (this
+  // rail is CSS-hidden below md anyway); wide native viewports must keep the
+  // rail, otherwise tablets/foldables lose all community navigation.
+  if (isMobileApp && isPhoneWidth) return null;
 
   const expanded = false;
   const isActive = (path: string) => location.pathname === path;
@@ -32,7 +38,7 @@ export function CommunitySidebar() {
     <nav
       data-sidebar
       className={cn(
-        'fixed z-[100] flex flex-col transition-all duration-300',
+        'fixed z-40 flex flex-col transition-colors duration-150',
         isDesktopApp
           ? cn(
               'left-0 top-0 h-screen border-r border-white/5 bg-background/40 pb-6 pt-16 backdrop-blur-3xl',

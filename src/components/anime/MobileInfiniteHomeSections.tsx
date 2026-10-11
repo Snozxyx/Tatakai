@@ -66,8 +66,8 @@ const MobileCard = memo(function MobileCard({ anime }: { anime: any }) {
       {...longPress}
     >
       {/* Plain card on mobile — no backdrop-blur / GlassPanel (GPU-heavy). */}
-      <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03]">
-        <div className="relative aspect-[2/3]">
+      <div data-mobile-poster-card className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03]">
+        <div data-mobile-poster-image className="relative aspect-[2/3]">
           <img
             src={getHighQualityPoster(anime.poster || '', anime.anilistId)}
             alt={anime.name || 'Anime'}
@@ -89,7 +89,7 @@ const MobileCard = memo(function MobileCard({ anime }: { anime: any }) {
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
           <div className="absolute bottom-0 left-0 right-0 p-2.5">
-            <h4 className="line-clamp-2 text-[13px] font-bold leading-tight text-white">{anime.name}</h4>
+            <h4 data-mobile-poster-title className="line-clamp-2 text-[13px] font-bold leading-tight text-white">{anime.name}</h4>
             <div className="mt-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/70">
               <span className="rounded-md bg-black/50 border border-white/10 px-1.5 py-0.5">SUB {anime.episodes?.sub || 0}</span>
               {(anime.episodes?.dub || 0) > 0 && (
@@ -190,7 +190,7 @@ export function MobileInfiniteHomeSections() {
       </div>
 
       {isLoading && (
-        <div className="grid grid-cols-2 gap-3 px-1">
+        <div data-mobile-home-rail className="grid grid-cols-2 gap-3 px-1">
           {Array.from({ length: 4 }).map((_, index) => (
             <div key={index} className="aspect-[2/3] animate-pulse rounded-2xl border border-white/[0.08] bg-white/[0.04]" />
           ))}
@@ -221,7 +221,7 @@ export function MobileInfiniteHomeSections() {
             icon={<Compass className="w-5 h-5 text-primary" />}
             title={<span className="line-clamp-1 pr-2">{section.title}</span>}
           />
-          <div className="grid grid-cols-2 gap-3 px-1">
+          <div data-mobile-home-rail className="grid grid-cols-2 gap-3 px-1">
             {(section.animes || []).slice(0, CARDS_PER_SECTION).map((anime: any) => (
               <MobileCard key={anime.id || anime.name} anime={anime} />
             ))}

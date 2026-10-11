@@ -30,6 +30,9 @@ export interface ElectronBridge {
     body?: string;
   }>;
   startDownload?: (payload: Record<string, unknown>) => Promise<{ success?: boolean; error?: string; status?: string }>;
+  getDownloadRecovery?: () => Promise<{ autoResume: boolean; jobs: Array<{ id: string; type: string; title: string; status: string; error?: string }> }>;
+  setDownloadAutoResume?: (enabled: boolean) => Promise<{ autoResume: boolean; jobs: Array<{ id: string; type: string; title: string; status: string; error?: string }> }>;
+  resumeInterruptedDownloads?: () => Promise<{ success: boolean; results: Array<{ id: string; success: boolean; error?: string }> }>;
   cancelDownload?: (params: { episodeId?: string; animePath?: string }) => Promise<{ success?: boolean }>;
   getDownloadsDir?: (customPath?: string) => Promise<string>;
   onDownloadProgress?: (cb: (data: Record<string, unknown>) => void) => void;
