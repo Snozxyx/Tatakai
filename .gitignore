@@ -88,3 +88,34 @@ android/window.xml
 android/settings.xml
 android/emulator-screenshot.png
 android/tatakai-live.png
+
+# ── Agent skills / verification artifacts / local caches ────────────────────
+# Installed agent skills (21st, impeccable, animation packs, …) — per-machine
+# tooling, not app source.
+.agents/
+
+# Local verification output: screenshots, check scripts, typecheck/build logs,
+# UI-polish before/after captures. Regenerated on demand, never code.
+.artifacts/
+
+# Local investigation caches and scratch check outputs.
+.cache/
+toko-download-investigation/
+
+# Root-level one-off check scripts and screenshots.
+.check-mobile-types.mjs
+.mobile-onboarding-check.png
+check-*.local.mjs
+*-check.png
+
+# ── Generic temps ───────────────────────────────────────────────────────────
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+.tmp/
+.temp/
+coverage/
+.nyc_output/
+*.tsbuildinfo

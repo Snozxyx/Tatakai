@@ -27,24 +27,24 @@ All notable changes to Tatakai are documented here.
 - **SEO Hardening** — JSON-LD (`TVSeries`/`Book`/`Article`/`ProfilePage`) on share pages and a sitemap branch that never serves HTML (XML-only responses, 8 s upstream timeout, XML validation, 503+XML fallback so crawlers retry instead of indexing an error page).
 - **Mobile Showcase & Search Chips** — Landing mobile showcase with device screenshots, applied-filter chips with focus-moving remove/clear, and refreshed search/genre-browse surfaces.
 
-### Changed
-- **Season Download Modal** — Released-episodes only, progressive SSE source fill with a shared request cache and dedup, 20 s/45 s start timeouts, server probing via query cache, prefetch cut to the `server` step, and retry that clears caches and invalidates `['servers']`.
-- **Offline Library** — Unified anime/manga offline rows with active cards, history retry, and manga rows fed by the download monitor's progress events.
-- **Mobile Playback Reliability** — One cold-start `502` retry after 1.2 s, playlist pre-warm (`bytes=0-1023`), redirect follower replaying provider headers + Range cross-host, 10-minute source cache with hydration wait and dedup, and quiet-window/cap tuning so slow servers still appear.
-- **Continue Watching/Reading Sync** — Local-first newest-wins merge kept, with clamped page/progress saves and theme-token cleanup in the reader.
-- **Settings Surfaces** — Downloads (auto-resume), card style, mobile appearance, and Cloudflare/FlareSolverr controls added to the relevant Settings panels; version surfaces stay on the single app-version source.
+  ### Changed
+  - **Season Download Modal** — Released-episodes only, progressive SSE source fill with a shared request cache and dedup, 20 s/45 s start timeouts, server probing via query cache, prefetch cut to the `server` step, and retry that clears caches and invalidates `['servers']`.
+  - **Offline Library** — Unified anime/manga offline rows with active cards, history retry, and manga rows fed by the download monitor's progress events.
+  - **Mobile Playback Reliability** — One cold-start `502` retry after 1.2 s, playlist pre-warm (`bytes=0-1023`), redirect follower replaying provider headers + Range cross-host, 10-minute source cache with hydration wait and dedup, and quiet-window/cap tuning so slow servers still appear.
+  - **Continue Watching/Reading Sync** — Local-first newest-wins merge kept, with clamped page/progress saves and theme-token cleanup in the reader.
+  - **Settings Surfaces** — Downloads (auto-resume), card style, mobile appearance, and Cloudflare/FlareSolverr controls added to the relevant Settings panels; version surfaces stay on the single app-version source.
 
-### Fixed
-- **Fullscreen Clipping** — Fixed player shifted-right/clipped by transformed/filtered ancestors via lock/unlock with `visualViewport` sync; body overflow restored on exit and Android back exits fullscreen first.
-- **Skip Edge Cases** — Skip times reset on `malId`/episode change, stale AniSkip responses ignored, invalid intervals filtered, and the skip button kept clickable above fullscreen controls with `aria-disabled`.
-- **Download Integrity** — Short reads error instead of completing, mixed-scanlator partials invalidated by `resume-source.json` identity, partial manga sets throw `Downloaded x/y pages. Resume…` instead of marking complete, and cancelled vs failed states split.
-- **Watch Containment** — Main-frame navigation away from the app is blocked while watching; embed pop-under blocking only fires when an embed is active; deep links validate `*.tatakai.me` and close the browser on OAuth handoffs.
-- **Trending Empty State** — `get_trending_anime` / `get_anime_metrics` cast `COUNT(*)` to integer, fixing the `42804 bigint ≠ integer` failure that left `/trending` empty.
-- **Mobile Controls Overlap** — 44 px targets verified at 320/393/480 px, seek slider keyboard-operable with buffered fill, locked taps reveal controls without seeking, and opposite-side/center taps never seek.
-- **Auth & Onboarding** — MAL redirect, AniList redirect, auth, onboarding, and setup pages corrected for the deep-link OAuth bridge and offline states.
-- **Reader Styling** — Reader `transform: none` fix, section rhythm tokens, dialog/peek shadows, and overlay-variant card hover restricted to `hover:hover + fine` pointers.
+  ### Fixed
+  - **Fullscreen Clipping** — Fixed player shifted-right/clipped by transformed/filtered ancestors via lock/unlock with `visualViewport` sync; body overflow restored on exit and Android back exits fullscreen first.
+  - **Skip Edge Cases** — Skip times reset on `malId`/episode change, stale AniSkip responses ignored, invalid intervals filtered, and the skip button kept clickable above fullscreen controls with `aria-disabled`.
+  - **Download Integrity** — Short reads error instead of completing, mixed-scanlator partials invalidated by `resume-source.json` identity, partial manga sets throw `Downloaded x/y pages. Resume…` instead of marking complete, and cancelled vs failed states split.
+  - **Watch Containment** — Main-frame navigation away from the app is blocked while watching; embed pop-under blocking only fires when an embed is active; deep links validate `*.tatakai.me` and close the browser on OAuth handoffs.
+  - **Trending Empty State** — `get_trending_anime` / `get_anime_metrics` cast `COUNT(*)` to integer, fixing the `42804 bigint ≠ integer` failure that left `/trending` empty.
+  - **Mobile Controls Overlap** — 44 px targets verified at 320/393/480 px, seek slider keyboard-operable with buffered fill, locked taps reveal controls without seeking, and opposite-side/center taps never seek.
+  - **Auth & Onboarding** — MAL redirect, AniList redirect, auth, onboarding, and setup pages corrected for the deep-link OAuth bridge and offline states.
+  - **Reader Styling** — Reader `transform: none` fix, section rhythm tokens, dialog/peek shadows, and overlay-variant card hover restricted to `hover:hover + fine` pointers.
 
----
+  ---
 
 ## [6.0.6] - 2026-10-06
 
