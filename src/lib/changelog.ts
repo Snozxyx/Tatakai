@@ -14,6 +14,18 @@ export interface ChangelogRelease {
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '6.1.1',
+    date: '2026-10-14',
+    changes: [
+      'Mobile Pull-to-Refresh: Pull down at the top on phones to refresh page data in place without losing your place — safely disabled in readers, watch, auth, and setup flows',
+      'Novel Search Fix: Unfiltered novel searches no longer return empty results, and partial upstream failures are now reported correctly',
+      'Novel Sorting Fix: Chapter-count sort now uses chapter data (not popularity), newest uses start date, and chapterCount/latestUpdate URLs select the right control',
+      'Stable Trending: Trending pages keep provider order instead of re-sorting by popularity, so items no longer jump between pages',
+      'Faster Search: Ready search categories show immediately while others still load, and novels no longer leak into manga results',
+      'Sidebar Tooltips: Hover labels now appear once (no duplicate native tooltip) and stay readable on the selected button',
+    ],
+  },
+  {
     version: '6.1.0',
     date: '2026-10-14',
     changes: [

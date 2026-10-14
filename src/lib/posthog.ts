@@ -12,7 +12,7 @@ export function captureProductEvent(event:'page_view'|'app_started',properties:R
   for(const field of ['surface','route_group'])if(properties[field])safe[field]=properties[field].slice(0,40);
   const runtime=window as Window & {electron?:unknown;Capacitor?:{isNativePlatform?:()=>boolean}};
   safe.surface=safe.surface||(runtime.electron?'desktop':runtime.Capacitor?.isNativePlatform?.()?'mobile':'web');
-  queue.push({event,properties:{...safe,app_version:'6.1.0',distinct_id:id,$process_person_profile:false}});
+  queue.push({event,properties:{...safe,app_version:'6.1.1',distinct_id:id,$process_person_profile:false}});
   if(!timer)timer=setTimeout(()=>{timer=undefined;void flush();},5000);
 }
 async function flush(){

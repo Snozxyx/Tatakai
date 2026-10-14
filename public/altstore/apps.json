@@ -20,10 +20,10 @@
       "iconURL": "https://tatakai.me/assets/logo/tatakai-logo-square.png",
       "tintColor": "#a855f7",
       "category": "entertainment",
-      "version": "6.1.0",
-      "versionDate": "2026-10-14T02:39:50.681Z",
-      "versionDescription": "Tatakai 6.1.0 for iPhone & iPad. Unsigned build: sideload with AltStore, SideStore or TrollStore using your own Apple ID, then refresh before the 7-day free-account expiry. See the GitHub release notes for the full changelog.",
-      "downloadURL": "https://github.com/snozxyx/tatakai/releases/download/v6.1.0/Tatakai-v6.1.0-ios-unsigned.ipa",
+      "version": "6.1.1",
+      "versionDate": "2026-10-14T06:26:45.827Z",
+      "versionDescription": "Tatakai 6.1.1 for iPhone & iPad. Unsigned build: sideload with AltStore, SideStore or TrollStore using your own Apple ID, then refresh before the 7-day free-account expiry. See the GitHub release notes for the full changelog.",
+      "downloadURL": "https://github.com/snozxyx/tatakai/releases/download/v6.1.1/Tatakai-v6.1.1-ios-unsigned.ipa",
       "size": 0,
       "screenshots": [],
       "permissions": []
@@ -31,14 +31,14 @@
   ],
   "news": [
     {
-      "identifier": "tatakai-6.1.0-ios-source",
-      "title": "Tatakai 6.1.0 available for sideloading",
+      "identifier": "tatakai-6.1.1-ios-source",
+      "title": "Tatakai 6.1.1 available for sideloading",
       "caption": "Add this source in AltStore or SideStore to install on iPhone & iPad.",
-      "date": "2026-10-14T02:39:50.681Z",
+      "date": "2026-10-14T06:26:45.827Z",
       "tintColor": "#a855f7",
       "imageURL": "https://tatakai.me/assets/logo/tatakaibanner.png",
       "notify": false,
-      "url": "https://github.com/snozxyx/tatakai/releases/tag/v6.1.0",
+      "url": "https://github.com/snozxyx/tatakai/releases/tag/v6.1.1",
       "appID": "app.tatakai.me"
     }
   ]

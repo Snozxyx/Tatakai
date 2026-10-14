@@ -67,7 +67,7 @@ Tatakai brings anime discovery, streaming, manga reading, and community features
 | Web | Available |
 | Desktop | Available |
 | Android | Available |
-| Android TV | Available |
+| Android TV | Planned |
 | iOS | Available |
 
 ## Roadmap

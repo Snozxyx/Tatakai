@@ -19,7 +19,6 @@ export function NavIcon({ icon: Icon, active, onClick, label, expanded = false }
       onClick={onClick}
       aria-label={label}
       aria-current={active ? "page" : undefined}
-      title={expanded ? undefined : label}
       className={cn(
         "nav-icon group relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         expanded && "flex w-full items-center gap-3.5 !justify-start",
@@ -31,7 +30,7 @@ export function NavIcon({ icon: Icon, active, onClick, label, expanded = false }
         (expanded ? (
           <span className="truncate text-sm font-semibold">{label}</span>
         ) : (
-          <span className="pointer-events-none absolute left-full ml-4 whitespace-nowrap rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-medium opacity-0 transition-opacity duration-150 ease-out group-hover:opacity-100 group-focus-visible:opacity-100">
+          <span className="pointer-events-none absolute left-full ml-4 whitespace-nowrap rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-medium text-card-foreground opacity-0 shadow-md transition-opacity duration-150 ease-out group-hover:opacity-100 group-focus-visible:opacity-100">
             {label}
           </span>
         ))}

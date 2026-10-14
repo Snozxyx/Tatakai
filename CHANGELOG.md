@@ -4,6 +4,25 @@ All notable changes to Tatakai are documented here.
 
 ---
 
+## [6.1.1] - 2026-10-14
+
+**Patch release.** Safe mobile pull-to-refresh, novel catalogue correctness, and faster search rendering.
+
+### Added
+- **Mobile Pull-to-Refresh** — New `MobilePullToRefresh` (`MobilePullToRefresh.tsx` + `pull-refresh-gesture.ts`) mounted in `MainLayout`: phone / native-mobile only, pull-down at scroll top refreshes active queries in place (navigation + local state preserved) with a `Pull to refresh` / `Release to refresh` / `Refreshing…` pill, offline + failure toasts, and a keyboard-accessible Refresh button; disabled on watch, manga/novel readers, auth, setup/onboarding, and integration routes, and never triggers from inputs, dialogs/menus, sliders, video, iframe, canvas, horizontal/upward swipes, or multitouch.
+
+### Fixed
+- **Novel Empty Filters** — `novel-client.ts` no longer sends empty `tags`/`statuses` arrays, so unfiltered novel searches return results instead of empty sets; partial upstream failures now surface via `payload.extensions.partial` (`partial: true`, `failedProviders: ['anilist-upstream']`) instead of hardcoded `false` / `[]`.
+- **Novel Chapter Sorting** — `NovelGenreBrowsePage` `sortToBackend`: explicit sort wins over feed mode, `chapterCount` now maps to `CHAPTERS_DESC` (was `POPULARITY_DESC`) and `newest` to `START_DATE_DESC`; shared `normalizeCatalogSort` keeps canonical mixed-case options (`chapterCount`, `latestUpdate`) and is case-insensitive, so those URLs no longer fall back to `default`.
+- **Stable Trending Pagination** — `preservesCatalogPageOrder` keeps `default` / `trending` pages in provider order (append, no popularity re-sort), so later pages with higher popularity no longer jump ahead; applied to both manga and novel catalogues.
+- **Search Rendering** — `SearchPage.tsx` shows ready categories immediately (skeleton only when `hybridLoading && !hasAnyResult`) and filters `novel` / `light_novel` types out of manga results.
+- **Sidebar Tooltips** — `NavIcon` no longer sets a native `title` alongside its custom hover label, so the button name appears once instead of twice; the hover label now uses `text-card-foreground` on `bg-card` so it stays readable on the selected (`nav-icon-active`) state.
+
+### Changed
+- **Manga Catalogue** — `MangaGenreBrowsePage` reuses the shared `catalog-sort.ts` normalizer + page-order guard for consistent sort-URL handling with novels.
+
+---
+
 ## [6.1.0] - 2026-10-14
 
 **Novels, extension ecosystems, and platform reliability.** Adds light/web-novel reading with offline support and narration, Stremio and Seanime integrations, expanded manga providers, playback coordination, download improvements, and stronger authentication handling. Operations tooling is maintained separately in TatakaiOPS.
