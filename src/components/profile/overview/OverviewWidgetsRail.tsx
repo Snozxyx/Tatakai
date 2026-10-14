@@ -16,6 +16,7 @@ import {
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { getProxiedImageUrl } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { useResolvedMangaReadlist } from '@/hooks/api/useResolvedMangaReadlist';
 
 export interface OverviewWidgetsRailProps {
   watchlist?: any[];
@@ -84,6 +85,7 @@ export const OverviewWidgetsRail = memo(function OverviewWidgetsRail({
   onNavigateTab,
 }: OverviewWidgetsRailProps) {
   const navigate = useNavigate();
+  const { data: resolvedManga, isLoading: mangaLoading } = useResolvedMangaReadlist(mangaReadlist);
 
   return (
     <motion.div
@@ -126,20 +128,25 @@ export const OverviewWidgetsRail = memo(function OverviewWidgetsRail({
       {/* ── Manga & Manhwa Widget ── */}
       <Widget
         title="Manga & Manhwa"
-        count={`${mangaReadlist.length} titles`}
+        count={mangaLoading ? 'Loading titles…' : `${resolvedManga.length} titles`}
         icon={<BookOpen className="w-4 h-4" />}
         color="amber"
         onMore={() => onNavigateTab('manga-readlist')}
       >
-        {mangaReadlist.slice(0, 3).map((item) => (
+        {mangaLoading ? Array.from({ length: 3 }, (_, index) => (
+          <div key={`manga-loading-${index}`} aria-hidden="true" className="space-y-2">
+            <div className="aspect-[3/4] animate-pulse rounded-xl bg-white/[0.04]" />
+            <div className="h-3 w-3/4 animate-pulse rounded bg-white/[0.04]" />
+          </div>
+        )) : resolvedManga.slice(0, 3).map((item) => (
           <Media
             key={`manga-${item.id || item.manga_id}`}
-            onClick={() => navigate(`/manga/${item.manga_id}`)}
+            onClick={() => navigate(`/manga/${encodeURIComponent(item.resolved_manga_id || item.manga_id)}`)}
             image={item.manga_poster}
             title={item.manga_title}
             color="amber"
             badge={
-              item.last_chapter_number != null ? (
+              item.last_chapter_number != null && (Number(item.last_chapter_number) > 0 || item.last_chapter_key) ? (
                 <>
                   <BookOpen className="w-3 h-3" />
                   Ch. {item.last_chapter_number}

@@ -69,16 +69,17 @@ function groupMediaBySeries(identifiedFiles) {
             .replace(/\(.*?\)/g, '')
             .replace(/\b(s\d{1,2}e\d{1,3}|episode\s*\d{1,3}|ep\.?\s*\d{1,3}|e\d{1,3}|\d{1,4}v\d+)\b/g, ' ')
             .replace(/\b(2160p|1080p|720p|540p|480p|x264|x265|h\.??264|h\.??265|hevc|avc|aac|flac|ac3|dts|truehd|web[- ]?dl|web[- ]?rip|blu[- ]?ray|hdtv)\b/g, ' ')
-            .replace(/\b\d{1,4}\b/g, ' ')
+            .replace(/\bseason\s*\d{1,2}\b/gi, ' ')
             .trim();
 
-        if (!seriesMap[normalizedTitle]) {
-            seriesMap[normalizedTitle] = {
+        const seriesKey = `${normalizedTitle}::season-${file.season || 1}`;
+        if (!seriesMap[seriesKey]) {
+            seriesMap[seriesKey] = {
                 displayTitle: file.title,
                 files: []
             };
         }
-        seriesMap[normalizedTitle].files.push(file);
+        seriesMap[seriesKey].files.push(file);
     }
 
     // Sort files in each series by episode number

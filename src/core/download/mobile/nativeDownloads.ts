@@ -203,6 +203,7 @@ export async function enqueueNativeDownload(input: MobileDownloadInput) {
     }
   });
   await plugin.enqueue({
+    wifiOnly: input.wifiOnly === true,
     ...input, ...target, animeId: input.animeId || String(metadata.animeId || input.episodeId),
     posterUrl: input.posterUrl || metadata.posterUrl,
     subtitles: safeSubtitles,
@@ -240,7 +241,13 @@ export async function retryNativeDownload(episodeId: string) {
 export async function deleteNativeDownload(episodeId: string) {
   await plugin.remove({ episodeId }); removeMobileDownloadState(episodeId); await refreshNativeDownloads();
 }
-export async function resolveNativeOfflineEpisode(episodeId: string) {
+export async function resolveNativeOfflineEpisode(episodeId: string, localPath?: string) {
+  // Older Downloads links use a synthetic route ID. The saved reference is
+  // authoritative, including provider IDs containing query strings or slashes.
+  if (localPath) {
+    const { getMobileOfflineEpisodeId } = await import('./offlineEpisodeId');
+    episodeId = getMobileOfflineEpisodeId(localPath, episodeId);
+  }
   await installNativeDownloads();
   const resolved = await plugin.resolvePlayback({ episodeId });
   const base = await ensureNativeProxy();

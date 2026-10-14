@@ -35,6 +35,15 @@ export function sanitizeContent(content: string, options?: { allowHTML?: boolean
  * Sanitize comment content
  */
 export function sanitizeComment(content: string): string {
+  if (/^> ?/m.test(content)) {
+    const validation = validateInput(content, 5000);
+    const draft = validation.valid ? content : validation.sanitized || '';
+    // Quotes are prose, even when the selected text looks like HTML. Escape
+    // them before DOMPurify so the quotation survives without creating tags.
+    const escaped = draft.split('\n').map(line => /^> ?/.test(line)
+      ? `&gt; ${escapeHTML(line.replace(/^> ?/, ''))}` : line).join('\n');
+    return sanitizeHTML(escaped);
+  }
   return sanitizeContent(content, { allowHTML: true, maxLength: 5000 });
 }
 

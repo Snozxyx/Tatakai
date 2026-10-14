@@ -1,3 +1,5 @@
+import { OfflineMediaCard } from '@/components/library/OfflineMediaCard';
+import { AutomationProfiles } from '@/components/library/AutomationProfiles';
 import { useState, useEffect, useMemo } from 'react';
 import { liveQuery } from 'dexie';
 import { useMangaDownload } from '@/hooks/media/useMangaDownload';
@@ -5,8 +7,8 @@ import { MobileOfflineLibrary } from '@/components/mobile/MobileOfflineLibrary';
 import { isMobileNative } from '@/lib/platform/platform';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  Download, Play, Trash2, FolderOpen, Info, Search, RefreshCw,
-  Plus, FolderSync, HardDrive, Wrench, Loader2, X, History,
+  Download, Play, Trash2, FolderOpen, Search, RefreshCw,
+  Plus, FolderSync, HardDrive, Loader2, X, History,
   AlertCircle, CheckCircle2, Ban, Bot, Magnet, Languages, Server, BookOpen,
 } from 'lucide-react';
 import { ImportAnimeModal } from '@/components/modals/ImportAnimeModal';
@@ -27,12 +29,8 @@ import { getLanguageLabel } from '@/core/download/language-resolver';
 import { getKnownServerOptions } from '@/lib/serverNames';
 import type { DownloadHistoryEntry } from '@/core/db/tatakai-db';
 import type { OfflineMangaSeries } from '@/types/electron-bridge';
-
-const MANGA_KIND_BADGE: Record<string, { label: string; cls: string }> = {
-  manhwa: { label: 'Manhwa', cls: 'bg-fuchsia-500/20 text-fuchsia-300' },
-  manhua: { label: 'Manhua', cls: 'bg-amber-500/20 text-amber-300' },
-  manga: { label: 'Manga', cls: 'bg-sky-500/20 text-sky-300' },
-};
+import type { OfflineNovel } from '@/core/db/tatakai-db';
+import { observeOfflineNovels, removeOfflineNovelSeries } from '@/core/download/novelOffline';
 
 interface OfflineAnime {
   name: string;
@@ -55,16 +53,6 @@ interface DownloadStats {
   failed: number;
   cancelled: number;
   totalSizeBytes: number;
-}
-
-// ── AutoDownloadRules component ───────────────────────────────────────────
-
-interface AutoDownloadSubscription {
-  animeId: string;
-  title: string;
-  nextEpisode: number;
-  addedAt: number;
-  enqueuedEpisodes: number[];
 }
 
 // Canonical languages offered by the resolver, in preference-friendly order.
@@ -98,23 +86,22 @@ function AutoDownloadSettings() {
   };
 
   const selectClass =
-    'w-full h-10 rounded-lg bg-white/5 border border-white/10 px-3 text-sm ' +
-    'focus:outline-none focus:border-primary/50 transition-colors appearance-none cursor-pointer';
+    'w-full h-10 rounded-lg bg-background border border-input px-3 text-sm ' +
+    'focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring cursor-pointer';
 
   return (
-    <GlassPanel className="p-4 space-y-4">
+    <section className="space-y-4 border-t border-border pt-6">
       <div className="flex items-center gap-2">
-        <Wrench className="w-4 h-4 text-primary" />
         <h3 className="font-semibold text-sm">Download preferences</h3>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+          <label htmlFor="download-audio-language" className="flex items-center gap-2 text-sm font-medium">
             <Languages className="w-3.5 h-3.5" /> Preferred audio language
           </label>
-          <select value={language} onChange={(e) => onLanguage(e.target.value)} className={selectClass}>
+          <select id="download-audio-language" value={language} onChange={(e) => onLanguage(e.target.value)} className={selectClass}>
             {AUTO_DL_LANGUAGES.map((code) => (
-              <option key={code} value={code} className="bg-neutral-900">
+              <option key={code} value={code} className="bg-background">
                 {getLanguageLabel(code)}
               </option>
             ))}
@@ -122,13 +109,13 @@ function AutoDownloadSettings() {
           <p className="text-[11px] text-muted-foreground">Used for auto-downloads and as the default in the download picker.</p>
         </div>
         <div className="space-y-1.5">
-          <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+          <label htmlFor="download-default-server" className="flex items-center gap-2 text-sm font-medium">
             <Server className="w-3.5 h-3.5" /> Default server
           </label>
-          <select value={server} onChange={(e) => onServer(e.target.value)} className={selectClass}>
-            <option value="" className="bg-neutral-900">Auto (recommended)</option>
+          <select id="download-default-server" value={server} onChange={(e) => onServer(e.target.value)} className={selectClass}>
+            <option value="" className="bg-background">Auto (recommended)</option>
             {serverOptions.map((s) => (
-              <option key={s.key} value={s.key} className="bg-neutral-900">
+              <option key={s.key} value={s.key} className="bg-background">
                 {s.name}
               </option>
             ))}
@@ -136,129 +123,7 @@ function AutoDownloadSettings() {
           <p className="text-[11px] text-muted-foreground">Preferred first — the app falls back to others when unavailable.</p>
         </div>
       </div>
-    </GlassPanel>
-  );
-}
-
-function AutoDownloadRules({ isNative }: { isNative: boolean }) {
-  const [subscriptions, setSubscriptions] = useState<AutoDownloadSubscription[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const loadSubscriptions = async () => {
-    setLoading(true);
-    try {
-      const electron = (window as any).electron;
-      if (!electron?.autoDownload?.list) { setLoading(false); return; }
-      const list = await electron.autoDownload.list();
-      if (Array.isArray(list)) {
-        setSubscriptions(list.map((item: any) => ({
-          animeId: item.animeId || item.id || '',
-          title: item.title || 'Unknown',
-          nextEpisode: item.nextEpisode || 1,
-          addedAt: item.addedAt || Date.now(),
-          enqueuedEpisodes: item.enqueuedEpisodes || [],
-        })));
-      }
-    } catch (err) {
-      console.error('Failed to load auto-download subscriptions:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (isNative) loadSubscriptions();
-    else setLoading(false);
-  }, [isNative]);
-
-  const handleUnsubscribe = async (animeId: string, title: string) => {
-    try {
-      const electron = (window as any).electron;
-      if (!electron?.autoDownload?.unsubscribe) return;
-      await electron.autoDownload.unsubscribe(animeId);
-      toast.success(`Removed auto-download for "${title}"`);
-      loadSubscriptions();
-    } catch (err) {
-      toast.error('Failed to remove subscription');
-    }
-  };
-
-  if (!isNative) {
-    return (
-      <div className="flex flex-col items-center justify-center py-24 text-center space-y-4">
-        <Bot className="w-12 h-12 text-muted-foreground opacity-30" />
-        <p className="font-medium text-muted-foreground">Auto-download is only available in the desktop app.</p>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="space-y-3">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="h-16 rounded-xl bg-white/5 animate-pulse" />
-        ))}
-      </div>
-    );
-  }
-
-  if (subscriptions.length === 0) {
-    return (
-      <div className="space-y-6">
-        <AutoDownloadSettings />
-        <div className="flex flex-col items-center justify-center py-16 text-center space-y-4">
-          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-            <Bot className="w-8 h-8 text-primary/60" />
-          </div>
-          <h3 className="text-xl font-bold">No shows queued for auto-download</h3>
-          <p className="text-muted-foreground text-sm max-w-sm">
-            Open any anime, tap <span className="text-foreground font-medium">Download → Auto-Download</span>, and new
-            episodes will download automatically as they air — using the preferences above.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      <AutoDownloadSettings />
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold flex items-center gap-2">
-          <Bot className="w-5 h-5 text-primary" />
-          Active Rules ({subscriptions.length})
-        </h2>
-        <Button variant="outline" size="sm" onClick={loadSubscriptions} className="gap-2">
-          <RefreshCw className="w-4 h-4" />
-          Refresh
-        </Button>
-      </div>
-      <div className="space-y-3">
-        {subscriptions.map((sub) => (
-          <GlassPanel key={sub.animeId} className="p-4">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                <h4 className="font-semibold text-sm truncate">{sub.title}</h4>
-                <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                  <span>Next: Episode {sub.nextEpisode}</span>
-                  {sub.enqueuedEpisodes.length > 0 && (
-                    <span>{sub.enqueuedEpisodes.length} episode(s) already queued</span>
-                  )}
-                  <span>Added {new Date(sub.addedAt).toLocaleDateString()}</span>
-                </div>
-              </div>
-              <button
-                onClick={() => handleUnsubscribe(sub.animeId, sub.title)}
-                className="p-2 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-400/10 transition-colors"
-                title="Remove auto-download rule"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </GlassPanel>
-        ))}
-      </div>
-    </div>
+    </section>
   );
 }
 
@@ -270,6 +135,7 @@ export default function OfflineLibraryPage() {
   const [search, setSearch] = useState('');
   const [downloadPath, setDownloadPath] = useState<string | null>(null);
   const [mangaSeries, setMangaSeries] = useState<OfflineMangaSeries[]>([]);
+  const [novelRows, setNovelRows] = useState<OfflineNovel[]>([]);
   const [recoveryState, setRecoveryState] = useState<{ autoResume: boolean; jobs: { id: string; type: string; title: string }[] }>({ autoResume: false, jobs: [] });
   const [resuming, setResuming] = useState(false);
 
@@ -339,7 +205,7 @@ export default function OfflineLibraryPage() {
       const library = await (window as any).electron.getOfflineLibrary(customPath);
       const items = library || [];
 
-      // Convert tatakai-media:// poster URLs to HTTP stream URLs for <img> display
+      // Convert tatakai-media:// poster URLs to HTTP stream URLs for image display.
       const electron = (window as any).electron;
       if (electron?.streamLocalFile) {
         await Promise.all(items.map(async (anime: any) => {
@@ -412,6 +278,9 @@ export default function OfflineLibraryPage() {
 
   // ── Effects ────────────────────────────────────────────────────────────────
   useEffect(() => { loadOfflineLibrary(); loadMangaLibrary(); }, [isNative]);
+
+  // Downloaded novels live in Dexie on every platform — observe them directly.
+  useEffect(() => observeOfflineNovels(setNovelRows), []);
 
   useEffect(() => {
     if (activeTab === 'history') loadHistoryData();
@@ -547,8 +416,64 @@ export default function OfflineLibraryPage() {
     navigate(`/manga/read/${series.anilistId}?${params.toString()}`);
   };
 
+  // ── Novel handlers (Dexie-backed, every platform) ──────────────────────────
+  const novelSeries = useMemo(() => {
+    const byId = new Map<number, { anilistId: number; novelId: string; title: string; poster: string | null; chapters: OfflineNovel[] }>();
+    for (const row of novelRows) {
+      const existing = byId.get(row.anilistId) ?? {
+        anilistId: row.anilistId,
+        novelId: row.novelId,
+        title: row.title,
+        poster: row.posterUrl ?? null,
+        chapters: [] as OfflineNovel[],
+      };
+      existing.chapters.push(row);
+      if (!existing.poster && row.posterUrl) existing.poster = row.posterUrl;
+      byId.set(row.anilistId, existing);
+    }
+    return [...byId.values()].map((s) => ({
+      ...s,
+      chapters: s.chapters.sort((a, b) => (a.chapterNumber ?? 0) - (b.chapterNumber ?? 0)),
+    }));
+  }, [novelRows]);
+
+  const handleReadNovel = (series: (typeof novelSeries)[number]) => {
+    const first = series.chapters[0];
+    if (!first) { toast.error('No chapters downloaded'); return; }
+    const params = new URLSearchParams({ chapterKey: first.chapterKey });
+    if (first.chapterNumber != null) params.set('chapterNumber', String(first.chapterNumber));
+    if (first.chapterTitle) params.set('chapterTitle', first.chapterTitle);
+    if (first.provider) params.set('provider', String(first.provider));
+    params.set('paragraph', '0');
+    params.set('offline', 'true');
+    navigate(`/novel/read/${encodeURIComponent(series.novelId)}?${params.toString()}`);
+  };
+
+  const handleDeleteNovelSeries = async (series: (typeof novelSeries)[number], e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!(await confirm({ title: `Delete "${series.title}" and all downloaded chapters?`, description: 'This action cannot be undone.', destructive: true }))) return;
+    try {
+      const count = await removeOfflineNovelSeries(series.anilistId);
+      toast.success(`Deleted ${series.title} (${count} chapters)`);
+    } catch {
+      toast.error('Failed to delete novel series');
+    }
+  };
+
+  const handlePlayAnime = (anime: OfflineAnime) => {
+    const first = anime.episodes[0];
+    if (!first) { toast.error('No episodes downloaded'); return; }
+    navigate(`/watch/${encodeURIComponent(first.id)}?offline=true&path=${encodeURIComponent(anime.path)}`);
+  };
+
   // ── Not-native gate ────────────────────────────────────────────────────────
-  if (isMobileNative()) return <MobileOfflineLibrary />;
+  if (isMobileNative()) return <main className="mx-auto max-w-3xl space-y-6 px-4 pt-6 pb-[calc(6rem+env(safe-area-inset-bottom))]">
+    <header className="space-y-1"><h1 className="text-2xl font-semibold">Offline Library</h1><p className="text-sm text-muted-foreground">Downloads and automatic rules, in one place.</p></header>
+    <Tabs defaultValue="library" className="space-y-6">
+      <TabsList className="h-11 bg-muted/50"><TabsTrigger value="library" className="h-9 px-4">Library</TabsTrigger><TabsTrigger value="automation" className="h-9 px-4">Auto-download</TabsTrigger></TabsList>
+      <TabsContent value="library"><MobileOfflineLibrary embedded /></TabsContent><TabsContent value="automation"><AutomationProfiles /><div className="mt-8"><AutoDownloadSettings /></div></TabsContent>
+    </Tabs>
+  </main>;
   if (!isNative) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-foreground p-6 text-center">
@@ -572,6 +497,7 @@ export default function OfflineLibraryPage() {
 
   const filteredAnimes = animes.filter(a => a.name.toLowerCase().includes(search.toLowerCase()));
   const filteredManga = mangaSeries.filter(m => (m.title || '').toLowerCase().includes(search.toLowerCase()));
+  const filteredNovels = novelSeries.filter(n => (n.title || '').toLowerCase().includes(search.toLowerCase()));
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -581,19 +507,20 @@ export default function OfflineLibraryPage() {
           width (pl-6 slid the heading under the rail). Mobile app hides the rail
           (bottom MobileNav instead); web clears the floating pill via md:pl-32. */}
       <main className={isDesktopApp
-        ? 'lg:pl-3 pl-6 pr-6 py-12 max-w-[1600px] mx-auto space-y-8'
+        ? 'lg:pl-3 pl-6 pr-6 py-8 max-w-[1440px] mx-auto space-y-6'
         : isNative
-        ? 'pl-6 pr-6 py-12 max-w-[1600px] mx-auto space-y-8'
-        : 'pl-6 md:pl-32 pr-6 py-12 max-w-[1600px] mx-auto space-y-8'
+        ? 'pl-6 pr-6 py-8 max-w-[1440px] mx-auto space-y-6'
+        : 'pl-6 md:pl-32 pr-6 py-8 max-w-[1440px] mx-auto space-y-6'
       }>
         {/* Page header */}
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
           <div className="space-y-2">
-            <h1 className="text-4xl md:text-5xl font-bold font-display tracking-tight">Offline Library</h1>
-            <p className="text-muted-foreground">Manage downloads, rules, and your download history.</p>
+            <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">Offline Library</h1>
+            <p className="text-muted-foreground">Watch and read offline. Manage your downloads in one place.</p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          {activeTab === 'library' && <div className="flex flex-wrap items-center gap-2">
+
             <Button variant="outline" size="sm" onClick={handleSyncLibrary} disabled={syncing} className="gap-2">
               <FolderSync className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
               {syncing ? 'Syncing...' : 'Sync Folder'}
@@ -612,11 +539,11 @@ export default function OfflineLibraryPage() {
               <FolderOpen className="w-4 h-4" />
               Open Folder
             </Button>
-          </div>
+          </div>}
         </div>
 
         {/* Search bar */}
-        {isDesktopApp && (window as any).electron?.getDownloadRecovery && (
+        {activeTab === 'library' && isDesktopApp && recoveryState.jobs.length > 0 && (window as any).electron?.getDownloadRecovery && (
           <GlassPanel className="p-4 flex flex-wrap items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">Continue interrupted anime and manga downloads from saved progress.</p>
             <Button variant="outline" size="sm" disabled={resuming || recoveryState.jobs.length === 0} onClick={async () => {
@@ -633,19 +560,20 @@ export default function OfflineLibraryPage() {
             </Button>
           </GlassPanel>
         )}
-        <div className="flex flex-col md:flex-row md:items-center gap-4">
+        {activeTab === 'library' && <div className="flex flex-col md:flex-row md:items-center gap-4">
           <div className="relative group flex-1 max-w-md">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
             <input
-              type="text"
-              placeholder="Search your library..."
+              type="search"
+              aria-label="Search offline library"
+              placeholder="Search downloaded anime, manga and novels"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full h-12 pl-12 pr-4 rounded-xl bg-white/5 border border-white/10 focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all outline-none text-sm"
+              className="w-full h-11 pl-12 pr-4 rounded-lg bg-background border border-input focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring text-sm"
             />
           </div>
-          {(animes.length > 0 || mangaSeries.length > 0) && (
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          {(animes.length > 0 || mangaSeries.length > 0 || novelSeries.length > 0) && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
               {animes.length > 0 && (
                 <>
                   <div className="flex items-center gap-2"><HardDrive className="w-4 h-4" /><span>{animes.length} anime</span></div>
@@ -658,24 +586,30 @@ export default function OfflineLibraryPage() {
                   <div className="flex items-center gap-2"><Download className="w-4 h-4" /><span>{mangaSeries.reduce((a, b) => a + (b.chapterCount ?? b.chapters?.length ?? 0), 0)} chapters</span></div>
                 </>
               )}
+              {novelSeries.length > 0 && (
+                <>
+                  <div className="flex items-center gap-2"><BookOpen className="w-4 h-4" /><span>{novelSeries.length} novels</span></div>
+                  <div className="flex items-center gap-2"><Download className="w-4 h-4" /><span>{novelSeries.reduce((a, b) => a + b.chapters.length, 0)} chapters</span></div>
+                </>
+              )}
             </div>
           )}
-        </div>
+        </div>}
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <div className="max-w-full overflow-x-auto pb-1">
-          <TabsList className="h-11 w-max bg-muted/50 border border-border rounded-xl p-1">
-            <TabsTrigger value="library" className="gap-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-white px-5">
-              <HardDrive className="w-4 h-4" />
+          <div className="max-w-full overflow-x-auto border-b border-border pb-3">
+          <TabsList className="h-11 w-full sm:w-max bg-transparent rounded-none p-0 gap-1">
+            <TabsTrigger value="library" className="gap-2 rounded-lg data-[state=active]:bg-muted data-[state=active]:shadow-none px-4">
+              <HardDrive className="hidden sm:block w-4 h-4" />
               Library
             </TabsTrigger>
-            <TabsTrigger value="automation" className="gap-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-white px-5">
-              <Bot className="w-4 h-4" />
+            <TabsTrigger value="automation" className="gap-2 rounded-lg data-[state=active]:bg-muted data-[state=active]:shadow-none px-4">
+              <Bot className="hidden sm:block w-4 h-4" />
               Auto-Download
             </TabsTrigger>
-            <TabsTrigger value="history" className="gap-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-white px-5">
-              <History className="w-4 h-4" />
+            <TabsTrigger value="history" className="gap-2 rounded-lg data-[state=active]:bg-muted data-[state=active]:shadow-none px-4">
+              <History className="hidden sm:block w-4 h-4" />
               History
               {historyStats.failed > 0 && (
                 <span className="ml-1 px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 text-[10px] font-bold">
@@ -687,7 +621,9 @@ export default function OfflineLibraryPage() {
           </div>
 
           {/* ── Library Tab ── */}
+
           <TabsContent value="library" className="space-y-6 mt-0">
+
             {/* Active Downloads */}
             {activeDownloads.length + activeMangaDownloads.length > 0 && (
               <div className="space-y-4">
@@ -708,7 +644,7 @@ export default function OfflineLibraryPage() {
                         </button>
                       </div>
                       <div className="h-2 overflow-hidden rounded-full bg-white/5" role="progressbar" aria-valuenow={state.progress} aria-valuemin={0} aria-valuemax={100} aria-label="Chapter download progress">
-                        <div className="h-full bg-primary transition-all duration-300" style={{ width: `${state.progress}%` }} />
+                        <div className="h-full bg-primary" style={{ width: `${state.progress}%` }} />
                       </div>
                       <p className="text-xs text-muted-foreground">{state.status === 'queued' ? 'Queued' : `${Math.round(state.progress)}% · ${state.page || 0}/${state.totalPages || 0} pages`}</p>
                     </GlassPanel>
@@ -731,7 +667,7 @@ export default function OfflineLibraryPage() {
                       <div className="space-y-1.5">
                         <div className="h-2 bg-white/5 rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-gradient-to-r from-primary to-primary/70 transition-all duration-300"
+                            className="h-full bg-primary"
                             style={{ width: `${state.progress || 0}%` }}
                           />
                         </div>
@@ -755,190 +691,50 @@ export default function OfflineLibraryPage() {
                 {Array.from({ length: 12 }).map((_, i) => <Skeleton key={i} className="aspect-[2/3] rounded-2xl" />)}
               </div>
             ) : filteredAnimes.length > 0 ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-                {filteredAnimes.map((anime) => (
-                  <GlassPanel
-                    key={anime.path}
-                    className="group relative overflow-hidden h-fit cursor-pointer border-transparent hover:border-primary/50 transition-all duration-300"
-                    onClick={() => {
-                      if (anime.episodes.length > 0) {
-                        navigate(`/watch/${encodeURIComponent(anime.episodes[0].id)}?offline=true&path=${encodeURIComponent(anime.path)}`);
-                      }
-                    }}
-                  >
-                    <div className="aspect-[2/3] relative overflow-hidden bg-gradient-to-br from-primary/20 to-secondary/20">
-                      {anime.poster ? (
-                        <img
-                          src={anime.poster}
-                          alt={anime.name}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Download className="w-12 h-12 text-white/20" />
-                        </div>
-                      )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-60 group-hover:opacity-100 transition-opacity" />
-                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
-                        <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center shadow-xl shadow-primary/40 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                          <Play className="w-6 h-6 text-white fill-current ml-1" />
-                        </div>
-                      </div>
-                      <div className="absolute top-3 right-3 px-2 py-1 rounded-md bg-black/60 backdrop-blur-md text-[10px] font-bold text-white border border-white/10 uppercase tracking-wider">
-                        {anime.episodes.length} EP
-                      </div>
-                      <button
-                        onClick={(e) => handleRepairAnime(anime, e)}
-                        className="absolute top-3 left-3 min-h-11 min-w-11 p-2 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity hover:bg-primary/20 hover:border-primary/50"
-                        title="Repair — re-download missing poster & subtitles"
-                      >
-                        <Wrench className="w-3.5 h-3.5 text-white" />
-                      </button>
-                      <button
-                        onClick={(e) => handleDeleteAnime(anime, e)}
-                        className="absolute bottom-3 left-3 min-h-11 min-w-11 p-2 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity hover:bg-destructive/20 hover:border-destructive/50"
-                        title="Delete anime and all episodes"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                      </button>
-                    </div>
-                    <div className="p-4 space-y-1">
-                      <h3 className="font-bold text-sm line-clamp-1 group-hover:text-primary transition-colors">{anime.name}</h3>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">
-                          <FolderOpen className="w-3 h-3" />
-                          Offline Ready
-                        </div>
-                        {!anime.poster && <span className="text-[10px] text-amber-500 font-medium">Missing poster</span>}
-                      </div>
-                    </div>
-                  </GlassPanel>
-                ))}
-              </div>
-            ) : filteredManga.length > 0 ? null : (
-              <div className="flex flex-col items-center justify-center py-32 text-center space-y-6">
-                <div className="w-24 h-24 rounded-3xl bg-muted flex items-center justify-center text-muted-foreground/30">
-                  <Download className="w-12 h-12" />
+              <section aria-label="Downloaded anime" className="space-y-4">
+                <h2 className="text-lg font-semibold">Anime</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-x-4 gap-y-6">
+                  {filteredAnimes.map(anime => <OfflineMediaCard key={anime.path} title={anime.name} poster={anime.poster} count={anime.episodes.length}
+                    onOpen={() => handlePlayAnime(anime)} onRepair={event => void handleRepairAnime(anime, event)} onDelete={event => void handleDeleteAnime(anime, event)} />)}
                 </div>
-                <div className="space-y-2">
-                  <h2 className="text-2xl font-bold">Library is empty</h2>
-                  <p className="text-muted-foreground max-w-sm">
-                    You haven't downloaded any anime or manga yet. Start by downloading your favourite episodes
-                    or chapters, or sync your folder if you already have videos.
-                  </p>
+              </section>
+            ) : filteredManga.length > 0 || filteredNovels.length > 0 ? null : (
+              <div className="py-16 text-center space-y-4">
+                <Download className="mx-auto h-8 w-8 text-muted-foreground" />
+                <div className="space-y-2"><h2 className="text-xl font-semibold">{search ? 'No matching downloads' : 'Your offline library starts here'}</h2>
+                  <p className="mx-auto max-w-md text-sm leading-relaxed text-muted-foreground">{search ? 'Try a different title or clear your search to see everything.' : 'Download episodes and chapters from a series, or import videos using the toolbar above.'}</p>
                 </div>
-                <div className="flex flex-wrap gap-3 justify-center">
-                  <Button onClick={() => navigate('/')} variant="default" className="rounded-full h-12 px-8">Discover Anime</Button>
-                  <Button onClick={handleSyncLibrary} variant="outline" className="rounded-full h-12 px-8 gap-2" disabled={syncing}>
-                    <FolderSync className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-                    Sync Folder
-                  </Button>
-                  <Button onClick={handleImportVideos} variant="outline" className="rounded-full h-12 px-8 gap-2">
-                    <Plus className="w-4 h-4" />
-                    Import Videos
-                  </Button>
-                </div>
-                <div className="mt-8 p-4 rounded-xl bg-white/5 border border-white/10 max-w-lg text-left">
-                  <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                    <Info className="w-4 h-4 text-primary" />
-                    How to add videos
-                  </h3>
-                  <ul className="text-xs text-muted-foreground space-y-1.5">
-                    <li>• <strong>Download:</strong> Go to any anime and click the download button</li>
-                    <li>• <strong>Sync Folder:</strong> Put video files in the Tatakai folder and click Sync</li>
-                    <li>• <strong>Import:</strong> Select video files from anywhere on your computer</li>
-                  </ul>
-                  <Button variant="link" size="sm" onClick={handleOpenFolder} className="mt-2 p-0 h-auto text-xs">
-                    Open Downloads Folder →
-                  </Button>
-                </div>
+                {search ? <Button variant="outline" onClick={() => setSearch('')}>Clear search</Button> : <Button onClick={() => navigate('/search')}>Find a series</Button>}
               </div>
             )}
 
-            {/* Manga / Manhwa / Manhua Grid */}
-            {filteredManga.length > 0 && (
-              <div className="space-y-4">
-                <h2 className="text-lg font-bold flex items-center gap-2">
-                  <BookOpen className="w-5 h-5 text-primary" />
-                  Manga & Comics ({filteredManga.length})
-                </h2>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-                  {filteredManga.map((series) => {
-                    const badge = MANGA_KIND_BADGE[series.kind || 'manga'] || MANGA_KIND_BADGE.manga;
-                    const chapterCount = series.chapterCount ?? series.chapters?.length ?? 0;
-                    return (
-                      <GlassPanel
-                        key={series.anilistId}
-                        className="group relative overflow-hidden h-fit cursor-pointer border-transparent hover:border-primary/50 transition-all duration-300"
-                        onClick={() => handleReadManga(series)}
-                      >
-                        <div className="aspect-[2/3] relative overflow-hidden bg-gradient-to-br from-primary/20 to-secondary/20">
-                          {series.poster ? (
-                            <img
-                              src={series.poster}
-                              alt={series.title}
-                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <BookOpen className="w-12 h-12 text-white/20" />
-                            </div>
-                          )}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-60 group-hover:opacity-100 transition-opacity" />
-                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
-                            <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center shadow-xl shadow-primary/40 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                              <BookOpen className="w-6 h-6 text-white" />
-                            </div>
-                          </div>
-                          <div className={`absolute top-3 left-3 px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider ${badge.cls}`}>
-                            {badge.label}
-                          </div>
-                          <div className="absolute top-3 right-3 px-2 py-1 rounded-md bg-black/60 backdrop-blur-md text-[10px] font-bold text-white border border-white/10 uppercase tracking-wider">
-                            {chapterCount} CH
-                          </div>
-                          <button
-                            onClick={(e) => handleOpenMangaFolder(series, e)}
-                            className="absolute bottom-3 right-3 min-h-11 min-w-11 p-2 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity hover:bg-primary/20 hover:border-primary/50"
-                            aria-label="Open folder"
-                            title="Open folder"
-                          >
-                            <FolderOpen className="w-3.5 h-3.5 text-white" />
-                          </button>
-                          <button
-                            onClick={(e) => handleDeleteMangaSeries(series, e)}
-                            className="absolute bottom-3 left-3 min-h-11 min-w-11 p-2 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity hover:bg-destructive/20 hover:border-destructive/50"
-                            aria-label="Delete series and all chapters"
-                            title="Delete series and all chapters"
-                          >
-                            <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                          </button>
-                        </div>
-                        <div className="p-4 space-y-1">
-                          <h3 className="font-bold text-sm line-clamp-1 group-hover:text-primary transition-colors">{series.title}</h3>
-                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">
-                            <BookOpen className="w-3 h-3" />
-                            Offline Ready
-                          </div>
-                        </div>
-                      </GlassPanel>
-                    );
-                  })}
-                </div>
+            {filteredManga.length > 0 && <section aria-label="Downloaded manga and comics" className="space-y-4">
+              <h2 className="text-lg font-semibold">Manga & comics</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-x-4 gap-y-6">
+                {filteredManga.map(series => <OfflineMediaCard key={series.anilistId} title={series.title} poster={series.poster} count={series.chapterCount ?? series.chapters?.length ?? 0} kind={series.kind || 'manga'}
+                  onOpen={() => handleReadManga(series)} onReveal={event => void handleOpenMangaFolder(series, event)} onDelete={event => void handleDeleteMangaSeries(series, event)} />)}
               </div>
-            )}
+            </section>}
+
+            {filteredNovels.length > 0 && <section aria-label="Downloaded light novels" className="space-y-4">
+              <h2 className="text-lg font-semibold">Light novels</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-x-4 gap-y-6">
+                {filteredNovels.map(series => <OfflineMediaCard key={`novel-${series.anilistId}`} title={series.title} poster={series.poster} count={series.chapters.length} kind="novel"
+                  onOpen={() => handleReadNovel(series)} onDelete={event => void handleDeleteNovelSeries(series, event)} />)}
+              </div>
+            </section>}
           </TabsContent>
 
           {/* ── Auto-Download Tab ── */}
-          <TabsContent value="automation" className="mt-0">
-            <AutoDownloadRules isNative={isNative} />
+          <TabsContent value="automation" className="mt-0 space-y-8">
+            <AutomationProfiles />
+            <AutoDownloadSettings />
           </TabsContent>
 
           {/* ── History Tab ── */}
           <TabsContent value="history" className="space-y-6 mt-0">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="space-y-1">
                 <h2 className="text-xl font-bold flex items-center gap-2">
                   <History className="w-5 h-5 text-primary" />
@@ -972,29 +768,12 @@ export default function OfflineLibraryPage() {
               </div>
             </div>
 
-            {/* Stats bar */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <GlassPanel className="p-4">
-                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Total Attempts</p>
-                <p className="text-3xl font-black mt-1">{historyStats.total}</p>
-              </GlassPanel>
-              <GlassPanel className="p-4">
-                <p className="text-xs text-green-400 font-semibold uppercase tracking-wider">Completed</p>
-                <p className="text-3xl font-black text-green-500 mt-1">{historyStats.completed}</p>
-              </GlassPanel>
-              <GlassPanel className="p-4">
-                <p className="text-xs text-red-400 font-semibold uppercase tracking-wider">Failed</p>
-                <p className="text-3xl font-black text-red-500 mt-1">{historyStats.failed}</p>
-              </GlassPanel>
-              <GlassPanel className="p-4">
-                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Storage Used</p>
-                <p className="text-3xl font-black mt-1">
-                  {historyStats.totalSizeBytes >= 1_073_741_824
-                    ? `${(historyStats.totalSizeBytes / 1_073_741_824).toFixed(2)} GB`
-                    : `${(historyStats.totalSizeBytes / 1_048_576).toFixed(0)} MB`}
-                </p>
-              </GlassPanel>
-            </div>
+            <dl className="flex flex-wrap gap-x-8 gap-y-4 border-y border-border py-4 text-sm">
+              <div><dt className="text-xs text-muted-foreground">Attempts</dt><dd className="mt-1 font-semibold tabular-nums">{historyStats.total}</dd></div>
+              <div><dt className="text-xs text-muted-foreground">Completed</dt><dd className="mt-1 font-semibold tabular-nums">{historyStats.completed}</dd></div>
+              <div><dt className="text-xs text-muted-foreground">Failed</dt><dd className="mt-1 font-semibold tabular-nums">{historyStats.failed}</dd></div>
+              <div><dt className="text-xs text-muted-foreground">Downloaded</dt><dd className="mt-1 font-semibold tabular-nums">{historyStats.totalSizeBytes >= 1_073_741_824 ? `${(historyStats.totalSizeBytes / 1_073_741_824).toFixed(2)} GB` : `${(historyStats.totalSizeBytes / 1_048_576).toFixed(0)} MB`}</dd></div>
+            </dl>
 
             {/* History list */}
             {historyLoading ? (

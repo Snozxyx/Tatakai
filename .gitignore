@@ -119,3 +119,15 @@ check-*.local.mjs
 coverage/
 .nyc_output/
 *.tsbuildinfo
+
+# Separate services and local provider workspaces have their own repositories.
+/ops/
+/tatakaiapi/
+/TatakaiAPI/
+/tatakaiextension/
+/toko/
+/agent/
+/plans/
+/.claude/
+/skills-lock.json
+/tests/operations-api.test.ts

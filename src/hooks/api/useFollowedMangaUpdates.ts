@@ -2,7 +2,9 @@ import { useMemo } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { useMangaReadlist } from "@/hooks/user/useMangaReadlist";
 import { getMangaChapters } from "@/core/content/manga-client";
-import type { MappedMangaChapter } from "@/types/manga";
+import { needsReadlistMetadata, resolveReadlistMetadata } from "@/lib/reader/readlistMetadata";
+import type { MangaChapterResponse, MappedMangaChapter } from "@/types/manga";
+import { mangaUpdateChapters } from '@/lib/reader/mangaChapterReliability';
 
 export interface FollowedMangaUpdate {
   mangaId: string;
@@ -27,11 +29,11 @@ export interface FollowedMangaUpdate {
  *
  * Takes the readlist (reading / plan_to_read / on_hold first), fetches each
  * title's chapter hierarchy (cached 10min) and diffs the newest chapter number
- * against the stored `last_chapter_number`. Bounded to 10 titles so the rail
- * costs at most 10 cached reads on first paint.
+ * against the stored `last_chapter_number`. Metadata repair and chapter reads
+ * are bounded to the selected titles and cached independently.
  */
 export function useFollowedMangaUpdates(limit = 10) {
-  const { data: readlist, isLoading: readlistLoading } = useMangaReadlist();
+  const { data: readlist, isLoading: readlistLoading } = useMangaReadlist(["reading", "plan_to_read", "on_hold", "completed"]);
 
   const candidates = useMemo(() => {
     const list = Array.isArray(readlist) ? readlist : [];
@@ -55,26 +57,38 @@ export function useFollowedMangaUpdates(limit = 10) {
       .slice(0, limit);
   }, [readlist, limit]);
 
-  const chapterQueries = useQueries({
+  const metadataQueries = useQueries({
     queries: candidates.map((item) => ({
-      queryKey: ["followed-manga-chapters", item.manga_id],
-      queryFn: async (): Promise<MappedMangaChapter[]> => {
+      queryKey: ["followed-manga-metadata", item.manga_id, item.manga_title, item.manga_poster, item.anilist_id, item.mal_id, item.format],
+      queryFn: () => resolveReadlistMetadata(item),
+      enabled: needsReadlistMetadata(item),
+      staleTime: 60 * 60 * 1000,
+      retry: false,
+    })),
+  });
+
+  const chapterQueries = useQueries({
+    queries: candidates.map((item, index) => ({
+      queryKey: ["followed-manga-chapters", metadataQueries[index]?.data?.id || item.manga_id],
+      queryFn: async (): Promise<MangaChapterResponse | null> => {
         try {
-          const res = await getMangaChapters(item.manga_id);
-          return res?.mappedChapters ?? [];
+          const res = await getMangaChapters(metadataQueries[index]?.data?.id || item.manga_id);
+          return res ?? null;
         } catch {
-          return [];
+          return null;
         }
       },
       staleTime: 10 * 60 * 1000,
       gcTime: 30 * 60 * 1000,
       retry: false,
+      enabled: !metadataQueries[index]?.isLoading,
     })),
   });
 
   const updates = useMemo<FollowedMangaUpdate[]>(() => {
     return candidates.map((item, index) => {
-      const chapters = (chapterQueries[index]?.data ?? []) as MappedMangaChapter[];
+      const catalog = chapterQueries[index]?.data;
+      const chapters = mangaUpdateChapters(catalog?.mappedChapters ?? []);
       // Newest numeric chapter in the hierarchy.
       let latest: MappedMangaChapter | null = null;
       for (const c of chapters) {
@@ -88,37 +102,34 @@ export function useFollowedMangaUpdates(limit = 10) {
         item.last_chapter_number != null && Number.isFinite(Number(item.last_chapter_number))
           ? Number(item.last_chapter_number)
           : null;
-      const latestNum = latest?.chapterNumber ?? null;
-      const newCount =
-        latestNum != null && lastNum != null
-          ? Math.max(0, Math.floor(latestNum - lastNum))
-          : latestNum != null && lastNum == null
-            ? Math.min(Math.floor(latestNum), 99)
-            : 0;
+      const latestNum = catalog?.mangaUpdates?.latestChapter ?? latest?.chapterNumber ?? null;
+      if (catalog?.mangaUpdates) latest = chapters.find(c => c.chapterNumber === latestNum) ?? null;
+      const listedNewCount = chapters.filter(c => lastNum == null || c.chapterNumber! > lastNum).length;
+      const newCount = catalog?.mangaUpdates && latestNum != null && (lastNum == null || latestNum > lastNum)
+        ? Math.max(1, listedNewCount) : listedNewCount;
 
       const latestKey =
-        latest?.sources?.[0]?.chapterKey ??
-        (latestNum != null ? `chapter-${latestNum}` : null);
+        latest?.sources?.find(s => s.chapterKey && s.provider !== 'tatakai_media')?.chapterKey ?? null;
 
       return {
-        mangaId: item.manga_id,
-        mangaTitle: item.manga_title,
-        mangaPoster: item.manga_poster,
-        format: item.format || "unknown",
+        mangaId: metadataQueries[index]?.data?.id || item.manga_id,
+        mangaTitle: metadataQueries[index]?.data?.title || item.manga_title,
+        mangaPoster: metadataQueries[index]?.data?.poster || item.manga_poster,
+        format: metadataQueries[index]?.data?.format || item.format || "unknown",
         status: item.status,
         updatedAt: item.updated_at,
         lastChapterNumber: lastNum,
         lastChapterTitle: item.last_chapter_title,
         latestChapterNumber: latestNum,
-        latestChapterTitle: latest?.chapterTitle ?? null,
+        latestChapterTitle: latest?.chapterTitle ?? (latestNum != null ? `Chapter ${latestNum}` : null),
         latestChapterThumbnail: latest?.thumbnail ?? null,
-        latestPublished: latest?.published ?? null,
+        latestPublished: catalog?.mangaUpdates?.latestReleaseDate ?? latest?.published ?? latest?.sources?.map(s => s.releaseDate).filter(Boolean).sort().at(-1) ?? null,
         newChaptersCount: newCount,
         hasNew: newCount > 0,
         latestChapterKey: latestKey,
       };
     });
-  }, [candidates, chapterQueries]);
+  }, [candidates, chapterQueries, metadataQueries]);
 
   const sorted = useMemo(
     () =>
@@ -134,7 +145,7 @@ export function useFollowedMangaUpdates(limit = 10) {
   );
 
   const isLoading =
-    readlistLoading || chapterQueries.some((q) => q.isLoading);
+    readlistLoading || metadataQueries.some((q) => q.isLoading) || chapterQueries.some((q) => q.isLoading);
 
   return {
     updates: sorted,

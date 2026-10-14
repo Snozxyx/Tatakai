@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useGitHubRepo, useLatestRelease, useAllReleases, platformForAsset, formatCompact, GITHUB_REPO_URL } from "@/lib/github";
 import { supabase } from "@/integrations/supabase/client";
 import { FeatureShowcase } from "@/components/landing/FeatureShowcase";
+import { FooterSection } from "@/components/ui/footer";
 
 const words = ["explore", "discover", "immerse", "love"];
 
@@ -412,8 +413,10 @@ export default function LandingPage() {
       </main>
       </section>
 
+
       {/* ===================== FEATURE SHOWCASE ===================== */}
       <FeatureShowcase />
+      <FooterSection />
 
       {/* Custom shimmer keyframes */}
       <style>{`

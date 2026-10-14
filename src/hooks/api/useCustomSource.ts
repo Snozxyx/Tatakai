@@ -32,7 +32,8 @@ export function useCustomSources() {
       void queryClient.invalidateQueries({ queryKey: ["custom-sources"] });
     };
     window.addEventListener('tatakai-extensions-changed', refresh);
-    return () => window.removeEventListener('tatakai-extensions-changed', refresh);
+    window.addEventListener('tatakai:extension-installed', refresh);
+    return () => { window.removeEventListener('tatakai-extensions-changed', refresh); window.removeEventListener('tatakai:extension-installed', refresh); };
   }, [queryClient]);
 
   return useQuery<CustomSourceEntry[]>({

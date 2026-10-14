@@ -32,7 +32,7 @@ function Poster({ anime, active, nearby }: { anime: SpotlightAnime; active: bool
 export function CinematicHero({ spotlights, onActiveSpotlightChange, mediaType = 'anime' }: {
   spotlights: CinematicSpotlight[];
   onActiveSpotlightChange?: (anime: CinematicSpotlight) => void;
-  mediaType?: 'anime' | 'manga';
+  mediaType?: 'anime' | 'manga' | 'novel';
 }) {
   const items = useMemo(() => spotlights.filter(Boolean).slice(0, 5), [spotlights]);
   const [api, setApi] = useState<CarouselApi>();
@@ -86,7 +86,8 @@ export function CinematicHero({ spotlights, onActiveSpotlightChange, mediaType =
   }, [api, items.length, paused, interacting, focused, visible, inView, reduced, index]);
 
   if (!active) return null;
-  const routeId = mediaType === 'manga' ? active.id : buildPreferredAnimeRouteId({ ...active }) || active.id;
+  const isText = mediaType === 'manga' || mediaType === 'novel';
+  const routeId = isText ? active.id : buildPreferredAnimeRouteId({ ...active }) || active.id;
   return (
     <section ref={section} className="cinematic-hero" aria-label={`Featured ${mediaType}`}
       onPointerDown={() => setInteracting(true)} onPointerUp={() => setInteracting(false)}
@@ -107,7 +108,7 @@ export function CinematicHero({ spotlights, onActiveSpotlightChange, mediaType =
           <Star className="h-3 w-3 fill-primary text-primary" /> The spotlight <span className="text-white/40">/</span> {String(active.rank).padStart(2, '0')}
         </div>
         <Carousel setApi={setApi} opts={{ align: 'center', loop: items.length > 2, containScroll: false, duration: reduced ? 0 : 25 }}
-          aria-label={`${mediaType === 'manga' ? 'Manga' : 'Anime'} spotlight posters`} className="cinematic-carousel">
+          aria-label={`${isText ? (mediaType === 'novel' ? 'Novel' : 'Manga') : 'Anime'} spotlight posters`} className="cinematic-carousel">
           <CarouselContent className="ml-0 items-center py-5">
             {items.map((anime, i) => (
               <CarouselItem key={anime.id} className="cinematic-slide pl-0" aria-label={`${i + 1} of ${items.length}`}>
@@ -125,15 +126,15 @@ export function CinematicHero({ spotlights, onActiveSpotlightChange, mediaType =
           <TitleArtwork key={`${active.id}:${active.titleLogo}:${active.logo}`} anime={active} />
           <div className="mt-2 flex min-h-6 items-center justify-center gap-2 overflow-hidden text-[11px] font-medium text-white/75">
             {active.otherInfo.slice(0, 3).map((info, i) => <span key={i} className="truncate rounded-md border border-white/10 bg-white/5 px-2 py-1">{info}</span>)}
-            <span className="shrink-0 text-white/55">{mediaType === 'manga' ? (active.chapters ? `${active.chapters} chapters` : '') : `SUB ${active.episodes.sub}`}</span>
+            <span className="shrink-0 text-white/55">{isText ? (active.chapters ? `${active.chapters} chapters` : '') : `SUB ${active.episodes.sub}`}</span>
           </div>
           <p key={active.id} className="ui-spotlight-copy mt-3 h-9 line-clamp-2 text-xs leading-[18px] text-white/60">{active.description}</p>
           <div className="mt-5 flex items-center gap-3">
             <button type="button" onClick={() => navigate(`/${mediaType}/${routeId}`)}
               className="ui-button flex h-[52px] flex-1 items-center justify-center gap-2 rounded-2xl bg-primary text-sm font-bold text-primary-foreground transition-[background-color,transform] duration-150 hover:bg-primary/90 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
-              {mediaType === 'manga' ? <BookOpen className="h-4 w-4" /> : <Play className="h-4 w-4 fill-current" />} {mediaType === 'manga' ? 'Read Now' : 'Watch Now'}
+              {isText ? <BookOpen className="h-4 w-4" /> : <Play className="h-4 w-4 fill-current" />} {isText ? 'Read Now' : 'Watch Now'}
             </button>
-            <AddToPlaylistButton animeId={active.id} animeName={active.name} animePoster={active.poster} mediaType={mediaType} variant="icon"
+            <AddToPlaylistButton animeId={active.id} animeName={active.name} animePoster={active.poster} mediaType={isText ? 'manga' : mediaType} {...(mediaType === 'novel' ? { mediaFormat: 'novel' } : {})} variant="icon"
               className="h-[52px] w-[52px] shrink-0 rounded-2xl border border-border bg-muted/60 text-foreground" />
           </div>
         </div>

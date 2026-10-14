@@ -38,7 +38,7 @@ export interface UnifiedMediaCardProps {
     episodes?: { sub?: number; dub?: number }; // For anime
     chapters?: number; // For manga
     year?: number;
-    mediaType: 'anime' | 'manga' | 'character';
+    mediaType: 'anime' | 'manga' | 'novel' | 'character';
     malId?: number;
     anilistId?: number;
     href?: string;
@@ -59,7 +59,7 @@ export interface UnifiedMediaCardProps {
 
 /** Normalize a manga `type` into its display label ("manhwa", "comics", …). */
 function mangaFormatLabel(type?: string | null, mediaType = 'manga'): string {
-  if (mediaType !== 'manga') return mediaType;
+  if (mediaType !== 'manga' && mediaType !== 'novel') return mediaType;
   const normalized = String(type || mediaType || 'manga').trim().toLowerCase();
   if (normalized === 'manwha' || normalized === 'manwah') return 'manhwa';
   if (normalized === 'comic' || normalized === 'oel') return 'comics';
@@ -70,6 +70,7 @@ function mangaFormatLabel(type?: string | null, mediaType = 'manga'): string {
 export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant, rank, className = "", topBadges = 'auto' }: UnifiedMediaCardProps) {
   const isAnime = item.mediaType === 'anime';
   const isManga = item.mediaType === 'manga';
+  const isNovel = (item.mediaType as string) === 'novel';
   const isCharacter = item.mediaType === 'character';
   const isAdultItem = Boolean(item.isAdult);
   const shouldBlurAdult = Boolean(isAdultItem && item.blurAdult);
@@ -82,7 +83,7 @@ export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant, 
   // Phones: no hover states exist, so drop the GPU-heavy hover overlays,
   // backdrop-blurs and transitions entirely (big scroll win on long grids).
 
-  const mediaBadgeLabel = isManga
+  const mediaBadgeLabel = isManga || isNovel
     ? mangaFormatLabel(item.type, item.mediaType)
     : item.mediaType;
 
@@ -95,6 +96,7 @@ export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant, 
     if (item.href) return item.href;
     if (isAnime) return `/anime/${encodeURIComponent(item.id)}`;
     if (isManga) return `/manga/${encodeURIComponent(item.id)}`;
+    if (isNovel) return `/novel/${encodeURIComponent(item.id)}`;
     if (isCharacter) {
       const characterRouteId = item.id || item.name;
       return characterRouteId ? `/char/${encodeURIComponent(characterRouteId)}` : null;
@@ -107,12 +109,12 @@ export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant, 
   const peekMedia: QuickPeekMedia | null =
     !isCharacter && routeTo
       ? {
-          kind: isAnime ? "anime" : "manga",
+          kind: isAnime ? "anime" : isNovel ? "novel" : "manga",
           id: item.id,
           name: item.name,
           poster: item.poster,
           anilistId: item.anilistId ?? null,
-          type: isManga ? mediaBadgeLabel : item.type,
+          type: isManga || isNovel ? mediaBadgeLabel : item.type,
           status: item.status,
           year: item.year,
           rating: item.rating,
@@ -146,7 +148,7 @@ export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant, 
       {preview.isLoading && <div aria-hidden className="pointer-events-none absolute inset-0 flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-white" /></div>}
       {preview.unavailable && <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center"><span className="rounded-lg bg-black/75 px-3 py-2 text-xs text-white">Preview unavailable</span></div>}
       {!preview.isLoading && !preview.unavailable && !preview.isActive && <div aria-hidden className="media-card-preview media-card-open pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/90 text-primary-foreground">{isManga ? <BookOpen className="h-6 w-6" /> : isCharacter ? <Star className="h-6 w-6" /> : <Play className="ml-1 h-6 w-6" />}</span>
+        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/90 text-primary-foreground">{isManga || isNovel ? <BookOpen className="h-6 w-6" /> : isCharacter ? <Star className="h-6 w-6" /> : <Play className="ml-1 h-6 w-6" />}</span>
       </div>}
     </>}
     badges={<>
@@ -154,7 +156,7 @@ export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant, 
       {isAdultItem && <AdultBadge className={cn('absolute left-2 z-20', rank !== undefined ? 'top-10' : 'top-2')} />}
       {shouldBlurAdult && <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50"><span className="rounded-full bg-black/80 px-3 py-1 text-xs font-semibold text-white">Sensitive preview</span></div>}
       {overlay && topBadges !== 'none' && <span className={cn('absolute left-2 z-20 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/60 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white', rank !== undefined || isAdultItem ? 'top-10' : 'top-2')}>
-        {isManga ? <BookOpen aria-hidden className="h-3 w-3" /> : isAnime ? <Film aria-hidden className="h-3 w-3" /> : <Star aria-hidden className="h-3 w-3" />}{mediaBadgeLabel}
+        {isManga || isNovel ? <BookOpen aria-hidden className="h-3 w-3" /> : isAnime ? <Film aria-hidden className="h-3 w-3" /> : <Star aria-hidden className="h-3 w-3" />}{mediaBadgeLabel}
       </span>}
       {overlay && topBadges !== 'none' && item.status && !isCharacter && !isAdultItem && <span className="absolute right-2 top-2 z-20 max-w-[60%] truncate rounded-full border border-white/10 bg-black/60 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white/85">{item.status}</span>}
       {!overlay && score && <span className="media-card-score absolute right-2 top-2 z-20 inline-flex items-center gap-1 rounded-lg bg-black/75 px-2 py-1 text-xs font-semibold text-white"><Star aria-hidden className="h-3 w-3 fill-amber text-amber" />{score}</span>}
@@ -162,11 +164,11 @@ export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant, 
     metadata={overlay ? <div className="flex flex-wrap items-center gap-2">
       {score && <ScoreBadge score={score} />}{label && <MetaBadge className="text-white/85">{label}</MetaBadge>}
       {isAnime && !!item.episodes?.sub && <MetaBadge className="text-white/85">{item.episodes.sub} sub {item.episodes.dub ? `· ${item.episodes.dub} dub` : ''}</MetaBadge>}
-      {isManga && !!item.chapters && <MetaBadge className="text-white/85">{item.chapters} ch</MetaBadge>}
+      {(isManga || isNovel) && !!item.chapters && <MetaBadge className="text-white/85">{item.chapters} ch</MetaBadge>}
     </div> : <div className="flex flex-wrap items-center gap-x-1.5">
       <span className="capitalize">{isAnime ? item.type || 'Anime' : mediaBadgeLabel}</span>
       {item.year && <span>· {item.year}</span>}
-      {isManga && !!item.chapters && <span>· {item.chapters} ch</span>}
+      {(isManga || isNovel) && !!item.chapters && <span>· {item.chapters} ch</span>}
       {isAnime && !!item.episodes?.sub && <span>· {item.episodes.sub} sub</span>}
       {isAnime && !!item.episodes?.dub && <span>· {item.episodes.dub} dub</span>}
       {label && <span>· {label}</span>}

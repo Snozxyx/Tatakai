@@ -1,4 +1,4 @@
-import { Search, User, LogOut, Shield, Download, Camera, Loader2, X, Film, Play, ChevronRight, BookOpen } from "lucide-react";
+import { Search, User, LogOut, Shield, Download, Camera, Loader2, X, Film, Play, ChevronRight, BookOpen, ScrollText } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -162,17 +162,97 @@ export function Header() {
     commitSearch(searchQuery);
   };
 
-  // Mobile Anime ↔ Manga catalog switch: haptic tick + icon pop (the icon
-  // remounts on `key` change and plays `animate-catalog-switch`, gated behind
-  // `motion-safe` so reduced-motion users just get the instant swap) + reset
-  // scroll so the new catalog starts at the top. `triggerHaptic` already
+  // Mobile Anime → Manga → Novel catalog switch: haptic tick + icon pop (the
+  // icon remounts on `key` change and plays `animate-catalog-switch`, gated
+  // behind `motion-safe` so reduced-motion users just get the instant swap) +
+  // reset scroll so the new catalog starts at the top. `triggerHaptic` already
   // honors the user's haptic toggle, reduced-motion and tap throttle.
-  const isMangaCatalog = location.pathname.startsWith('/manga');
+  const catalog: 'anime' | 'manga' | 'novel' = location.pathname.startsWith('/manga')
+    ? 'manga'
+    : location.pathname.startsWith('/novel')
+      ? 'novel'
+      : 'anime';
   const handleCatalogSwitch = useCallback(() => {
     void triggerHaptic('toggle');
-    navigate(isMangaCatalog ? '/' : '/manga');
+    navigate(catalog === 'anime' ? '/manga' : catalog === 'manga' ? '/novel' : '/');
     requestAnimationFrame(() => window.scrollTo({ top: 0 }));
-  }, [navigate, isMangaCatalog]);
+  }, [navigate, catalog]);
+
+  // Long-press ("hard press") on the catalog pill opens a jump menu with the
+  // other two catalogs; a normal tap keeps cycling anime → manga → novel.
+  // Pointer-event based so it works for touch, pen and mouse alike.
+  const LONG_PRESS_MS = 550;
+  const [catalogMenuOpen, setCatalogMenuOpen] = useState(false);
+  const catalogBtnRef = useRef<HTMLButtonElement | null>(null);
+  const catalogMenuRef = useRef<HTMLDivElement | null>(null);
+  const longPressTimer = useRef<number | null>(null);
+  const longPressFired = useRef(false);
+
+  const clearLongPressTimer = useCallback(() => {
+    if (longPressTimer.current != null) {
+      window.clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }, []);
+
+  useEffect(() => clearLongPressTimer, [clearLongPressTimer]);
+
+  const goCatalog = useCallback((path: '/' | '/manga' | '/novel') => {
+    setCatalogMenuOpen(false);
+    if (location.pathname === path) return;
+    void triggerHaptic('toggle');
+    navigate(path);
+    requestAnimationFrame(() => window.scrollTo({ top: 0 }));
+  }, [navigate, location.pathname]);
+
+  const startCatalogLongPress = useCallback((e: React.PointerEvent) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    longPressFired.current = false;
+    clearLongPressTimer();
+    longPressTimer.current = window.setTimeout(() => {
+      longPressTimer.current = null;
+      longPressFired.current = true;
+      void triggerHaptic('medium');
+      setCatalogMenuOpen(true);
+    }, LONG_PRESS_MS);
+  }, [clearLongPressTimer]);
+
+  const handleCatalogTap = useCallback(() => {
+    // A tap that ends a long-press must not also cycle the catalog.
+    if (longPressFired.current) {
+      longPressFired.current = false;
+      return;
+    }
+    setCatalogMenuOpen(false);
+    handleCatalogSwitch();
+  }, [handleCatalogSwitch]);
+
+  // Dismiss the jump menu on route change, outside tap, or Escape.
+  useEffect(() => {
+    setCatalogMenuOpen(false);
+  }, [location.pathname]);
+  useEffect(() => {
+    if (!catalogMenuOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const t = e.target as Node | null;
+      if (
+        t &&
+        catalogMenuRef.current?.contains(t) !== true &&
+        catalogBtnRef.current?.contains(t) !== true
+      ) {
+        setCatalogMenuOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setCatalogMenuOpen(false);
+    };
+    window.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [catalogMenuOpen]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -240,16 +320,52 @@ export function Header() {
             </button>
           )}
           <button
+            ref={catalogBtnRef}
             type="button"
-            onClick={handleCatalogSwitch}
-            className="absolute left-1/2 top-1/2 z-10 inline-flex h-9 -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3.5 text-xs font-bold tracking-wide text-foreground shadow-sm transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 hover:border-primary/40 hover:bg-white/[0.1] active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-            aria-label={isMangaCatalog ? 'Switch to Anime' : 'Switch to Manga'}
+            onClick={handleCatalogTap}
+            onPointerDown={startCatalogLongPress}
+            onPointerUp={clearLongPressTimer}
+            onPointerLeave={clearLongPressTimer}
+            onPointerCancel={clearLongPressTimer}
+            onContextMenu={(e) => e.preventDefault()}
+            className="absolute left-1/2 top-1/2 z-10 inline-flex h-9 -translate-x-1/2 -translate-y-1/2 touch-manipulation select-none items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3.5 text-xs font-bold tracking-wide text-foreground shadow-sm transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 [-webkit-touch-callout:none] hover:border-primary/40 hover:bg-white/[0.1] active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+            aria-label={catalog === 'anime' ? 'Switch to Manga' : catalog === 'manga' ? 'Switch to Novels' : 'Switch to Anime'}
+            title="Tap to switch catalog · hold for all catalogs"
+            aria-haspopup="menu"
+            aria-expanded={catalogMenuOpen}
           >
-            <span key={isMangaCatalog ? 'manga' : 'anime'} className="inline-flex motion-safe:animate-catalog-switch">
-              {isMangaCatalog ? <BookOpen className="h-3.5 w-3.5 text-primary" /> : <Play className="h-3.5 w-3.5 fill-primary text-primary" />}
+            <span key={catalog} className="inline-flex motion-safe:animate-catalog-switch">
+              {catalog === 'anime' ? <Play className="h-3.5 w-3.5 fill-primary text-primary" /> : catalog === 'manga' ? <BookOpen className="h-3.5 w-3.5 text-primary" /> : <ScrollText className="h-3.5 w-3.5 text-primary" />}
             </span>
-            {isMangaCatalog ? 'Manga' : 'Anime'}
+            {catalog === 'anime' ? 'Anime' : catalog === 'manga' ? 'Manga' : 'Novels'}
           </button>
+          {catalogMenuOpen && (
+            <div
+              ref={catalogMenuRef}
+              role="menu"
+              aria-label="Jump to catalog"
+              className="absolute left-1/2 top-[calc(100%+8px)] z-30 w-48 -translate-x-1/2 rounded-2xl border border-white/10 bg-card/95 p-1.5 shadow-2xl backdrop-blur-xl data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=open]:duration-150"
+            >
+              {(['anime', 'manga', 'novel'] as const)
+                .filter((c) => c !== catalog)
+                .map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => goCatalog(c === 'anime' ? '/' : c === 'manga' ? '/manga' : '/novel')}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-colors hover:bg-white/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 active:scale-[0.98]"
+                  >
+                    {c === 'anime'
+                      ? <Play className="mr-1 h-4 w-4 fill-primary text-primary" />
+                      : c === 'manga'
+                        ? <BookOpen className="mr-1 h-4 w-4 text-primary" />
+                        : <ScrollText className="mr-1 h-4 w-4 text-primary" />}
+                    {c === 'anime' ? 'Anime' : c === 'manga' ? 'Manga' : 'Novels'}
+                  </button>
+                ))}
+            </div>
+          )}
           <div className="relative z-10">
             {isLoading ? (
               <div className="h-9 w-9 rounded-full bg-muted animate-pulse ring-1 ring-white/10" />

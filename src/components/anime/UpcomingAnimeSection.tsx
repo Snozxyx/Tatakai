@@ -1,27 +1,37 @@
 import { Calendar, ChevronLeft, ChevronRight, Star } from "lucide-react";
 import { GlassPanel } from "@/components/ui/GlassPanel";
-import { useUpcomingAnime, JikanAnime } from "@/hooks/api/useUpcomingAnime";
+import { useUpcomingAnime, type UpcomingAnimeItem } from "@/hooks/api/useUpcomingAnime";
 import { useRef } from "react";
 import { Peekable } from "@/components/media/MediaQuickPeek";
 import { peekFromAnime } from "@/components/media/quickPeekStore";
 
-function UpcomingAnimeCard({ anime }: { anime: JikanAnime }) {
-  const imageUrl = anime.images.webp?.large_image_url || anime.images.jpg.large_image_url;
-  const title = anime.title_english || anime.title;
-  const airDate = anime.aired.string
-    ? anime.aired.string.includes(" to ")
-      ? anime.aired.string.split(" to ")[0]
-      : anime.aired.string
-    : null;
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function formatAirDate(media: UpcomingAnimeItem): string | null {
+  const { year, month, day } = media.startDate || {};
+  if (!year) return media.seasonYear ? String(media.seasonYear) : null;
+  if (month && day) return `${MONTHS[month - 1]} ${day}, ${year}`;
+  if (month) return `${MONTHS[month - 1]} ${year}`;
+  return String(year);
+}
+
+function UpcomingAnimeCard({ anime }: { anime: UpcomingAnimeItem }) {
+  const imageUrl = anime.coverImage?.large || anime.coverImage?.medium || "/placeholder.svg";
+  const title = anime.title?.english || anime.title?.romaji || anime.title?.native || "Unknown title";
+  const airDate = formatAirDate(anime);
+  const studio = anime.studios?.nodes?.find((node) => node?.name)?.name || null;
+  const score = anime.averageScore ? (anime.averageScore / 10).toFixed(1) : null;
 
   // Unreleased titles: info-only peek (no save, View goes to search).
   const peekMedia = peekFromAnime(
     {
-      id: `mal:${anime.mal_id}`,
+      id: `anilist:${anime.id}`,
+      anilistId: anime.id,
       name: title,
       poster: imageUrl,
-      type: anime.type,
-      rating: anime.score ?? undefined,
+      type: anime.format,
+      year: anime.seasonYear ?? anime.startDate?.year ?? undefined,
+      rating: score ?? undefined,
     },
     `/search?q=${encodeURIComponent(title)}`,
   );
@@ -44,17 +54,17 @@ function UpcomingAnimeCard({ anime }: { anime: JikanAnime }) {
         <div className="absolute inset-0 bg-black/0 transition-colors duration-300 group-hover:bg-black/10" />
 
         {/* Type */}
-        {anime.type && (
+        {anime.format && (
           <div className="absolute top-3 left-3 px-2 py-0.5 rounded-md bg-purple-500/90 text-white text-[10px] font-bold uppercase tracking-wider shadow-lg shadow-purple-500/20">
-            {anime.type}
+            {anime.format}
           </div>
         )}
 
         {/* Score */}
-        {anime.score && (
+        {score && (
           <div className="absolute top-3 right-3 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-black/50 backdrop-blur-md border border-white/10 text-[10px] font-bold text-white">
             <Star className="w-3 h-3 fill-amber text-amber" />
-            {anime.score}
+            {score}
           </div>
         )}
 
@@ -70,9 +80,9 @@ function UpcomingAnimeCard({ anime }: { anime: JikanAnime }) {
                 {airDate}
               </span>
             )}
-            {anime.studios.length > 0 && (
+            {studio && (
               <span className="text-[10px] text-white/50 line-clamp-1 font-medium tracking-wide">
-                {anime.studios[0].name}
+                {studio}
               </span>
             )}
           </div>
@@ -122,7 +132,7 @@ export function UpcomingAnimeSection() {
     );
   }
 
-  if (!data?.data || data.data.length === 0) return null;
+  if (!data || data.length === 0) return null;
 
   return (
     <section className="mb-24">
@@ -163,8 +173,8 @@ export function UpcomingAnimeSection() {
           className="flex gap-4 overflow-x-auto pb-4 px-2 scrollbar-hide scroll-smooth snap-x snap-mandatory"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
-          {data.data.map((anime, index) => (
-            <UpcomingAnimeCard key={`${anime.mal_id}-${index}`} anime={anime} />
+          {data.map((anime) => (
+            <UpcomingAnimeCard key={`anilist-${anime.id}`} anime={anime} />
           ))}
         </div>
       </div>

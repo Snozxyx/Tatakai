@@ -67,6 +67,7 @@ const GH_REPO  = 'Tatakai'
  * @returns {UpdateManager}
  */
 function createUpdateManager({ ipcMain, autoUpdater, logger, app, appCID, supabaseUrl, supabaseKey }) {
+  let activeChannel = 'stable'
   // Certificate-less macOS builds check for updates, but never download or
   // install them through electron-updater. Users replace the app manually.
   const manualUpdates = process.platform === 'darwin'
@@ -268,6 +269,7 @@ function createUpdateManager({ ipcMain, autoUpdater, logger, app, appCID, supaba
    * @param {object} payload
    */
   function _broadcast(payload) {
+    payload = { ...payload, channel: activeChannel }
     try {
       const { BrowserWindow } = require('electron')
       for (const win of BrowserWindow.getAllWindows()) {
@@ -341,6 +343,7 @@ function createUpdateManager({ ipcMain, autoUpdater, logger, app, appCID, supaba
    * @returns {Promise<void>}
    */
   async function checkOnStartup(channel) {
+    activeChannel = channel || 'stable'
     // Dev-mode bypass (Req 5.17) — fetchPolicy already guards, but be explicit here too.
     if (!app.isPackaged) {
       _debug('[UpdateManager] Skipping checkOnStartup — dev mode')

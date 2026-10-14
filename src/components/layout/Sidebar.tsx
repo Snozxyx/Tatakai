@@ -9,6 +9,7 @@ import {
   Users,
   Download,
   BookOpen,
+  ScrollText,
   CalendarDays,
   MoreHorizontal,
   Plus,
@@ -99,6 +100,7 @@ export function Sidebar() {
 
   const isActive = (path: string) => location.pathname === path;
   const isMangaActive = location.pathname === "/manga" || location.pathname.startsWith("/manga/");
+  const isNovelActive = location.pathname === "/novel" || location.pathname.startsWith("/novel/");
   const overflowActive = OVERFLOW_ITEMS.some((i) => isActive(i.path));
 
   return (
@@ -139,6 +141,7 @@ export function Sidebar() {
         <NavIcon icon={LayoutGrid} active={isActive("/")} onClick={() => navigate("/")} label="Home" />
         <NavIcon icon={Search} active={isActive("/search")} onClick={() => navigate("/search")} label="Search" />
         <NavIcon icon={BookOpen} active={isMangaActive} onClick={() => navigate("/manga")} label="Manga" />
+        <NavIcon icon={ScrollText} active={isNovelActive} onClick={() => navigate("/novel")} label="Novels" />
 
         {/* Separator Line */}
         <div className="w-8 h-[1px] bg-border/50 my-1 rounded-full" />

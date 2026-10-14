@@ -6,7 +6,7 @@ import type { EngineRecommendation } from '@/hooks/api/useRecommendationEngine';
 import { computeAtlasLayout, type AtlasInput } from '@/core/recommendations/atlasEmbedding';
 import { AnimeAtlas, type ColorBy } from './AnimeAtlas';
 
-type MediaFilter = 'all' | 'anime' | 'manga';
+type MediaFilter = 'all' | 'anime' | 'manga' | 'novel';
 
 function Segmented<T extends string>({
   value,
@@ -37,33 +37,40 @@ function Segmented<T extends string>({
 
 /**
  * Anime Atlas: an interactive galaxy of the current recommendation candidates
- * (anime and/or manga), positioned by content similarity and colored by release
- * year or average rating.
+ * (anime, manga and/or novels), positioned by content similarity and colored
+ * by release year or average rating.
  */
 export function AnimeAtlasPanel({
   animeRecs,
   mangaRecs,
+  novelRecs = [],
 }: {
   animeRecs: EngineRecommendation[];
   mangaRecs: EngineRecommendation[];
+  novelRecs?: EngineRecommendation[];
 }) {
   const [colorBy, setColorBy] = useState<ColorBy>('year');
   const [media, setMedia] = useState<MediaFilter>('all');
 
   const hasManga = mangaRecs.length > 0;
-  const effectiveMedia: MediaFilter = !hasManga && media === 'manga' ? 'all' : media;
+  const hasNovels = novelRecs.length > 0;
+  const effectiveMedia: MediaFilter =
+    (!hasManga && media === 'manga') || (!hasNovels && media === 'novel') ? 'all' : media;
 
   const metas = useMemo<AtlasInput[]>(() => {
     const out: AtlasInput[] = [];
-    // Namespace ids so anime/manga ids can't collide inside a combined layout.
-    if (effectiveMedia !== 'manga') {
+    // Namespace ids so anime/manga/novel ids can't collide inside a combined layout.
+    if (effectiveMedia === 'all' || effectiveMedia === 'anime') {
       for (const r of animeRecs) out.push({ ...r.anime, id: `anime:${r.anime.id}`, mediaType: 'anime', href: `/anime/${r.anime.id}` });
     }
-    if (effectiveMedia !== 'anime') {
+    if (effectiveMedia === 'all' || effectiveMedia === 'manga') {
       for (const r of mangaRecs) out.push({ ...r.anime, id: `manga:${r.anime.id}`, mediaType: 'manga', href: `/manga/${r.anime.id}` });
     }
+    if (effectiveMedia === 'all' || effectiveMedia === 'novel') {
+      for (const r of novelRecs) out.push({ ...r.anime, id: `novel:${r.anime.id}`, mediaType: 'novel', href: `/novel/${r.anime.id}` });
+    }
     return out;
-  }, [animeRecs, mangaRecs, effectiveMedia]);
+  }, [animeRecs, mangaRecs, novelRecs, effectiveMedia]);
 
   const layout = useMemo(() => computeAtlasLayout(metas, { maxNodes: 500, neighbors: 6 }), [metas]);
 
@@ -75,14 +82,19 @@ export function AnimeAtlasPanel({
         onChange={(id) => setColorBy(id)}
         options={[{ id: 'year', label: 'Year' }, { id: 'rating', label: 'Rating' }]}
       />
-      {hasManga && (
+      {(hasManga || hasNovels) && (
         <>
           <span className="mx-0.5 h-4 w-px bg-white/15" />
           <span className="text-[10px] font-medium uppercase tracking-wide text-white/45">Type</span>
           <Segmented
             value={effectiveMedia}
             onChange={(id) => setMedia(id)}
-            options={[{ id: 'all', label: 'All' }, { id: 'anime', label: 'Anime' }, { id: 'manga', label: 'Manga' }]}
+            options={[
+              { id: 'all', label: 'All' },
+              { id: 'anime', label: 'Anime' },
+              ...(hasManga ? [{ id: 'manga', label: 'Manga' } as const] : []),
+              ...(hasNovels ? [{ id: 'novel', label: 'Novels' } as const] : []),
+            ]}
           />
         </>
       )}

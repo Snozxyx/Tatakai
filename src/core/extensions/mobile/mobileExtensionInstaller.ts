@@ -43,7 +43,10 @@ async function unpackKai(
   buf: ArrayBuffer,
 ): Promise<{ manifest: ExtensionManifest; bundleCode: string; hasIcon: boolean } | null> {
   try {
+    if (buf.byteLength > 50 * 1024 * 1024) throw new Error('Package exceeds 50 MB');
     const zip = await JSZip.loadAsync(buf);
+    const files = Object.values(zip.files);
+    if (files.length > 1000 || files.some(f => f.name.startsWith('/') || f.name.split('/').includes('..') || ((f as any)._data?.uncompressedSize || 0) > 50 * 1024 * 1024)) throw new Error('Unsafe archive');
     // Manifest: prefer a top-level `manifest.json`, else the first match anywhere.
     const manifestFile =
       zip.file('manifest.json') ||
@@ -58,6 +61,7 @@ async function unpackKai(
 
     const manifest = JSON.parse(await manifestFile.async('string')) as ExtensionManifest;
     const bundleCode = await bundleFile.async('string');
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/.test(manifest.id) || manifest.id.includes('..') || !manifest.name || !manifest.version || bundleCode.length > 50 * 1024 * 1024) throw new Error('Invalid package metadata');
     const hasIcon = Boolean(zip.file('icon.png') || zip.file(/(^|\/)icon\.png$/i)?.[0]);
     return { manifest, bundleCode, hasIcon };
   } catch {
@@ -75,7 +79,7 @@ async function unpackKai(
  */
 export async function installMobileKaiExtension(
   buf: ArrayBuffer,
-  marketplace?: Pick<MarketplaceExtension, 'signature' | 'signedBy' | 'permissions'>,
+  marketplace?: Pick<MarketplaceExtension, 'permissions'>,
 ): Promise<MobileKaiInstallResult> {
   if (!isCapacitor()) return { success: false, error: 'Mobile runtime unavailable' };
 
@@ -85,8 +89,6 @@ export async function installMobileKaiExtension(
   const { manifest, bundleCode, hasIcon } = unpacked;
   const merged: ExtensionManifest = {
     ...manifest,
-    signature: manifest.signature ?? marketplace?.signature ?? undefined,
-    signedBy: manifest.signedBy ?? marketplace?.signedBy ?? undefined,
     permissions: manifest.permissions?.length ? manifest.permissions : marketplace?.permissions ?? [],
   };
 
@@ -191,6 +193,7 @@ export async function refreshMobileExtensions(): Promise<number> {
 
     for (const ext of list) {
       const prior = cachedById.get(ext.id);
+      if (!prior || !prior.enabled) continue;
       // Skip re-download when the cached version already matches.
       if (prior && prior.version === ext.version) continue;
       if (await installOne(ext)) installed++;

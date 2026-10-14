@@ -4,6 +4,7 @@ const nativeJobs: any[] = [];
 const submissions: any[] = [];
 const reconciled: any[] = [];
 const removed: string[] = [];
+const playbackRequests: string[] = [];
 let nativeListener: ((event: any) => void) | undefined;
 let resume: (() => void) | undefined;
 const values = new Map<string, string>();
@@ -20,7 +21,11 @@ const native = {
   enqueue: async (input: any) => { submissions.push(input); return { success: true }; },
   cancel: async () => {}, retry: async () => {},
   remove: async ({ episodeId }: any) => { const index = nativeJobs.findIndex((job) => job.episodeId === episodeId); if (index >= 0) nativeJobs.splice(index, 1); },
-  resolvePlayback: async () => ({ path: 'file:///private/offline-anime/abc/index.m3u8', folder: 'abc', entry: 'index.m3u8' }),
+  resolvePlayback: async ({ episodeId }: { episodeId: string }) => {
+    playbackRequests.push(episodeId);
+    if (!nativeJobs.some((job) => job.episodeId === episodeId && job.status === 'completed')) throw new Error('Episode is not downloaded');
+    return { path: 'file:///private/offline-anime/abc/index.m3u8', folder: 'abc', entry: 'index.m3u8' };
+  },
 };
 let refreshedSources: any[] = [];
 mock.module('../src/core/extensions/mobile/mobileExtensionHost', () => ({ mobileExtensionDispatch: { resolveSources: async () => refreshedSources } }));
@@ -46,7 +51,7 @@ const bridge = await import('../src/core/download/mobile/nativeDownloads');
 await bridge.installNativeDownloads();
 
 describe('native mobile download bridge', () => {
-  beforeEach(() => { submissions.length = 0; reconciled.length = 0; removed.length = 0; values.clear(); });
+  beforeEach(() => { submissions.length = 0; reconciled.length = 0; removed.length = 0; playbackRequests.length = 0; values.clear(); });
   test('hands native jobs original URLs and provider headers, never loopback tokens', async () => {
     values.set('tatakai:dl:meta:ep1', JSON.stringify({ animeId: 123, posterUrl: '/poster.png' }));
     await bridge.enqueueNativeDownload({ episodeId: 'ep1', animeName: 'Anime', episodeNumber: 1, url: 'mobile-proxy://stream/live', headers: { 'User-Agent': 'Tatakai' }, subtitles: [{ url: 'https://cdn.example/en.vtt', language: 'en' }] });
@@ -93,6 +98,14 @@ describe('native mobile download bridge', () => {
     resume?.(); await new Promise((resolve) => setTimeout(resolve, 0));
     expect(reconciled.at(-1)?.[0].localUri).toBe('native-offline://ep1');
     const playback = await bridge.resolveNativeOfflineEpisode('ep1');
+    expect(playback.url).toBe('http://127.0.0.1:43127/offline/abc/index.m3u8');
+    expect(playback.subtitles[0].url).toContain('/offline/abc/english.vtt');
+  });
+  test('older Downloads watch links resolve the saved episode instead of the synthetic route ID', async () => {
+    nativeJobs.splice(0, nativeJobs.length, { episodeId: 'ep1', status: 'completed', subtitles: [{ lang: 'en', file: 'english.vtt' }] });
+    await bridge.refreshNativeDownloads();
+    const playback = await bridge.resolveNativeOfflineEpisode('mobile-123?ep=1', 'native-offline://ep1');
+    expect(playbackRequests).toEqual(['ep1']);
     expect(playback.url).toBe('http://127.0.0.1:43127/offline/abc/index.m3u8');
     expect(playback.subtitles[0].url).toContain('/offline/abc/english.vtt');
   });

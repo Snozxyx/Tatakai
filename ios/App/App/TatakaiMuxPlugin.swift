@@ -130,3 +130,51 @@ public final class TatakaiMuxPlugin: CAPPlugin, CAPBridgedPlugin {
         return resolved
     }
 }
+
+
+// Local library import and media handoff share the existing native bridge.
+import UIKit
+import UniformTypeIdentifiers
+import Network
+
+@objc(TatakaiMediaPlugin)
+public final class TatakaiMediaPlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "TatakaiMediaPlugin"
+    public let jsName = "TatakaiMedia"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "openExternalPlayer", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "networkStatus", returnType: CAPPluginReturnPromise)
+    ]
+    private let network = NWPathMonitor()
+    private var wifi = false
+    public override func load() {
+        network.pathUpdateHandler = { [weak self] path in self?.wifi = path.status == .satisfied && path.usesInterfaceType(.wifi) }
+        network.start(queue: DispatchQueue(label: "tatakai.media.network"))
+    }
+    deinit { network.cancel() }
+    @objc func networkStatus(_ call: CAPPluginCall) { call.resolve(["wifi": wifi]) }
+    @objc func openExternalPlayer(_ call: CAPPluginCall) {
+        guard let value = call.getString("url"), let url = URL(string: value) else { call.reject("Invalid media URL."); return }
+        DispatchQueue.main.async {
+            guard let controller = self.bridge?.viewController else { call.reject("Player handoff is unavailable."); return }
+            if url.scheme == "https" || url.scheme == "http" {
+                var components = URLComponents(string: "vlc-x-callback://x-callback-url/stream")!
+                components.queryItems = [URLQueryItem(name: "url", value: value)]
+                guard let target = components.url, UIApplication.shared.canOpenURL(target) else { call.reject("Install VLC to open streaming URLs."); return }
+                UIApplication.shared.open(target, options: [:]) { opened in
+                    if opened { call.resolve(["success": true, "progressSupported": false]) }
+                    else { call.reject("VLC could not open this stream.") }
+                }
+            } else {
+                let file = URL(fileURLWithPath: value.replacingOccurrences(of: "file://", with: "")).resolvingSymlinksInPath()
+                let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].resolvingSymlinksInPath()
+                guard file.path.hasPrefix(documents.path + "/"), FileManager.default.fileExists(atPath: file.path) else { call.reject("File is unavailable."); return }
+                let share = UIActivityViewController(activityItems: [file], applicationActivities: nil)
+                share.popoverPresentationController?.sourceView = controller.view
+                share.popoverPresentationController?.sourceRect = CGRect(x: controller.view.bounds.midX, y: controller.view.bounds.midY, width: 1, height: 1)
+                controller.present(share, animated: true)
+                call.resolve(["success": true, "progressSupported": false])
+            }
+        }
+    }
+}

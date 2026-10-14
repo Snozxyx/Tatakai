@@ -16,7 +16,7 @@
  */
 
 import { CapacitorHttp } from '@capacitor/core';
-import { registerNativeSource } from '@/core/mobile/localProxyNative';
+import { registerNativeSource, prepareNativeRequestHeaders } from '@/core/mobile/localProxyNative';
 import { loadMobileConfig } from '@/hooks/ui/useMobileConfig';
 
 const unhealthyHosts = new Map<string, number>();
@@ -55,10 +55,13 @@ export interface NativeFetchResponse {
   ok: boolean;
   status: number;
   statusText: string;
+  rawHeaders?: Record<string, string[]>;
+  cookies?: Record<string, string>;
   url: string;
   headers: { get(name: string): string | null };
   text(): Promise<string>;
   json(): Promise<unknown>;
+  arrayBuffer(): Promise<ArrayBuffer>;
 }
 
 export interface NativeFetchInit {
@@ -73,6 +76,38 @@ function toHeaderGetter(headers: Record<string, string> | undefined) {
   const lower = new Map<string, string>();
   for (const [k, v] of Object.entries(headers || {})) lower.set(k.toLowerCase(), String(v));
   return { get: (name: string) => lower.get(String(name).toLowerCase()) ?? null };
+}
+
+/**
+ * Novel/manga scraping proxy — the mobile twin of the desktop worker-pool
+ * `__tatakai_fetch__` forwarding (`/proxy?url=` on the loopback proxy).
+ *
+ * WAF-walled novel origins (webnovel / royalroad / novelfull /
+ * justlightnovels / …) answer a direct device fetch with 403 "access
+ * blocked" but succeed through the native loopback, which replays headers
+ * and runs the on-device Cloudflare solver before answering. Any HTTP status
+ * out of the loopback is a real answer (challenges are already retried
+ * server-side); only a network failure returns null so the caller falls
+ * back to the direct CapacitorHttp path.
+ *
+ * Register a token and use `/stream/<token>`, supported on Android and iOS.
+ * Registration carries all provider headers; CapacitorHttp reads the loopback
+ * outside WebView mixed-content restrictions. POSTs remain native HTTP calls.
+ */
+async function fetchViaLoopbackProxy(
+  url: string,
+  headers: Record<string, string>,
+  signal?: AbortSignal | null,
+): Promise<{ status: number; headers: Record<string, string>; data: string; url: string } | null> {
+  try {
+    const proxyUrl = await registerNativeSource(url, headers);
+    if (!proxyUrl || !/^http:\/\/127\.0\.0\.1:\d+\/stream\/[a-f0-9]{32}$/i.test(proxyUrl)) return null;
+    if (signal?.aborted) return null;
+    const response = await CapacitorHttp.request({ url: proxyUrl, method: 'GET', responseType: 'text', connectTimeout: 6000, readTimeout: 65000 });
+    return { ...response, data: typeof response.data === 'string' ? response.data : JSON.stringify(response.data ?? ''), url };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -133,7 +168,7 @@ export function createNativeFetch(allowedDomains: string[]) {
     // Allow exact host or any parent-domain grant (`network:domain:example.com`
     // also covers `cdn.example.com`), mirroring how CDNs rotate subdomains.
     const permitted =
-      allow.has(hostname) ||
+      allow.has("*") || allow.has(hostname) ||
       [...allow].some((d) => hostname === d || hostname.endsWith(`.${d}`));
     if (!permitted) {
       const err = new Error(
@@ -148,6 +183,15 @@ export function createNativeFetch(allowedDomains: string[]) {
     if (unhealthyUntil) unhealthyHosts.delete(hostname);
 
     const headers = normalizeHeaders(init.headers);
+    const binaryBody = init.body instanceof ArrayBuffer ? new Uint8Array(init.body)
+      : ArrayBuffer.isView(init.body) ? new Uint8Array(init.body.buffer, init.body.byteOffset, init.body.byteLength) : null;
+    const binaryResponse = Boolean(binaryBody) || Object.entries(headers).some(([key, value]) => key.toLowerCase() === 'accept' && /grpc|octet-stream/.test(value));
+    let requestData = init.body;
+    if (binaryBody) {
+      let encoded = '';
+      for (let offset = 0; offset < binaryBody.length; offset += 8192) encoded += String.fromCharCode(...binaryBody.subarray(offset, offset + 8192));
+      requestData = btoa(encoded);
+    }
 
     // Honor the bundle's AbortSignal (timeouts/retries). The native client has
     // no cancellation API, so an abort races the request: the bundle moves on
@@ -171,29 +215,33 @@ export function createNativeFetch(allowedDomains: string[]) {
     // dead weight on mobile radio, and the bundle's own (now honored) signal
     // still governs providers that set tighter timeouts.
     const request = (async () => {
+      // Native HTTP already supports provider headers and avoids CORS. Only
+      // blocked hosts need the loopback solver; proxying every API/search first
+      // adds token registration and consumes the proxy's playback connections.
+      const isProxyableGet = (init.method || 'GET').toUpperCase() === 'GET' && init.body == null && !binaryBody;
+      const directHeaders = await prepareNativeRequestHeaders(url, headers);
+      if (signal?.aborted) throw abortError();
       const initial = await CapacitorHttp.request({
       url,
       method: (init.method || 'GET').toUpperCase(),
-      headers,
-      data: init.body as any,
+      headers: directHeaders,
+      data: requestData as any,
+      ...(binaryBody ? { dataType: 'file' } : {}),
       // Keep the raw payload so `.text()` and `.json()` both work regardless of
       // content type; CapacitorHttp otherwise pre-parses JSON into an object.
-      responseType: 'text',
+      responseType: binaryResponse ? 'arraybuffer' : 'text',
       connectTimeout: 6_000,
       readTimeout: 10_000,
       } as any);
       // Provider searches use CapacitorHttp too. Hand a detected GET challenge
       // to the native proxy so metadata and playback share the same solver.
       const text = typeof initial.data === 'string' ? initial.data.slice(0, 65536).toLowerCase() : '';
-      if ((init.method || 'GET').toUpperCase() === 'GET' && loadMobileConfig().cloudflareBypass
-          && [403, 503, 429].includes(initial.status)
-          && ['cf-browser-verification', 'cf_chl_', 'cf-chl-', 'challenge-platform', 'turnstile', 'just a moment', '__cf_chl_tk'].some((marker) => text.includes(marker))) {
+      const challenged = [200, 403, 503, 429].includes(initial.status)
+        && ['cf-browser-verification', 'cf_chl_', 'cf-chl-', 'challenge-platform', 'turnstile', 'just a moment', '__cf_chl_tk'].some((marker) => text.includes(marker));
+      if (isProxyableGet && ([403, 503].includes(initial.status) || (loadMobileConfig().cloudflareBypass && challenged))) {
         if (signal?.aborted) throw abortError();
-        const proxyUrl = await registerNativeSource(url, headers);
-        if (proxyUrl) {
-          const result = await CapacitorHttp.request({ url: proxyUrl, method: 'GET', responseType: 'text', connectTimeout: 6000, readTimeout: 65000 });
-          return { ...result, url };
-        }
+        const loopback = await fetchViaLoopbackProxy(url, headers, signal);
+        if (loopback) return loopback;
       }
       return initial;
     })();
@@ -232,7 +280,10 @@ export function createNativeFetch(allowedDomains: string[]) {
 
     const status = Number(res.status) || 0;
     const rawData = (res as any).data;
-    const bodyText = typeof rawData === 'string' ? rawData : JSON.stringify(rawData ?? '');
+    const bytes = binaryResponse
+      ? Uint8Array.from(atob(typeof rawData === 'string' ? rawData : ''), char => char.charCodeAt(0))
+      : new TextEncoder().encode(typeof rawData === 'string' ? rawData : JSON.stringify(rawData ?? ''));
+    const bodyText = new TextDecoder().decode(bytes);
 
     return {
       ok: status >= 200 && status < 300,
@@ -240,7 +291,10 @@ export function createNativeFetch(allowedDomains: string[]) {
       statusText: '',
       url: (res as any).url || url,
       headers: toHeaderGetter((res as any).headers),
+      rawHeaders: Object.fromEntries(Object.entries((res as any).headers || {}).map(([k, v]) => [k.toLowerCase(), [String(v)]])),
+      cookies: Object.fromEntries(String((res as any).headers?.['set-cookie'] || '').split(/,(?=[^;,]+=)/).map(pair => pair.split(';')[0].split('=')).filter(pair => pair.length > 1)),
       text: async () => bodyText,
+      arrayBuffer: async () => bytes.slice().buffer,
       json: async () => {
         try {
           return JSON.parse(bodyText);

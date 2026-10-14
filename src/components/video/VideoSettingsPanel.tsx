@@ -19,7 +19,8 @@ import {
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { useIsMobile } from '@/hooks/ui/use-mobile';
 import { useVideoSettings, VideoSettings } from '@/hooks/media/useVideoSettings';
 import { isMobileNative } from '@/lib/platform/platform';
 import { useKeybinds } from '@/hooks/media/useKeybinds';
@@ -42,6 +43,8 @@ interface VideoSettingsPanelProps {
   isOpen: boolean;
   onClose: () => void;
   embedded?: boolean;
+  currentSubtitle?: string;
+  onSubtitleChange?: (value: string) => void;
   availableSubtitles?: Array<{ lang: string; label: string; value: string }>;
   audioTracks?: Array<{ id: number; label: string; lang: string }>;
   currentAudioTrack?: number;
@@ -49,6 +52,9 @@ interface VideoSettingsPanelProps {
   internalSubtitles?: Array<{ id: number; label: string; lang: string }>;
   currentInternalSubtitleTrackId?: number | null;
   onInternalSubtitleChange?: (id: number) => void;
+  onSubtitleUpload?: () => void;
+  initialTab?: TabId;
+  portalContainer?: HTMLElement | null;
 }
 
 const DEFAULT_SUBTITLE_OPTIONS = [
@@ -164,25 +170,34 @@ function ToggleRow({
 function SettingsPanelBody({
   showHeader,
   availableSubtitles,
+  currentSubtitle,
+  onSubtitleChange,
   audioTracks = [],
   currentAudioTrack,
   onAudioTrackChange,
   internalSubtitles = [],
   currentInternalSubtitleTrackId = null,
   onInternalSubtitleChange,
+  onSubtitleUpload,
+  initialTab = 'playback',
 }: {
   showHeader: boolean;
   availableSubtitles?: VideoSettingsPanelProps['availableSubtitles'];
+  currentSubtitle?: string;
+  onSubtitleChange?: (value: string) => void;
   audioTracks?: NonNullable<VideoSettingsPanelProps['audioTracks']>;
   currentAudioTrack?: number;
   onAudioTrackChange?: (id: number) => void;
   internalSubtitles?: NonNullable<VideoSettingsPanelProps['internalSubtitles']>;
   currentInternalSubtitleTrackId?: number | null;
   onInternalSubtitleChange?: (id: number) => void;
+  onSubtitleUpload?: () => void;
+  initialTab?: TabId;
 }) {
   const { settings, updateSetting, resetSettings } = useVideoSettings();
   const { keybinds, setBinding, reset: resetKeybinds } = useKeybinds();
-  const [activeTab, setActiveTab] = useState<TabId>('playback');
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab);
+  useEffect(() => setActiveTab(initialTab), [initialTab]);
   const [listeningAction, setListeningAction] = useState<KeybindAction | null>(null);
   const [customFontName, setCustomFontName] = useState<string | null>(() => getCustomSubtitleFontName());
   const [fontError, setFontError] = useState<string | null>(null);
@@ -243,7 +258,7 @@ function SettingsPanelBody({
   }, [listeningAction, setBinding]);
 
   const pill = (active: boolean) =>
-    `px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+    `min-h-11 max-w-full break-words px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
       active ? 'bg-primary text-primary-foreground' : 'bg-muted/30 text-foreground hover:bg-muted/50'
     }`;
 
@@ -257,14 +272,15 @@ function SettingsPanelBody({
       )}
 
       {/* Tab Navigation */}
-      <div className="flex gap-1 p-1 bg-muted/30 rounded-xl">
+      <div className="flex min-w-0 gap-1 p-1 bg-muted/30 rounded-xl">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-lg text-[10px] font-medium transition-all ${
+              aria-pressed={activeTab === tab.id}
+              className={`min-h-11 min-w-0 flex-1 flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-lg text-[10px] font-medium transition-all ${
                 activeTab === tab.id
                   ? 'bg-primary text-primary-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
@@ -284,7 +300,7 @@ function SettingsPanelBody({
           <>
             {/* Volume Slider */}
             <section className="space-y-3">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Volume2 className="w-4 h-4 text-primary" />
                 <h3 className="text-sm font-medium">Volume</h3>
                 <span className="ml-auto text-sm text-muted-foreground">
@@ -302,7 +318,7 @@ function SettingsPanelBody({
 
             {/* Playback Speed */}
             <section className="space-y-3">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Gauge className="w-4 h-4 text-primary" />
                 <h3 className="text-sm font-medium">Speed</h3>
               </div>
@@ -321,7 +337,7 @@ function SettingsPanelBody({
 
             {/* Behavior toggles */}
             <section className="space-y-3">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <PlayCircle className="w-4 h-4 text-primary" />
                 <h3 className="text-sm font-medium">Behavior</h3>
               </div>
@@ -339,14 +355,14 @@ function SettingsPanelBody({
                 {settings.autoNextEpisode && (
                   <div className="flex items-center gap-2 pl-1 pt-0.5">
                     <span className="text-xs text-muted-foreground w-28 shrink-0">Up-next countdown</span>
-                    <div className="flex items-center gap-3 flex-1">
+                    <div className="flex min-w-0 items-center gap-3 flex-1">
                       <Slider
                         value={[settings.autoNextCountdownSeconds]}
                         onValueChange={([v]) => updateSetting('autoNextCountdownSeconds', v)}
                         min={3}
                         max={30}
                         step={1}
-                        className="flex-1"
+                        className="min-w-0 flex-1"
                         aria-label="Up-next countdown seconds"
                       />
                       <span className="text-xs text-muted-foreground w-9 text-right tabular-nums">
@@ -375,7 +391,7 @@ function SettingsPanelBody({
           <>
             {/* Default Quality */}
             <section className="space-y-3">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <MonitorPlay className="w-4 h-4 text-primary" />
                 <h3 className="text-sm font-medium">Default Quality</h3>
               </div>
@@ -394,7 +410,7 @@ function SettingsPanelBody({
 
             {/* Anime4K Upscaling */}
             <section className="space-y-3">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Sparkles className="w-4 h-4 text-primary" />
                 <h3 className="text-sm font-medium">Anime4K Upscaling</h3>
               </div>
@@ -425,7 +441,7 @@ function SettingsPanelBody({
 
             {/* Playback modes */}
             <section className="space-y-3">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Video className="w-4 h-4 text-primary" />
                 <h3 className="text-sm font-medium">Display</h3>
               </div>
@@ -453,7 +469,7 @@ function SettingsPanelBody({
 
             {/* Sleep Timer */}
             <section className="space-y-3">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Timer className="w-4 h-4 text-primary" />
                 <h3 className="text-sm font-medium">Sleep Timer</h3>
               </div>
@@ -477,7 +493,7 @@ function SettingsPanelBody({
           <>
             {/* Live Preview — mirrors exactly how cues render during playback */}
             <section className="space-y-2">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Type className="w-4 h-4 text-primary" />
                 <h3 className="text-sm font-medium">Preview</h3>
               </div>
@@ -491,14 +507,14 @@ function SettingsPanelBody({
 
             {/* Subtitle Language */}
             <section className="space-y-3">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Subtitles className="w-4 h-4 text-primary" />
                 <h3 className="text-sm font-medium">Language</h3>
               </div>
               <div className="flex flex-wrap gap-2">
                 {(() => {
                   const seen = new Set<string>();
-                  const options = [...DEFAULT_SUBTITLE_OPTIONS, ...(availableSubtitles || [])].filter(
+                  const options = DEFAULT_SUBTITLE_OPTIONS.filter(
                     (opt) => {
                       if (seen.has(opt.value)) return false;
                       seen.add(opt.value);
@@ -524,10 +540,23 @@ function SettingsPanelBody({
               </div>
             </section>
 
+            {onSubtitleUpload && <button type="button" onClick={onSubtitleUpload} className={`${pill(false)} w-full text-left`}>Add subtitle file (.srt, .ass, .ssa, .vtt)</button>}
+            {onSubtitleChange && <button type="button" onClick={() => onSubtitleChange('off')} className={`${pill(currentSubtitle === 'off')} w-full text-left`}>Subtitles off</button>}
+            {(availableSubtitles || []).length > 0 && <section className="space-y-3">
+              <h3 className="flex items-center gap-2 text-sm font-medium"><Subtitles className="h-4 w-4 text-primary" />Custom &amp; source subtitles ({availableSubtitles!.length})</h3>
+              <div className="max-h-64 space-y-1 overflow-y-auto">
+                {availableSubtitles!.map((option, index) => <button key={option.value} type="button"
+                  onClick={() => onSubtitleChange?.(option.value)}
+                  className={`${pill((currentSubtitle || settings.subtitleLanguage) === option.value)} w-full text-left`}>
+                  {option.label}{availableSubtitles!.filter(track => track.label === option.label).length > 1 ? ` · ${index + 1}` : ''}
+                </button>)}
+              </div>
+            </section>}
+
             {/* Internal Subtitles (MKV) */}
             {internalSubtitles.length > 0 && (
               <section className="space-y-3">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Subtitles className="w-4 h-4 text-primary" />
                   <h3 className="text-sm font-medium">Internal Tracks</h3>
                 </div>
@@ -547,20 +576,20 @@ function SettingsPanelBody({
 
             {/* Subtitle Styling */}
             <section className="space-y-3">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Type className="w-4 h-4 text-primary" />
                 <h3 className="text-sm font-medium">Style</h3>
               </div>
               <div className="space-y-2">
                 {/* Size */}
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="text-xs text-muted-foreground w-16 shrink-0">Size</span>
-                  <div className="flex gap-1 flex-1">
+                  <div className="flex min-w-0 flex-wrap gap-1 flex-1">
                     {SIZE_OPTIONS.map((option) => (
                       <button
                         key={option.value}
                         onClick={() => updateSetting('subtitleSize', option.value)}
-                        className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-all ${
+                        className={`min-h-11 flex-1 px-2 py-1.5 rounded text-xs font-medium transition-all ${
                           settings.subtitleSize === option.value
                             ? 'bg-primary text-primary-foreground'
                             : 'bg-muted/30 text-foreground hover:bg-muted/50'
@@ -572,14 +601,14 @@ function SettingsPanelBody({
                   </div>
                 </div>
                 {/* Font */}
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="text-xs text-muted-foreground w-16 shrink-0">Font</span>
-                  <div className="flex gap-1 flex-1">
+                  <div className="flex min-w-0 flex-wrap gap-1 flex-1">
                     {FONT_OPTIONS.map((option) => (
                       <button
                         key={option.value}
                         onClick={() => updateSetting('subtitleFont', option.value)}
-                        className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-all ${
+                        className={`min-h-11 flex-1 px-2 py-1.5 rounded text-xs font-medium transition-all ${
                           settings.subtitleFont === option.value
                             ? 'bg-primary text-primary-foreground'
                             : 'bg-muted/30 text-foreground hover:bg-muted/50'
@@ -592,7 +621,7 @@ function SettingsPanelBody({
                 </div>
                 {/* Custom font upload — only relevant when Font = Custom */}
                 {settings.subtitleFont === 'custom' && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="text-xs text-muted-foreground w-16 shrink-0">File</span>
                     <div className="flex flex-1 items-center gap-2 min-w-0">
                       <input
@@ -635,14 +664,14 @@ function SettingsPanelBody({
                 )}
 
                 {/* Background */}
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="text-xs text-muted-foreground w-16 shrink-0">BG</span>
-                  <div className="flex gap-1 flex-1">
+                  <div className="flex min-w-0 flex-wrap gap-1 flex-1">
                     {BG_OPTIONS.map((option) => (
                       <button
                         key={option.value}
                         onClick={() => updateSetting('subtitleBackground', option.value)}
-                        className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-all ${
+                        className={`min-h-11 flex-1 px-2 py-1.5 rounded text-xs font-medium transition-all ${
                           settings.subtitleBackground === option.value
                             ? 'bg-primary text-primary-foreground'
                             : 'bg-muted/30 text-foreground hover:bg-muted/50'
@@ -655,24 +684,24 @@ function SettingsPanelBody({
                 </div>
 
                 {/* Text Color */}
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="text-xs text-muted-foreground w-16 shrink-0">Color</span>
-                  <div className="flex items-center gap-2 flex-1">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2 flex-1">
                     <input
                       type="color"
                       aria-label="Subtitle text color"
                       value={settings.subtitleColor}
                       onChange={(e) => updateSetting('subtitleColor', e.target.value)}
-                      className="h-8 w-10 shrink-0 cursor-pointer rounded-lg border border-white/10 bg-transparent p-0.5"
+                      className="h-11 w-11 shrink-0 cursor-pointer rounded-lg border border-white/10 bg-transparent p-0.5"
                     />
-                    <div className="flex gap-1.5">
+                    <div className="flex flex-wrap gap-1.5">
                       {COLOR_SWATCHES.map((color) => (
                         <button
                           key={color}
                           aria-label={`Set subtitle color ${color}`}
                           onClick={() => updateSetting('subtitleColor', color)}
                           style={{ backgroundColor: color }}
-                          className={`h-6 w-6 rounded-full border transition-transform hover:scale-110 ${
+                          className={`h-11 w-11 rounded-full border transition-transform hover:scale-110 ${
                             settings.subtitleColor.toLowerCase() === color.toLowerCase()
                               ? 'border-primary ring-2 ring-primary/50'
                               : 'border-white/20'
@@ -686,13 +715,13 @@ function SettingsPanelBody({
                 {/* Background Opacity */}
                 <div className="flex items-center gap-2 pt-1">
                   <span className="text-xs text-muted-foreground w-16 shrink-0">BG Opacity</span>
-                  <div className="flex items-center gap-3 flex-1">
+                  <div className="flex min-w-0 items-center gap-3 flex-1">
                     <Slider
                       value={[Math.round(settings.subtitleOpacity * 100)]}
                       onValueChange={([v]) => updateSetting('subtitleOpacity', v / 100)}
                       max={100}
                       step={5}
-                      className="flex-1"
+                      className="min-w-0 flex-1"
                     />
                     <span className="text-xs text-muted-foreground w-9 text-right">
                       {Math.round(settings.subtitleOpacity * 100)}%
@@ -703,13 +732,13 @@ function SettingsPanelBody({
                 {/* Position */}
                 <div className="flex items-center gap-2 pt-1">
                   <span className="text-xs text-muted-foreground w-16 shrink-0">Position</span>
-                  <div className="flex items-center gap-3 flex-1">
+                  <div className="flex min-w-0 items-center gap-3 flex-1">
                     <Slider
                       value={[settings.subtitlePosition]}
                       onValueChange={([v]) => updateSetting('subtitlePosition', v)}
                       max={40}
                       step={1}
-                      className="flex-1"
+                      className="min-w-0 flex-1"
                       aria-label="Vertical position"
                     />
                     <span className="text-xs text-muted-foreground w-9 text-right">
@@ -724,7 +753,7 @@ function SettingsPanelBody({
                 {/* Sync Offset */}
                 <div className="flex items-center gap-2 pt-1">
                   <span className="text-xs text-muted-foreground w-16 shrink-0">Sync</span>
-                  <div className="flex items-center gap-2 flex-1">
+                  <div className="flex min-w-0 items-center gap-2 flex-1">
                     <button
                       type="button"
                       aria-label="Shift subtitles earlier"
@@ -734,7 +763,7 @@ function SettingsPanelBody({
                           Math.round(Math.max(-30, settings.subtitleOffset - 0.1) * 10) / 10,
                         )
                       }
-                      className="h-7 w-7 shrink-0 rounded-lg bg-muted/30 text-sm font-semibold text-foreground hover:bg-muted/50"
+                      className="h-11 w-11 shrink-0 rounded-lg bg-muted/30 text-sm font-semibold text-foreground hover:bg-muted/50"
                     >
                       −
                     </button>
@@ -744,7 +773,7 @@ function SettingsPanelBody({
                       min={-30}
                       max={30}
                       step={0.1}
-                      className="flex-1"
+                      className="min-w-0 flex-1"
                       aria-label="Subtitle sync offset in seconds"
                     />
                     <button
@@ -756,7 +785,7 @@ function SettingsPanelBody({
                           Math.round(Math.min(30, settings.subtitleOffset + 0.1) * 10) / 10,
                         )
                       }
-                      className="h-7 w-7 shrink-0 rounded-lg bg-muted/30 text-sm font-semibold text-foreground hover:bg-muted/50"
+                      className="h-11 w-11 shrink-0 rounded-lg bg-muted/30 text-sm font-semibold text-foreground hover:bg-muted/50"
                     >
                       +
                     </button>
@@ -787,7 +816,7 @@ function SettingsPanelBody({
           <>
             {audioTracks.length >= 1 && (
               <section className="space-y-3">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Volume2 className="w-4 h-4 text-primary" />
                   <h3 className="text-sm font-medium">Audio Tracks</h3>
                 </div>
@@ -821,7 +850,7 @@ function SettingsPanelBody({
         {activeTab === 'shortcuts' && (
           <>
             <section className="space-y-3">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Keyboard className="w-4 h-4 text-primary" />
                 <h3 className="text-sm font-medium">Keyboard Shortcuts</h3>
               </div>
@@ -880,21 +909,31 @@ export function VideoSettingsPanel({
   onClose,
   embedded = false,
   availableSubtitles,
+  currentSubtitle,
+  onSubtitleChange,
   audioTracks = [],
   currentAudioTrack,
   onAudioTrackChange,
   internalSubtitles = [],
   currentInternalSubtitleTrackId = null,
   onInternalSubtitleChange,
+  onSubtitleUpload,
+  initialTab = 'playback',
+  portalContainer,
 }: VideoSettingsPanelProps) {
+  const isMobile = useIsMobile();
   const bodyProps = {
     availableSubtitles,
+    currentSubtitle,
+    onSubtitleChange,
     audioTracks,
     currentAudioTrack,
     onAudioTrackChange,
     internalSubtitles,
     currentInternalSubtitleTrackId,
     onInternalSubtitleChange,
+    onSubtitleUpload,
+    initialTab,
   };
 
   // Settings-page mode: render inline, no sheet, no header.
@@ -913,15 +952,19 @@ export function VideoSettingsPanel({
       }}
     >
       <SheetContent
-        side="right"
-        className="flex flex-col gap-0 overflow-hidden border-white/10 bg-background/95 p-0 backdrop-blur-xl md:w-[400px] md:max-w-[400px] max-md:inset-x-2 max-md:bottom-2 max-md:top-auto max-md:h-auto max-md:max-h-[85dvh] max-md:w-auto max-md:rounded-3xl max-md:border max-md:shadow-2xl"
+        side={isMobile ? 'bottom' : 'right'}
+        portalContainer={portalContainer}
+        className="z-[210] flex max-w-full flex-col gap-0 overflow-hidden border-white/10 bg-background/95 p-0 backdrop-blur-xl md:w-[400px] md:max-w-[400px] max-md:max-h-[85dvh] max-md:rounded-t-2xl"
+        overlayClassName="z-[209]"
       >
+        <SheetTitle className="shrink-0 px-4 py-4 pr-14 text-lg font-semibold">Player settings</SheetTitle>
+        <SheetDescription className="sr-only">Adjust playback, video, subtitles, and audio.</SheetDescription>
         {/* drag handle — mobile only */}
         <div className="shrink-0 pt-2.5 md:hidden" aria-hidden>
           <div className="mx-auto h-1 w-10 rounded-full bg-white/20" />
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-[max(1rem,env(safe-area-inset-bottom))] custom-scrollbar sm:p-6">
-          <SettingsPanelBody showHeader {...bodyProps} />
+          <SettingsPanelBody showHeader={false} {...bodyProps} />
         </div>
       </SheetContent>
     </Sheet>

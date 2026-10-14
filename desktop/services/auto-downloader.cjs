@@ -3,6 +3,8 @@
 const fs = require('fs');
 const path = require('path');
 const { app } = require('electron');
+const { evaluateCandidates } = require('../../src/core/download/candidate-evaluator.cjs');
+const { parseReleaseName } = require('../runtime/torrent/naming/release-parser.cjs');
 
 /**
  * AutoDownloader — polls for new episodes every 30 minutes and enqueues
@@ -41,6 +43,7 @@ class AutoDownloader {
                     entries.map(([id, rec]) => [
                         id,
                         {
+                            ...rec,
                             title: rec.title,
                             nextEpisode: rec.nextEpisode,
                             addedAt: rec.addedAt,
@@ -82,6 +85,7 @@ class AutoDownloader {
         this.subscriptions.set(animeId, {
             title,
             nextEpisode,
+            scoringProfile: 'balanced',
             addedAt: Date.now(),
             enqueuedEpisodes: [],
             anilistId: Number(anilistId) || (/^\d+$/.test(String(animeId)) ? Number(animeId) : null),
@@ -137,10 +141,11 @@ class AutoDownloader {
         }, 30 * 60 * 1000);
 
         // Initial check 30 seconds after start to avoid blocking app startup
-        setTimeout(() => this.checkFeeds(), 30000);
+        this.startTimer = setTimeout(() => this.checkFeeds(), 30000);
     }
 
     stop() {
+        clearTimeout(this.startTimer);
         if (this.intervalId) {
             clearInterval(this.intervalId);
             this.intervalId = null;
@@ -155,6 +160,9 @@ class AutoDownloader {
      * Requirements 20.4 – 20.9
      */
     async checkFeeds() {
+        if (this._checking) return;
+        this._checking = true;
+        try {
         this.logger.info('[AutoDownloader] Checking feeds for new episodes...');
 
         if (this.subscriptions.size === 0) {
@@ -172,6 +180,7 @@ class AutoDownloader {
                 );
             }
         }
+        } finally { this._checking = false; }
     }
 
     /**
@@ -195,15 +204,8 @@ class AutoDownloader {
             return;
         }
 
-        // An extension search hit is not evidence that a future episode aired.
-        // Unknown schedules are retried next poll without advancing the cursor.
-        if (!await this._isEpisodeAvailable(data.anilistId || (/^\d+$/.test(String(animeId)) ? Number(animeId) : null), nextEpisode)) {
-            this.logger.info(`[AutoDownloader] Episode ${nextEpisode} is not confirmed aired — waiting.`);
-            return;
-        }
-
-        // Attempt to find a source for episode N
-        const source = await this._resolveSource(animeId, title, nextEpisode);
+        const simulation = await this.simulate(animeId, nextEpisode);
+        const source = simulation.selected?.payload;
 
         if (!source) {
             // Requirement 20.9: both sources unavailable — skip, retry next poll
@@ -263,6 +265,37 @@ class AutoDownloader {
      * @param {number} episode
      * @returns {Promise<{sourceType: 'hls'|'torrent', url?: string, magnet?: string, headers?: object}|null>}
      */
+    setScoringProfile(animeId, profile) {
+        if (!['balanced', 'best-quality', 'data-saver'].includes(profile)) throw new Error('Invalid scoring profile');
+        const subscription = this.subscriptions.get(animeId);
+        if (!subscription) throw new Error('Subscription not found');
+        subscription.scoringProfile = profile;
+        this.saveConfig();
+    }
+
+    async simulate(animeId, episode) {
+        const data = this.subscriptions.get(animeId);
+        if (!data) throw new Error('Subscription not found');
+        episode = episode ?? data.nextEpisode;
+        if (!Number.isInteger(episode) || episode < 1) throw new Error('Invalid episode number');
+        if (!await this._isEpisodeAvailable(data.anilistId || Number(animeId), episode)) return { ranked: [], selected: null, message: 'Episode is not confirmed available' };
+        const sources = this.candidateResolver ? await this.candidateResolver(data.anilistId || Number(animeId), data.title, episode, data)
+            : [await this._resolveSource(animeId, data.title, episode)].filter(Boolean);
+        const candidates = sources.map((source, index) => {
+            const parsed = parseReleaseName(source.title || source.filenameHint || data.title);
+            return { id: source.url || source.magnet || String(index), payload: source, candidate: {
+                title: source.sourceType === 'hls' ? source.catalogTitle || data.title : parsed.title || data.title,
+                episodeNumber: source.episodeNumber ?? parsed.episodeNumber ?? episode,
+                seasonNumber: source.season ?? parsed.season, quality: source.quality || parsed.resolution,
+                language: source.audioLanguage || 'ja', providerId: source.providerId || source.provider,
+                sourceType: source.sourceType, releaseGroup: parsed.releaseGroup,
+            } };
+        });
+        const evaluation = evaluateCandidates({ preferredQuality: '1080p', audioLanguage: 'ja', fallbackLanguage: '', providerPriority: [], ...data }, candidates, episode, [data.title]);
+        if (!data.scoringProfile) evaluation.selected = evaluation.ranked.find(row => row.accepted && row.candidate.sourceType === 'hls') || evaluation.selected;
+        return evaluation;
+    }
+
     async _resolveSource(animeId, title, episode) {
         if (this.sourceResolver) return this.sourceResolver(this.subscriptions.get(animeId)?.anilistId || Number(animeId), title, episode);
         // ── Step 1: Try HLS source ────────────────────────────────────────────

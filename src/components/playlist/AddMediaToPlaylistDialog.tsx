@@ -11,9 +11,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAddToPlaylist } from '@/hooks/user/usePlaylist';
 import { useSearch } from '@/hooks/api/useAnimeData';
 import { useMangaSearch } from '@/hooks/api/useMangaData';
+import { useNovelSearch } from '@/hooks/api/useNovelData';
 import { getProxiedImageUrl } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { Search, Loader2, Check, Plus, Tv, BookOpen } from 'lucide-react';
+import { Search, Loader2, Check, Plus, Tv, BookOpen, ScrollText } from 'lucide-react';
 
 interface AddMediaToPlaylistDialogProps {
   playlistId: string;
@@ -22,7 +23,7 @@ interface AddMediaToPlaylistDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type AddMediaKind = 'anime' | 'manga';
+type AddMediaKind = 'anime' | 'manga' | 'novel';
 
 interface MediaResult {
   ref: string;
@@ -65,6 +66,9 @@ export function AddMediaToPlaylistDialog({
 
   const animeSearch = useSearch(kind === 'anime' ? debouncedQuery : '');
   const mangaSearch = useMangaSearch(kind === 'manga' ? debouncedQuery : '');
+  const novelSearch = useNovelSearch(kind === 'novel' ? debouncedQuery : '');
+
+  const kindLabel = kind === 'anime' ? 'anime' : kind === 'novel' ? 'novel' : 'manga';
 
   const results = useMemo<MediaResult[]>(() => {
     if (kind === 'anime') {
@@ -72,6 +76,23 @@ export function AddMediaToPlaylistDialog({
       return animes
         .filter((a) => a.id)
         .map((a) => ({ ref: String(a.id), name: a.name || 'Untitled', poster: a.poster || null, kind: 'anime' as const, format: 'anime' }));
+    }
+    if (kind === 'novel') {
+      const rows = (novelSearch.data?.results || []) as Array<{
+        id: string;
+        anilistId?: number | null;
+        malId?: number | null;
+        canonicalTitle?: string;
+        poster?: string | null;
+      }>;
+      return rows
+        .map((row) => {
+          const mediaId = String(row.anilistId || row.malId || row.id || '');
+          return mediaId
+            ? { ref: `novel:${mediaId}`, name: row.canonicalTitle || 'Untitled', poster: row.poster || null, kind: 'novel' as const, format: 'novel' }
+            : null;
+        })
+        .filter((r): r is MediaResult => r !== null);
     }
     const rows = (mangaSearch.data?.results || []) as Array<{
       id: string;
@@ -90,9 +111,10 @@ export function AddMediaToPlaylistDialog({
           : null;
       })
       .filter((r): r is MediaResult => r !== null);
-  }, [kind, animeSearch.data, mangaSearch.data]);
+  }, [kind, animeSearch.data, mangaSearch.data, novelSearch.data]);
 
-  const isLoading = kind === 'anime' ? animeSearch.isFetching : mangaSearch.isFetching;
+  const isLoading =
+    kind === 'anime' ? animeSearch.isFetching : kind === 'novel' ? novelSearch.isFetching : mangaSearch.isFetching;
 
   const handleAdd = async (result: MediaResult) => {
     if (existingRefs.has(result.ref) || pendingRef) return;
@@ -128,7 +150,7 @@ export function AddMediaToPlaylistDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-1">
-          <div className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-muted/40">
+          <div className="grid grid-cols-3 gap-1 p-1 rounded-lg bg-muted/40">
             <button
               type="button"
               onClick={() => switchKind('anime')}
@@ -149,6 +171,16 @@ export function AddMediaToPlaylistDialog({
             >
               <BookOpen className="w-4 h-4" /> Manga
             </button>
+            <button
+              type="button"
+              onClick={() => switchKind('novel')}
+              className={cn(
+                'flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium transition-colors',
+                kind === 'novel' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <ScrollText className="w-4 h-4" /> Novels
+            </button>
           </div>
 
           <div className="relative">
@@ -156,7 +188,7 @@ export function AddMediaToPlaylistDialog({
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={`Search ${kind === 'manga' ? 'manga' : 'anime'}...`}
+              placeholder={`Search ${kindLabel}...`}
               className="pl-9"
               autoFocus
             />
@@ -169,7 +201,7 @@ export function AddMediaToPlaylistDialog({
               </div>
             ) : !debouncedQuery ? (
               <div className="text-center py-16 text-muted-foreground text-sm">
-                Start typing to search for {kind === 'manga' ? 'manga' : 'anime'}.
+                Start typing to search for {kindLabel}.
               </div>
             ) : results.length === 0 ? (
               <div className="text-center py-16 text-muted-foreground text-sm">No results found.</div>

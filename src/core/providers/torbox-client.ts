@@ -64,6 +64,12 @@ export function createMultipartBody(fields: Record<string, string>): {
  * Docs: https://api-docs.torbox.app/
  */
 export class TorboxClient {
+  readonly id = 'torbox' as const;
+  readonly capabilities = { instantAvailability: true };
+  async resolve(magnet: string, options: import('./debrid-orchestrator').DebridResolveOptions): Promise<string> {
+    const { resolveTorboxMagnet } = await import('./debrid-orchestrator');
+    return (await resolveTorboxMagnet(this, magnet, options)).url;
+  }
   private readonly apiKey: string;
   private readonly baseUrl = 'https://api.torbox.app/v1';
   private readonly request: DebridHttpRequest;
@@ -103,6 +109,11 @@ export class TorboxClient {
   /** Validate a token without creating or querying a fake torrent. */
   async verifyToken(): Promise<Record<string, unknown>> {
     return this.fetchApi<Record<string, unknown>>('/api/user/me?settings=false');
+  }
+
+  async checkAvailability(hashes: string[]): Promise<Record<string, import('./cloud-debrid-client').AvailabilityState>> {
+    const data = await this.fetchApi<Record<string, unknown>>(`/api/torrents/checkcached?hash=${encodeURIComponent(hashes.join(','))}&format=object`);
+    return Object.fromEntries(hashes.map(hash => [hash, Object.prototype.hasOwnProperty.call(data || {}, hash) ? 'cached' : 'uncached']));
   }
 
   /** Add a magnet link to TorBox and return its account-local torrent ID. */

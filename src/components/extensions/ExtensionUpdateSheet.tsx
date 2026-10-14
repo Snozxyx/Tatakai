@@ -22,16 +22,30 @@ import { ExtensionIcon } from '@/components/extensions/store/StorePrimitives';
 import {
   useExtensionInstaller,
   useExtensionUpdates,
+  useRemoteExtensionUpdates,
   type ExtensionUpdate,
+  type RemoteExtensionUpdate,
 } from '@/hooks/api/useExtensionStore';
+
+function remoteHost(manifestUrl: string): string | null {
+  try {
+    return new URL(manifestUrl).hostname;
+  } catch {
+    return null;
+  }
+}
 
 export function ExtensionUpdateSheet() {
   const { pendingUpdates, dismiss } = useExtensionUpdates();
+  const { pendingRemote, dismissRemote, applyRemoteUpdate } =
+    useRemoteExtensionUpdates();
   const installer = useExtensionInstaller();
 
   const [open, setOpen] = useState(false);
   const [busyIds, setBusyIds] = useState<string[]>([]);
   const autoOpenedRef = useRef(false);
+
+  const totalPending = pendingUpdates.length + pendingRemote.length;
 
   const idOf = (update: ExtensionUpdate) =>
     String(update.extension.slug || update.extension.id).toLowerCase();
@@ -39,16 +53,17 @@ export function ExtensionUpdateSheet() {
   // Open once per session the first time there is something to show. The user
   // closing it (which defers these versions) must not re-trigger the auto-open.
   useEffect(() => {
-    if (!autoOpenedRef.current && pendingUpdates.length > 0) {
+    if (!autoOpenedRef.current && totalPending > 0) {
       autoOpenedRef.current = true;
       setOpen(true);
     }
-  }, [pendingUpdates.length]);
+  }, [totalPending]);
 
   // Everything got updated while the sheet was open — nothing left to show.
+  // Unconditional: the sheet must never sit open with zero updates.
   useEffect(() => {
-    if (open && pendingUpdates.length === 0 && busyIds.length === 0) setOpen(false);
-  }, [open, pendingUpdates.length, busyIds.length]);
+    if (totalPending === 0 && busyIds.length === 0) setOpen(false);
+  }, [totalPending, busyIds.length]);
 
   const runUpdate = useCallback(
     async (update: ExtensionUpdate) => {
@@ -65,24 +80,45 @@ export function ExtensionUpdateSheet() {
     [installer.install],
   );
 
+  const runRemoteUpdate = useCallback(
+    async (update: RemoteExtensionUpdate) => {
+      const id = update.row.id;
+      setBusyIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+      try {
+        await applyRemoteUpdate(update);
+      } catch {
+        /* installRemoteExtension callers surface their own error toast */
+      } finally {
+        setBusyIds((prev) => prev.filter((value) => value !== id));
+      }
+    },
+    [applyRemoteUpdate]
+  );
+
   const updateAll = useCallback(async () => {
     for (const update of pendingUpdates) {
       // Sequential: the installer tracks a single pending id at a time.
-      // eslint-disable-next-line no-await-in-loop
       await runUpdate(update);
     }
-  }, [pendingUpdates, runUpdate]);
+    for (const update of pendingRemote) {
+      await runRemoteUpdate(update);
+    }
+  }, [pendingUpdates, pendingRemote, runUpdate, runRemoteUpdate]);
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
       setOpen(next);
       // Closing with updates still outstanding defers them to the next release.
-      if (!next && pendingUpdates.length > 0) dismiss(pendingUpdates);
+      if (!next) {
+        if (pendingUpdates.length > 0) dismiss(pendingUpdates);
+        if (pendingRemote.length > 0) dismissRemote(pendingRemote);
+      }
     },
-    [dismiss, pendingUpdates],
+    [dismiss, dismissRemote, pendingUpdates, pendingRemote]
   );
 
-  if (pendingUpdates.length === 0 && !open) return null;
+  // No updates, no sheet — not even an empty frame while state settles.
+  if (totalPending === 0) return null;
 
   const anyBusy = busyIds.length > 0;
 
@@ -95,12 +131,12 @@ export function ExtensionUpdateSheet() {
         <SheetHeader className="pr-10">
           <SheetTitle className="flex items-center gap-2">
             <RefreshCw className="h-5 w-5 text-primary" />
-            Extension update{pendingUpdates.length === 1 ? '' : 's'} available
+            Extension update{totalPending === 1 ? '' : 's'} available
           </SheetTitle>
           <SheetDescription>
-            {pendingUpdates.length === 1
+            {totalPending === 1
               ? 'A newer version of an installed extension is ready.'
-              : `${pendingUpdates.length} installed extensions have newer versions ready.`}
+              : `${totalPending} installed extensions have newer versions ready.`}
           </SheetDescription>
         </SheetHeader>
 
@@ -145,11 +181,69 @@ export function ExtensionUpdateSheet() {
           })}
         </div>
 
+        {pendingRemote.length > 0 && (
+          <div className="mt-5">
+            <p className="mb-2 px-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+              Installed add-ons &amp; providers
+            </p>
+            <div className="flex flex-col gap-3">
+              {pendingRemote.map((update) => {
+                const id = update.row.id;
+                const busy = busyIds.includes(id);
+                const host = remoteHost(update.row.manifestUrl);
+                return (
+                  <div
+                    key={id}
+                    className="flex gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3"
+                  >
+                    <ExtensionIcon
+                      extension={{
+                        name: update.row.manifest.name || update.row.id,
+                        icon: update.row.manifest.icon,
+                        type: 'custom',
+                      }}
+                      size="sm"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="truncate font-semibold text-foreground">
+                          {update.row.manifest.name || 'Unnamed add-on'}
+                        </p>
+                        <Button
+                          size="sm"
+                          onClick={() => runRemoteUpdate(update)}
+                          disabled={busy || anyBusy}
+                        >
+                          {busy ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4" />
+                          )}
+                          {busy ? 'Updating' : 'Update'}
+                        </Button>
+                      </div>
+                      <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <span className="font-mono">v{update.installedVersion}</span>
+                        <ArrowRight className="h-3 w-3" />
+                        <span className="font-mono text-primary">v{update.latestVersion}</span>
+                      </div>
+                      <p className="mt-1 truncate text-[11px] text-muted-foreground/70">
+                        {update.row.ecosystem === 'stremio' ? 'Stremio add-on' : 'Seanime provider'}
+                        {host ? ` · ${host}` : ''}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="mt-4 flex items-center justify-end gap-2">
           <Button variant="ghost" onClick={() => handleOpenChange(false)} disabled={anyBusy}>
             Later
           </Button>
-          {pendingUpdates.length > 1 && (
+          {totalPending > 1 && (
             <Button onClick={updateAll} disabled={anyBusy}>
               {anyBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               Update all

@@ -1,3 +1,5 @@
+import { recordSourceReport } from '@/core/extensions/remote/diagnostics';
+import { declaresNovelContent } from '@/lib/reader/mangaSourceFormat';
 /**
  * Desktop manga extension bridge.
  *
@@ -9,6 +11,8 @@
  *
  * Extensions expose optional bundle methods: getMangaChapters, getMangaPages.
  */
+
+import { remoteMangaChapters, remoteMangaPages } from "@/core/extensions/remote/manga";
 
 import type {
   MangaChapterResponse,
@@ -178,6 +182,7 @@ async function httpGetJson(url: string, timeoutMs = 20_000): Promise<{ status: n
 
 interface MangaChapterSourceRow {
   provider: string;
+  providerName?: string;
   chapterKey: string;
   providerChapterId: string;
   language?: string | null;
@@ -295,8 +300,9 @@ function mergeFlatRows(
   namespace?: string,
 ): void {
   for (const row of rows) {
+    if (declaresNovelContent(row)) continue;
     const number = Number(row.number);
-    if (!Number.isFinite(number) || number <= 0) continue;
+    if (row.number == null || !Number.isFinite(number) || number < 0) continue;
     const provider = row.provider || fallbackProvider;
     if (namespace && provider) subProviderToNamespace.set(provider, namespace);
     const existing = byNumber.get(number) ?? {
@@ -310,6 +316,7 @@ function mergeFlatRows(
     // the whole chapter to a synthetic `toko:<number>` source.
     if (Array.isArray(row.sources) && row.sources.length > 0) {
       for (const source of row.sources) {
+        if (declaresNovelContent(source)) continue;
         const sourceProvider = source.provider || fallbackProvider;
         if (namespace && sourceProvider) subProviderToNamespace.set(sourceProvider, namespace);
         existing.sources.push({
@@ -321,7 +328,7 @@ function mergeFlatRows(
           releaseDate: source.releaseDate ?? null,
         });
       }
-      byNumber.set(number, existing);
+      if (existing.sources.length > 0) byNumber.set(number, existing);
       continue;
     }
     existing.sources.push({
@@ -336,7 +343,21 @@ function mergeFlatRows(
   }
 }
 
-export async function fetchExtensionMangaChapters(params: {
+export async function fetchExtensionMangaChapters(params: { anilistId?: number; malId?: number; title?: string }): Promise<MangaChaptersPayload> {
+  const [native, remote] = await Promise.all([fetchNativeMangaChapters(params).catch(() => ({ chapters: [], providersAvailable: [], failedProviders: [] })), remoteMangaChapters(params).catch(() => ({ chapters: [], providersAvailable: [], failedProviders: [] }))]);
+  const byNumber = new Map<number, MangaChapterAggregate>();
+  for (const chapter of [...native.chapters, ...remote.chapters]) {
+    if (declaresNovelContent(chapter)) continue;
+    chapter.sources = chapter.sources.filter(source => !declaresNovelContent(source));
+    if (!chapter.sources.length) continue;
+    const prior = byNumber.get(chapter.number);
+    if (prior) prior.sources.push(...chapter.sources.filter((source: any) => !prior.sources.some(s => s.provider === source.provider && s.providerChapterId === source.providerChapterId)));
+    else byNumber.set(chapter.number, chapter);
+  }
+  return { chapters: [...byNumber.values()].sort((a,b) => a.number - b.number), providersAvailable: [...new Set([...native.providersAvailable, ...remote.providersAvailable])], failedProviders: [...native.failedProviders, ...remote.failedProviders] };
+}
+
+async function fetchNativeMangaChapters(params: {
   anilistId?: number;
   malId?: number;
   title?: string;
@@ -348,7 +369,7 @@ export async function fetchExtensionMangaChapters(params: {
   if (env) {
     const http = await fetchChaptersViaHttp(env, params);
     dbg("fetchExtensionMangaChapters: HTTP result chapters=", http.chapters.length, "available=", http.providersAvailable, "failed=", http.failedProviders);
-    if (http.chapters.length > 0 || http.providersAvailable.length > 0) return http;
+    if (env.baseUrl === MOBILE_EXT_BASE || http.chapters.length > 0 || http.providersAvailable.length > 0) return http;
     // Host is up but returned nothing (e.g. an extension that only streams).
     // Fall through to IPC in case a non-HTTP extension can still answer.
     dbgWarn("fetchExtensionMangaChapters: HTTP host up but no chapters — falling through to IPC");
@@ -431,6 +452,8 @@ async function fetchChaptersViaHttp(
     for (const s of ch.sources) perProvider.set(s.provider, (perProvider.get(s.provider) ?? 0) + 1);
   }
   logMangaSummary(diagnostics, perProvider, byNumber.size);
+  for (const diag of diagnostics) recordSourceReport({ provider: diag.provider, name: diag.provider, ecosystem: 'tatakai', kind: 'manga', status: diag.status, count: perProvider.get(diag.provider) || 0, durationMs: diag.durationMs || 0, error: diag.error });
+  for (const [provider, count] of perProvider) if (!diagnostics.some(d => d.provider === provider)) recordSourceReport({ provider, name: provider, ecosystem: 'tatakai', kind: 'manga', status: 'ok', count, durationMs: 0 });
 
   return {
     chapters: Array.from(byNumber.values()).sort((a, b) => a.number - b.number),
@@ -564,6 +587,7 @@ async function fetchOneSourcePages(params: {
   providerChapterId?: string;
   anilistId?: number;
 }): Promise<MangaReadResponse> {
+  if (params.extensionId.startsWith('seanime-')) return remoteMangaPages(params);
   // `extensionId` here is really the source's sub-provider name (mangadex/
   // allmanga/…) threaded from the reader URL — see subProviderToNamespace.
   const env = await resolveMangaHttpEnv();
@@ -806,6 +830,7 @@ function buildReadResponse(
 function extSource(s: MangaChapterSourceRow): MangaChapterSource {
   return {
     provider: s.provider,
+    providerName: s.providerName,
     chapterKey: s.chapterKey,
     providerChapterId: s.providerChapterId,
     language: s.language ?? null,
@@ -822,7 +847,7 @@ export function mergeChaptersWithExtensions(
     return {
       ...base,
       providersAvailable: [...(base as any).providersAvailable || [], "tatakai_media"],
-      failedProviders: extensionPayload.failedProviders,
+      failedProviders: [...new Set([...base.failedProviders, ...extensionPayload.failedProviders])],
     } as MangaChapterResponse;
   }
 
@@ -842,11 +867,12 @@ export function mergeChaptersWithExtensions(
     const tatakai = mapped.sources.find((s) => s.provider === "tatakai_media");
     return {
       ...mapped,
-      chapterTitle: ext.title || mapped.chapterTitle,
+      chapterTitle: ext.title && !/^chapter\s+\d+(?:\.\d+)?$/i.test(ext.title)
+        ? ext.title : mapped.chapterTitle || ext.title,
       volume: ext.volume ?? mapped.volume,
       sources: [
         ...ext.sources.map(extSource),
-        ...withoutPlaceholder.filter((s) => !ext.sources.some((e) => e.provider === s.provider)),
+        ...withoutPlaceholder.filter((s) => !ext.sources.some((e) => e.provider === s.provider && e.chapterKey === s.chapterKey)),
         ...(tatakai ? [tatakai] : []),
       ],
     };
@@ -876,8 +902,8 @@ export function mergeChaptersWithExtensions(
   return {
     ...base,
     mappedChapters,
-    partial: extensionPayload.failedProviders.length > 0,
-    failedProviders: extensionPayload.failedProviders,
+    partial: base.partial || extensionPayload.failedProviders.length > 0,
+    failedProviders: [...new Set([...base.failedProviders, ...extensionPayload.failedProviders])],
     providersAvailable: [...extensionPayload.providersAvailable, "tatakai_media"],
   } as MangaChapterResponse;
 }

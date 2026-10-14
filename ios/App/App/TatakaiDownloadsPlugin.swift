@@ -27,6 +27,7 @@ private final class OfflineJob: Codable {
     var posterUrl: String?
     var headers: [String: String]
     var subtitles: [OfflineSubtitle]
+    var wifiOnly: Bool?
     var folder: String
     var entry = "media.bin"
     var status = "queued"
@@ -43,6 +44,7 @@ private final class OfflineJob: Codable {
               !["127.0.0.1", "localhost"].contains(upstream.host ?? "") else {
             throw DownloadError.invalid("Resolve the original episode stream URL before downloading")
         }
+        wifiOnly = input["wifiOnly"] as? Bool
         episodeId = id; url = raw; animeName = input["animeName"] as? String ?? "Anime"
         animeId = input["animeId"] as? String ?? id
         episodeNumber = input["episodeNumber"] as? Int ?? 1
@@ -322,13 +324,14 @@ final class MobileDownloads: NSObject, URLSessionDownloadDelegate {
         return ["path": file.absoluteString, "folder": job.folder, "entry": job.entry]
     }
     private func schedule() {
-        guard restored && !playback && networkReady && (!wifiOnly || !metered), let job = jobs.first(where: { ["queued", "downloading"].contains($0.status) }) else { return }
+        guard restored && !playback && networkReady && (!wifiOnly || !metered), let job = jobs.first(where: { ["queued", "downloading"].contains($0.status) && ($0.wifiOnly != true || !metered) }) else { return }
         job.status = "downloading"
         let limit = playback || dataSaver ? 1 : metered ? 2 : 6
         for r in job.resources where !r.done && tasks.count < limit {
             let key = job.episodeId + "\t" + r.name
             guard tasks[key] == nil, let url = URL(string: r.url) else { continue }
             var request = URLRequest(url: url); request.timeoutInterval = 30
+            request.allowsCellularAccess = job.wifiOnly != true
             if let cookies = HTTPCookieStorage.shared.cookies(for: url) {
                 for (name, value) in HTTPCookie.requestHeaderFields(with: cookies) { request.setValue(value, forHTTPHeaderField: name) }
             }

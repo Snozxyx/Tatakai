@@ -43,8 +43,8 @@ export interface ProfileOverviewTabProps {
   manhwaCount: number;
   comicsCount: number;
   totalChaptersRead: number;
-  /** Chapter totals per reading track — drive the manga/manhwa/comic rank ladders. */
-  readingTotals?: { manga: number; manhwa: number; comic: number } | null;
+  /** Chapter totals per reading track — drive the manga/manhwa/comic/novel rank ladders. */
+  readingTotals?: { manga: number; manhwa: number; comic: number; novel?: number } | null;
   streakDays: number;
   longestStreak: number;
   totalDaysActive?: number;
@@ -125,6 +125,7 @@ export const ProfileOverviewTab = memo(function ProfileOverviewTab({
     manga: readingTotals?.manga ?? 0,
     manhwa: readingTotals?.manhwa ?? 0,
     comic: readingTotals?.comic ?? 0,
+    novel: readingTotals?.novel ?? 0,
   };
   const rankScore = computeRankScore(rankUnits);
 

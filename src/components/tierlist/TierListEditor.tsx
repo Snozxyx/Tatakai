@@ -9,21 +9,22 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Trash2, Save, Share2, Lock, Globe, GripVertical, X, Film, Users, BookOpen } from 'lucide-react';
+import { Search, Trash2, Save, Share2, Lock, Globe, GripVertical, X, Film, Users, BookOpen, ScrollText } from 'lucide-react';
 import { useCreateTierList, useUpdateTierList, DEFAULT_TIERS, type TierListItem } from '@/hooks/user/useTierLists';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { contentGraph, toAnimeCard } from '@/core';
 import { searchManga } from '@/core/content/manga-client';
+import { searchNovels } from '@/core/content/novel-client';
 import { ANILIST_GRAPHQL_ENDPOINT } from '@/lib/api/backendOrigin';
 
-type TierSearchType = 'anime' | 'manga' | 'character';
+type TierSearchType = 'anime' | 'manga' | 'novel' | 'character';
 
 interface SearchResult {
   /**
    * Storable id, prefixed by media type so the viewer's link resolver
    * (`getItemDetails`) can route it: bare id = anime, `char:<id>` = character,
-   * `manga:<id>` = manga/manhwa/manhua/comic/novel.
+   * `manga:<id>` = manga/manhwa/manhua/comic, `novel:<id>` = light novel.
    */
   id: string;
   title: string;
@@ -195,7 +196,7 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
       if (typeof parsed.name === 'string') setName(parsed.name);
       if (typeof parsed.description === 'string') setDescription(parsed.description);
       if (typeof parsed.isPublic === 'boolean') setIsPublic(parsed.isPublic);
-      if (parsed.searchType === 'anime' || parsed.searchType === 'manga' || parsed.searchType === 'character') {
+      if (parsed.searchType === 'anime' || parsed.searchType === 'manga' || parsed.searchType === 'novel' || parsed.searchType === 'character') {
         setSearchType(parsed.searchType);
       }
       if (Array.isArray(parsed.items)) {
@@ -281,7 +282,8 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
         setSearchResults(prev => pageNum === 1 ? newResults : [...prev, ...newResults]);
         setHasNextPage(data.hasNextPage);
       } else if (type === 'manga') {
-        // Manga/manhwa/manhua/comic/novel — all written works, routed to /manga/.
+        // Manga/manhwa/manhua/comics — all image-chapter works, routed to /manga/.
+        // Novels have their own tab (stored as `novel:<id>`, routed to /novel/).
         const res = await searchManga(query, pageNum, 24);
         const rows = (res?.results || []) as Array<{
           id: string;
@@ -300,6 +302,34 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
                   title: row.canonicalTitle || 'Untitled',
                   image: row.poster || '',
                   type: 'manga' as const,
+                }
+              : null;
+          })
+          .filter((r): r is SearchResult => r !== null);
+
+        if (requestId !== latestSearchRequestRef.current) return;
+        setSearchResults(prev => pageNum === 1 ? newResults : [...prev, ...newResults]);
+        setHasNextPage(Boolean(res?.hasNextPage));
+      } else if (type === 'novel') {
+        // Light novels — stored as `novel:<id>`, routed to /novel/.
+        const res = await searchNovels(query, pageNum, 24);
+        const rows = (res?.results || []) as Array<{
+          id: string;
+          anilistId?: number | null;
+          malId?: number | null;
+          canonicalTitle?: string;
+          poster?: string | null;
+        }>;
+
+        const newResults = rows
+          .map((row) => {
+            const mediaId = String(row.anilistId || row.malId || row.id || '');
+            return mediaId
+              ? {
+                  id: `novel:${mediaId}`,
+                  title: row.canonicalTitle || 'Untitled',
+                  image: row.poster || '',
+                  type: 'novel' as const,
                 }
               : null;
           })
@@ -539,7 +569,7 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
       {/* Search Anime/Characters */}
       <GlassPanel className="p-4">
         <Tabs value={searchType} onValueChange={(v) => handleSearchTypeChange(v as TierSearchType)} className="mb-4">
-          <TabsList className="grid grid-cols-3 w-72">
+          <TabsList className="grid grid-cols-4 w-96 max-w-full">
             <TabsTrigger value="anime" className="flex items-center gap-2">
               <Film className="w-4 h-4" />
               Anime
@@ -547,6 +577,10 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
             <TabsTrigger value="manga" className="flex items-center gap-2">
               <BookOpen className="w-4 h-4" />
               Manga
+            </TabsTrigger>
+            <TabsTrigger value="novel" className="flex items-center gap-2">
+              <ScrollText className="w-4 h-4" />
+              Novels
             </TabsTrigger>
             <TabsTrigger value="character" className="flex items-center gap-2">
               <Users className="w-4 h-4" />
@@ -563,7 +597,9 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
                 ? 'Search anime (min 3 chars)...'
                 : searchType === 'manga'
                   ? 'Search manga, manhwa, manhua, comics (min 3 chars)...'
-                  : 'Search characters (min 3 chars)...'
+                  : searchType === 'novel'
+                    ? 'Search light novels (min 3 chars)...'
+                    : 'Search characters (min 3 chars)...'
             }
             value={searchQuery}
             onChange={(e) => handleSearchChange(e.target.value)}

@@ -31,9 +31,14 @@ import {
   SITE_ORIGIN,
   SHARE_API_ORIGIN,
 } from './inject.mjs';
+import {
+  canonicalSitemapPath,
+  looksXml,
+  degradedSitemapBody,
+  sitemapContentType,
+} from './sitemap-utils.mjs';
 
 const DEFAULT_OG_IMAGE = `${SITE_ORIGIN}/assets/logo/tatakaibanner.png`;
-const SITEMAP_RE = /^\/sitemap(-[\w.-]+)?\.(xml|xsl)$/;
 
 export function seoPreviewPlugin() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -68,21 +73,23 @@ export function seoPreviewPlugin() {
           // below ends with valid XML + an XML content type; when neither
           // upstream nor disk has usable XML we answer 503+XML (crawlers retry
           // instead of indexing an HTML error page).
-          if (SITEMAP_RE.test(pathname)) {
-            const isXsl = pathname.endsWith('.xsl');
-            const isIndex = pathname === '/sitemap.xml';
-            const expectedType = isXsl ? 'text/xsl; charset=utf-8' : 'application/xml; charset=utf-8';
-            const looksXml = (t) => {
-              const s = String(t || '').trimStart();
-              return s.startsWith('<?xml') || s.startsWith('<urlset') || s.startsWith('<sitemapindex') || s.startsWith('<xsl:stylesheet') || s.startsWith('<xsl:transform');
-            };
-            const degradedBody = isXsl
-              ? `<?xml version="1.0" encoding="UTF-8"?>\n<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"><xsl:template match="/"><html><body>temporarily unavailable</body></html></xsl:template></xsl:stylesheet>\n`
-              : isIndex
-                ? `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <sitemap>\n    <loc>${SITE_ORIGIN}/sitemap-static.xml</loc>\n  </sitemap>\n</sitemapindex>\n`
-                : `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n</urlset>\n`;
+          const canonicalSitemap = canonicalSitemapPath(pathname);
+          if (canonicalSitemap) {
+            // Tolerated trailing slash (/sitemap-anime-1.xml/): redirect to the
+            // canonical XML URL rather than serving SPA HTML for it.
+            if (canonicalSitemap !== pathname) {
+              const qs = rawUrl.includes('?') ? rawUrl.slice(rawUrl.indexOf('?')) : '';
+              res.statusCode = 301;
+              res.setHeader('Location', `${canonicalSitemap}${qs}`);
+              res.setHeader('Cache-Control', 'public, max-age=86400');
+              res.end();
+              return;
+            }
+            const isXsl = canonicalSitemap.endsWith('.xsl');
+            const expectedType = sitemapContentType(canonicalSitemap);
+            const degradedBody = degradedSitemapBody(canonicalSitemap, SITE_ORIGIN);
             try {
-              const upstream = `${SHARE_API_ORIGIN}/api/public${pathname}`;
+              const upstream = `${SHARE_API_ORIGIN}/api/public${canonicalSitemap}`;
               const ctrl = new AbortController();
               const timer = setTimeout(() => ctrl.abort(), 8000);
               let r;
@@ -110,7 +117,7 @@ export function seoPreviewPlugin() {
             }
 
             // Local fallback if upstream returned non-200 or errored (e.g. dist/sitemap.xsl)
-            const localFile = join(distDir, pathname.replace(/^\/+/, ''));
+            const localFile = join(distDir, canonicalSitemap.replace(/^\/+/, ''));
             if (existsSync(localFile)) {
               try {
                 const diskContent = readFileSync(localFile, 'utf8');

@@ -499,7 +499,12 @@ class TorrentSessionManager extends EventEmitter {
 
                 // Apply playback prioritization immediately.
                 try {
-                    prioritizePlaybackPieces(torrent, entry.targetFileIndex, {});
+                    entry.preloadOnly = options.preloadOnly === true;
+                    if (entry.preloadOnly) {
+                        require('./next-episode-preloader.cjs').preloadFile(entry, entry.targetFileIndex, options.preloadBudget);
+                    } else {
+                        prioritizePlaybackPieces(torrent, entry.targetFileIndex, {});
+                    }
                 } catch (_) {}
 
                 // Emit metadata ready to renderer.
@@ -606,6 +611,7 @@ class TorrentSessionManager extends EventEmitter {
                         source,
                         {
                             path: downloadPath,
+                            deselect: options.preloadOnly === true,
                             maxConns: this._torrentSettings.maxConns,
                             announce,
                         },
@@ -655,6 +661,8 @@ class TorrentSessionManager extends EventEmitter {
         if (!entry) return { success: false, error: 'session_not_found' };
         if (entry.pending || !entry.torrent?.files?.length) return { success: false, error: 'metadata_not_ready' };
 
+        entry.preloadOnly = false;
+        require('./next-episode-preloader.cjs').cancelPreload(entry);
         this._markStreamingSession(sessionId);
 
         const torrent = entry.torrent;

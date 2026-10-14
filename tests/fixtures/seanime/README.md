@@ -1,0 +1,1 @@
+Comix provider fixture from Ari-03/Seanime-Providers, commit 7cdfb2392432ed97b5084814457943aae84f57d8, src/manga/comix/provider.js. Used unchanged for compatibility tests. Upstream repository: https://github.com/Ari-03/Seanime-Providers (MIT). Test network/security-module responses are fixtures; passing tests do not certify live site availability.

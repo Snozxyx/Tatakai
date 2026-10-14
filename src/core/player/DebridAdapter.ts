@@ -29,6 +29,7 @@ export class DebridAdapter extends AbstractSourceAdapter {
       const resolvedUrl = await debridOrchestrator.resolveMagnetToStream(source.url, {
         episodeNumber: source.episodeNumber,
         filenameHint: source.filenameHint,
+        signal: options.signal,
       });
       if (generation !== this.loadGeneration || this.videoElement !== videoElement) return;
 
@@ -58,7 +59,7 @@ export class DebridAdapter extends AbstractSourceAdapter {
       this.delegate = hls;
       await hls.load({
         ...options,
-        source: { ...source, url: resolvedUrl, mode: 'hls' },
+        source: { ...source, url: resolvedUrl, mode: 'hls', debridResolved: true },
       });
       return;
     }
@@ -79,7 +80,7 @@ export class DebridAdapter extends AbstractSourceAdapter {
         playbackEventBus.emit(PlayerEvents.BUFFERING, false);
         if (options.autoPlay) videoElement.play().catch(() => {});
     };
-    videoElement.onerror = (e) => playbackEventBus.emit(PlayerEvents.ERROR, e);
+    videoElement.onerror = (e) => { debridOrchestrator.invalidateResolvedUrls(); playbackEventBus.emit(PlayerEvents.ERROR, e); };
 
     // Debrid CDN URLs play direct — never route through the shared proxy
     // (IP-pinned, expiring, tokenized).

@@ -8,6 +8,7 @@ import { fetchAniZipMapping, type AniZipEpisode, type AniZipMapping } from "@/li
 import { resolveApiV3Base } from "@/lib/api/backendOrigin";
 import { useContentSafetySettings } from "@/hooks/user/useContentSafetySettings";
 import { filterAdultAnime } from "@/lib/contentSafety";
+import { MEDIA_METADATA_STALE_TIME } from '@/lib/cache/mediaMetadataCache';
 import type {
   AnimeInfo,
   EpisodeData,
@@ -582,7 +583,7 @@ export function useAnimeInfo(animeId: string | undefined) {
       return mediaToAnimeInfo(media, mapping);
     },
     enabled: !!animeId,
-    staleTime: STALE_TIME.anime,
+    staleTime: MEDIA_METADATA_STALE_TIME,
     gcTime: isMobileNative ? 60 * 60 * 1000 : 30 * 60 * 1000,
   });
 }

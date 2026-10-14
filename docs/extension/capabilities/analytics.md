@@ -62,6 +62,4 @@ interface AnalyticsProvider {
 
 ## Privacy note
 
-Analytics providers see all app events. Only trusted (sideloaded/signed)
-extensions load renderer code that can register code providers; ingest URLs are
-declared statically in the manifest and visible to the user.
+Analytics providers see all app events. Installed analytics extensions execute with application privileges.

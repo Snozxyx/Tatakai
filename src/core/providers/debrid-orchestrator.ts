@@ -1,3 +1,4 @@
+import { CloudDebridClient, type AvailabilityState, type DebridProviderAdapter, throwIfAborted } from './cloud-debrid-client';
 import {
   type DebridAccount,
   type DebridProvider,
@@ -18,43 +19,19 @@ const ACTIVE_PROVIDER_KEY = 'tatakai_active_debrid_provider';
 // report "No playable video file" even when cached.
 const VIDEO_EXTENSION = /\.(?:mp4|mkv|webm|m4v|mov|avi|ts|m2ts|mts|mpg|mpeg|m2v|wmv|flv|ogv|3gp)(?:$|[?#])/i;
 
-// Magnet -> resolved HTTP cache (10min). Prevents the triple addMagnet race
-// where WatchPage + VideoPlayer + MobileVideoPlayer each created the same
-// provider torrent (quota burn + account pollution).
-const resolveCache = new Map<string, { url: string; at: number }>();
-const RESOLVE_CACHE_TTL_MS = 10 * 60 * 1000;
-
-function magnetCacheKey(magnet: string, options: Pick<DebridResolveOptions, 'episodeNumber' | 'filenameHint'>): string {
-  return `${String(magnet || '').trim()}::${Number(options.episodeNumber) || 0}::${String(options.filenameHint || '').toLowerCase().slice(0, 80)}`;
-}
-
-function getCachedResolve(magnet: string, options: Pick<DebridResolveOptions, 'episodeNumber' | 'filenameHint'>): string | null {
-  const entry = resolveCache.get(magnetCacheKey(magnet, options));
-  if (!entry) return null;
-  if (Date.now() - entry.at > RESOLVE_CACHE_TTL_MS) {
-    resolveCache.delete(magnetCacheKey(magnet, options));
-    return null;
-  }
-  return entry.url;
-}
-
-function setCachedResolve(
-  magnet: string,
-  options: Pick<DebridResolveOptions, 'episodeNumber' | 'filenameHint'>,
-  url: string,
-): void {
-  resolveCache.set(magnetCacheKey(magnet, options), { url, at: Date.now() });
-  // Bound growth: keep the last 50 entries.
-  if (resolveCache.size > 50) {
-    const oldest = resolveCache.keys().next().value;
-    if (oldest) resolveCache.delete(oldest);
-  }
-}
-
 /** Extract btih hash from a magnet link for TorBox hash-dedupe. */
 export function extractMagnetHash(magnet: string): string | null {
   const m = /btih:([a-f0-9]{40}|[a-z2-7]{32})/i.exec(String(magnet || ''));
-  return m ? m[1].toLowerCase() : null;
+  if (!m) return null;
+  if (m[1].length === 40) return m[1].toLowerCase();
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let buffer = 0, bits = 0;
+  const bytes: number[] = [];
+  for (const character of m[1].toUpperCase()) {
+    buffer = (buffer << 5) | alphabet.indexOf(character); bits += 5;
+    if (bits >= 8) { bits -= 8; bytes.push((buffer >> bits) & 255); }
+  }
+  return bytes.map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
 type DebridStorage = Pick<Storage, 'getItem' | 'setItem'>;
@@ -257,6 +234,10 @@ export class DebridOrchestrator {
   private rdClient: RealDebridClient | null = null;
   private tbClient: TorboxClient | null = null;
   private activeProvider: DebridProvider | null = null;
+  private cloudClient: CloudDebridClient | null = null;
+  private epoch = 0;
+  private cache = new Map<string, { url: string; expiresAt: number }>();
+  private pending = new Map<string, { promise: Promise<string>; controller: AbortController; users: number }>();
   private readonly storage: DebridStorage | null;
 
   constructor(storage?: DebridStorage | null) {
@@ -270,6 +251,7 @@ export class DebridOrchestrator {
     // Reset first: removing/deactivating an account must not leave its old
     // in-memory client active until the app is restarted.
     this.rdClient = null;
+    this.cloudClient = null;
     this.tbClient = null;
     this.activeProvider = null;
     if (!this.storage) return;
@@ -284,6 +266,7 @@ export class DebridOrchestrator {
       this.activeProvider = active.provider;
       if (active.provider === 'realdebrid') this.rdClient = new RealDebridClient(active.apiKey);
       if (active.provider === 'torbox') this.tbClient = new TorboxClient(active.apiKey);
+      if (active.provider === 'alldebrid' || active.provider === 'premiumize') this.cloudClient = new CloudDebridClient(active.provider, active.apiKey);
     } catch (error) {
       console.error('[DebridOrchestrator] Failed to load accounts', error);
     }
@@ -292,7 +275,7 @@ export class DebridOrchestrator {
   saveAccounts(accounts: DebridAccount[], preferredProvider?: DebridProvider): void {
     if (!this.storage) return;
     const cleaned = accounts
-      .filter((account) => account?.provider === 'realdebrid' || account?.provider === 'torbox')
+      .filter((account) => ['realdebrid', 'torbox', 'alldebrid', 'premiumize'].includes(account?.provider))
       .map((account) => ({
         provider: account.provider,
         apiKey: String(account.apiKey || '').trim(),
@@ -303,7 +286,12 @@ export class DebridOrchestrator {
       this.storage.setItem(ACTIVE_PROVIDER_KEY, preferredProvider);
     }
     this.storage.setItem(ACCOUNTS_KEY, JSON.stringify(cleaned));
+    this.epoch += 1;
+    this.cache.clear();
+    for (const pending of this.pending.values()) pending.controller.abort();
+    this.pending.clear();
     this.loadAccounts();
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('tatakai:debrid-accounts-changed'));
   }
 
   getAccounts(): DebridAccount[] {
@@ -313,7 +301,7 @@ export class DebridOrchestrator {
       return Array.isArray(parsed)
         ? parsed.filter((account) => (
           account &&
-          (account.provider === 'realdebrid' || account.provider === 'torbox') &&
+          (['realdebrid', 'torbox', 'alldebrid', 'premiumize'].includes(account.provider)) &&
           typeof account.apiKey === 'string'
         ))
         : [];
@@ -330,6 +318,21 @@ export class DebridOrchestrator {
     return this.activeProvider;
   }
 
+  getActiveProvider(): DebridProviderAdapter | null {
+    return this.rdClient || this.tbClient || this.cloudClient;
+  }
+
+  invalidateResolvedUrls(): void { this.cache.clear(); }
+
+  async checkInstantAvailability(hashes: string[]): Promise<Record<string, AvailabilityState>> {
+    const cleaned = [...new Set(hashes.map(h => h.toLowerCase()).filter(h => /^[a-f0-9]{40}$|^[a-z2-7]{32}$/.test(h)))].slice(0, 100);
+    try {
+      if (this.cloudClient) return await this.cloudClient.checkAvailability(cleaned);
+      if (this.tbClient) return await this.tbClient.checkAvailability(cleaned);
+      return Object.fromEntries(cleaned.map(h => [h, 'unknown']));
+    } catch { return Object.fromEntries(cleaned.map(h => [h, 'error'])); }
+  }
+
   async resolveMagnetToStream(
     magnet: string,
     options: DebridResolveOptions = {},
@@ -339,21 +342,54 @@ export class DebridOrchestrator {
     }
     if (!this.activeProvider) throw new Error('No active debrid provider is configured');
 
-    // In-memory dedupe: same magnet+episode within 10min reuses the HTTP URL
-    // instead of creating another provider torrent.
-    const cached = getCachedResolve(magnet, options);
-    if (cached) return cached;
-
-    let url: string;
-    if (this.activeProvider === 'realdebrid' && this.rdClient) {
-      url = (await resolveRealDebridMagnet(this.rdClient, magnet, options)).url;
-    } else if (this.activeProvider === 'torbox' && this.tbClient) {
-      url = (await resolveTorboxMagnet(this.tbClient, magnet, options)).url;
-    } else {
-      throw new Error('The active debrid provider could not be initialized');
+    throwIfAborted(options.signal);
+    const key = `${this.epoch}:${this.activeProvider}:${extractMagnetHash(magnet) || magnet}:${options.episodeNumber || 0}:${options.filenameHint || ''}`;
+    const cached = this.cache.get(key);
+    if (cached && Date.now() < cached.expiresAt) return cached.url;
+    let task = this.pending.get(key);
+    if (!task) {
+      const controller = new AbortController();
+      const epoch = this.epoch;
+      const rd = this.rdClient, tb = this.tbClient, cloud = this.cloudClient;
+      const provider = this.activeProvider;
+      const resolve = async () => {
+        const shared = { ...options, signal: controller.signal };
+        let url: string;
+        if (provider === 'realdebrid' && rd) url = (await resolveRealDebridMagnet(rd, magnet, shared)).url;
+        else if (provider === 'torbox' && tb) url = (await resolveTorboxMagnet(tb, magnet, shared)).url;
+        else if (cloud) url = await cloud.resolve(magnet, shared);
+        else throw new Error('The active debrid provider could not be initialized');
+        throwIfAborted(controller.signal);
+        if (epoch === this.epoch && /^https?:/i.test(url)) {
+          let expiresAt = Date.now() + 10 * 60 * 1000;
+          const params = new URL(url).searchParams;
+          for (const key of ['expires', 'expiry', 'exp']) {
+            const value = Number(params.get(key));
+            if (value > 1_000_000_000) expiresAt = Math.min(expiresAt, value > 1_000_000_000_000 ? value : value * 1000);
+          }
+          this.cache.set(key, { url, expiresAt });
+          if (this.cache.size > 50) this.cache.delete(this.cache.keys().next().value!);
+        }
+        return url;
+      };
+      task = { controller, users: 0, promise: resolve().finally(() => { if (this.pending.get(key)?.controller === controller) this.pending.delete(key); }) };
+      this.pending.set(key, task);
     }
-    if (/^https?:/i.test(url)) setCachedResolve(magnet, options, url);
-    return url;
+    const active = task;
+    active.users++;
+    return new Promise<string>((resolve, reject) => {
+      let settled = false;
+      const finish = (error?: unknown, url?: string) => {
+        if (settled) return;
+        settled = true;
+        options.signal?.removeEventListener('abort', abort);
+        if (--active.users === 0) active.controller.abort();
+        if (error) reject(error); else resolve(url!);
+      };
+      const abort = () => finish(new DOMException('Debrid resolution cancelled', 'AbortError'));
+      options.signal?.addEventListener('abort', abort, { once: true });
+      active.promise.then(url => finish(undefined, url), error => finish(error));
+    });
   }
 }
 

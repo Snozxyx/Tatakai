@@ -13,6 +13,7 @@ import { initDiscordActivity } from '@/lib/discordActivity';
 import { installGlobalAdminSecretFetchPatch } from '@/lib/api/adminSecret';
 import '@/lib/production'; // Suppress console in production
 import { installMobileLayout } from '@/lib/mobile/layout';
+import { initializeMediaMetadataCache } from '@/lib/queryClient';
 
 installMobileLayout();
 
@@ -100,7 +101,7 @@ async function renderApp() {
   // Native source discovery must be ready before routes/nav mount. Otherwise
   // their first React Query request caches an empty extension/custom-source
   // catalogue for five minutes.
-  await bootstrapMobile();
+  await Promise.all([bootstrapMobile(), initializeMediaMetadataCache()]);
   createRoot(document.getElementById("root")!).render(
     <HelmetProvider>
       <ErrorBoundary>

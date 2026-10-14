@@ -1,3 +1,6 @@
+import { normalizeUpdateState } from '@/core/update/normalized-update';
+import { ReleaseDetails } from '../ReleaseDetails';
+import { clearMediaMetadataCache } from '@/lib/queryClient';
 import { memo, Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { CapacitorHttp } from '@capacitor/core';
@@ -153,6 +156,7 @@ async function readDeviceSummary(): Promise<DeviceSummary> {
 
 /** Clear the WebView HTTP/image caches (Cache Storage API). Best-effort. */
 async function clearWebCaches(): Promise<number> {
+  await clearMediaMetadataCache();
   if (typeof caches === 'undefined') return 0;
   const keys = await caches.keys();
   await Promise.all(keys.map((k) => caches.delete(k)));
@@ -173,6 +177,7 @@ const DebridSettingsPanel = lazy(() =>
  */
 const AppUpdateSection = memo(function AppUpdateSection() {
   const mobileUpdate = useMobileUpdateState();
+  const release = normalizeUpdateState(mobileUpdate, __APP_VERSION__);
   const { openSettings } = useSettingsModal();
   const autoCapable = isAndroidAutoUpdateTarget() && !!mobileUpdate.downloadUrl;
 
@@ -311,6 +316,7 @@ const AppUpdateSection = memo(function AppUpdateSection() {
           </Button>
         }
       />
+      <ReleaseDetails notes={release.releaseNotes} percentage={release.rolloutPercentage} channel={release.channel} checkedAt={release.checkedAt} />
     </SettingsSection>
   );
 });
@@ -368,7 +374,7 @@ export function MobileAppSettingsPanel(_props: { section?: string }) {
     setClearing(true);
     try {
       const n = await clearWebCaches();
-      toast.success(n > 0 ? `Cleared ${n} cache${n === 1 ? '' : 's'}` : 'Caches already empty');
+      toast.success('Cleared web and title metadata caches');
     } catch {
       toast.error('Could not clear caches');
     } finally {
@@ -632,7 +638,7 @@ export function MobileAppSettingsPanel(_props: { section?: string }) {
         <SettingRow
           icon={HardDrive}
           title="Clear cache"
-          description="Remove cached web responses and images. Downloads are not affected."
+          description="Remove saved title metadata, web responses, and images. Downloads are not affected."
           control={
             <button
               type="button"

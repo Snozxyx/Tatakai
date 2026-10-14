@@ -8,7 +8,7 @@
  * A .kai file is a ZIP archive with the following structure:
  *
  *   my-extension.kai
- *   ├── manifest.json   (required) extension metadata + Ed25519 signature
+ *   ├── manifest.json   (required) extension metadata
  *   ├── bundle.js       (required) sandboxed extension code
  *   ├── README.md       (optional) markdown documentation
  *   └── icon.png        (optional) icon image, base64-encoded on read
@@ -22,13 +22,10 @@
  *   "permissions": ["network:domain:nyaa.si", "torrent:search"],
  *   "author": "Tatakai Labs",
  *   "description": "...",
- *   "signature": "<base64 Ed25519 sig over bundle.js bytes>",
- *   "sideloaded": false   // injected on parse if missing sig
  * }
  */
 
 const JSZip = require('jszip');
-const crypto = require('crypto');
 
 const KAI_MAGIC = '.kai';
 
@@ -55,26 +52,11 @@ function isValidExtensionId(id) {
     );
 }
 
-const TATAKAI_PUBLIC_KEY_PEM =
-    process.env.TATAKAI_EXT_PUBLIC_KEY ||
-    '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\n-----END PUBLIC KEY-----';
-
-function verifySignature(bundleBytes, signatureBase64) {
-    try {
-        const sig = Buffer.from(signatureBase64, 'base64');
-        return crypto.verify(null, bundleBytes, {
-            key: TATAKAI_PUBLIC_KEY_PEM, format: 'pem', type: 'spki',
-        }, sig);
-    } catch (_) {
-        return false;
-    }
-}
-
 /**
  * Parse a .kai buffer into a structured KaiExtension object.
  *
  * @param {Buffer} kaiBuffer - Raw .kai file bytes
- * @param {{ skipSignatureCheck?: boolean }} options
+ * @param {object} options - Legacy options are ignored
  * @returns {Promise<KaiExtension>}
  */
 async function parseKaiFile(kaiBuffer, options = {}) {
@@ -169,19 +151,10 @@ async function parseKaiFile(kaiBuffer, options = {}) {
     }
     const bundleCode = bundleBytes.toString('utf8');
 
-    // ── Signature verification ───────────────────────────────────────────────
-    const isSideloaded = !manifest.signature;
-    let signatureValid = false;
-
-    if (!isSideloaded && !options.skipSignatureCheck) {
-        signatureValid = verifySignature(bundleBytes, manifest.signature);
-        if (!signatureValid) {
-            throw new Error(
-                'Invalid .kai — Ed25519 signature verification failed. ' +
-                'Only install .kai files from trusted sources.'
-            );
-        }
-    }
+    // Legacy signing metadata is ignored.
+    delete manifest.signature;
+    delete manifest.signedBy;
+    delete manifest.sideloaded;
 
     // ── README.md (optional) ─────────────────────────────────────────────────
     const readmeFile = zip.file('README.md');
@@ -199,12 +172,12 @@ async function parseKaiFile(kaiBuffer, options = {}) {
     }
 
     return {
-        manifest: { ...manifest, sideloaded: isSideloaded },
+        manifest,
         bundleCode,
         readme,
         iconBase64,
-        signatureValid: isSideloaded ? null : signatureValid,
-        isSideloaded,
+        signatureValid: null, // legacy bridge compatibility
+        isSideloaded: false, // legacy bridge compatibility
         fileSizeBytes: kaiBuffer.length,
     };
 }

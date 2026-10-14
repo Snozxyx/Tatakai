@@ -21,6 +21,7 @@ export type BadgeRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
 export type BadgeMetricKey =
   | 'episodes'
   | 'manga_chapters'
+  | 'novel_chapters'
   | 'comments'
   | 'reputation'
   | 'ratings'
@@ -494,6 +495,93 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     animated: true,
     description: 'Held steady when time itself fractured.',
     rule: 'Legendary event reward',
+  },
+  // ── Novel pilgrimage (tiered reading ladder, ranked Chikra art) ──────────
+  {
+    key: 'chapter-pilgrim',
+    family: 'collectible',
+    label: 'Chapter Pilgrim',
+    rarity: 'common',
+    image: chikra('74488-ranked-bronze'),
+    award: 'auto',
+    description: 'Read your first novel chapters.',
+    rule: 'Auto: 10+ novel chapters read',
+    metricKey: 'novel_chapters',
+    tiers: [
+      { name: 'First Page', threshold: 0, description: 'The pilgrimage begins.' },
+      { name: 'Pilgrim', threshold: 10, description: 'Read 10 novel chapters.' },
+      { name: 'Wayfarer', threshold: 50, description: 'Read 50 novel chapters.', effectClass: 'rn-3' },
+      { name: 'Pathfinder', threshold: 150, description: 'Read 150 novel chapters.', effectClass: 'rn-6' },
+    ],
+  },
+  {
+    key: 'scroll-keeper',
+    family: 'collectible',
+    label: 'Scroll Keeper',
+    rarity: 'rare',
+    image: chikra('11539-ranked-silver'),
+    award: 'auto',
+    description: 'Keeps every scroll within reach.',
+    rule: 'Auto: 50+ novel chapters read',
+    metricKey: 'novel_chapters',
+    tiers: [
+      { name: 'Apprentice', threshold: 0, description: 'Learning the shelves.' },
+      { name: 'Keeper', threshold: 50, description: 'Read 50 novel chapters.' },
+      { name: 'Curator', threshold: 200, description: 'Read 200 novel chapters.', effectClass: 'rn-5' },
+      { name: 'Archivist', threshold: 400, description: 'Read 400 novel chapters.', effectClass: 'rn-8' },
+    ],
+  },
+  {
+    key: 'inkbound-scholar',
+    family: 'collectible',
+    label: 'Inkbound Scholar',
+    rarity: 'epic',
+    image: chikra('42769-ranked-gold'),
+    award: 'auto',
+    description: 'Bound to ink and endless nights.',
+    rule: 'Auto: 100+ novel chapters read',
+    metricKey: 'novel_chapters',
+    tiers: [
+      { name: 'Reader', threshold: 0, description: 'Ink on fingers.' },
+      { name: 'Scholar', threshold: 100, description: 'Read 100 novel chapters.' },
+      { name: 'Savant', threshold: 300, description: 'Read 300 novel chapters.', effectClass: 'rn-6' },
+      { name: 'Luminary', threshold: 600, description: 'Read 600 novel chapters.', effectClass: 'rn-10' },
+    ],
+  },
+  {
+    key: 'grand-archivist',
+    family: 'collectible',
+    label: 'Grand Archivist',
+    rarity: 'legendary',
+    image: chikra('37118-ranked-grandmaster'),
+    award: 'auto',
+    description: 'The archive bends to your memory.',
+    rule: 'Auto: 250+ novel chapters read',
+    metricKey: 'novel_chapters',
+    tiers: [
+      { name: 'Attendant', threshold: 0, description: 'Among the stacks.' },
+      { name: 'Archivist', threshold: 250, description: 'Read 250 novel chapters.' },
+      { name: 'Grand Archivist', threshold: 500, description: 'Read 500 novel chapters.', effectClass: 'rn-10' },
+      { name: 'Eternal Record', threshold: 1000, description: 'Read 1000 novel chapters.', effectClass: 'rn-14' },
+    ],
+  },
+  {
+    key: 'celestial-scribe',
+    family: 'collectible',
+    label: 'Celestial Scribe',
+    rarity: 'mythic',
+    image: chikra('94048-ranked-celestial'),
+    award: 'auto',
+    animated: true,
+    description: 'Writes among the stars.',
+    rule: 'Auto: 500+ novel chapters read',
+    metricKey: 'novel_chapters',
+    tiers: [
+      { name: 'Stargazer', threshold: 0, description: 'Looking up.' },
+      { name: 'Scribe', threshold: 500, description: 'Read 500 novel chapters.', effectClass: 'rn-12' },
+      { name: 'Celestial', threshold: 1000, description: 'Read 1000 novel chapters.', effectClass: 'rn-15' },
+      { name: 'Transcendent', threshold: 2000, description: 'Read 2000 novel chapters.', effectClass: 'rn-16' },
+    ],
   },
 ];
 

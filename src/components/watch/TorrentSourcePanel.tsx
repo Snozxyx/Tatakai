@@ -1,3 +1,5 @@
+import { debridOrchestrator, extractMagnetHash } from '@/core/providers/debrid-orchestrator';
+import type { AvailabilityState } from '@/core/providers/cloud-debrid-client';
 /**
  * TorrentSourcePanel
  *
@@ -16,7 +18,7 @@
  * confirmation dialog. Nothing here starts a session.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowDownWideNarrow,
   ArrowUpNarrowWide,
@@ -78,6 +80,20 @@ export function TorrentSourcePanel({
   canPlayTorrent,
   onSelect,
 }: TorrentSourcePanelProps) {
+  const [accountRevision, setAccountRevision] = useState(0);
+  useEffect(() => {
+    const update = () => setAccountRevision(value => value + 1);
+    window.addEventListener('tatakai:debrid-accounts-changed', update);
+    return () => window.removeEventListener('tatakai:debrid-accounts-changed', update);
+  }, []);
+  const [availability, setAvailability] = useState<Record<string, AvailabilityState>>({});
+  useEffect(() => {
+    let active = true;
+    const hashes = sources.map(source => extractMagnetHash(source.magnet || source.magnetLink || source.url || '')).filter((h): h is string => !!h);
+    if (!debridOrchestrator.hasActiveProvider() || !hashes.length) { setAvailability({}); return; }
+    void debridOrchestrator.checkInstantAvailability(hashes).then(result => { if (active) setAvailability(result); });
+    return () => { active = false; };
+  }, [sources, accountRevision]);
   const [sortKey, setSortKey] = useState<TorrentSortKey>("seeders");
   const [direction, setDirection] = useState<SortDirection>("desc");
   const [query, setQuery] = useState("");
@@ -301,6 +317,13 @@ export function TorrentSourcePanel({
                   <span className="min-w-0 flex-1 truncate font-mono text-[11px] leading-relaxed text-foreground">
                     {title}
                   </span>
+                  {debridOrchestrator.hasActiveProvider() && (() => {
+                    const hash = extractMagnetHash(source.magnet || source.magnetLink || source.url || '');
+                    const state = hash ? availability[hash] || 'unknown' : 'unknown';
+                    return <span className={`shrink-0 text-[10px] ${state === 'cached' ? 'text-emerald-400' : 'text-muted-foreground'}`}>
+                      {state === 'cached' ? 'Cached' : state === 'uncached' ? 'Uncached' : state === 'error' ? 'Check failed' : 'Unknown'}
+                    </span>;
+                  })()}
                   {isActive && (
                     <span className="shrink-0 rounded-full bg-emerald-400/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-300">
                       Playing

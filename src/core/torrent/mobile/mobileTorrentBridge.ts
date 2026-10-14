@@ -19,6 +19,11 @@ import { isAndroid } from '@/lib/platform/platform';
 
 /** Native plugin contract implemented in Kotlin (android-torrent-plugin/). */
 interface TatakaiTorrentPlugin {
+  preloadSource(input: { magnet: string; episode: number; budgetBytes: number }): Promise<{ success: boolean; sessionId?: string; ownsSession?: boolean; error?: string }>;
+  releasePreload(input: { sessionId: string }): Promise<{ success: boolean }>;
+  preloadNext(input: { sessionId: string; nextEpisode: number; budgetBytes: number }): Promise<{ success: boolean; error?: string }>;
+  cancelPreload(input: { sessionId: string }): Promise<{ success: boolean; error?: string }>;
+
   addMagnet(opts: { magnet: string; fileIndex?: number }): Promise<{
     success: boolean;
     sessionId?: string;
@@ -76,6 +81,10 @@ export function installMobileTorrentBridge(): void {
 
   const plugin = registerPlugin<TatakaiTorrentPlugin>('TatakaiTorrent');
   const rt = ((window as any).tatakaiRuntime ||= {});
+  rt.preloadTorrentSource = (magnet: string, episode: number, budgetBytes: number) => plugin.preloadSource({ magnet, episode, budgetBytes });
+  rt.releaseTorrentPreload = (sessionId: string) => plugin.releasePreload({ sessionId });
+  rt.preloadNextTorrentEpisode = (sessionId: string, nextEpisode: number, budgetBytes: number) => plugin.preloadNext({ sessionId, nextEpisode, budgetBytes });
+  rt.cancelTorrentPreload = (sessionId: string) => plugin.cancelPreload({ sessionId });
   const progressListeners = new Set<(event: TorrentProgressEvent) => void>();
   let nativeProgressListener: { remove: () => Promise<void> } | null = null;
   let progressListenerPending = false;

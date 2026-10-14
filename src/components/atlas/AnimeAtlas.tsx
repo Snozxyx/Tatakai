@@ -426,7 +426,7 @@ export function AnimeAtlas({ layout, colorBy, controls }: { layout: AtlasLayout;
           <div className="min-w-0">
             <Link to={infoHref} className="block text-sm font-bold text-white hover:text-primary line-clamp-2">{info.title}</Link>
             <p className="mt-1 text-xs text-muted-foreground">
-              {info.mediaType === 'manga' ? 'Manga' : 'Anime'}
+              {info.mediaType === 'novel' ? 'Novel' : info.mediaType === 'manga' ? 'Manga' : 'Anime'}
               {info.year ? ` · ${info.year}` : ''}
               {info.averageScore != null ? ` · ★ ${(info.averageScore / 10).toFixed(1)}` : ''}
             </p>

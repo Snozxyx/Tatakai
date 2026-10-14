@@ -194,7 +194,7 @@ module.exports = function registerMangaDownloadManager(ipcMain, app, fs, path, l
      *
      * CRUCIAL: the `provider` field on a chapter source is the SUB-PROVIDER name
      * (e.g. "mangadex" / "allmanga"), NOT the extension namespace id
-     * ("tatakai.extension.toko"). chapterKeys are prefixed with it
+     * (e.g. "tatakai.extension.manga"). chapterKeys are prefixed with it
      * (`mangadex:<uuid>`). An extension's `getMangaPages` routes internally by
      * that sub-provider; passing the namespace id yields "Chapter not found".
      *

@@ -23,6 +23,16 @@ Refreshed poster rules apply only to the native shell. The existing Mobile desig
 
 Reproduce: run `npm run build`, `npx cap sync android`, then `android/gradlew.bat :app:assembleDebug :app:testDebugUnitTest`. Run `bun test tests/native-mobile-downloads.test.ts tests/watch/source-selection.unit.test.js tests/watch/source-selection.integration.test.js`. With Vite on 8091, run `node scripts/check-native-mobile-layout.mjs` (override `MOBILE_TEST_URL` for a different port).
 
+## Offline content and custom source fixes
+
+Offline media servers inspect extensionless downloaded files to serve MP4, WebM/Matroska, and transport streams with the correct content type. This applies to existing `.bin` downloads as well as new ones. Raw local SRT/ASS subtitles are converted to VTT before browser playback, and subtitle loading decodes UTF-16 files with a byte-order mark.
+
+Downloaded novels open from device storage even when the reader URL uses a provider ID rather than an AniList ID. The offline reader runs its local queries without a network connection and builds chapter navigation from downloaded chapters. Missing offline chapters produce an error instead of starting a provider request.
+
+Mobile custom home, search, info, watch, and read routes install the dispatch bridge and await cached extension hydration before calling a bundle. Ordinary `fetch()` calls in those bundles use the native HTTP client with the extension's network permissions.
+
+Regression coverage: `bun test tests/mobile-offline-custom.test.ts tests/native-mobile-downloads.test.ts tests/novel-mobile-bundle.test.ts tests/novel-mobile-http.test.ts tests/subtitle-engine.test.js tests/mobile-offline-episode-id.test.ts tests/mobile-content-regression.test.ts`. Android container detection is covered by `MediaPayloadValidatorTest`; native Android compilation and the 12 pure Java media/HLS tests passed on Windows. Physical-device playback and iOS compilation still require device/macOS validation.
+
 ## Device validation still required
 
 This host has no connected Android device and no Xcode/macOS toolchain. iOS source has not been compiled or device-tested here. On a Mac, sync iOS and run the existing `mobile:build:ios:unsigned` build or signed Xcode device build. Check header-gated CDN redirects, encrypted/fMP4/byte-range HLS, long episodes, range rejection, expired links, storage exhaustion, cancellation/retry, Wi-Fi/cellular transitions, screen lock, backgrounding, OS termination, relaunch, subtitles, deletion, and airplane-mode playback on both platforms.

@@ -85,6 +85,10 @@ function laneToCards(
 ): UnifiedMediaCardProps["item"][] {
   if (!Array.isArray(lane)) return [];
   const mapped = lane
+    .filter((item) => {
+      const format = String(item.format || "").toUpperCase();
+      return !format || format === "MANGA" || format === "ONE_SHOT";
+    })
     .filter((item) => options.forceAdult || !inferMangaAdultFlag(item) || options.canShowAdult)
     .map((item) =>
       toUnifiedMangaCard(item, { isAdult: options.forceAdult || inferMangaAdultFlag(item) }),

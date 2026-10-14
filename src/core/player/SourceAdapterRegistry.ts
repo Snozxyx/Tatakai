@@ -6,6 +6,7 @@ export interface AdapterLoadOptions {
   videoElement: HTMLVideoElement;
   startTime?: number;
   autoPlay?: boolean;
+  signal?: AbortSignal;
 }
 
 export abstract class AbstractSourceAdapter {
@@ -40,6 +41,9 @@ export abstract class AbstractSourceAdapter {
 export class SourceAdapterRegistry {
   private adapters: Map<PlaybackMode, AbstractSourceAdapter> = new Map();
   private currentAdapter: AbstractSourceAdapter | null = null;
+  private generation = 0;
+  private controller: AbortController | null = null;
+  private pending: Promise<void> = Promise.resolve();
   private static instance: SourceAdapterRegistry;
 
   private constructor() {}
@@ -60,17 +64,45 @@ export class SourceAdapterRegistry {
   }
 
   async switchTo(options: AdapterLoadOptions): Promise<void> {
-    if (this.currentAdapter) {
-      await this.currentAdapter.unload();
-    }
+    const generation = ++this.generation;
+    this.controller?.abort();
+    const controller = new AbortController();
+    this.controller = controller;
+    const abort = () => controller.abort();
+    options.signal?.addEventListener('abort', abort, { once: true });
+    if (options.signal?.aborted) controller.abort();
+    const operation = this.pending.catch(() => {}).then(async () => {
+      if (controller.signal.aborted || generation !== this.generation) return;
+      const adapter = this.adapters.get(options.source.mode);
+      if (!adapter) throw new Error(`No adapter registered for mode: ${options.source.mode}`);
+      await this.currentAdapter?.unload();
+      this.currentAdapter = null;
+      if (controller.signal.aborted || generation !== this.generation) return;
+      try {
+        await adapter.load({ ...options, signal: controller.signal });
+        if (controller.signal.aborted || generation !== this.generation) {
+          await adapter.unload();
+          return;
+        }
+        this.currentAdapter = adapter;
+      } catch (error) {
+        await adapter.unload();
+        if (!controller.signal.aborted) throw error;
+      }
+    }).finally(() => options.signal?.removeEventListener('abort', abort));
+    this.pending = operation;
+    await operation;
+  }
 
-    const adapter = this.adapters.get(options.source.mode);
-    if (!adapter) {
-      throw new Error(`No adapter registered for mode: ${options.source.mode}`);
-    }
-
-    this.currentAdapter = adapter;
-    await adapter.load(options);
+  async unload(): Promise<void> {
+    ++this.generation;
+    this.controller?.abort();
+    const operation = this.pending.catch(() => {}).then(async () => {
+      await this.currentAdapter?.unload();
+      this.currentAdapter = null;
+    });
+    this.pending = operation;
+    await operation;
   }
 
   getCurrentAdapter() {

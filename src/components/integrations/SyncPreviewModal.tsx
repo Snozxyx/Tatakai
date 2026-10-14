@@ -6,7 +6,7 @@
  * which to apply. Sync is always previewed first, never applied silently.
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
   Sheet,
@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, ArrowDown, ArrowUp, ArrowLeftRight, CheckCircle2, Check, Info, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { MANGABAKA_ACCENT, MANGABAKA_LOGO_URL } from '@/lib/mangabaka';
 import type { SyncProposalItem, Integration, MediaType } from '@/hooks/user/useIntegrationSync';
 
 interface SyncPreviewModalProps {
@@ -32,9 +33,10 @@ interface SyncPreviewModalProps {
   isApplying?: boolean;
 }
 
-const INTEGRATION_META = {
+const INTEGRATION_META: Record<Integration, { label: string; color: string; short: string; logo?: string }> = {
   mal: { label: 'MyAnimeList', color: '#2E51A2', short: 'MAL' },
   anilist: { label: 'AniList', color: '#02A9FF', short: 'AL' },
+  mangabaka: { label: 'MangaBaka', color: MANGABAKA_ACCENT, short: 'MB', logo: MANGABAKA_LOGO_URL },
 };
 
 function DirectionBadge({ direction }: { direction: SyncProposalItem['direction'] }) {
@@ -85,9 +87,15 @@ export function SyncPreviewModal({
   const reduceMotion = useReducedMotion();
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(items.map(i => i.id)));
+  const [logoFailed, setLogoFailed] = useState(false);
+
+  // Reset the logo fallback whenever the sheet switches integration.
+  useEffect(() => {
+    setLogoFailed(false);
+  }, [integration]);
 
   // Re-sync selection whenever a new preview loads.
-  useMemo(() => {
+  useEffect(() => {
     setSelectedIds(new Set(items.map(i => i.id)));
   }, [items]);
 
@@ -101,7 +109,7 @@ export function SyncPreviewModal({
   };
 
   const toggleAll = () => {
-    if (selectedIds.size === items.length) setSelectedIds(new Set());
+    if (items.every(item => selectedIds.has(item.id))) setSelectedIds(new Set());
     else setSelectedIds(new Set(items.map(i => i.id)));
   };
 
@@ -115,7 +123,7 @@ export function SyncPreviewModal({
     await onApply(selectedItems);
   };
 
-  const selectAnim = reduceMotion ? {} : { scale: [1, 1.02, 1], transition: { duration: 0.35, ease: 'easeOut' } };
+  const selectAnim = reduceMotion ? {} : { scale: [1, 1.02, 1], transition: { duration: 0.35, ease: 'easeOut' as const } };
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -139,10 +147,20 @@ export function SyncPreviewModal({
         <SheetHeader className="relative shrink-0 border-b border-white/[0.05] bg-white/[0.01] p-6 pb-5 text-left z-10">
           <SheetTitle className="flex items-center gap-3 text-2xl font-black tracking-tight text-white drop-shadow-md">
             <div
-              className="flex h-11 w-11 items-center justify-center rounded-2xl border text-white font-black text-sm shadow-lg"
+              className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border text-white font-black text-sm shadow-lg"
               style={{ backgroundColor: meta.color, borderColor: `${meta.color}40`, boxShadow: `0 0 20px ${meta.color}40` }}
             >
-              {meta.short}
+              {meta.logo && !logoFailed ? (
+                <img
+                  src={meta.logo}
+                  alt={meta.label}
+                  className="h-8 w-8 object-contain"
+                  loading="lazy"
+                  onError={() => setLogoFailed(true)}
+                />
+              ) : (
+                meta.short
+              )}
             </div>
             Sync with {meta.label}
           </SheetTitle>
@@ -175,7 +193,7 @@ export function SyncPreviewModal({
                 onClick={toggleAll}
                 className="ml-auto text-xs font-bold text-muted-foreground hover:text-white underline underline-offset-2 transition-colors"
               >
-                {selectedIds.size === items.length ? 'Deselect all' : 'Select all'}
+                {items.every(item => selectedIds.has(item.id)) ? 'Deselect all' : 'Select all'}
               </button>
             </div>
           )}

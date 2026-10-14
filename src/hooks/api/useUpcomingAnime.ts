@@ -1,88 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
+import { fetchUpcomingAniListAnime, type AniListMedia } from "@/lib/externalIntegrations";
 
-export interface JikanAnime {
-  mal_id: number;
-  title: string;
-  title_english: string | null;
-  title_japanese: string | null;
-  images: {
-    jpg: {
-      image_url: string;
-      small_image_url: string;
-      large_image_url: string;
-    };
-    webp?: {
-      image_url: string;
-      small_image_url: string;
-      large_image_url: string;
-    };
-  };
-  type: string | null;
-  source: string | null;
-  episodes: number | null;
-  status: string;
-  aired: {
-    from: string | null;
-    to: string | null;
-    string: string;
-  };
-  duration: string | null;
-  rating: string | null;
-  score: number | null;
-  scored_by: number | null;
-  rank: number | null;
-  popularity: number | null;
-  members: number | null;
-  favorites: number | null;
-  synopsis: string | null;
-  season: string | null;
-  year: number | null;
-  studios: Array<{ mal_id: number; name: string }>;
-  genres: Array<{ mal_id: number; name: string }>;
-}
+export type UpcomingAnimeItem = AniListMedia;
 
-interface JikanResponse {
-  data: JikanAnime[];
-  pagination: {
-    last_visible_page: number;
-    has_next_page: boolean;
-    current_page: number;
-    items: {
-      count: number;
-      total: number;
-      per_page: number;
-    };
-  };
-}
-
-async function fetchUpcomingAnime(page: number = 1): Promise<JikanResponse> {
-  // Jikan rate-limits aggressively and the host can hang (observed
-  // ERR_CONNECTION_TIMED_OUT in dev) — fail fast instead of holding the
-  // section in skeleton state until the browser gives up.
-  const response = await fetch(
-    `https://api.jikan.moe/v4/seasons/upcoming?page=${page}&limit=12`,
-    {
-      headers: {
-        'Accept': 'application/json',
-      },
-      signal: AbortSignal.timeout(15000),
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch upcoming anime: ${response.status} ${response.statusText}`);
-  }
-
-  return response.json();
-}
-
+/**
+ * Upcoming anime via AniList (NOT_YET_RELEASED by popularity), served through
+ * the TatakaiAPI GraphQL proxy. Previously this called Jikan's
+ * seasons/upcoming endpoint directly from the browser — retired now that
+ * Jikan is unreliable (aggressive rate limits, hanging hosts).
+ */
 export function useUpcomingAnime(page: number = 1) {
   return useQuery({
     queryKey: ["upcoming_anime", page],
-    queryFn: () => fetchUpcomingAnime(page),
+    queryFn: () => fetchUpcomingAniListAnime(page, 12),
     staleTime: 10 * 60 * 1000, // 10 minutes
-    // One retry only: Jikan 429s hard on bursts, and two extra hung attempts
-    // used to triple the console spam before the section gave up.
+    // The proxy already retries internally (rate-limit aware); one client
+    // retry is enough to avoid console spam before the section gives up.
     retry: 1,
   });
 }

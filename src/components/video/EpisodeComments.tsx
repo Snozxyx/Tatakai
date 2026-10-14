@@ -37,6 +37,7 @@ import type { CommentPollDraft } from '@/hooks/community/useComments';
 type CommentFilter = 'new' | 'global' | 'episodes';
 
 export interface CommentsProps {
+  quoteDraft?: import('@/lib/commentQuotes').CommentQuoteDraft;
   /** Which surface these comments belong to. */
   entityType: CommentEntityType;
   /** The surface's id (anime/manga id, playlist id, tier list id, post id). */
@@ -86,7 +87,7 @@ function embedLabel(e: CommentEmbed): string {
  * when entityType === 'anime'; every other surface gets the same GIF / poll /
  * mention / embed feature set without them.
  */
-export function Comments({ entityType, entityId, episodeId, entityName, fallbackEpisodeId }: CommentsProps) {
+export function Comments({ entityType, entityId, episodeId, entityName, fallbackEpisodeId, quoteDraft }: CommentsProps) {
   const { user, profile, isAdmin, isModerator } = useAuth();
   const confirm = useConfirm();
   const navigate = useNavigate();
@@ -369,6 +370,7 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <RichCommentComposer
+                      quoteDraft={quoteDraft}
                       key={`${user.id}:${entityType}:${entityId}:${epId ?? "all"}`}
                       draftKey={`${entityType}:${entityId}:${epId ?? "all"}`}
                       compact
@@ -384,6 +386,7 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
               </GlassPanel>
             ) : (
               <GlassPanel className="p-4 mb-6 text-center">
+                {quoteDraft && <blockquote className="mb-3 whitespace-pre-wrap break-words rounded-lg border border-border bg-muted/40 p-3 text-left text-sm text-muted-foreground">{quoteDraft.text}</blockquote>}
                 <p className="text-sm text-muted-foreground mb-3">Sign in to join the discussion</p>
                 <Button size="sm" onClick={() => navigate('/auth')}>Sign In</Button>
               </GlassPanel>

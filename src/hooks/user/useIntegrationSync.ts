@@ -12,17 +12,20 @@
  */
 
 import { useState, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { TATAKAI_API_URL } from '@/lib/api/api-client';
 
-export type Integration = 'mal' | 'anilist';
-export type MediaType = 'anime' | 'manga';
+export type Integration = 'mal' | 'anilist' | 'mangabaka';
+export type MediaType = 'anime' | 'manga' | 'novel';
 
 export interface SyncProposalItem {
   id: string;
   mediaId: string | number;
+  localMediaIds?: string[];
   malId?: number | null;
   anilistId?: number | null;
+  mangabakaId?: number | null;
   title: string;
   poster: string | null;
   type: MediaType;
@@ -56,6 +59,7 @@ async function getBearerHeader(): Promise<Record<string, string>> {
 }
 
 export function useIntegrationSync() {
+  const queryClient = useQueryClient();
   const [state, setState] = useState<SyncState>({
     isLoadingPreview: false,
     isApplying: false,
@@ -159,6 +163,7 @@ export function useIntegrationSync() {
       }
 
       // Record last sync time locally
+      await queryClient.invalidateQueries({ predicate: query => /watch|history|readlist|stats/i.test(String(query.queryKey[0])) });
       const mediaTypes = [...new Set(actions.map(a => a.type))] as MediaType[];
       for (const mt of mediaTypes) {
         try {
@@ -179,7 +184,7 @@ export function useIntegrationSync() {
       setState(s => ({ ...s, isApplying: false, error: err.message }));
       return { success: false, error: err.message };
     }
-  }, []);
+  }, [queryClient]);
 
   /**
    * Sends a single-item realtime sync (e.g. after episode completion).

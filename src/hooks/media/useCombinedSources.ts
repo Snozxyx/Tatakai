@@ -1,3 +1,4 @@
+import { useRemoteExtensionSources } from "./useRemoteExtensionSources";
 import { useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchCombinedSources } from "@/lib/api";
@@ -244,6 +245,7 @@ function mapRawSourcesToStreamingData(rawSources: any[], ctx: MapContext): Strea
       isTorrent: typeof src.isTorrent === "boolean" ? src.isTorrent : src.sourceType === "torrent",
       originalUrl: src.originalUrl,
       magnetLink: src.magnetLink,
+      fileIndex: src.fileIndex,
       torrentFileUrl: src.torrentFileUrl,
       seeders: typeof src.seeders === "number" ? src.seeders : undefined,
       leechers: typeof src.leechers === "number" ? src.leechers : undefined,
@@ -434,6 +436,7 @@ export function useCombinedSourcesWithRefetch(
   const streamEnabled =
     !!episodeId && (hasAnilist || !!animeName) && typeof episodeNumber === "number" && !!episodeNumber;
 
+  const remote = useRemoteExtensionSources(hasAnilist ? anilistIdNum : undefined, animeName, episodeNumber, category === "dub");
   const stream = useExtensionSourceStream("toko", {
     anilistId: hasAnilist ? anilistIdNum : undefined,
     titles: animeName ? [animeName] : undefined,
@@ -474,20 +477,30 @@ export function useCombinedSourcesWithRefetch(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streamEnabled, stream.sources, stream.phase, stream.providerStatus, category, knownAnilistId, knownMalId]);
 
-  const data = useFallback ? fallback.data : (streamData ?? fallback.data);
+  const baseData = useFallback ? fallback.data : (streamData ?? fallback.data);
+  const data = useMemo(() => {
+    if (!remote.data) return baseData;
+    const extra = mapRawSourcesToStreamingData(remote.data.sources, { category, knownAnilistId, knownMalId });
+    const dedup = <T,>(items: T[], key: (item: T) => string): T[] => [...new Map(items.map(item => [key(item), item])).values()];
+    return { ...extra, ...baseData, hasTatakaiProviders: true,
+      sources: dedup([...(baseData?.sources || []), ...extra.sources], s => String(s.providerKey) + s.url + String(s.fileIndex ?? '')).map(source => ({ ...source, subtitles: dedup([...(source.subtitles || []), ...remote.data.subtitles], s => s.url) })),
+      subtitles: dedup([...(baseData?.subtitles || []), ...extra.subtitles, ...remote.data.subtitles], s => s.url),
+      providerServers: [...(baseData?.providerServers || []), ...extra.providerServers],
+      providerStatus: [...(baseData?.providerStatus || []), ...remote.data.statuses],
+    } as CombinedResult;
+  }, [baseData, remote.data, category, knownAnilistId, knownMalId]);
 
-  const isLoading = useFallback ? fallback.isLoading : data === undefined;
-  const isFetching = useFallback
-    ? fallback.isFetching
-    : !stream.baseResolved || stream.phase === "connecting" || stream.phase === "streaming";
+  const isLoading = (useFallback ? fallback.isLoading : data === undefined) || (remote.isLoading && !data?.sources.length);
+  const isFetching = remote.isFetching || (useFallback ? fallback.isFetching : !stream.baseResolved || stream.phase === "connecting" || stream.phase === "streaming");
   const error = useFallback ? fallback.error : stream.phase === "error" ? stream.error : null;
 
   const streamReload = stream.reload;
   const fallbackRefetch = fallback.refetch;
   const refetch = useCallback(async () => {
     streamReload();
+    await remote.refetch();
     return fallbackRefetch();
-  }, [streamReload, fallbackRefetch]);
+  }, [streamReload, fallbackRefetch, remote.refetch]);
 
   // Additive diagnostics so callers can explain an empty server list instead
   // of a dead "No servers found" — distinguishes "toko host unreachable /
@@ -505,5 +518,5 @@ export function useCombinedSourcesWithRefetch(
     providerStatus: stream.providerStatus,
   };
 
-  return { data, isLoading, isFetching, error, refetch, diagnostics };
+  return { data, isLoading, isFetching, error, refetch, diagnostics: { ...diagnostics, remoteProviders: remote.data?.statuses, remoteFetching: remote.isFetching } };
 }

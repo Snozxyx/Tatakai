@@ -18,7 +18,7 @@ import { WatchStreaks } from '@/components/profile/WatchStreaks';
 import { useWatchStreaks, usePublicWatchStreaks } from '@/hooks/user/useWatchStreaks';
 import { useExternalStats } from '@/hooks/user/useExternalStats';
 import { ProfileOverviewTab } from '@/components/profile/overview';
-import { WatchlistTab, MangaReadlistTab, HistoryTab, VaultTab } from '@/components/profile/tabs';
+import { WatchlistTab, MangaReadlistTab, NovelReadlistTab, HistoryTab, VaultTab } from '@/components/profile/tabs';
 import { ProfileSettingsSheet } from '@/components/profile/ProfileSettingsSheet';
 import { ProfileBackgroundEffects } from '@/components/profile/ProfileBackgroundEffects';
 import { AvatarDecoration } from '@/components/profile/AvatarDecoration';
@@ -28,6 +28,7 @@ import { readProfileCustomization, profileSurfaceStyle } from '@/lib/profileSett
 import { Seo } from '@/components/seo/Seo';
 import { useWatchlist } from '@/hooks/user/useWatchlist';
 import { useWatchHistory } from '@/hooks/user/useWatchHistory';
+import { useResolvedMangaReadlist } from '@/hooks/api/useResolvedMangaReadlist';
 import { usePublicProfile, usePublicWatchlist, usePublicWatchHistory } from '@/hooks/user/useProfileFeatures';
 import {
   useMangaReadlist,
@@ -36,6 +37,7 @@ import {
   usePublicReadingTrackTotals,
   type MangaReadlistStatus,
 } from '@/hooks/user/useMangaReadlist';
+import { useNovelReadlist } from '@/hooks/user/useNovelReadlist';
 import { useUserForumPosts } from '@/hooks/community/useForum';
 import { useFollow } from '@/hooks/community/useFollow';
 import { useUserRank } from '@/hooks/community/useLeaderboard';
@@ -121,6 +123,7 @@ export default function ProfilePage() {
   const { data: ownHistory, isLoading: loadingOwnHistory } = useWatchHistory();
   const { data: ownMangaReadlist = [], isLoading: loadingOwnMangaReadlist } = useMangaReadlist();
   const { data: ownMangaReadingHistory = [], isLoading: loadingOwnMangaReadingHistory } = useMangaReadlist(MANGA_READING_ONLY_STATUSES);
+  const { data: ownNovelReadlist = [], isLoading: loadingOwnNovelReadlist } = useNovelReadlist();
 
   const { data: publicWatchlist = [], isLoading: loadingPublicWatchlist } = usePublicWatchlist(
     publicProfile?.user_id,
@@ -168,11 +171,13 @@ export default function ProfilePage() {
 
   const watchlist = isViewingOther ? publicWatchlist : ownWatchlist;
   const history = isViewingOther ? publicHistory : ownHistory;
-  const mangaReadlist = isViewingOther ? publicMangaReadlist : ownMangaReadlist;
+  const { data: mangaReadlist, isLoading: loadingMangaMetadata } = useResolvedMangaReadlist(
+    isViewingOther ? publicMangaReadlist : ownMangaReadlist,
+  );
   const mangaHistorySource = isViewingOther ? publicMangaReadingHistory : ownMangaReadingHistory;
   const loadingWatchlist = isViewingOther ? loadingPublicWatchlist : loadingOwnWatchlist;
   const loadingHistory = isViewingOther ? loadingPublicHistory : loadingOwnHistory;
-  const loadingMangaReadlist = isViewingOther ? loadingPublicMangaReadlist : loadingOwnMangaReadlist;
+  const loadingMangaReadlist = (isViewingOther ? loadingPublicMangaReadlist : loadingOwnMangaReadlist) || loadingMangaMetadata;
   const loadingMangaHistory = isViewingOther ? loadingPublicMangaReadingHistory : loadingOwnMangaReadingHistory;
   const loadingCombinedHistory = loadingHistory || loadingMangaHistory;
 
@@ -217,6 +222,7 @@ export default function ProfilePage() {
     manga: readingTotals?.manga ?? 0,
     manhwa: readingTotals?.manhwa ?? 0,
     comic: readingTotals?.comic ?? 0,
+    novel: readingTotals?.novel ?? 0,
   });
 
   const showWatchlistTab = !isViewingOther || (publicProfile?.is_public && publicProfile?.show_watchlist !== false);
@@ -267,6 +273,15 @@ export default function ProfilePage() {
   const forumUpvotes = useMemo(
     () => (forumPosts || []).reduce((acc: number, p: any) => acc + (p.upvotes || 0), 0),
     [forumPosts],
+  );
+
+  const novelChaptersRead = useMemo(
+    () =>
+      (ownNovelReadlist || []).reduce(
+        (acc: number, item: any) => acc + (Number(item.last_chapter_number) || 0),
+        0,
+      ),
+    [ownNovelReadlist],
   );
 
   // Real reputation score (0–100) from actual activity signals. viewedStreak is
@@ -436,7 +451,10 @@ export default function ProfilePage() {
       )}>
         
         {/* ── Cinematic Hero Banner ── */}
-        <div className="h-[360px] md:h-[500px] relative w-full overflow-hidden group select-none">
+        <div className={cn(
+          "h-[360px] md:h-[500px] relative w-full overflow-hidden group select-none",
+          !isDesktopApp && "md:-ml-24 md:w-[calc(100%+6rem)]"
+        )}>
           <ProfileCosmeticEffect effect={profileEffect} />
           <div
             className="absolute inset-0 pointer-events-none"
@@ -544,6 +562,7 @@ export default function ProfilePage() {
                     userStats={{
                       episodes: effectiveEpisodeCount,
                       manga_chapters: mangaCounts.totalChapters,
+                      novel_chapters: novelChaptersRead,
                       comments: commentsCount,
                       ratings: userRatings.length,
                       reputation: reputationRate,
@@ -711,6 +730,12 @@ export default function ProfilePage() {
                     Manga Readlist
                   </TabsTrigger>
                 )}
+                {showWatchlistTab && (
+                  <TabsTrigger value="novel-readlist" className="shrink-0 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-4 py-2.5 text-sm font-bold transition-all sm:px-6">
+                    <BookOpen className="w-4 h-4" />
+                    Novels
+                  </TabsTrigger>
+                )}
                 {showHistoryTab && (
                   <TabsTrigger value="history" className="shrink-0 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-4 py-2.5 text-sm font-bold transition-all sm:px-6">
                     <History className="w-4 h-4" />
@@ -799,6 +824,17 @@ export default function ProfilePage() {
                     mangaReadlist={mangaReadlist || []}
                     loading={loadingMangaReadlist}
                     isViewingOther={isViewingOther}
+                    onNavigate={navigate}
+                  />
+                </TabsContent>
+              )}
+
+              {showWatchlistTab && !isViewingOther && (
+                <TabsContent value="novel-readlist" className="mt-8">
+                  <NovelReadlistTab
+                    novels={ownNovelReadlist || []}
+                    loading={loadingOwnNovelReadlist}
+                    isViewingOther={false}
                     onNavigate={navigate}
                   />
                 </TabsContent>

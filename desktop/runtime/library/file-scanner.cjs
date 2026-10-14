@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const VIDEO_EXTENSIONS = new Set(['.mp4', '.mkv', '.avi', '.webm']);
+const VIDEO_EXTENSIONS = new Set(['.mp4', '.mkv', '.avi', '.webm', '.mov', '.m4v', '.ts', '.m2ts']);
 
 /**
  * Recursively scans a directory for video files.

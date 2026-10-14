@@ -371,21 +371,25 @@ export function PostMediaEmbed({
   const kind = (type || 'anime').toLowerCase();
   const isCharacter = kind === 'character';
   const isAnime = kind === 'anime';
+  const isNovel = kind === 'novel' || kind === 'light_novel';
   const href = isCharacter
     ? `/character/${encodeURIComponent(id)}?name=${encodeURIComponent(name)}`
-    : isAnime ? `/anime/${id}` : `/manga/${id}`;
-  const kindLabel = isCharacter ? 'Character' : isAnime ? 'Anime' : kind.replace(/^\w/, (c) => c.toUpperCase());
+    : isAnime ? `/anime/${id}` : isNovel ? `/novel/${id}` : `/manga/${id}`;
+  const kindLabel = isCharacter ? 'Character' : isAnime ? 'Anime' : isNovel ? 'Novel' : kind.replace(/^\w/, (c) => c.toUpperCase());
 
   // The primary attachment upgrades to the app's canonical media card so a
   // shared title reads like it does everywhere else (poster + type badge),
   // instead of a hand-rolled pill. Sub-formats (manhwa/manhua/comics) collapse
-  // to the `manga` media type but keep their own label via `type`.
+  // to the `manga` media type but keep their own label via `type`; novels use
+  // the `novel` media type.
   if (variant === 'card') {
-    const mediaType: 'anime' | 'manga' | 'character' = isCharacter
+    const mediaType: 'anime' | 'manga' | 'novel' | 'character' = isCharacter
       ? 'character'
       : isAnime
         ? 'anime'
-        : 'manga';
+        : isNovel
+          ? 'novel'
+          : 'manga';
     return (
       <div className="max-w-[190px]" onClick={(e) => e.stopPropagation()}>
         <UnifiedMediaCard

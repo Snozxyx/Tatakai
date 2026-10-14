@@ -1,3 +1,4 @@
+import { DiagnosticsSettings } from '../DiagnosticsSettings';
 import { useNavigate } from 'react-router-dom';
 import { FileText, Info, MessageSquarePlus, Scale, ScrollText, Users } from 'lucide-react';
 import { useTheme } from '@/hooks/ui/useTheme';
@@ -54,6 +55,8 @@ export function AboutPanel() {
           }
         />
       </SettingsSection>
+
+      <DiagnosticsSettings />
 
       <SettingsSection icon={Scale} eyebrow="Legal" title="Legal & policies">
         <div className="flex flex-col">

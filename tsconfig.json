@@ -4,7 +4,10 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@tatakai/release-parser": ["./desktop/runtime/torrent/naming/release-parser.cjs"],
+      "@tatakai/candidate-scorer": ["./src/core/download/candidate-scorer.cjs"],
+      "@tatakai/candidate-evaluator": ["./src/core/download/candidate-evaluator.cjs"]
     },
     "noImplicitAny": false,
     "noUnusedParameters": false,

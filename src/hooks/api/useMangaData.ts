@@ -12,6 +12,7 @@ import { fetchMangaBakaSeries, type MangaBakaSeries } from "@/lib/mapping/mangab
 import { fetchKitsuChapterHierarchy, type KitsuChapterHierarchy } from "@/lib/mapping/kitsu";
 import { readCachedItemsSync, hydrateCachedItems } from "@/lib/cache/extensionResultCache";
 import type { MangaChapterResponse, MappedMangaChapter } from "@/types/manga";
+import { MEDIA_METADATA_STALE_TIME } from '@/lib/cache/mediaMetadataCache';
 
 // Detect mobile for longer cache times
 const isMobileNative = typeof window !== 'undefined' && 
@@ -112,10 +113,7 @@ export function useMangaDetail(id: string | undefined) {
     queryKey: ["manga-detail", id],
     queryFn: () => getMangaDetail(id!),
     enabled: !!id,
-    staleTime: FORCE_FRESH_MANGA_READS ? 0 : STALE_TIME.manga,
-    refetchOnMount: FORCE_FRESH_MANGA_READS ? "always" : true,
-    refetchOnWindowFocus: FORCE_FRESH_MANGA_READS,
-    refetchOnReconnect: FORCE_FRESH_MANGA_READS,
+    staleTime: MEDIA_METADATA_STALE_TIME,
   });
 }
 

@@ -93,7 +93,12 @@ public final class CloudflareBypass {
         "weebcentral.com", "nelomanga.com", "toongod.org", "www.toongod.org",
         "mangadot.net", "www.mangadot.net", "mangaball.net", "www.mangaball.net",
         "bulbasaur.poke-black-and-white.net", "heracross.red-and-blue.net",
-        "api.comick.dev"
+        "api.comick.dev",
+        "webnovel.com", "novelfull.com", "royalroad.com", "justlightnovels.com",
+        "lightnovel.to", "novelbuddy.me", "novelbuddy.com", "novelfire.net",
+        "novelbin.com", "readnovelfull.com", "novelcool.com", "novgo.net",
+        "re-library.com", "woopread.com", "wuxiaworld.site", "divinedaolibrary.com",
+        "toonily.com", "onisaga.com"
     ));
 
     /** Challenge body markers (desktop cloudflare-bypass `isChallengeResponse`). */
@@ -186,10 +191,11 @@ public final class CloudflareBypass {
 
     /** Desktop `isChallengeResponse` parity: status + body markers. */
     public static boolean isChallengeResponse(int status, String bodySnippet) {
-        if (status != 403 && status != 503 && status != 429) return false;
+        if (status != 200 && status != 403 && status != 503 && status != 429) return false;
         if (bodySnippet == null) return false;
         String lower = bodySnippet.toLowerCase(Locale.US);
         for (String marker : CHALLENGE_MARKERS) {
+            if (status == 200 && (marker.equals("turnstile") || marker.equals("attention required") || marker.equals("cf_clearance"))) continue;
             if (lower.contains(marker)) return true;
         }
         // Short body + CF ray header footprint (desktop's short-body heuristic).

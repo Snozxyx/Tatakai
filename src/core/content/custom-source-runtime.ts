@@ -1,3 +1,6 @@
+import { proxyCustomSources } from '@/core/extensions/remote/media';
+import { isCapacitor } from '@/lib/platform/platform';
+import { listRemoteCustomSources, remoteCustomRow, remoteCustomHome, remoteCustomSearch, remoteCustomInfo, remoteCustomWatch, remoteCustomRead } from '@/core/extensions/remote/custom';
 /**
  * Custom-source bridge (renderer side).
  *
@@ -145,7 +148,7 @@ function customNamespaces(namespaces: NamespaceInfo[]): NamespaceInfo[] {
  * "+" menu and the custom-source routes.
  */
 export async function listAllCustomSources(): Promise<CustomSourceEntry[]> {
-  const out: CustomSourceEntry[] = [];
+  const out: CustomSourceEntry[] = await listRemoteCustomSources();
   const seen = new Set<string>();
 
   // Deep links can reach a custom route before the app-shell bootstrap has
@@ -153,8 +156,9 @@ export async function listAllCustomSources(): Promise<CustomSourceEntry[]> {
   // first discovery query does not cache an empty custom-source list for five
   // minutes.
   try {
-    const cap = (globalThis as any).Capacitor;
-    if (cap?.isNativePlatform?.()) {
+    if (isCapacitor()) {
+      const { installMobileExtensionHost } = await import('@/core/extensions/mobile/mobileExtensionHost');
+      installMobileExtensionHost();
       const { initMobileExtensions } = await import('@/core/extensions/mobile/mobileExtensionInstaller');
       await initMobileExtensions();
     }
@@ -218,6 +222,13 @@ interface CustomHttpEnv {
 }
 
 async function resolveCustomHttpEnv(): Promise<CustomHttpEnv | null> {
+  if (isCapacitor()) {
+    const { installMobileExtensionHost } = await import('@/core/extensions/mobile/mobileExtensionHost');
+    installMobileExtensionHost();
+    const { initMobileExtensions } = await import('@/core/extensions/mobile/mobileExtensionInstaller');
+    await initMobileExtensions();
+    return { baseUrl: MOBILE_EXT_BASE };
+  }
   try {
     const base = await resolveExtensionApiBase();
     if (!base.baseUrl) return null;
@@ -263,6 +274,7 @@ export interface CustomReadData {
 // ── fetchers (HTTP primary, IPC fallback) ────────────────────────────────────
 
 export async function fetchCustomHome(namespace: string, sourceId: string): Promise<CustomHomeData> {
+  const remote = await remoteCustomRow(namespace); if (remote) return remoteCustomHome(remote, sourceId);
   const env = await resolveCustomHttpEnv();
   if (isMobileEnv(env)) {
     const r = await mobileCustom<{ sections?: unknown[]; filters?: CustomFilterSchema }>(
@@ -296,6 +308,7 @@ export async function fetchCustomSearch(
   page = 1,
   filters?: CustomSearchFilters,
 ): Promise<CustomSearchData> {
+  const remote = await remoteCustomRow(namespace); if (remote) return remoteCustomSearch(remote, sourceId, query, page);
   const filtersParam =
     filters && Object.keys(filters).length ? JSON.stringify(filters) : undefined;
   const env = await resolveCustomHttpEnv();
@@ -323,6 +336,7 @@ export async function fetchCustomSearch(
 }
 
 export async function fetchCustomInfo(namespace: string, sourceId: string, id: string): Promise<CustomInfoData | null> {
+  const remote = await remoteCustomRow(namespace); if (remote) return remoteCustomInfo(remote, sourceId, id);
   const env = await resolveCustomHttpEnv();
   if (isMobileEnv(env)) {
     const r = await mobileCustom<CustomInfoResult>(namespace, 'Info', [sourceId, id]);
@@ -356,15 +370,16 @@ export async function fetchCustomWatch(
   id: string,
   episodeId: string,
 ): Promise<CustomWatchData> {
+  const remote = await remoteCustomRow(namespace); if (remote) return remoteCustomWatch(remote, sourceId, episodeId);
   const env = await resolveCustomHttpEnv();
   if (isMobileEnv(env)) {
     const r = await mobileCustom<{ sources?: SourceResult[] }>(
       namespace, 'Watch', [sourceId, id, episodeId],
     );
-    if (r && Array.isArray(r.sources)) return { sources: r.sources };
+    if (r && Array.isArray(r.sources)) return { sources: await proxyCustomSources(r.sources) };
   } else if (env) {
     const body = await httpGetJson(customUrl(env.baseUrl, namespace, "watch", { sourceId, id, episodeId }));
-    if (body && Array.isArray(body.sources)) return { sources: body.sources };
+    if (body && Array.isArray(body.sources)) return { sources: await proxyCustomSources(body.sources) };
   }
   if (hasExtensionRuntime()) {
     const extId = await resolveExtensionId(namespace);
@@ -372,7 +387,7 @@ export async function fetchCustomWatch(
       const r = (await invokeExt(extId, "customWatch", [sourceId, id, episodeId])) as
         | { sources?: SourceResult[] }
         | null;
-      if (r && Array.isArray(r.sources)) return { sources: r.sources };
+      if (r && Array.isArray(r.sources)) return { sources: await proxyCustomSources(r.sources) };
     }
   }
   return { sources: [] };
@@ -384,6 +399,7 @@ export async function fetchCustomRead(
   id: string,
   chapterId: string,
 ): Promise<CustomReadData> {
+  const remote = await remoteCustomRow(namespace); if (remote) return remoteCustomRead(remote, chapterId);
   const env = await resolveCustomHttpEnv();
   if (isMobileEnv(env)) {
     const r = await mobileCustom<{ pages?: Array<{ pageNumber?: number; imageUrl?: string; proxiedImageUrl?: string | null; headers?: unknown }> }>(

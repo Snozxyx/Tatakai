@@ -464,24 +464,40 @@ function nowISO() {
  * the nearest package.json and sidesteps Node's require cache when invalidated.
  * Instances are cached per bundlePath; call `invalidate()` to force reload.
  */
-function createBundleLoader(logger) {
-    const cache = new Map(); // bundlePath → instance
+function createBundleLoader(logger, onReload) {
+    const cache = new Map(); // bundlePath → { instance, fingerprint }
     const tmpDir = path.join(os.tmpdir(), 'tatakai-extension-api-host');
     let counter = 0;
 
-    function load(bundlePath) {
-        if (cache.has(bundlePath)) return cache.get(bundlePath);
+    function load(bundlePath, manifest) {
         if (!fs.existsSync(bundlePath)) {
             throw new Error(`Extension bundle not found at ${bundlePath}`);
         }
+        const stat = fs.statSync(bundlePath);
+        const fingerprint = `${stat.mtimeMs}:${stat.ctimeMs}:${stat.size}:${JSON.stringify([manifest?.browserDomains, manifest?.permissions])}`;
+        const cached = cache.get(bundlePath);
+        if (cached?.fingerprint === fingerprint) return cached.instance;
+        if (cached) onReload?.();
         fs.mkdirSync(tmpDir, { recursive: true });
         counter++;
-        const tmp = path.join(tmpDir, `bundle-${counter}.cjs`);
+        const tmp = path.join(tmpDir, `bundle-${process.pid}-${require('node:crypto').randomUUID()}-${counter}.cjs`);
         fs.copyFileSync(bundlePath, tmp);
 
         const mod = require(tmp);
         const Bundle = mod.default || mod;
         const instance = typeof Bundle === 'function' ? new Bundle() : Bundle;
+        let browserHost;
+        if (typeof instance?.configureBrowserRuntime === 'function' && manifest?.browserDomains?.length) {
+            const { SeanimeBrowserHost } = require('../extension/seanime-browser-host.cjs');
+            const network = (manifest.permissions || []).filter(p => typeof p === 'string' && p.startsWith('network:domain:')).map(p => p.slice('network:domain:'.length));
+            browserHost = new SeanimeBrowserHost(manifest.browserDomains.filter(domain => typeof domain === 'string' && network.some(allowed => domain === allowed || domain.endsWith('.' + allowed))));
+            instance.configureBrowserRuntime({ newBrowser: async options => {
+                const id = await browserHost.call('newBrowser', null, [options]);
+                const browser = {};
+                for (const method of ['navigate', 'evaluate', 'executeCDP', 'sleep', 'close']) browser[method] = (...args) => browserHost.call(method, id, args);
+                return browser;
+            } });
+        }
         const hasProgressive = instance
             && (typeof instance.sourcesAll === 'function'
                 || typeof instance.streamAll === 'function'
@@ -493,23 +509,28 @@ function createBundleLoader(logger) {
         const hasManga = instance
             && (typeof instance.getMangaChapters === 'function'
                 || typeof instance.getMangaPages === 'function');
+        // A novel-only extension answers the novel contract (text chapters).
+        const hasNovel = instance
+            && (typeof instance.getNovelChapters === 'function'
+                || typeof instance.getNovelContent === 'function');
         // A custom-source extension (custom-source-v1) exposes customHome plus at
         // least one of customWatch/customRead. It may implement none of the above.
         const hasCustomSource = instance
             && typeof instance.customHome === 'function'
             && (typeof instance.customWatch === 'function'
                 || typeof instance.customRead === 'function');
-        if (!hasProgressive && !hasOneShot && !hasManga && !hasCustomSource) {
-            throw new Error('Extension bundle does not expose sourcesAll/streamAll/torrentAll, batch/single, getMangaChapters/getMangaPages, or customHome + customWatch/customRead');
+        if (!hasProgressive && !hasOneShot && !hasManga && !hasNovel && !hasCustomSource) {
+            throw new Error('Extension bundle does not expose sourcesAll/streamAll/torrentAll, batch/single, getMangaChapters/getMangaPages, getNovelChapters/getNovelContent, or customHome + customWatch/customRead');
         }
-        cache.set(bundlePath, instance);
+        cached?.browserHost?.closeAll();
+        cache.set(bundlePath, { instance, fingerprint, browserHost });
         logger?.info?.(`[ExtHost] bundle loaded (${instance.constructor?.name || 'bundle'}) from ${bundlePath}`);
         return instance;
     }
 
     return {
         load,
-        invalidate() { cache.clear(); },
+        invalidate() { for (const entry of cache.values()) entry.browserHost?.closeAll(); cache.clear(); },
     };
 }
 
@@ -533,8 +554,17 @@ function createBundleLoader(logger) {
  * `type`: any source that carries both headers and tracks needs it.
  */
 function applyProxy(normalized, rawHeaders, localProxy, logger) {
+    // Recover older custom bundles' API-root media wrappers before proxying.
+    let legacyTarget = null;
+    try {
+        const legacy = new URL(normalized.url);
+        const target = legacy.searchParams.get('url');
+        if (['127.0.0.1', 'localhost', '[::1]'].includes(legacy.hostname) && legacy.pathname === '/' && legacy.searchParams.has('password') && /^https?:\/\//i.test(target || '')) legacyTarget = target;
+    } catch {}
+    if (legacyTarget) normalized = { ...normalized, url: legacyTarget, originalUrl: legacyTarget };
+
     const hasHeaders = rawHeaders && typeof rawHeaders === 'object' && Object.keys(rawHeaders).length > 0;
-    const canRegister = hasHeaders && localProxy && typeof localProxy.registerSource === 'function';
+    const canRegister = (hasHeaders || legacyTarget) && localProxy && typeof localProxy.registerSource === 'function';
     if (!canRegister) return normalized;
 
     let out = normalized;
@@ -595,7 +625,53 @@ function logProviderChunk(logger, namespace, mode, chunk, count) {
  * @returns {{ handler: Function, listNamespaces: Function, invalidateBundles: Function }}
  */
 function createHostApp({ registry, localProxy, logger }) {
-    const bundleLoader = createBundleLoader(logger);
+    const bundleLoader = createBundleLoader(logger, () => resultCache.clear());
+
+    // ── In-process bundle fetch shim (novel + manga scraping proxy) ─────────
+    // Bundles loaded here via `require()` run in-process with no worker
+    // sandbox, so `toko/src/utils/http/fetch.ts` sees no
+    // `globalThis.__tatakai_fetch__` and falls back to a direct `fetch()`:
+    // no loopback proxy, no Cloudflare-bypass ladder, bare headers. Novel
+    // origins (webnovel / royalroad / novelfull / justlightnovels / …) answer
+    // that direct fetch with 403 "access blocked" while the worker-pool path
+    // — which forwards every bundle request through `GET /proxy?url=` —
+    // succeeds. Install the same forwarding here, closing over this host's
+    // own `localProxy`, so in-process novel/manga scraping shares the header
+    // replay + Cloudflare-bypass ladder. `fetch.ts` captures the shim at
+    // `require()` time, hence this runs once before any bundle load.
+    (function installInProcessFetchShim() {
+        if (typeof globalThis.__tatakai_fetch__ === 'function') return;
+        globalThis.__tatakai_fetch__ = async (url, init = {}) => {
+            const target = String(url || '');
+            let base = null;
+            try {
+                const candidate = localProxy?.baseUrl?.();
+                if (/^http:\/\/127\.0\.0\.1:\d+$/i.test(String(candidate || ''))) base = candidate;
+            } catch { base = null; }
+            // Proxy not up yet (shouldn't happen — the supervisor starts it
+            // before listening): direct fetch rather than failing the scrape.
+            if (!base) return fetch(target, init);
+            const proxyUrl = new URL('/proxy', base);
+            proxyUrl.searchParams.set('url', target);
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 30_000);
+            const callerSignal = init?.signal;
+            const onCallerAbort = () => controller.abort();
+            try { callerSignal?.addEventListener?.('abort', onCallerAbort, { once: true }); } catch { /* no signal */ }
+            try {
+                return await fetch(proxyUrl.toString(), {
+                    method: init.method || 'GET',
+                    headers: init.headers,
+                    body: init.body !== undefined ? init.body : undefined,
+                    redirect: 'follow',
+                    signal: controller.signal,
+                });
+            } finally {
+                clearTimeout(timer);
+                try { callerSignal?.removeEventListener?.('abort', onCallerAbort); } catch { /* ignore */ }
+            }
+        };
+    })();
 
     /** Resolve a namespace to a trusted registered extension entry, or null. */
     function findNamespaceEntry(namespace) {
@@ -603,10 +679,8 @@ function createHostApp({ registry, localProxy, logger }) {
             const entry = registry.lookup(id);
             const api = entry?.manifest?.apiServer;
             if (api && api.namespace === namespace) {
-                if (entry.manifest.sideloaded !== true) {
-                    logger?.warn?.(`[ExtHost] Refusing untrusted apiServer namespace '${namespace}' from ${id} (not sideloaded)`);
-                    return null;
-                }
+                // Entries are already installed and loaded by the registry.
+                // Legacy `sideloaded` metadata must not disagree with discovery.
                 return { id, entry };
             }
         }
@@ -619,7 +693,7 @@ function createHostApp({ registry, localProxy, logger }) {
         for (const id of registry.listLoaded()) {
             const entry = registry.lookup(id);
             const api = entry?.manifest?.apiServer;
-            if (api && api.namespace && entry.manifest.sideloaded === true) {
+            if (api && api.namespace) {
                 const capabilities = Array.isArray(entry.manifest.capabilities)
                     ? entry.manifest.capabilities
                     : [];
@@ -653,7 +727,7 @@ function createHostApp({ registry, localProxy, logger }) {
     async function handleSourceRequest(req, res, mode, entry, searchParams) {
         let bundle;
         try {
-            bundle = bundleLoader.load(entry.bundlePath);
+            bundle = bundleLoader.load(entry.bundlePath, entry.manifest);
         } catch (err) {
             logger?.warn?.(`[ExtHost] bundle load failed: ${err.message}`);
             res.writeHead(502, JSON_HEADERS);
@@ -788,7 +862,7 @@ function createHostApp({ registry, localProxy, logger }) {
     function handleProviderList(res, entry, namespace) {
         let bundle;
         try {
-            bundle = bundleLoader.load(entry.bundlePath);
+            bundle = bundleLoader.load(entry.bundlePath, entry.manifest);
         } catch (err) {
             res.writeHead(502, JSON_HEADERS);
             return res.end(JSON.stringify({ providers: [], count: 0, error: err.message }));
@@ -839,7 +913,7 @@ function createHostApp({ registry, localProxy, logger }) {
     async function handleSingleProvider(req, res, entry, namespace, providerName, searchParams) {
         let bundle;
         try {
-            bundle = bundleLoader.load(entry.bundlePath);
+            bundle = bundleLoader.load(entry.bundlePath, entry.manifest);
         } catch (err) {
             res.writeHead(502, JSON_HEADERS);
             return res.end(JSON.stringify({ provider: providerName, sources: [], count: 0, error: err.message }));
@@ -901,7 +975,7 @@ function createHostApp({ registry, localProxy, logger }) {
     async function handleMangaChapters(res, entry, namespace, searchParams) {
         let bundle;
         try {
-            bundle = bundleLoader.load(entry.bundlePath);
+            bundle = bundleLoader.load(entry.bundlePath, entry.manifest);
         } catch (err) {
             res.writeHead(502, JSON_HEADERS);
             return res.end(JSON.stringify({ namespace, chapters: [], count: 0, error: err.message }));
@@ -986,7 +1060,7 @@ function createHostApp({ registry, localProxy, logger }) {
     async function handleMangaPages(res, entry, namespace, searchParams) {
         let bundle;
         try {
-            bundle = bundleLoader.load(entry.bundlePath);
+            bundle = bundleLoader.load(entry.bundlePath, entry.manifest);
         } catch (err) {
             res.writeHead(502, JSON_HEADERS);
             return res.end(JSON.stringify({ namespace, pages: [], count: 0, error: err.message }));
@@ -1054,6 +1128,177 @@ function createHostApp({ registry, localProxy, logger }) {
         return res.end(JSON.stringify({ namespace, count: pages.length, pages, fetchedAt: nowISO() }));
     }
 
+    // ── Novel routes (`novel/chapters`, `novel/content`) ─────────────────────────
+    //
+    // Text twin of the manga routes: chapter listing is the same shape
+    // (number/title/volume + per-provider sources; `translator` rides alongside
+    // `scanlator`), while reading returns ordered paragraphs instead of image
+    // pages. Ungated like the manga routes — any extension whose bundle
+    // implements getNovelChapters/getNovelContent answers here.
+
+    /** Flatten `NovelChapterEntry[]` into flat rows for the novel runtime. */
+    function flattenNovelChapters(entries) {
+        const rows = [];
+        for (const ch of Array.isArray(entries) ? entries : []) {
+            const sources = Array.isArray(ch?.sources) ? ch.sources : [];
+            for (const src of sources) {
+                rows.push({
+                    number: ch.number,
+                    title: ch.title ?? null,
+                    volume: ch.volume ?? null,
+                    provider: src.provider,
+                    chapterKey: src.chapterKey,
+                    providerChapterId: src.providerChapterId ?? null,
+                    language: src.language ?? null,
+                    translator: src.translator ?? null,
+                    scanlator: src.translator ?? null,
+                    releaseDate: src.releaseDate ?? null,
+                });
+            }
+        }
+        return rows;
+    }
+
+    /**
+     * `GET /api/v3/<ns>/novel/chapters` — flat chapter rows for a title.
+     * Gated on the bundle exposing `getNovelChapters` (501 otherwise).
+     */
+    async function handleNovelChapters(res, entry, namespace, searchParams) {
+        let bundle;
+        try {
+            bundle = bundleLoader.load(entry.bundlePath, entry.manifest);
+        } catch (err) {
+            res.writeHead(502, JSON_HEADERS);
+            return res.end(JSON.stringify({ namespace, chapters: [], count: 0, error: err.message }));
+        }
+
+        if (typeof bundle.getNovelChapters !== 'function') {
+            res.writeHead(501, JSON_HEADERS);
+            return res.end(JSON.stringify({
+                namespace,
+                chapters: [],
+                count: 0,
+                error: "bundle does not implement getNovelChapters() — this extension does not provide novels",
+            }));
+        }
+
+        const params = { ...mangaParamsFromQuery(searchParams), provider: searchParams.get('provider') || undefined, seriesId: searchParams.get('seriesId') || undefined, fullScan: searchParams.get('fullScan') === '1' };
+        const bypassCache = searchParams.get('refresh') === '1' || searchParams.get('nocache') === '1';
+        const key = [
+            'novel-chapters', namespace,
+            params.fullScan ? 'full' : 'fast',
+            params.provider || '', params.seriesId || '',
+            params.anilistId || 0, params.malId || 0,
+            params.title || '', (params.titles || []).join('|'),
+        ].join(':');
+
+        if (!bypassCache) {
+            const hit = cacheGet(key);
+            if (hit) {
+                res.writeHead(200, JSON_HEADERS);
+                return res.end(JSON.stringify({
+                    namespace, provider: namespace,
+                    count: hit.chapters.length, chapters: hit.chapters,
+                    providerStatus: hit.providerStatus || [],
+                    cached: true, fetchedAt: nowISO(),
+                }));
+            }
+        }
+
+        let chapters;
+        let providerStatus = [];
+        let partial = false;
+        try {
+            let entries;
+            if (typeof bundle.debugNovelChapters === 'function') {
+                const debug = await bundle.debugNovelChapters(params);
+                entries = debug && Array.isArray(debug.results) ? debug.results : [];
+                providerStatus = debug && Array.isArray(debug.diagnostics) ? debug.diagnostics : [];
+                partial = debug?.complete === false;
+            } else {
+                entries = await bundle.getNovelChapters(params);
+            }
+            chapters = flattenNovelChapters(entries);
+            logger?.info?.(`[ExtHost] ${namespace}/novel/chapters bundle returned entries=${Array.isArray(entries) ? entries.length : typeof entries} → flattened=${chapters.length} (params=${JSON.stringify(params)})`);
+        } catch (err) {
+            logger?.warn?.(`[ExtHost] ${namespace}/novel/chapters failed: ${err && err.stack ? err.stack : err.message}`);
+            res.writeHead(502, JSON_HEADERS);
+            return res.end(JSON.stringify({ namespace, chapters: [], count: 0, error: err.message }));
+        }
+
+        if (chapters.length > 0 && !partial) cacheSet(key, { chapters, providerStatus }, MANGA_TTL_MS);
+        res.writeHead(200, JSON_HEADERS);
+        return res.end(JSON.stringify({
+            namespace, provider: namespace,
+            count: chapters.length, chapters, providerStatus, partial,
+            cached: false, fetchedAt: nowISO(),
+        }));
+    }
+
+    /**
+     * `GET /api/v3/<ns>/novel/content` — ordered paragraphs for one chapter.
+     * Never cached (translator edits + paragraph-count growth).
+     */
+    async function handleNovelContent(res, entry, namespace, searchParams) {
+        let bundle;
+        try {
+            bundle = bundleLoader.load(entry.bundlePath, entry.manifest);
+        } catch (err) {
+            res.writeHead(502, JSON_HEADERS);
+            return res.end(JSON.stringify({ namespace, paragraphs: [], count: 0, error: err.message }));
+        }
+
+        if (typeof bundle.getNovelContent !== 'function') {
+            res.writeHead(501, JSON_HEADERS);
+            return res.end(JSON.stringify({
+                namespace, paragraphs: [], count: 0,
+                error: "bundle does not implement getNovelContent() — this extension does not provide novels",
+            }));
+        }
+
+        const chapterKey = String(searchParams.get('chapterKey') || '').trim();
+        if (!chapterKey) {
+            res.writeHead(400, JSON_HEADERS);
+            return res.end(JSON.stringify({ namespace, paragraphs: [], count: 0, error: 'chapterKey is required' }));
+        }
+        const anilistId = Number(searchParams.get('anilistId'));
+        const contentParams = {
+            chapterKey,
+            provider: searchParams.get('provider') || undefined,
+            providerChapterId: searchParams.get('providerChapterId') || undefined,
+            ...(Number.isFinite(anilistId) && anilistId > 0 ? { anilistId } : {}),
+        };
+
+        let content;
+        try {
+            content = await bundle.getNovelContent(contentParams);
+        } catch (err) {
+            const notFound = /not found/i.test(err.message || '');
+            logger?.warn?.(`[ExtHost] ${namespace}/novel/content ${chapterKey} failed: ${err.message}`);
+            res.writeHead(notFound ? 404 : 502, JSON_HEADERS);
+            return res.end(JSON.stringify({ namespace, paragraphs: [], count: 0, error: err.message }));
+        }
+
+        const paragraphs = (content && Array.isArray(content.paragraphs) ? content.paragraphs : [])
+            .filter((p) => p && String(p.text || '').trim())
+            .map((p, idx) => ({ index: typeof p.index === 'number' ? p.index : idx, text: String(p.text) }));
+        if (paragraphs.length === 0) {
+            res.writeHead(404, JSON_HEADERS);
+            return res.end(JSON.stringify({ namespace, paragraphs: [], count: 0, error: `Chapter not found: ${chapterKey}` }));
+        }
+
+        res.writeHead(200, JSON_HEADERS);
+        return res.end(JSON.stringify({
+            namespace,
+            count: paragraphs.length,
+            paragraphs,
+            title: content.title ?? null,
+            number: content.number ?? null,
+            provider: content.provider ?? namespace,
+            fetchedAt: nowISO(),
+        }));
+    }
+
     // ── Custom sources (`custom-source-v1`) ─────────────────────────────────────
     //
     // Isolated read/watch verticals. Like the manga routes these are ungated —
@@ -1065,7 +1310,7 @@ function createHostApp({ registry, localProxy, logger }) {
     /** Load the namespace's bundle or write a 502; returns null on failure. */
     function loadCustomBundle(res, entry, namespace, emptyShape) {
         try {
-            return bundleLoader.load(entry.bundlePath);
+            return bundleLoader.load(entry.bundlePath, entry.manifest);
         } catch (err) {
             res.writeHead(502, JSON_HEADERS);
             res.end(JSON.stringify({ namespace, ...emptyShape, error: err.message }));
@@ -1464,6 +1709,42 @@ function createHostApp({ registry, localProxy, logger }) {
             return;
         }
 
+        // Novel routes — text twin of the manga routes above. Available
+        // whenever the bundle implements the novel contract; the 501 inside
+        // each handler covers a manga/anime-only bundle.
+        if (route === 'novel/chapters') {
+            try {
+                await handleNovelChapters(res, found.entry, namespace, searchParams);
+            } catch (err) {
+                logger?.error?.(`[ExtHost] novel chapters handler crashed: ${err.message}`);
+                if (!res.headersSent) {
+                    res.writeHead(502, JSON_HEADERS);
+                    res.end(JSON.stringify({ namespace, chapters: [], count: 0, error: err.message }));
+                }
+            }
+            return;
+        }
+        if (route === 'novel/search') {
+            try {
+                const bundle = bundleLoader.load(found.entry.bundlePath, found.entry.manifest);
+                if (typeof bundle.getNovelSearch !== 'function') { res.writeHead(501, JSON_HEADERS); return res.end(JSON.stringify({ error: 'Update Toko to enable provider search', results: [] })); }
+                const result = await bundle.getNovelSearch({ query: searchParams.get('query') || '', provider: searchParams.get('provider') || undefined });
+                res.writeHead(200, JSON_HEADERS); return res.end(JSON.stringify({ namespace, ...result }));
+            } catch (error) { res.writeHead(502, JSON_HEADERS); return res.end(JSON.stringify({ results: [], error: error.message })); }
+        }
+        if (route === 'novel/content') {
+            try {
+                await handleNovelContent(res, found.entry, namespace, searchParams);
+            } catch (err) {
+                logger?.error?.(`[ExtHost] novel content handler crashed: ${err.message}`);
+                if (!res.headersSent) {
+                    res.writeHead(502, JSON_HEADERS);
+                    res.end(JSON.stringify({ namespace, paragraphs: [], count: 0, error: err.message }));
+                }
+            }
+            return;
+        }
+
         // Custom-source routes — ungated like the manga routes. Any extension
         // whose bundle implements the `custom*` methods answers here; the 501
         // inside each handler covers a bundle that doesn't. These verticals are
@@ -1522,6 +1803,7 @@ module.exports = {
     createHostApp,
     // Exported for unit testing / reuse
     normalizeSource,
+    applyProxy,
     resolveSourceType,
     inferLanguage,
     optionsFromQuery,

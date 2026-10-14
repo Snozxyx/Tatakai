@@ -7,6 +7,7 @@ import { Reveal } from "@/components/ui/Reveal";
 import { ShowcaseMedia } from "@/components/landing/ShowcaseMedia";
 import { MobileShowcase } from "@/components/landing/MobileShowcase";
 import { MoreFeatures } from "@/components/landing/MoreFeatures";
+import { Integrations } from "@/components/landing/Integrations";
 import { Extensions } from "@/components/landing/Extensions";
 import { Progression } from "@/components/landing/Progression";
 import {
@@ -27,6 +28,9 @@ import {
   CalendarDays,
   Trophy,
   Heart,
+  BookMarked,
+  Gauge,
+  MousePointer2,
   X,
   Maximize2,
   Check,
@@ -76,6 +80,17 @@ const flagships: Flagship[] = [
     media: `https://res.cloudinary.com/hgytxblu/video/upload/v1791138030/MangaReader.mp4`,
     accent: "text-pink-200",
     glow: "bg-pink-500/20",
+  },
+  {
+    icon: BookMarked,
+    kicker: "Novel reader · Listern",
+    title: "Get lost in every chapter",
+    body: "A focused light novel reader with a calm reading experience, flexible controls, and progress that stays with you.",
+    points: ["Light novel support", "Custom keybinds", "Saved progress"],
+    media:
+      "https://res.cloudinary.com/hgytxblu/video/upload/v1791808194/export-1791807786726.mp4",
+    accent: "text-fuchsia-200",
+    glow: "bg-fuchsia-500/20",
   },
   {
     icon: BarChart3,
@@ -201,6 +216,66 @@ const community: Tile[] = [
   },
 ];
 
+interface HighlightedFeature {
+  icon: LucideIcon;
+  eyebrow: string;
+  title: string;
+  body: string;
+  accent: string;
+  iconBackground: string;
+}
+
+const highlightedFeatures: HighlightedFeature[] = [
+  {
+    icon: Clapperboard,
+    eyebrow: "Watch",
+    title: "Anime support",
+    body: "Track episodes, discover what to watch next, and keep your progress in sync.",
+    accent: "text-violet-200",
+    iconBackground: "bg-violet-400/10",
+  },
+  {
+    icon: BookOpen,
+    eyebrow: "Read",
+    title: "Manga support",
+    body: "Follow chapters and keep every series close, from manga to manhwa and comics.",
+    accent: "text-cyan-200",
+    iconBackground: "bg-cyan-400/10",
+  },
+  {
+    icon: BookMarked,
+    eyebrow: "Discover",
+    title: "Novel support",
+    body: "Build one library for the stories you watch, read, and come back to.",
+    accent: "text-pink-200",
+    iconBackground: "bg-pink-400/10",
+  },
+  {
+    icon: Gauge,
+    eyebrow: "Performance",
+    title: "Fast by default",
+    body: "A focused interface that gets out of the way and keeps your library feeling instant.",
+    accent: "text-amber-200",
+    iconBackground: "bg-amber-400/10",
+  },
+  {
+    icon: MousePointer2,
+    eyebrow: "Experience",
+    title: "Easy to use",
+    body: "Simple controls, clear progress, and thoughtful details make Tatakai feel natural.",
+    accent: "text-emerald-200",
+    iconBackground: "bg-emerald-400/10",
+  },
+  {
+    icon: Users,
+    eyebrow: "Community",
+    title: "Find your people",
+    body: "Share recommendations, discuss favorites, and follow the fandom around you.",
+    accent: "text-blue-200",
+    iconBackground: "bg-blue-400/10",
+  },
+];
+
 function SectionHeading({
   id,
   eyebrow,
@@ -281,8 +356,8 @@ export function FeatureShowcase() {
             <SectionHeading
               id="flagship-features-heading"
               eyebrow="The complete experience"
-              title="Everything anime & manga, done right"
-              sub="One app for discovering, tracking, and sharing the anime & manga you love — designed to stay out of your way."
+              title="Everything anime, manga & novels, done right"
+              sub="One app for discovering, tracking, and sharing the stories you love — designed to stay out of your way."
             />
           </Reveal>
 
@@ -374,6 +449,69 @@ export function FeatureShowcase() {
                           </div>
                         </div>
                       </div>
+                    </div>
+                  </article>
+                </Reveal>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* ============================================================
+            HIGHLIGHTED FEATURES
+        ============================================================ */}
+        <section
+          className="border-t border-white/[0.08] py-16 lg:py-28"
+          aria-labelledby="highlighted-features-heading"
+        >
+          <Reveal>
+            <SectionHeading
+              id="highlighted-features-heading"
+              eyebrow="Why Tatakai"
+              title="One home for everything you love"
+              sub="Anime, manga, and novels come together with the speed and simplicity to make keeping up feel effortless."
+            />
+          </Reveal>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
+            {highlightedFeatures.map((feature, index) => {
+              const Icon = feature.icon;
+              const isPrimary = index === 0;
+
+              return (
+                <Reveal
+                  key={feature.title}
+                  delay={index * 0.05}
+                  className={isPrimary ? "lg:col-span-2 lg:row-span-2" : "lg:col-span-2"}
+                >
+                  <article
+                    className={`group relative flex h-full min-h-[220px] flex-col overflow-hidden rounded-[24px] border border-white/[0.1] bg-white/[0.035] p-6 shadow-[0_20px_60px_-35px_rgba(0,0,0,0.9)] transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:bg-white/[0.055] ${
+                      isPrimary ? "lg:min-h-[456px] lg:p-8" : ""
+                    }`}
+                  >
+                    <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-white/[0.04] blur-3xl transition-opacity duration-500 group-hover:opacity-80" />
+
+                    <div className="relative flex items-start justify-between gap-4">
+                      <div
+                        className={`flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 ${feature.iconBackground}`}
+                      >
+                        <Icon className={`h-5 w-5 ${feature.accent}`} aria-hidden="true" />
+                      </div>
+                      <span className="font-mono text-[10px] font-medium tracking-[0.18em] text-white/25">
+                        0{index + 1}
+                      </span>
+                    </div>
+
+                    <div className="relative mt-auto pt-12">
+                      <p className={`mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] ${feature.accent} opacity-80`}>
+                        {feature.eyebrow}
+                      </p>
+                      <h3 className="font-display text-xl font-medium leading-tight tracking-[-0.03em] text-white lg:text-2xl">
+                        {feature.title}
+                      </h3>
+                      <p className="mt-3 max-w-sm text-sm leading-relaxed text-white/50">
+                        {feature.body}
+                      </p>
                     </div>
                   </article>
                 </Reveal>
@@ -719,6 +857,11 @@ export function FeatureShowcase() {
             })}
           </div>
         </section>
+
+        {/* ============================================================
+            INTEGRATIONS (trackers + Seanime/Stremio ecosystems)
+        ============================================================ */}
+        <Integrations />
 
         {/* ============================================================
             EXTENSIONS

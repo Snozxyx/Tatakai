@@ -1,3 +1,4 @@
+import { recordDiagnosticError } from '@/core/diagnostics/recent-errors';
 import { logClientError } from './errorLogger';
 
 const noop = () => {};
@@ -22,6 +23,7 @@ export const logger = {
     }
   },
   warn: (...args: any[]) => {
+    recordDiagnosticError('warning', args[0]);
     if (!import.meta.env.PROD) {
       origConsole.warn(...args);
     }
@@ -35,6 +37,7 @@ export const logger = {
     } catch {}
   },
   error: async (...args: any[]) => {
+    recordDiagnosticError('error', args[0]);
     // Always keep original error output so developers can inspect locally
     origConsole.error(...args);
 

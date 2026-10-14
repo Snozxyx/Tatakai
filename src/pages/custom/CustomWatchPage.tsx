@@ -1,3 +1,4 @@
+import { SourceDebug } from '@/components/extensions/SourceDebug';
 /**
  * Custom-source watch page (`kind: 'watch'`).
  *
@@ -64,15 +65,18 @@ function toPlaybackSources(sources: SourceResult[]): PlaybackSource[] {
 }
 
 function toSubtitles(sources: SourceResult[]): ExternalSubtitle[] {
-  const first = sources.find((s) => Array.isArray(s.subtitles) && s.subtitles.length);
-  if (!first) return [];
-  return first.subtitles.map((t) => ({
-    lang: t.language,
-    url: t.url,
-    label: t.label,
-    originalUrl: (t as typeof t & { originalUrl?: string }).originalUrl,
-    headers: (t as typeof t & { headers?: Record<string, string> }).headers || first.headers,
-  }));
+  const seen = new Set<string>();
+  return sources.flatMap(source => (source.subtitles || []).map(track => ({
+    lang: track.language || 'und',
+    url: track.url,
+    label: track.label,
+    originalUrl: (track as typeof track & { originalUrl?: string }).originalUrl,
+    headers: (track as typeof track & { headers?: Record<string, string> }).headers || source.headers,
+  }))).filter(track => {
+    const key = track.originalUrl || track.url;
+    if (!key || seen.has(key)) return false;
+    seen.add(key); return true;
+  });
 }
 
 function toHeaders(sources: SourceResult[]): PlaybackHeaders | undefined {
@@ -163,6 +167,7 @@ export default function CustomWatchPage() {
       </div>
 
       <div className="mx-auto w-full max-w-6xl px-3 py-4">
+        <SourceDebug kind="custom" sources={sources.map(s => ({ providerKey: namespace, providerName: s.source || source?.name }))} />
         {isLoading ? (
           <div className="flex items-center justify-center gap-2 py-24 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" /> Loading sources…
@@ -171,10 +176,15 @@ export default function CustomWatchPage() {
           <GlassPanel className="mx-auto max-w-xl border border-white/10 p-6">
             <h2 className="text-xl font-bold">Unable to load this episode</h2>
             <p className="mt-2 text-muted-foreground">
-              {servers.length > 1
+              {failed && playbackSources.length > 0
+                ? "The stream was found, but playback failed. Retry it or choose another server."
+                : servers.length > 1
                 ? "This server returned no playable stream. Try another server below, or a different episode."
                 : "The source returned no playable streams. Try another episode or check that the extension is running."}
             </p>
+            {failed && (playbackSources.length > 0 || activeEmbed) && (
+              <button type="button" onClick={() => setFailed(false)} className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Retry playback</button>
+            )}
             {servers.length > 1 && (
               <div className="mt-4 flex flex-wrap gap-2">
                 {servers.map((srv, idx) => (

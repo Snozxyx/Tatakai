@@ -15,6 +15,7 @@ export interface MangaSearchItem {
   href?: string;
   id?: string;
   mediaType: "manga" | "manhwa" | "manhua" | "comics";
+  format?: string | null;
   anilistId?: number;
   malId?: number;
   canonicalTitle: string;
@@ -146,6 +147,7 @@ export interface MangaChapter {
 
 export interface MangaChapterSource {
   provider: string;
+  providerName?: string;
   chapterKey: string;
   providerChapterId: string;
   language: string | null;
@@ -154,6 +156,8 @@ export interface MangaChapterSource {
 }
 
 export interface MappedMangaChapter {
+  metadataSource?: 'mangaupdates';
+  releaseGroups?: string[];
   chapterNumber: number | null;
   chapterTitle: string | null;
   volume: number | null;
@@ -176,6 +180,15 @@ export interface MappedMangaChapter {
 }
 
 export interface MangaChapterResponse {
+  mangaUpdates?: {
+    seriesId: number;
+    title: string;
+    url: string;
+    latestChapter: number | null;
+    latestReleaseDate: string | null;
+    status: string | null;
+    partial: boolean;
+  };
   success?: true;
   anilistId: number;
   partial: boolean;

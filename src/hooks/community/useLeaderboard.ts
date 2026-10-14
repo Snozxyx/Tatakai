@@ -5,7 +5,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-export type LeaderboardType = 'watched' | 'rated' | 'comments' | 'active' | 'followers' | 'streak';
+export type LeaderboardType = 'watched' | 'rated' | 'comments' | 'active' | 'followers' | 'streak' | 'novels';
 
 export interface LeaderboardEntry {
   user_id: string;
@@ -70,8 +70,17 @@ export function useLeaderboard(
           break;
 
         case 'streak':
-          // Longest watch streak – fetch all watch_history dates per user
+          // Longest watch streak — fetch all watch_history dates per user
           return await getStreakLeaderboard(limit);
+
+        case 'novels':
+          // Most novel chapters read (manga_readlist rows with format = 'novel')
+          query = supabase
+            .from('manga_readlist')
+            .select('user_id')
+            .eq('format', 'novel')
+            .limit(10000);
+          break;
 
         default:
           throw new Error(`Unknown leaderboard type: ${type}`);

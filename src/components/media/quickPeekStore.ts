@@ -6,8 +6,8 @@
  */
 
 export interface QuickPeekMedia {
-  kind: "anime" | "manga";
-  /** Route id (`/anime/:id` / `/manga/:id`) — also the detail-query key. */
+  kind: "anime" | "manga" | "novel";
+  /** Route id (`/anime/:id` / `/manga/:id` / `/novel/:id`) — also the detail-query key. */
   id: string;
   name: string;
   poster: string;
@@ -128,11 +128,12 @@ export interface MangaPeekSource {
 export function peekFromManga(
   src: MangaPeekSource | null | undefined,
   routeTo: string | null | undefined,
+  kind: "manga" | "novel" = "manga",
 ): QuickPeekMedia | null {
   const name = String(src?.name ?? "").trim();
   if (!src || !name || !routeTo) return null;
   return {
-    kind: "manga",
+    kind,
     id: String(src.id ?? name),
     name,
     poster: String(src.poster ?? ""),
@@ -146,6 +147,14 @@ export function peekFromManga(
     chapters: typeof src.chapters === "number" ? src.chapters : undefined,
     routeTo,
   };
+}
+
+/** Normalize novel rows (hub cards, rails, library rows…) — same manga-catalog shape, novel routing. */
+export function peekFromNovel(
+  src: MangaPeekSource | null | undefined,
+  routeTo: string | null | undefined,
+): QuickPeekMedia | null {
+  return peekFromManga(src, routeTo, "novel");
 }
 
 /**
@@ -168,10 +177,11 @@ export function peekFromHref(
   if (!to || !title || /^https?:\/\//i.test(to)) return null;
   const manga = to.startsWith("/manga/");
   const anime = to.startsWith("/anime/");
-  if (!manga && !anime) return null;
-  const id = to.slice(anime ? "/anime/".length : "/manga/".length).split(/[?#]/)[0] || title;
+  const novel = to.startsWith("/novel/");
+  if (!manga && !anime && !novel) return null;
+  const id = to.slice(anime ? "/anime/".length : manga ? "/manga/".length : "/novel/".length).split(/[?#]/)[0] || title;
   return {
-    kind: manga ? "manga" : "anime",
+    kind: novel ? "novel" : manga ? "manga" : "anime",
     id,
     name: title,
     poster: String(src?.poster ?? ""),

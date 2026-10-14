@@ -1,3 +1,4 @@
+import { useDeveloperMode } from '@/hooks/ui/useDeveloperMode';
 import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
@@ -43,21 +44,11 @@ import { toast } from 'sonner';
 import { getLocalTorrentSessionHistory, getLocalTorrentSessionHistoryEnabled } from '@/lib/localStorage';
 
 import { useMobileUpdateOrchestrator } from '@/core/update/mobile-update';
-
-const getDevModeEnabled = (): boolean => {
-  try {
-    if (!Capacitor.isNativePlatform()) return false;
-    const saved = localStorage.getItem('tatakai_mobile_config');
-    if (!saved) return false;
-    const config = JSON.parse(saved);
-    return config.devMode === true;
-  } catch (e) {
-    return false;
-  }
-};
+import { EmailProofBanner } from '@/components/auth/EmailProofBanner';
 
 const MainLayout = ({ children }: { children: React.ReactNode }) => {
   useTheme();
+  const { enabled: isDeveloperMode } = useDeveloperMode();
   useMobileUpdateOrchestrator();
   const [deferredStartupReady, setDeferredStartupReady] = useState(false);
   usePageTracking(deferredStartupReady);
@@ -150,7 +141,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
   }, [deferredStartupReady, isDesktopApp]);
 
   const online = useOnline();
-  const hideSidebarPages = ['/', '/welcome', '/download', '/downloads', '/auth', '/onboarding', '/setup', '/maintenance', '/banned', '/error', '/smarttv', '/manga/read'];
+  const hideSidebarPages = ['/', '/welcome', '/download', '/downloads', '/auth', '/onboarding', '/setup', '/maintenance', '/banned', '/error', '/smarttv', '/manga/read', '/novel/read'];
   const isHiddenPage = hideSidebarPages.some(page => page === '/' ? location.pathname === '/' : location.pathname.startsWith(page));
   // The community feed ships its own X-style CommunitySidebar, so suppress the
   // global Sidebar there. The single-post /community/forum/:id view and the
@@ -237,6 +228,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
     <CommunityRulesGateProvider>
     <IdleReclaimProvider />
     <div
+      data-main-layout
       className={cn(
         "min-h-screen relative flex flex-col transition-[padding] duration-300",
         isDesktopApp && showSidebar && online && "lg:pl-[var(--sidebar-width)]",
@@ -257,7 +249,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
       {isDesktopApp && <TitleBar />}
       <OfflineGate>
           <>
-            {getDevModeEnabled() && <DevConsole />}
+            {isDeveloperMode && <DevConsole />}
             {showSidebar && <Background />}
             {showSidebar && <Sidebar />}
             <V6AnnouncementPopup />
@@ -286,6 +278,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
             <MediaQuickPeekHost />
 
             <main id="main-content" tabIndex={-1} className="flex-1 min-w-0 w-full relative z-10">
+              <EmailProofBanner />
               {children}
             </main>
 
@@ -303,7 +296,7 @@ function ConditionalFooter() {
   const isNative = useIsNativeApp();
   if (isNative) return null;
   const hideFooter = ['/welcome', '/download', '/watch/', '/novel/comingsoon', '/dmca', '/suggestions','/privacy', '/terms', '/community-guidelines', '/community-rules', '/char/', '/genre/', '/manga/', '/manga', '/isshoni/', '/search', '/image-search', '/status', '/banned', '/maintenance', '/service-unavailable', '/503', '/error', '/auth', '/reset-password', '/update-password', '/onboarding', '/setup', '/mal-redirect', '/anilist-redirect', '/favorites', '/', '/trending', '/settings' , '/recommendations' , '/admin', '/mobile-app'].some(path => location.pathname === '/' ? path === '/' : location.pathname.startsWith(path));
-  if (hideFooter) return null;
+  if (hideFooter || location.pathname.startsWith('/novel/read')) return null;
   return <Footer />;
 }
 

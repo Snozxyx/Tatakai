@@ -14,6 +14,21 @@ export interface ChangelogRelease {
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '6.1.0',
+    date: '2026-10-14',
+    changes: [
+      'Novels Vertical: Full light/web-novel stack with home, detail, reader, genre browse, trending, smart discover, recommendations, chapter providers, offline downloads, readlists, and followed-novel update rails',
+      'Novel Narration: Multi-engine TTS with on-device KittenTTS, OpenAI, ElevenLabs, and local-server voices plus desktop narration daemon',
+      'Extension Ecosystems: Stremio HTTP/JSON addons and Seanime JS/TS providers with remote adapters, setup ranking, diagnostics, and contained browser/config flows',
+      'Playback & Downloads: Single-owner PlaybackCoordinator, off-by-default next-episode torrent preload, shared auto-download scorer with simulation preview, and subtitle-core + external-player handoff',
+      'Manga Providers & Safety: Built-in MangaDex + MangaUpdates clients with chapter filters, reliability ranking, format normalization, and readlist display fixes',
+      'Library & Diagnostics: Confidence-gated auto-match policy, offline media cards, exportable redacted diagnostics, release channel/staging transparency, and Developer Mode provider insights',
+      'Accounts & Trust: MangaBaka OAuth sync, email-proof write gating with banner, serialized storage quotas, and service_role-only credential storage',
+      'Distribution & Ops: AltStore/SideStore source generator with sideload guides, full ops console (server/infra/web/tools), XML-only sitemaps, and PostHog telemetry',
+      'Coverage: ~50 new suites across novels, manga, extensions, playback, downloads, remote resolution, sitemap, ops, and mobile offline paths',
+    ],
+  },
+  {
     version: '6.0.7',
     date: '2026-10-11',
     changes: [

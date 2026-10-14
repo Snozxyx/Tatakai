@@ -30,7 +30,8 @@ import { ReviewPopup } from "@/components/ui/ReviewPopup";
 import {  ReleaseV6Banner } from "@/components/layout/MangaBanner";
 import { IndexMangaShowcase } from "@/components/manga/IndexMangaShowcase";
 import { LastReadMangaSection } from "@/components/manga/LastReadMangaSection";
-import { Heart, Sparkles } from "lucide-react";
+import { LastReadNovelSection } from "@/components/novel/LastReadNovelSection";
+import { Heart, RefreshCw, Sparkles } from "lucide-react";
 import { DiscordSection } from "@/components/home/DiscordSection";
 import { DownloadSection } from "@/components/home/DownloadSection";
 import { AppDownloadBanner } from "@/components/layout/AppDownloadBanner";
@@ -38,8 +39,10 @@ import { useEffect, useState, type ReactNode } from "react";
 import { BecauseYouWatched } from "@/components/anime/BecauseYouWatched";
 import { FollowedAnimeEpisodes } from "@/components/anime/FollowedAnimeEpisodes";
 import { FollowedMangaUpdates } from "@/components/manga/FollowedMangaUpdates";
+import { FollowedNovelUpdates } from "@/components/novel/FollowedNovelUpdates";
 import { TorrentSessionBanner } from "@/components/home/TorrentSessionBanner";
 import { ExtensionSlot } from "@/core/extensions/ExtensionSlot";
+import { Button } from "@/components/ui/button";
 
 /**
  * Home sections wrapped for a smooth scroll-in. The margin reset mirrors the
@@ -54,7 +57,7 @@ const RevealSection = ({ children, delay }: { children: ReactNode; delay?: numbe
 );
 
 const Index = () => {
-  const { data, isLoading, error } = useHomeData();
+  const { data, isLoading, error, refetch, isFetching } = useHomeData();
   const isNative = useIsNativeApp();
   const isDesktopApp = useIsDesktopApp(); // Only Electron/Tauri
   const isMobile = useIsMobile();
@@ -88,10 +91,14 @@ const Index = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center px-6">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-2">Failed to load</h1>
-          <p className="text-muted-foreground">Please try again later</p>
+          <p className="text-muted-foreground mb-6">Something went wrong loading your home feed.</p>
+          <Button onClick={() => refetch()} disabled={isFetching}>
+            <RefreshCw className={cn("mr-2 h-4 w-4", isFetching && "animate-spin")} />
+            {isFetching ? "Retrying…" : "Try again"}
+          </Button>
         </div>
       </div>
     );
@@ -140,10 +147,12 @@ const Index = () => {
             <LocalContinueWatching />
             <TorrentSessionBanner />
             <LastReadMangaSection />
+            <LastReadNovelSection />
 
             {/* ── New from what you follow — exact EP/CH deep-links ── */}
             <RevealSection><FollowedAnimeEpisodes /></RevealSection>
             <RevealSection><FollowedMangaUpdates /></RevealSection>
+            <RevealSection><FollowedNovelUpdates /></RevealSection>
 
             {/* ── Fresh & trending ── */}
             <RevealSection><LatestEpisodes animes={data.latestEpisodeAnimes} /></RevealSection>

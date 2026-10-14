@@ -161,6 +161,34 @@ class TorrentFacade {
         return this._sessions.updatePlayback(sessionId, currentTime, duration);
     }
 
+    async preloadNext(sessionId, nextEpisode, budget) {
+        if (!Number.isInteger(nextEpisode) || nextEpisode < 1) return { success: false, error: 'invalid_episode' };
+        const { preloadNextEpisode } = require('./session/next-episode-preloader.cjs');
+        return preloadNextEpisode(this._sessions._sessions.get(sessionId), nextEpisode, budget);
+    }
+
+    async cancelPreload(sessionId) {
+        const { cancelPreload } = require('./session/next-episode-preloader.cjs');
+        cancelPreload(this._sessions._sessions.get(sessionId));
+        return { success: true };
+    }
+
+    async preloadSource(magnet, episode, budget) {
+        if (!/^magnet:\?/i.test(magnet || '') || !Number.isInteger(episode) || episode < 1) return { success: false, error: 'invalid_preload_source' };
+        const hash = this._sessions._extractInfoHash(magnet);
+        for (const [sessionId, entry] of this._sessions._sessions) {
+            if (hash && entry.infoHash === hash) return { success: true, sessionId, ownsSession: false };
+        }
+        const result = await this._sessions.start(magnet, { episode, preloadOnly: true, preloadBudget: Math.min(20 * 1024 * 1024, budget || 20 * 1024 * 1024) });
+        return { ...result, ownsSession: result.success === true };
+    }
+
+    async releasePreload(sessionId) {
+        const entry = this._sessions._sessions.get(sessionId);
+        if (entry?.preloadOnly) return this._sessions.stop(sessionId, { destroyStore: false });
+        return { success: true };
+    }
+
     // Request an on-demand diagnostics dump for a session (development helper)
     async dumpDiagnostics(sessionId) {
         try {

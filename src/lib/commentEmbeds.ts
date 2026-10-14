@@ -43,7 +43,7 @@ export function sanitizeEmbeds(input: unknown): CommentEmbed[] {
     switch (e.kind) {
       case 'media':
         if (isNonEmptyString(e.id) && isNonEmptyString(e.name)) {
-          const known: MediaType[] = ['anime', 'manga', 'manhwa', 'manhua', 'comics'];
+          const known: MediaType[] = ['anime', 'manga', 'manhwa', 'manhua', 'comics', 'novel'];
           const mt = known.includes(e.mediaType as MediaType)
             ? (e.mediaType as MediaType)
             : ('anime' as MediaType);

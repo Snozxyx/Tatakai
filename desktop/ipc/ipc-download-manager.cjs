@@ -340,6 +340,7 @@ module.exports = function registerDownloadManager(ipcMain, app, fs, path, logger
     const autoDownloader = require('../services/auto-downloader.cjs').init(logger);
     const recovery = require('../runtime/download/recovery-store.cjs').getRecoveryStore(app);
     const resolveSource = require('../services/auto-download-sources.cjs');
+    autoDownloader.candidateResolver = (id, title, episode, preferences) => resolveSource.listCandidates(runtimeApi?.extensionApiHost, id, title, episode, preferences?.audioLanguage, preferences?.scoringProfile);
     autoDownloader.sourceResolver = (id, title, episode) => resolveSource(runtimeApi?.extensionApiHost, id, title, episode);
     const storageManager = new DownloadStorageManager({ app, fs, path });
     const torrentFacade = new TorrentFacade({ app, fs, path, logger, getMainWindow });
@@ -423,7 +424,7 @@ module.exports = function registerDownloadManager(ipcMain, app, fs, path, logger
             if (subtitles && Array.isArray(subtitles)) {
                 for (const sub of subtitles) {
                     if (!sub.url) continue;
-                    const langCode = sub.lang || sub.language || 'en';
+                    const langCode = String(sub.lang || sub.language || 'und').replace(/[^a-zA-Z0-9-]/g, '').slice(0, 32) || 'und';
                     const label = sub.label || langCode;
                     const subPath = path.join(animeDir, `Episode_${episodeNumber}_${langCode}.vtt`);
                     if (!fs.existsSync(subPath)) {
@@ -436,6 +437,10 @@ module.exports = function registerDownloadManager(ipcMain, app, fs, path, logger
                                 },
                                 timeout: 30000,
                             });
+                            const { normalizeSubtitleToVtt } = await import('../../src/core/player/subtitle-core.js');
+                            const text = normalizeSubtitleToVtt(await fs.promises.readFile(subPath, 'utf8'));
+                            if (!text || !text.includes('-->')) { await fs.promises.unlink(subPath).catch(() => {}); throw new Error('Subtitle contains no readable cues'); }
+                            await fs.promises.writeFile(subPath, text, 'utf8');
                             subtitleFiles.push({
                                 lang: langCode,
                                 label,
@@ -784,6 +789,9 @@ module.exports = function registerDownloadManager(ipcMain, app, fs, path, logger
     ipcMain.handle('auto-download:unsubscribe', async (_event, animeId) => {
         return autoDownloader.unsubscribe(animeId);
     });
+    ipcMain.handle('auto-download:simulate', (_event, id, episode) => autoDownloader.simulate(id, episode));
+    ipcMain.handle('auto-download:profile', (_event, id, profile) => autoDownloader.setScoringProfile(id, profile));
+    ipcMain.handle('auto-download:check', () => autoDownloader.checkFeeds());
     ipcMain.handle('auto-download:list', async () => {
         return autoDownloader.getSubscriptions();
     });

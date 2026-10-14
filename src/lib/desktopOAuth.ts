@@ -64,6 +64,27 @@ function usableWebRedirect(explicit: string): boolean {
   } catch { return false; }
 }
 
+/** Canonical MAL callback path. Keep in sync with `src/lib/mal.ts` and AppRoutes. */
+export const MAL_REDIRECT_PATH = '/api/mal/redirect';
+/** Canonical production origin for MAL. */
+export const MAL_PROD_ORIGIN = 'https://tatakai.me';
+
+/** Canonical MangaBaka callback path. Keep in sync with `src/lib/mangabaka.ts` and AppRoutes. */
+export const MANGABAKA_REDIRECT_PATH = '/integration/mangabaka/redirect';
+/** Canonical production origin for MangaBaka. */
+export const MANGABAKA_PROD_ORIGIN = 'https://tatakai.me';
+
+/**
+ * Splits a possibly multi-URL env value (MAL dashboard uses line breaks;
+ * legacy builds used commas) into individual URLs.
+ */
+function splitRedirectList(explicit: string): string[] {
+  return String(explicit || '')
+    .split(/[\s,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 /**
  * Takes the first URL of a possibly comma-separated env value (logs when the
  * env is misconfigured) so callers never send MAL/AniList a literal pair that
@@ -91,14 +112,72 @@ export function getWebAnilistRedirectUri(): string {
   return 'https://tatakai.me/integration/anilist/redirect';
 }
 
-/** Web redirect URI shared by web + desktop (the ONLY URI to register in provider dashboards). */
+/** Web redirect URI for MAL — origin-aware (see body). Register each origin's URI one-per-line in the MAL app settings. */
 export function getWebMalRedirectUri(): string {
-  const explicit = firstRedirectUri(String(import.meta.env.VITE_MAL_REDIRECT_URI || '').trim());
-  if (usableWebRedirect(explicit)) return explicit;
-  if (!isNativeOAuthApp() && typeof window !== 'undefined' && window.location.protocol.startsWith('http')) {
-    return `${window.location.origin}/api/mal/redirect`;
+  const raw = String(import.meta.env.VITE_MAL_REDIRECT_URI || '').trim();
+  const candidates = splitRedirectList(raw);
+  const isWeb = !isNativeOAuthApp() && typeof window !== 'undefined' && window.location.protocol.startsWith('http');
+
+  // Web builds: the redirect MUST share the page origin (PKCE verifier lives in
+  // this origin's localStorage). Prefer an env entry that already matches the
+  // current origin; otherwise derive one from the current origin so the same
+  // build works on localhost AND production. Register BOTH URLs (one per line)
+  // in the MAL app settings — MAL supports multiple redirect URIs.
+  if (isWeb) {
+    const currentOrigin = window.location.origin;
+    for (const candidate of candidates) {
+      try {
+        if (new URL(candidate).origin === currentOrigin) return candidate;
+      } catch { /* skip malformed entries */ }
+    }
+    if (candidates.length > 0) {
+      console.warn(
+        `[OAuth] VITE_MAL_REDIRECT_URI (${candidates[0]}) does not match this origin (${currentOrigin}); ` +
+        `using ${currentOrigin}${MAL_REDIRECT_PATH} instead. Register both URLs (one per line) in the MAL app settings.`,
+      );
+    }
+    return `${currentOrigin}${MAL_REDIRECT_PATH}`;
   }
-  return 'https://tatakai.me/api/mal/redirect';
+
+  // Native / SSR: needs a public https URI. Prefer the first https
+  // non-localhost env entry, else the production canonical.
+  for (const candidate of candidates) {
+    if (usableWebRedirect(candidate)) return candidate;
+  }
+  const legacy = firstRedirectUri(raw);
+  if (usableWebRedirect(legacy)) return legacy;
+  return `${MAL_PROD_ORIGIN}${MAL_REDIRECT_PATH}`;
+}
+
+/** Web redirect URI for MangaBaka OAuth — origin-aware like MAL. Register each
+ * origin's URI one-per-line in the MangaBaka app settings. */
+export function getWebMangabakaRedirectUri(): string {
+  const raw = String(import.meta.env.VITE_MANGABAKA_REDIRECT_URI || '').trim();
+  const candidates = splitRedirectList(raw);
+  const isWeb = !isNativeOAuthApp() && typeof window !== 'undefined' && window.location.protocol.startsWith('http');
+
+  if (isWeb) {
+    const currentOrigin = window.location.origin;
+    for (const candidate of candidates) {
+      try {
+        if (new URL(candidate).origin === currentOrigin) return candidate;
+      } catch { /* skip malformed entries */ }
+    }
+    if (candidates.length > 0) {
+      console.warn(
+        `[OAuth] VITE_MANGABAKA_REDIRECT_URI (${candidates[0]}) does not match this origin (${currentOrigin}); ` +
+        `using ${currentOrigin}${MANGABAKA_REDIRECT_PATH} instead. Register both URLs (one per line) in the MangaBaka app settings.`,
+      );
+    }
+    return `${currentOrigin}${MANGABAKA_REDIRECT_PATH}`;
+  }
+
+  for (const candidate of candidates) {
+    if (usableWebRedirect(candidate)) return candidate;
+  }
+  const legacy = firstRedirectUri(raw);
+  if (usableWebRedirect(legacy)) return legacy;
+  return `${MANGABAKA_PROD_ORIGIN}${MANGABAKA_REDIRECT_PATH}`;
 }
 
 /** Prefix marking an OAuth flow as desktop-initiated (carried in `state`, echoed back by the provider). */

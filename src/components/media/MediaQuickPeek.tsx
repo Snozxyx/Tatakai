@@ -14,6 +14,7 @@ import { useMediaBanner } from "@/hooks/api/useMediaBanner";
 import { useLongPress } from "@/hooks/ui/useLongPress";
 import { useWatchlistItem, useAddToWatchlist, useRemoveFromWatchlist } from "@/hooks/user/useWatchlist";
 import { useMangaReadlistItem, useUpsertMangaReadlist, useRemoveFromMangaReadlist } from "@/hooks/user/useMangaReadlist";
+import { useNovelReadlistItem, useUpsertNovelReadlist, useRemoveFromNovelReadlist } from "@/hooks/user/useNovelReadlist";
 import {
   closeMediaQuickPeek,
   getMediaQuickPeekSnapshot,
@@ -77,11 +78,14 @@ export function MediaQuickPeekHost() {
 
   const animeId = visible?.kind === "anime" ? visible.id : undefined;
   const mangaId = visible?.kind === "manga" ? visible.id : undefined;
+  const novelId = visible?.kind === "novel" ? visible.id : undefined;
+  // Novels share the manga catalog (AniList MANGA/NOVEL), so detail enrichment
+  // reuses the manga query — only the library write targets the novel track.
 
   // Lazy enrichment — same queries the detail pages use, so results are
   // usually already cached. Disabled until the sheet actually opens.
   const { data: animeInfo, isLoading: animeLoading, isFetching: animeFetching, isError: animeError, refetch: retryAnime } = useAnimeInfo(open ? animeId : undefined);
-  const { data: mangaResp, isLoading: mangaLoading, isFetching: mangaFetching, isError: mangaError, refetch: retryManga } = useMangaDetail(open ? mangaId : undefined);
+  const { data: mangaResp, isLoading: mangaLoading, isFetching: mangaFetching, isError: mangaError, refetch: retryManga } = useMangaDetail(open ? (mangaId ?? novelId) : undefined);
   const mangaDetail = mangaResp?.detail ?? null;
 
   // Wide banner art: card-supplied first, else AniList (numeric id required).
@@ -100,6 +104,9 @@ export function MediaQuickPeekHost() {
   const { data: readlistItem, isLoading: readlistLoading } = useMangaReadlistItem(open ? mangaId : undefined);
   const upsertReadlist = useUpsertMangaReadlist();
   const removeFromReadlist = useRemoveFromMangaReadlist();
+  const { data: novelItem, isLoading: novelLoading } = useNovelReadlistItem(open ? novelId : undefined);
+  const upsertNovel = useUpsertNovelReadlist();
+  const removeNovel = useRemoveFromNovelReadlist();
   const saving = useRef(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [saveFailed, setSaveFailed] = useState(false);
@@ -141,7 +148,7 @@ export function MediaQuickPeekHost() {
   const detailFetching = isAnime ? animeFetching : mangaFetching;
   const detailError = isAnime ? animeError : mangaError;
   const status = media.status || (isAnime ? animeInfo?.moreInfo?.status : mangaDetail?.status) || null;
-  const metaLine = [media.type || (isAnime ? "Anime" : "Manga"), status, media.year].filter(Boolean).join(" · ");
+  const metaLine = [media.type || (isAnime ? "Anime" : media.kind === "novel" ? "Novel" : "Manga"), status, media.year].filter(Boolean).join(" · ");
 
   const countLine = isAnime
     ? [media.episodesSub != null && media.episodesSub > 0 ? `${media.episodesSub} episodes` : null]
@@ -152,11 +159,14 @@ export function MediaQuickPeekHost() {
       : "";
 
   const canSave = media.canSave !== false;
+  const isNovel = media.kind === "novel";
 
-  const saved = isAnime ? Boolean(watchlistItem) : Boolean(readlistItem);
+  const saved = isAnime ? Boolean(watchlistItem) : isNovel ? Boolean(novelItem) : Boolean(readlistItem);
   const saveLoading = isAnime
     ? watchlistLoading || addToWatchlist.isPending || removeFromWatchlist.isPending
-    : readlistLoading || upsertReadlist.isPending || removeFromReadlist.isPending;
+    : isNovel
+      ? novelLoading || upsertNovel.isPending || removeNovel.isPending
+      : readlistLoading || upsertReadlist.isPending || removeFromReadlist.isPending;
 
   const toggleSave = async () => {
     if (saveLoading || saving.current) return;
@@ -178,6 +188,15 @@ export function MediaQuickPeekHost() {
             animeName: media.name,
             animePoster: media.poster,
             status: "plan_to_watch",
+          });
+      } else if (isNovel) {
+        if (novelItem) await removeNovel.mutateAsync({ novelId: media.id });
+        else
+          await upsertNovel.mutateAsync({
+            novelId: media.id,
+            novelTitle: media.name,
+            novelPoster: media.poster,
+            status: "plan_to_read",
           });
       } else {
         if (readlistItem) await removeFromReadlist.mutateAsync({ mangaId: media.id });

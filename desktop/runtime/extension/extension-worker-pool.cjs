@@ -11,13 +11,11 @@
  */
 
 const { Worker } = require('worker_threads');
+const { SeanimeBrowserHost } = require('./seanime-browser-host.cjs');
 const { extractAllowedDomains } = require('./extension-sandbox.cjs');
 
 // Per-call timeout: 30 seconds (Requirement 9.3)
 const CALL_TIMEOUT_MS = 30_000;
-
-// Cumulative execution timeout per session: 2 minutes (Requirement 9.4)
-const CUMULATIVE_TIMEOUT_MS = 2 * 60 * 1_000;
 
 /**
  * Inline worker bootstrap script.
@@ -54,6 +52,29 @@ eval(workerData.helperCode);
 globalThis.TATAKAI_API_BASE_URL = TATAKAI_API_BASE_URL;
 globalThis.TATAKAI_PROXY_URL = TATAKAI_PROXY_URL;
 
+// Browser RPC stays inside this worker; only the scoped Electron host handles requests.
+const browserRequests = new Map();
+let browserRequestId = 0;
+parentPort.on('message', msg => {
+  if (!msg.__browserReply) return;
+  const pending = browserRequests.get(msg.id);
+  if (!pending) return;
+  clearTimeout(pending.timer); browserRequests.delete(msg.id);
+  if (msg.error) pending.reject(new Error(msg.error)); else pending.resolve(msg.result);
+});
+const browserCall = (method, session, args) => new Promise((resolve, reject) => {
+  const id = ++browserRequestId;
+  const timer = setTimeout(() => { browserRequests.delete(id); reject(new Error('ChromeDP host timed out')); }, 35000);
+  browserRequests.set(id, { resolve, reject, timer });
+  parentPort.postMessage({ __browserRequest: true, id, method, session, args });
+});
+const __tatakai_chromedp__ = { newBrowser: async options => {
+  const id = await browserCall('newBrowser', null, [options]);
+  const browser = {};
+  for (const method of ['navigate', 'evaluate', 'executeCDP', 'sleep', 'close']) browser[method] = (...args) => browserCall(method, id, args);
+  return browser;
+} };
+
 // ── Load extension code ───────────────────────────────────────────────────────
 let _extensionInstance = null;
 try {
@@ -61,10 +82,10 @@ try {
   // The extension is expected to assign its class/object to module.exports or
   // to expose a default export.  We capture whatever it exports.
   const _mod = { exports: {} };
-  const _fn = new Function('module', 'exports', '__tatakai_fetch__', '__tatakai_anitomy__', '__tatakai_parse_html__',
+  const _fn = new Function('module', 'exports', '__tatakai_fetch__', '__tatakai_anitomy__', '__tatakai_parse_html__', '__tatakai_chromedp__',
     workerData.extensionCode
   );
-  _fn(_mod, _mod.exports, __tatakai_fetch__, __tatakai_anitomy__, __tatakai_parse_html__);
+  _fn(_mod, _mod.exports, __tatakai_fetch__, __tatakai_anitomy__, __tatakai_parse_html__, __tatakai_chromedp__);
   const _export = _mod.exports.default || _mod.exports;
   // If the export is a class/constructor (has a prototype with methods), instantiate it.
   // If it is already an object instance, use it directly.
@@ -78,7 +99,9 @@ try {
 }
 
 // ── Message handler ───────────────────────────────────────────────────────────
-parentPort.on('message', async ({ __msgId, method, args }) => {
+parentPort.on('message', async (message) => {
+  if (message.__browserReply) return;
+  const { __msgId, method, args } = message;
   if (!_extensionInstance) {
     parentPort.postMessage({ __msgId, error: 'Extension failed to initialise' });
     return;
@@ -174,6 +197,7 @@ class ExtensionWorkerPool {
       workerData: {
         extensionId,
         extensionCode,
+        cheerioModulePath: require.resolve('cheerio'),
         manifest,
         allowedDomains: extractAllowedDomains(Array.isArray(manifest && manifest.permissions) ? manifest.permissions : []),
         tatakaiApiBaseUrl: (process.env.VITE_BACKEND_ORIGIN || 'http://localhost:4001') + '/api/v3',
@@ -182,11 +206,17 @@ class ExtensionWorkerPool {
       },
     });
 
+    const networkDomains = extractAllowedDomains(manifest?.permissions || []);
+    const browserHost = new SeanimeBrowserHost((manifest?.browserDomains || []).filter(domain => networkDomains.some(allowed => allowed === '*' || domain === allowed || domain.endsWith('.' + allowed))));
     const entry = {
       worker,
+      browserHost,
+      browserWaitMs: 0,
+      callTimeoutMs: browserHost.domains.length && /ChromeDP/.test(extensionCode) ? 180_000 : CALL_TIMEOUT_MS,
       cumulativeMs: 0,
       lastActivity: Date.now(),
       fetchProxyBaseUrl: this._fetchProxyBaseUrl,
+      codeHash: require('crypto').createHash('sha1').update(extensionCode).digest('hex').slice(0, 16),
       /** Map<msgId, { resolve, reject, timer, startedAt }> */
       pending: new Map(),
     };
@@ -194,7 +224,16 @@ class ExtensionWorkerPool {
     this._workers.set(extensionId, entry);
 
     // ── Wire up worker message / error / exit handlers ──────────────────────
-    worker.on('message', (msg) => {
+    worker.on('message', async (msg) => {
+      if (msg.__browserRequest) {
+        const started = Date.now();
+        let result, error;
+        try { result = await entry.browserHost.call(msg.method, msg.session, msg.args); }
+        catch (err) { error = err.message; }
+        entry.browserWaitMs += Date.now() - started;
+        if (this._workers.get(extensionId) === entry) worker.postMessage({ __browserReply: true, id: msg.id, result, error });
+        return;
+      }
       if (msg.__boot_error) {
         // Worker failed to boot — reject all pending calls
         for (const [, { reject, timer }] of entry.pending) {
@@ -202,7 +241,7 @@ class ExtensionWorkerPool {
           reject(new Error(`Extension boot error: ${msg.__boot_error}`));
         }
         entry.pending.clear();
-        this._removeWorker(extensionId);
+        this._removeWorker(extensionId, entry);
         return;
       }
 
@@ -210,20 +249,17 @@ class ExtensionWorkerPool {
       const pending = entry.pending.get(__msgId);
       if (!pending) return;
 
-      const { resolve, reject, timer, startedAt } = pending;
+      const { resolve, reject, timer, startedAt, browserWaitAtStart } = pending;
       clearTimeout(timer);
       entry.pending.delete(__msgId);
 
       // Accumulate elapsed time
-      const elapsed = Date.now() - startedAt;
+      const elapsed = Math.max(0, Date.now() - startedAt - (entry.browserWaitMs - browserWaitAtStart));
       entry.cumulativeMs += elapsed;
 
-      // Check cumulative timeout (Requirement 9.4)
-      if (entry.cumulativeMs >= CUMULATIVE_TIMEOUT_MS) {
-        this._suspendExtension(extensionId);
-        reject(new Error(`Extension suspended: cumulative execution time exceeded ${CUMULATIVE_TIMEOUT_MS / 1000}s`));
-        return;
-      }
+      // This is telemetry, not a lifetime execution budget. Successful network
+      // calls eventually exceed two minutes during ordinary browsing. The
+      // per-call timer below still terminates a worker that stops responding.
 
       if (error !== undefined) {
         reject(new Error(error));
@@ -239,10 +275,11 @@ class ExtensionWorkerPool {
         reject(err);
       }
       entry.pending.clear();
-      this._removeWorker(extensionId);
+      this._removeWorker(extensionId, entry);
     });
 
     worker.on('exit', (code) => {
+      entry.browserHost.closeAll();
       if (code !== 0) {
         for (const [, { reject, timer }] of entry.pending) {
           clearTimeout(timer);
@@ -250,7 +287,7 @@ class ExtensionWorkerPool {
         }
       }
       entry.pending.clear();
-      this._workers.delete(extensionId);
+      if (this._workers.get(extensionId) === entry) this._workers.delete(extensionId);
     });
 
     return worker;
@@ -275,16 +312,18 @@ class ExtensionWorkerPool {
 
     return new Promise((resolve, reject) => {
       const startedAt = Date.now();
+      const browserWaitAtStart = entry.browserWaitMs;
+      const timeoutMs = entry.callTimeoutMs;
 
       // Per-call timeout guard (Requirement 9.3)
       const timer = setTimeout(() => {
         entry.pending.delete(msgId);
         // Terminate the worker on timeout
         this.terminate(extensionId);
-        reject(new Error(`Extension invocation timed out after ${CALL_TIMEOUT_MS / 1000}s (${extensionId}.${method})`));
-      }, CALL_TIMEOUT_MS);
+        reject(new Error(`Extension invocation timed out after ${timeoutMs / 1000}s (${extensionId}.${method})`));
+      }, timeoutMs);
 
-      entry.pending.set(msgId, { resolve, reject, timer, startedAt });
+      entry.pending.set(msgId, { resolve, reject, timer, startedAt, browserWaitAtStart });
       entry.worker.postMessage({ __msgId: msgId, method, args });
       entry.lastActivity = Date.now();
     });
@@ -295,6 +334,9 @@ class ExtensionWorkerPool {
    *
    * @param {string} extensionId
    */
+  getCallTimeoutMs(extensionId) { return this._workers.get(extensionId)?.callTimeoutMs || CALL_TIMEOUT_MS; }
+  getBrowserWaitMs(extensionId) { return this._workers.get(extensionId)?.browserWaitMs || 0; }
+
   terminate(extensionId) {
     const entry = this._workers.get(extensionId);
     if (!entry) return;
@@ -305,6 +347,7 @@ class ExtensionWorkerPool {
       reject(new Error(`Worker terminated for extension: ${extensionId}`));
     }
     entry.pending.clear();
+    entry.browserHost.closeAll();
 
     try {
       entry.worker.terminate();
@@ -349,8 +392,9 @@ class ExtensionWorkerPool {
    *
    * @param {string} extensionId
    */
-  _removeWorker(extensionId) {
-    this._workers.delete(extensionId);
+  _removeWorker(extensionId, entry = this._workers.get(extensionId)) {
+    entry?.browserHost.closeAll();
+    if (this._workers.get(extensionId) === entry) this._workers.delete(extensionId);
   }
 }
 
@@ -392,7 +436,7 @@ const __tatakai_fetch__ = async function __tatakai_fetch__(url, init) {
     throw __err__;
   }
 
-  if (!__tatakai_allowedDomains__.includes(__hostname__)) {
+  if (!__tatakai_allowedDomains__.includes("*") && !__tatakai_allowedDomains__.includes(__hostname__)) {
     const __err__ = new Error(
       'PermissionDeniedError: hostname "' + __hostname__ + '" is not in the extension\\'s allowed domain list'
     );
@@ -434,29 +478,29 @@ const __tatakai_fetch__ = async function __tatakai_fetch__(url, init) {
     : 'http://localhost:9001';
   
   // Debug logging
-  console.log('[__tatakai_fetch__] Fetching:', url);
-  console.log('[__tatakai_fetch__] Proxy base:', __proxyBase__);
-  console.log('[__tatakai_fetch__] Hostname:', __hostname__);
-  
   const __proxyUrl__ = new URL('/proxy', __proxyBase__);
   __proxyUrl__.searchParams.set('url', url);
 
   // 5. Execute the proxied request
   try {
-    console.log('[__tatakai_fetch__] Proxied URL:', __proxyUrl__.toString());
-    const __response__ = await fetch(__proxyUrl__.toString(), {
+        const __response__ = await fetch(__proxyUrl__.toString(), {
       method: init.method || 'GET',
       headers: __forwardedHeaders__,
       body: init.body !== undefined ? init.body : undefined,
       signal: __controller__.signal,
     });
-    console.log('[__tatakai_fetch__] Response status:', __response__.status);
-    return __response__;
+        return {
+      ok: __response__.ok, status: __response__.status, statusText: __response__.statusText, url: __response__.url,
+      headers: __response__.headers,
+      rawHeaders: Object.fromEntries(Array.from(__response__.headers.entries()).map(([k,v]) => [k,[v]])),
+      cookies: Object.fromEntries((__response__.headers.getSetCookie ? __response__.headers.getSetCookie() : []).map(v => { const pair = v.split(';')[0]; const i = pair.indexOf('='); return [pair.slice(0,i), pair.slice(i+1)]; })),
+      text: () => __response__.text(), json: () => __response__.json(), arrayBuffer: () => __response__.arrayBuffer()
+    };
   } catch (__err__) {
-    console.error('[__tatakai_fetch__] Fetch error:', __err__.message);
+    console.error('[__tatakai_fetch__] Request failed');
     // Timeout fired (Req 1.1)
     if (__err__ && __err__.name === 'AbortError') {
-      const __te__ = new Error('FetchTimeoutError: request to "' + url + '" timed out after 30000 ms');
+      const __te__ = new Error('FetchTimeoutError: request timed out after 30000 ms');
       __te__.name = 'FetchTimeoutError';
       throw __te__;
     }
@@ -486,7 +530,7 @@ globalThis.__tatakai_fetch__ = __tatakai_fetch__;
 /**
  * Parses an HTML string using cheerio and returns a `CheerioLikeAPI` adapter
  * that supports `find`, `first`, `attr`, `text`, `html`, and `each` — mirroring
- * the jQuery-like API expected by Toko provider adapters.
+ * the jQuery-like API expected by Extension provider adapters.
  *
  * Requirements: 1.2
  *
@@ -512,6 +556,8 @@ function __tatakai_parse_html__(html) {
    */
   function wrap(selection) {
     return {
+      length: selection.length, eq: i => wrap(selection.eq(i)), last: () => wrap(selection.last()),
+      parent: () => wrap(selection.parent()), children: s => wrap(selection.children(s)), next: () => wrap(selection.next()), prev: () => wrap(selection.prev()),
       /**
        * Find descendants matching `selector` within the current selection.
        * @param {string} selector
@@ -586,10 +632,17 @@ const __tatakai_parse_html__ = function __tatakai_parse_html__(html) {
     __err__.name = 'InvalidInputError';
     throw __err__;
   }
-  const cheerio = require('cheerio');
+  const cheerio = require(workerData.cheerioModulePath);
   const $ = cheerio.load(html);
   function wrap(sel) {
     return {
+      length: sel.length,
+      eq: function(i) { return wrap(sel.eq(i)); },
+      last: function() { return wrap(sel.last()); },
+      parent: function() { return wrap(sel.parent()); },
+      children: function(s) { return wrap(sel.children(s)); },
+      next: function() { return wrap(sel.next()); },
+      prev: function() { return wrap(sel.prev()); },
       find: function(selector) { return wrap(sel.find(selector)); },
       first: function() { return wrap(sel.first()); },
       attr: function(name) { return sel.attr(name); },
@@ -683,7 +736,7 @@ async function __tatakai_fetch__(allowedDomains, url, init = {}) {
     throw err;
   }
 
-  if (!allowedDomains.includes(hostname)) {
+  if (!allowedDomains.includes("*") && !allowedDomains.includes(hostname)) {
     const err = new Error(
       `PermissionDeniedError: hostname "${hostname}" is not in the extension's allowed domain list`
     );

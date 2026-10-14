@@ -5,20 +5,18 @@
  */
 
 import { resolveApiV3Base } from '@/lib/api/backendOrigin';
-import { getWebMalRedirectUri, isNativeOAuthApp } from '@/lib/desktopOAuth';
+import { getWebMalRedirectUri, isNativeOAuthApp, MAL_PROD_ORIGIN, MAL_REDIRECT_PATH } from '@/lib/desktopOAuth';
 
 const MAL_CLIENT_ID = import.meta.env.VITE_MAL_CLIENT_ID;
-const REDIRECT_URI = getWebMalRedirectUri();
+/** Canonical production redirect URI (register this in the MAL app settings). */
+export const MAL_CANONICAL_REDIRECT_URI = `${MAL_PROD_ORIGIN}${MAL_REDIRECT_PATH}`;
+/** Fresh redirect URI per call — never captured at module load (Vite bakes env). */
+function getMalRedirectUri(): string {
+    return getWebMalRedirectUri();
+}
 
 function getMalAuthFunctionUrl(): string {
-    const explicit = import.meta.env.VITE_MAL_AUTH_FUNCTION_URL;
-    if (explicit) return explicit.replace(/\/$/, '');
-
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    if (!supabaseUrl) {
-        throw new Error('Missing VITE_MAL_AUTH_FUNCTION_URL or VITE_SUPABASE_URL');
-    }
-    return `${supabaseUrl.replace(/\/$/, '')}/functions/v1/mal-auth`;
+    return `${resolveApiV3Base()}/sync/mal/legacy`;
 }
 
 // Helper to generate a random string for code_verifier
@@ -46,22 +44,25 @@ const MAL_OAUTH_STARTED_AT_KEY = 'mal_oauth_started_at';
 const MAL_PENDING_FLOW_TTL_MS = 10 * 60 * 1000;
 
 /**
- * MAL treats the registered redirect URI as one literal string: a
- * comma-separated pair (e.g. prod + localhost) is NOT two valid URIs — the
- * authorize call answers 401 with `WWW-Authenticate: Basic`, so Chromium /
- * Electron pops a native "Please Sign In — https://myanimelist.net" HTTP-auth
- * dialog. Entering MAL credentials there can never succeed and loops forever.
- * Guard here so a misconfigured env surfaces a readable error instead.
+ * The `redirect_uri` sent on the authorize call must be a SINGLE URL that
+ * exactly matches one entry in the MAL app settings. MAL's dashboard accepts
+ * MULTIPLE urls (one per line) — register both the production URL and the
+ * localhost URL there. What it does NOT accept is a comma-joined pair sent as
+ * one literal string: the authorize call then answers 401 with
+ * `WWW-Authenticate: Basic`, so Chromium / Electron pops a native
+ * "Please Sign In — https://myanimelist.net" HTTP-auth dialog that loops.
+ * Guard here so a misconfigured value surfaces a readable error instead.
  */
 function assertSingleRedirectUri(redirectUri: string): string {
     const value = String(redirectUri || '').trim();
     if (!value) {
-        throw new Error('Missing VITE_MAL_REDIRECT_URI or window location context');
+        throw new Error('Missing MAL redirect URI (no window location context and no VITE_MAL_REDIRECT_URI)');
     }
-    if (value.includes(',')) {
+    if (value.includes(',') || /[\s]/.test(value)) {
         throw new Error(
-            'Invalid MAL redirect URI: register exactly one URL in MAL (https://tatakai.me/api/mal/redirect). ' +
-            'A comma-separated pair is treated as one literal URL by MAL and triggers an HTTP login prompt that loops forever.',
+            `Invalid MAL redirect URI: send exactly one URL (canonical: ${MAL_CANONICAL_REDIRECT_URI}). ` +
+            'Register each URL on its own line in the MAL app settings — never send a comma/space-separated pair as one URL, ' +
+            'or MAL answers 401 and the browser shows an HTTP login prompt that loops forever.',
         );
     }
     return value;
@@ -71,7 +72,7 @@ export function getMalAuthUrl(redirectUriOverride?: string, stateOverride?: stri
     if (!MAL_CLIENT_ID) {
         throw new Error('Missing VITE_MAL_CLIENT_ID');
     }
-    const redirectUri = assertSingleRedirectUri(redirectUriOverride || REDIRECT_URI);
+    const redirectUri = assertSingleRedirectUri(redirectUriOverride || getMalRedirectUri());
     // Persist so exchangeMalCode sends the identical redirect_uri (required by MAL).
     localStorage.setItem(MAL_REDIRECT_STORAGE_KEY, redirectUri);
     // Marks a login in flight. Starting a second flow overwrites the verifier,
@@ -143,10 +144,16 @@ export function clearMalPendingMarker(): void {
 /**
  * Pre-flight for pure-web logins: the PKCE verifier + state live in the
  * CURRENT origin's localStorage, so the redirect URI MAL sends the user back
- * to MUST share this origin. Developing on `http://localhost:8090` while MAL
- * registers `https://tatakai.me/api/mal/redirect` can never complete — MAL
- * either 401s (unregistered URI) or drops the user on production without the
- * verifier. Throws a setup-oriented error instead of navigating into that.
+ * to MUST share this origin. With the origin-aware `getWebMalRedirectUri`
+ * above this should rarely trigger — it fires only when a stale stored URI or
+ * an explicit override points elsewhere.
+ *
+ * Fix: in the MAL app settings (API panel → App Redirect URL) register BOTH
+ * URLs, one per line:
+ *   https://tatakai.me/api/mal/redirect
+ *   <this-origin>/api/mal/redirect
+ * (MAL supports multiple redirect URIs line-separated in the SAME app — no
+ * second app / second client ID needed.)
  *
  * Native apps are exempt: the https page forwards to `tatakai://` and the
  * desktop session owns the verifier.
@@ -163,15 +170,16 @@ export function assertWebMalRedirectMatchesOrigin(redirectUri: string): void {
     if (redirectOrigin !== window.location.origin) {
         throw new Error(
             `MAL login can't complete from ${window.location.origin}: this build sends redirect URI ${redirectUri}, ` +
-            `which points at a different origin. For local development, register a second MAL app with redirect URI ` +
-            `${window.location.origin}/api/mal/redirect and use its client ID here — or connect from the deployed site instead.`,
+            `which points at a different origin. In your MAL app settings, register BOTH URLs (one per line): ` +
+            `${MAL_CANONICAL_REDIRECT_URI} and ${window.location.origin}${MAL_REDIRECT_PATH} — then reconnect. ` +
+            `No second MAL app is needed.`,
         );
     }
 }
 
 /**
  * Completes the MAL authentication by exchanging the code for tokens.
- * Calls our Supabase Edge Function to keep the client_secret secure.
+ * Calls TatakaiAPI to keep the client_secret secure.
  */
 export async function exchangeMalCode(code: string) {
     const codeVerifier = localStorage.getItem('mal_code_verifier');
@@ -179,7 +187,7 @@ export async function exchangeMalCode(code: string) {
         throw new Error('Missing code_verifier');
     }
     const redirectUri = assertSingleRedirectUri(
-        localStorage.getItem(MAL_REDIRECT_STORAGE_KEY) || REDIRECT_URI,
+        localStorage.getItem(MAL_REDIRECT_STORAGE_KEY) || getMalRedirectUri(),
     );
 
     const { supabase } = await import('@/integrations/supabase/client');

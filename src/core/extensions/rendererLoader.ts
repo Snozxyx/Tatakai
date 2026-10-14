@@ -1,13 +1,8 @@
 /**
  * Renderer module loader (code-driven contributions).
  *
- * Trust model — READ THIS BEFORE TOUCHING:
- * A renderer contribution is arbitrary JavaScript that runs in the app's OWN
- * realm (same window, same React runtime, same DOM). `import(blobURL)` is NOT a
- * sandbox — the loaded module can do anything the app can. The ONLY security
- * boundary is the trust gate: the bundle is fetched over an IPC that main-side
- * refuses unless the extension is `sideloaded === true` OR carries a signature.
- * Untrusted store extensions never reach this loader (they stay data-only).
+ * Installed renderer modules run with application privileges. The bridge validates
+ * identifiers and paths and observes kill switches. Signing fields are ignored.
  *
  * The extension exports an ESM `renderer.js` whose default export is
  * `activate(ctx: ExtensionContext)`. It contributes React pages/slots, code
@@ -64,9 +59,6 @@ type LoadedContribution = {
 
 const loaded = new Map<string, LoadedContribution>();
 
-function isTrusted(ext: LoadableExtension): boolean {
-  return ext.sideloaded === true || (typeof ext.signature === 'string' && ext.signature.length > 0);
-}
 
 function scopedStorage(extensionId: string): ScopedStorage {
   const prefix = `ext:${extensionId}:`;
@@ -130,12 +122,6 @@ export async function loadRendererContribution(
 ): Promise<boolean> {
   if (loaded.has(ext.id)) return false;
   if (!ext.contributes?.rendererEntry) return false;
-
-  // Trust gate (belt-and-suspenders — main-side also enforces it).
-  if (!isTrusted(ext)) {
-    console.warn(`[rendererLoader] refusing untrusted extension: ${ext.id}`);
-    return false;
-  }
 
   const api = getBundleApi();
   if (!api?.getRendererBundle) return false;

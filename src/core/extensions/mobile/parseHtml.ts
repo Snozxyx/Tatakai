@@ -12,6 +12,7 @@
  */
 
 export interface CheerioLikeAPI {
+  length: number; eq(index: number): CheerioLikeAPI; last(): CheerioLikeAPI; parent(): CheerioLikeAPI; children(selector?: string): CheerioLikeAPI; next(): CheerioLikeAPI; prev(): CheerioLikeAPI;
   find(selector: string): CheerioLikeAPI;
   first(): CheerioLikeAPI;
   attr(name: string): string | undefined;
@@ -23,6 +24,12 @@ export interface CheerioLikeAPI {
 /** Wrap a static list of elements in the chainable, cheerio-shaped adapter. */
 function wrap(nodes: Element[]): CheerioLikeAPI {
   return {
+    length: nodes.length,
+    eq: i => wrap(nodes.at(i) ? [nodes.at(i)!] : []), last: () => wrap(nodes.length ? [nodes[nodes.length - 1]] : []),
+    parent: () => wrap([...new Set(nodes.map(n => n.parentElement).filter(Boolean))] as Element[]),
+    children: s => wrap(nodes.flatMap(n => Array.from(n.children)).filter(n => !s || n.matches(s))),
+    next: () => wrap(nodes.map(n => n.nextElementSibling).filter(Boolean) as Element[]),
+    prev: () => wrap(nodes.map(n => n.previousElementSibling).filter(Boolean) as Element[]),
     find(selector: string): CheerioLikeAPI {
       const out: Element[] = [];
       const seen = new Set<Element>();

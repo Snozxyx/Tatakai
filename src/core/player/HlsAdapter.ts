@@ -40,6 +40,7 @@ export class HlsAdapter extends AbstractSourceAdapter {
   async load(options: AdapterLoadOptions): Promise<void> {
     await super.load(options);
     const { source, videoElement, startTime } = options;
+    if (options.signal?.aborted) return;
 
     const referer = (source as any).headers?.Referer;
     const userAgent = (source as any).headers?.['User-Agent'];
@@ -51,7 +52,7 @@ export class HlsAdapter extends AbstractSourceAdapter {
     // the source's headers with it), so there is nothing to wrap it in — going
     // through the remote proxy would just strip the headers that make it work.
     this.candidates =
-      source.url.startsWith('http') && !isLoopbackProxyUrl(source.url)
+      source.url.startsWith('http') && !source.debridResolved && !isLoopbackProxyUrl(source.url)
         ? buildProxyCandidateUrls(source.url, referer, userAgent, undefined, undefined, refererCandidates)
         : [source.url];
     if (this.candidates.length === 0) this.candidates = [source.url];
@@ -75,6 +76,7 @@ export class HlsAdapter extends AbstractSourceAdapter {
     }
 
     this.candidateIndex = 0;
+    if (options.signal?.aborted) return;
     this.networkRetries = 0;
     this.mediaRetries = 0;
     this.recovering = false;
@@ -97,6 +99,7 @@ export class HlsAdapter extends AbstractSourceAdapter {
     const { getEffectiveMemoryProfile } = await import('@/lib/mobile/dataSaver');
     const { backBufferLength, maxBufferLength, maxMaxBufferLength } =
       getProfileKnobs(getEffectiveMemoryProfile()).hls;
+    if (options.signal?.aborted) return;
 
     this.hls = new Hls({
       enableWorker: true,

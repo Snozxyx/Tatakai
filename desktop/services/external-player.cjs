@@ -30,6 +30,8 @@ const PLAYERS = [
             '--force-window=yes',
             opts?.startTime ? `--start=${opts.startTime}` : null,
             opts?.title ? `--title=${opts.title}` : null,
+            ...Object.entries(opts?.headers || {}).filter(([key, value]) => !/[\r\n]/.test(key + value)).map(([key, value]) => `--http-header-fields-append=${key}: ${value}`),
+            ...(opts?.subtitles || []).map(sub => `--sub-file=${sub.url}`),
         ].filter(Boolean),
         windowsPaths: [
             'C:\\Program Files\\mpv\\mpv.exe',
@@ -58,6 +60,8 @@ const PLAYERS = [
             url,
             opts?.startTime ? `--mpv-start=${opts.startTime}` : null,
             opts?.title ? `--mpv-title=${opts.title}` : null,
+            ...Object.entries(opts?.headers || {}).filter(([key, value]) => !/[\r\n]/.test(key + value)).map(([key, value]) => `--mpv-http-header-fields-append=${key}: ${value}`),
+            ...(opts?.subtitles || []).map(sub => `--mpv-sub-file=${sub.url}`),
         ].filter(Boolean),
         macPaths: [
             '/Applications/IINA.app/Contents/MacOS/iina-cli',
@@ -73,6 +77,9 @@ const PLAYERS = [
             url,
             '--play-and-exit',
             opts?.startTime ? `--start-time=${opts.startTime}` : null,
+            opts?.headers?.Referer ? `:http-referrer=${opts.headers.Referer}` : null,
+            opts?.headers?.['User-Agent'] ? `:http-user-agent=${opts.headers['User-Agent']}` : null,
+            opts?.subtitles?.[0]?.url ? `--sub-file=${opts.subtitles[0].url}` : null,
         ].filter(Boolean),
         windowsPaths: [
             'C:\\Program Files\\VideoLAN\\VLC\\vlc.exe',
@@ -218,6 +225,9 @@ async function detectExternalPlayers(fs) {
  * @returns {{ success: boolean, pid?: number, error?: string }}
  */
 function launchExternalPlayer(executablePath, streamUrl, options = {}, logger) {
+    if (!executablePath || !/^(https?:\/\/|file:\/\/|[A-Za-z]:[\\/]|\/)/i.test(String(streamUrl || ''))) {
+        return { success: false, error: 'Select an installed player and a playable media URL.' };
+    }
     // Find the player definition for correct arg building. Match against every
     // OS's known paths (a stored pref may have been captured on any platform)
     // plus the exec-name suffix from a PATH-resolved binary.
@@ -228,13 +238,13 @@ function launchExternalPlayer(executablePath, streamUrl, options = {}, logger) {
 
     const args = playerDef.args(streamUrl, options);
 
-    logger.info(`[ExternalPlayer] Launching ${executablePath} with args: ${args.join(' ')}`);
+    logger.info(`[ExternalPlayer] Launching ${playerDef.name}`);
 
     try {
         const proc = spawn(executablePath, args, {
             detached: true,
             stdio: 'ignore',
-            windowsHide: false,
+            windowsHide: true,
         });
         proc.unref();
 

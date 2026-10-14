@@ -215,6 +215,7 @@ export interface EpisodeServer {
 }
 
 export interface StreamingSource {
+  fileIndex?: number;
   url: string;
   isM3U8: boolean;
   quality?: string;

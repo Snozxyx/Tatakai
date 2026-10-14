@@ -9,7 +9,7 @@ interface Suggestion {
   id: string | number;
   name: string;
   poster: string | null;
-  type: "anime" | "manga" | "history";
+  type: "anime" | "manga" | "novel" | "history";
   year?: number | null;
   format?: string | null;
   countryOfOrigin?: string | null;
@@ -27,11 +27,13 @@ async function fetchSuggestions(q: string): Promise<Suggestion[]> {
   for (const m of mediaArr) {
     const name = m.titleEnglish || m.titleRomaji || m.titleNative;
     if (!name || name === "Unknown") continue;
+    const formatUpper = String(m.format ?? "").toUpperCase();
+    const isNovel = formatUpper === "NOVEL" || formatUpper === "LIGHT_NOVEL" || m.mediaType === "novel";
     results.push({
       id: m.anilistId ?? m.tatakaiId ?? m.malId,
       name,
       poster: m.coverImageLarge || m.coverImageMedium || null,
-      type: m.mediaType === "manga" ? "manga" : "anime",
+      type: isNovel ? "novel" : m.mediaType === "manga" ? "manga" : "anime",
       year: m.startDate?.year ?? m.seasonYear ?? null,
       format: m.format ?? null,
       countryOfOrigin: m.countryOfOrigin ?? null,
@@ -49,6 +51,7 @@ interface Props {
 }
 
 function formatSuggestionType(item: Suggestion): string {
+  if (item.type === "novel") return "Novel";
   if (item.type !== "manga") return item.format || "Anime";
   const format = String(item.format || "MANGA").toUpperCase();
   if (item.countryOfOrigin === "KR") return "Manhwa";
@@ -109,9 +112,11 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose }: P
   const handleSelect = (item: Suggestion) => {
     onSelect(item.name);
     navigate(
-      item.type === "manga"
-        ? `/manga/${item.id}`
-        : `/anime/${item.id}`
+      item.type === "novel"
+        ? `/novel/${item.id}`
+        : item.type === "manga"
+          ? `/manga/${item.id}`
+          : `/anime/${item.id}`
     );
   };
 
@@ -185,24 +190,24 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose }: P
                   onClick={() => handleSelect(item)}
                   className="w-full flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/5 transition-colors text-left group"
                 >
-                  <div className="w-8 h-10 rounded-lg overflow-hidden shrink-0 bg-muted">
-                    {item.poster ? (
-                      <img
-                        src={item.poster}
-                        alt=""
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        {item.type === "manga" ? (
-                          <BookOpen className="w-3.5 h-3.5 text-muted-foreground" />
+                      <div className="w-8 h-10 rounded-lg overflow-hidden shrink-0 bg-muted">
+                        {item.poster ? (
+                          <img
+                            src={item.poster}
+                            alt=""
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
                         ) : (
-                          <Film className="w-3.5 h-3.5 text-muted-foreground" />
+                          <div className="w-full h-full flex items-center justify-center">
+                            {item.type === "anime" ? (
+                              <Film className="w-3.5 h-3.5 text-muted-foreground" />
+                            ) : (
+                              <BookOpen className="w-3.5 h-3.5 text-muted-foreground" />
+                            )}
+                          </div>
                         )}
                       </div>
-                    )}
-                  </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
                       {item.name}
@@ -211,9 +216,11 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose }: P
                       <span
                         className={cn(
                           "text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md",
-                          item.type === "manga"
-                            ? "bg-emerald-500/15 text-emerald-400"
-                            : "bg-primary/15 text-primary/80"
+                          item.type === "novel"
+                            ? "bg-violet-500/15 text-violet-400"
+                            : item.type === "manga"
+                              ? "bg-emerald-500/15 text-emerald-400"
+                              : "bg-primary/15 text-primary/80"
                         )}
                       >
                         {formatSuggestionType(item)}

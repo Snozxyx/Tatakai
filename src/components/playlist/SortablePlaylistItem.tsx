@@ -16,10 +16,10 @@ const MEDIA_LABELS: Record<string, string> = {
 };
 
 /** Prefer the stored per-item media_format; fall back to the playlist's coarse kind. */
-function formatMediaLabel(mediaFormat: string | null | undefined, mediaKind: 'anime' | 'manga'): string {
+function formatMediaLabel(mediaFormat: string | null | undefined, mediaKind: 'anime' | 'manga' | 'novel'): string {
   const f = String(mediaFormat || '').trim().toLowerCase();
   if (f) return MEDIA_LABELS[f] || f.charAt(0).toUpperCase() + f.slice(1);
-  return mediaKind === 'manga' ? 'Manga' : 'Anime';
+  return mediaKind === 'manga' || mediaKind === 'novel' ? (mediaKind === 'novel' ? 'Novel' : 'Manga') : 'Anime';
 }
 
 interface SortablePlaylistItemProps {
@@ -27,7 +27,7 @@ interface SortablePlaylistItemProps {
   index: number;
   viewMode: PlaylistViewMode;
   canEdit: boolean;
-  mediaKind: 'anime' | 'manga';
+  mediaKind: 'anime' | 'manga' | 'novel';
   href: string;
   onRemove: (animeId: string) => void;
   onLaunchWatchRoom: (animeId: string, animeName: string, animePoster?: string | null) => void;
@@ -164,10 +164,10 @@ export function SortablePlaylistItem({
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-            {mediaKind === 'manga' ? (
-              <BookOpen className="w-6 h-6 text-white" />
-            ) : (
+            {mediaKind === 'anime' ? (
               <Play className="w-6 h-6 text-white" />
+            ) : (
+              <BookOpen className="w-6 h-6 text-white" />
             )}
           </div>
         </div>

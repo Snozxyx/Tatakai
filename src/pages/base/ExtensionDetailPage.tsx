@@ -584,6 +584,8 @@ export default function ExtensionDetailPage() {
               </section>
             ) : null}
 
+            {extension.sourceUrl && <a href={extension.sourceUrl} target="_blank" rel="noreferrer" className="block break-all rounded-xl border border-border p-4 text-sm text-primary">Imported from upstream catalog</a>}
+            {extension.compatibilityReason && <p className="text-sm text-muted-foreground">{extension.compatibilityReason}</p>}
             {extension.githubRepoUrl ? (
               <a
                 href={extension.githubRepoUrl}
@@ -604,12 +606,12 @@ export default function ExtensionDetailPage() {
 
             <section className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5">
               <h2 className="font-display text-base font-bold tracking-tight text-foreground">
-                About .kai bundles
+                About extensions
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-white/50">
                 Tatakai extensions ship as a single <code className="font-mono text-primary">.kai</code>{' '}
-                file: a signed manifest plus a sandboxed JavaScript bundle. Installing one never
-                executes code outside the sandbox.
+                file containing metadata and JavaScript. Source manifests also support Stremio and Seanime.
+                Choose which extensions to install and enable.
               </p>
             </section>
           </aside>

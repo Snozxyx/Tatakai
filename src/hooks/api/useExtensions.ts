@@ -1,3 +1,5 @@
+import { migrateExtensionStorage } from "@/core/extensions/ecosystems";
+migrateExtensionStorage();
 import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -69,9 +71,9 @@ export function useExtensions() {
     const handleSideloaded = () => {
       queryClient.invalidateQueries({ queryKey: ['extensions'] });
     };
-    window.addEventListener('tatakai:extension-sideloaded', handleSideloaded);
+    window.addEventListener('tatakai:extension-installed', handleSideloaded);
     return () => {
-      window.removeEventListener('tatakai:extension-sideloaded', handleSideloaded);
+      window.removeEventListener('tatakai:extension-installed', handleSideloaded);
     };
   }, [queryClient]);
 
@@ -79,7 +81,7 @@ export function useExtensions() {
   const { data: extensions, isLoading } = useQuery({
     queryKey: ['extensions', 'approved'],
     queryFn: async () => {
-      const sideloadedRaw = typeof window !== 'undefined' ? localStorage.getItem('tatakai_sideloaded_extensions') : null;
+      const sideloadedRaw = typeof window !== 'undefined' ? localStorage.getItem('tatakai_extension_manifests') : null;
       const sideloadedList: ExtensionManifest[] = sideloadedRaw ? JSON.parse(sideloadedRaw) : [];
 
       let fetched: ExtensionManifest[] = [];

@@ -86,18 +86,19 @@ function readNavigatorOnline(): boolean {
 
 /** Resolve true if the origin answers at the network layer within the timeout. */
 async function probeOrigin(origin: string): Promise<boolean> {
+  const isApi = origin.replace(/\/+$/, '') === API_ORIGIN.replace(/\/+$/, '');
+  const url = `${origin.replace(/\/+$/, '')}${isApi ? '/health' : '/auth/v1/health'}`;
+  const anonKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
+  const headers = !isApi && anonKey ? { apikey: anonKey } : undefined;
   // Avoid Capacitor's patched fetch interceptor for native health checks.
   // Browser-only fetch options can reject even while the native network stack
   // is healthy. Any HTTP status proves the origin was reached.
   if (Capacitor.isNativePlatform()) {
     try {
-      const normalizedOrigin = origin.replace(/\/+$/, '');
-      const url = normalizedOrigin === API_ORIGIN.replace(/\/+$/, '')
-        ? `${normalizedOrigin}/health`
-        : normalizedOrigin;
       const response = await CapacitorHttp.request({
         url,
         method: 'GET',
+        headers,
         connectTimeout: PROBE_TIMEOUT_MS,
         readTimeout: PROBE_TIMEOUT_MS,
         responseType: 'text',
@@ -111,9 +112,10 @@ async function probeOrigin(origin: string): Promise<boolean> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
   try {
-    await fetch(origin, {
+    await fetch(url, {
       method: 'GET',
-      mode: 'no-cors',
+      mode: headers ? 'cors' : 'no-cors',
+      headers,
       cache: 'no-store',
       signal: controller.signal,
       // A bare origin fetch is enough to learn "is anything answering here".

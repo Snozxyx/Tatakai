@@ -18,12 +18,26 @@ import {
   hydrateCachedItems,
   writeCachedItems,
   MANGA_CHAPTERS_TTL_MS,
+  clearCachedItemsByPrefix,
 } from "@/lib/cache/extensionResultCache";
 import { isCapacitor } from "@/lib/platform/platform";
+import { removeMangaChapterOutliers } from '@/lib/reader/mangaChapterReliability';
 
 /** Cache-key builder shared by the client + the query hook's placeholder. */
+let chaptersCacheGeneration = 0;
 export function mangaChaptersCacheKey(id: string, providers?: string, language?: string): string {
-  return `manga-chapters::${String(id || "")}::${providers || ""}::${language || ""}`;
+  return `manga-chapters::v3::${String(id || "")}::${providers || ""}::${language || ""}`;
+}
+
+export async function clearMangaChaptersCache(id: string): Promise<void> {
+  chaptersCacheGeneration++;
+  const { clearMangaDexChapterCache } = await import('./mangadex-api');
+  clearMangaDexChapterCache(id);
+  const { clearMangaUpdatesCache } = await import('./mangaupdates-api');
+  clearMangaUpdatesCache(id);
+  await clearCachedItemsByPrefix(`manga-chapters::v3::${id}::`);
+  await clearCachedItemsByPrefix(`manga-chapters::v2::${id}::`);
+  await clearCachedItemsByPrefix(`manga-chapters::${id}::`);
 }
 
 /** Stable identity for a mapped chapter: chapter number when present, else its canonical order. */
@@ -38,7 +52,7 @@ function chapterIdentity(c: MappedMangaChapter): string {
  * collapse into one and the reader loses same-chapter fallback candidates.
  */
 function sourceIdentity(s: MangaChapterSource): string {
-  return `${s?.provider || ""}::${s?.language || ""}::${s?.scanlator || ""}`;
+  return `${s?.provider || ""}::${s?.language || ""}::${s?.scanlator || ""}::${s?.providerChapterId || s?.chapterKey || ""}`;
 }
 
 /**
@@ -49,10 +63,15 @@ function sourceIdentity(s: MangaChapterSource): string {
  *   re-added (no-drop guarantee: a provider momentarily down never shrinks the
  *   list). Additive only.
  */
-function unionMappedChapters(
+export function unionMappedChapters(
   fresh: MappedMangaChapter[],
   cached: MappedMangaChapter[],
 ): MappedMangaChapter[] {
+  // A responding provider replaces its old catalog. Preserve cache entries
+  // only for sources absent from this scan (e.g. temporarily unavailable).
+  const freshProviders = new Set(fresh.flatMap(c => (c.sources || []).map(s => s.provider)));
+  cached = cached.map(c => ({ ...c, sources: (c.sources || []).filter(s => !freshProviders.has(s.provider)) }))
+    .filter(c => c.sources.length > 0);
   const cachedById = new Map<string, MappedMangaChapter>();
   for (const c of cached || []) cachedById.set(chapterIdentity(c), c);
 
@@ -223,14 +242,14 @@ function resolveApiOrigin(): string {
   return 'https://api.tatakai.me';
 }
 
-async function apiGet<T>(path: string, params?: Record<string, string | number | boolean | undefined>, onMeta?: (meta: { total?: number; hasNextPage?: boolean; lastPage?: number; source?: string }) => void): Promise<T> {
+async function apiGet<T>(path: string, params?: Record<string, string | number | boolean | undefined>, onMeta?: (meta: { total?: number; hasNextPage?: boolean; lastPage?: number; source?: string }) => void, timeoutMs = 30_000): Promise<T> {
   const url = new URL(path, resolveApiOrigin());
   if (params) {
     for (const [k, v] of Object.entries(params)) {
       if (v !== undefined && v !== null && v !== "") url.searchParams.set(k, String(v));
     }
   }
-  const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+  const res = await fetch(url.toString(), { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(timeoutMs) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const json = await res.json();
   if (json?.meta) onMeta?.(json.meta);
@@ -436,25 +455,23 @@ export async function getMangaDetail(id: string): Promise<MangaDetailResponse> {
 }
 
 export async function getMangaChapters(id: string, _providers?: string, _language?: string): Promise<MangaChapterResponse> {
-  const normalizedId = encodeURIComponent(String(id || ""));
-  const base = await apiGet<MangaChapterResponse>(`/api/v3/manga/${normalizedId}/chapters`);
-
+  const generation = chaptersCacheGeneration;
+  const { fetchMangaDexChapters } = await import('./mangadex-api');
+  const { fetchMangaUpdatesCatalog, applyMangaUpdatesCatalog } = await import('./mangaupdates-api');
+  const runtime = await import('@/core/content/manga-extension-runtime');
+  const anilistId = Number(String(id).replace(/^anilist:/i, ""));
+  const [mangaDex, updatesCatalog, extensionPayload] = await Promise.all([
+    fetchMangaDexChapters(id),
+    fetchMangaUpdatesCatalog(id),
+    runtime.fetchExtensionMangaChapters({anilistId:Number.isFinite(anilistId)?anilistId:undefined})
+      .catch(() => ({chapters:[],providersAvailable:[],failedProviders:[]})),
+  ]);
+  const empty: MangaChapterResponse = {anilistId:Number.isFinite(anilistId)?anilistId:0,partial:false,failedProviders:[],chapters:[],mappedChapters:[]};
+  // Reader providers always contribute, regardless of which metadata API answers.
+  const base = mangaDex || (updatesCatalog || extensionPayload.chapters.length ? empty : await apiGet<MangaChapterResponse>(`/api/v3/manga/${encodeURIComponent(id)}/chapters`,undefined,undefined,10000).catch(()=>empty));
   const cacheKey = mangaChaptersCacheKey(id, _providers, _language);
 
-  let merged: MangaChapterResponse = base;
-  try {
-    const { fetchExtensionMangaChapters, mergeChaptersWithExtensions } = await import(
-      "@/core/content/manga-extension-runtime"
-    );
-    const anilistId = Number(String(id).replace(/^anilist:/i, ""));
-    const extensionPayload = await fetchExtensionMangaChapters({
-      anilistId: Number.isFinite(anilistId) ? anilistId : undefined,
-      title: undefined,
-    });
-    merged = mergeChaptersWithExtensions(base, extensionPayload);
-  } catch {
-    merged = base;
-  }
+  const merged = applyMangaUpdatesCatalog(runtime.mergeChaptersWithExtensions(base, extensionPayload), updatesCatalog);
 
   // Union-merge with the persisted cache (fresh-authoritative). Guarantees a
   // weaker refetch (a provider momentarily down) never *drops* previously-seen
@@ -463,14 +480,15 @@ export async function getMangaChapters(id: string, _providers?: string, _languag
   try {
     const cachedFromMem = readCachedItemsSync<MappedMangaChapter>(cacheKey);
     const cached = cachedFromMem ?? (await hydrateCachedItems<MappedMangaChapter>(cacheKey)) ?? [];
-    const unioned = unionMappedChapters(merged.mappedChapters || [], cached);
+    const unioned = removeMangaChapterOutliers(unionMappedChapters(merged.mappedChapters || [], cached))
+      .map((chapter, index) => ({ ...chapter, canonicalOrder: index }));
 
     // Recompute providersAvailable as the union across the merged chapters'
     // sources plus whatever the fresh response already advertised.
     const providers = new Set<string>((merged as any).providersAvailable || []);
     for (const c of unioned) for (const s of c.sources || []) if (s?.provider) providers.add(s.provider);
 
-    writeCachedItems(cacheKey, unioned, MANGA_CHAPTERS_TTL_MS);
+    if (generation === chaptersCacheGeneration) writeCachedItems(cacheKey, unioned, MANGA_CHAPTERS_TTL_MS);
 
     return {
       ...merged,
@@ -656,6 +674,33 @@ export async function getMangaReadByKey(
     providerChapterId = first.providerChapterId || providerChapterId;
   }
 
+  if (provider === 'mangadex' || effKey.startsWith('mangadex:')) {
+    const { fetchMangaDexPages } = await import('./mangadex-api');
+    const keys = [...new Set([effKey, ...(options?.alternatives || [])
+      .filter(source => source.provider === 'mangadex').map(source => source.chapterKey)])];
+    let failure: MangaReadResponse = {success:false,message:'MangaDex pages could not be loaded.'};
+    for (const [index, key] of keys.entries()) {
+      const result = await fetchMangaDexPages(Number.isFinite(anilistIdNum) ? anilistIdNum : 0, key);
+      if (result.success) {
+        if (result.data?.readMeta) result.data.readMeta.fallbackUsed = index > 0;
+        return result;
+      }
+      failure = result;
+    }
+    const otherSources = (options?.alternatives || []).filter(source => source.provider !== 'mangadex');
+    if (otherSources.length) {
+      const { fetchExtensionMangaPages } = await import('./manga-extension-runtime');
+      const first = otherSources[0];
+      const result = await fetchExtensionMangaPages({extensionId:first.provider,chapterKey:first.chapterKey,
+        providerChapterId:first.providerChapterId,anilistId:Number.isFinite(anilistIdNum)?anilistIdNum:undefined,
+        alternatives:otherSources.slice(1)});
+      if (result.success) {
+        if (result.data?.readMeta) result.data.readMeta.fallbackUsed = true;
+        return result;
+      }
+    }
+    return failure;
+  }
   if (isNative && provider && provider !== "tatakai_media") {
     const { fetchExtensionMangaPages } = await import("@/core/content/manga-extension-runtime");
     const anilistId = Number(String(id).replace(/^anilist:/i, ""));
@@ -824,6 +869,7 @@ export function mediaToMangaSearchItem(m: TatakaiMedia): MangaSearchItem {
   return {
     id: m.anilistId ? String(m.anilistId) : m.malId ? `mal:${m.malId}` : "",
     mediaType,
+    format: m.format ?? null,
     anilistId: m.anilistId,
     malId: m.malId,
     canonicalTitle: m.titleEnglish || m.titleRomaji || m.titleNative || "Untitled",

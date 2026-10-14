@@ -5,13 +5,14 @@ import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useLeaderboard, LeaderboardType, useUserRank } from '@/hooks/community/useLeaderboard';
 import { useAuth } from '@/contexts/AuthContext';
-import { Trophy, Star, MessageSquare, TrendingUp, UserPlus, Flame, Crown } from 'lucide-react';
+import { Trophy, Star, MessageSquare, TrendingUp, UserPlus, Flame, Crown, BookOpen } from 'lucide-react';
 import { getRankTier, getRankImageUrl } from '@/lib/rankUtils';
 import { AnimatedCounter } from '@/components/profile/overview/AnimatedCounter';
 import { cn } from '@/lib/utils';
 
 const LEADERBOARD_TYPES: Array<{ value: LeaderboardType; label: string; icon: any; scoreLabel: string }> = [
   { value: 'watched', label: 'Most Watched', icon: Trophy, scoreLabel: 'episodes' },
+  { value: 'novels', label: 'Top Novel Readers', icon: BookOpen, scoreLabel: 'novels' },
   { value: 'streak', label: 'Best Streak', icon: Flame, scoreLabel: 'days' },
   { value: 'rated', label: 'Most Rated', icon: Star, scoreLabel: 'ratings' },
   { value: 'comments', label: 'Most Comments', icon: MessageSquare, scoreLabel: 'comments' },

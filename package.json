@@ -1,8 +1,8 @@
 {
   "name": "tatakai",
   "private": true,
-  "version": "6.0.7",
-  "description": "Tatakai — an extension-based otaku community for tracking anime & manga",
+  "version": "6.1.0",
+  "description": "Tatakai \u00e2\u20ac\u201d an extension-based otaku community for tracking anime & manga",
   "author": {
     "name": "Snozxyx",
     "email": "snozxyx@gmail.com"
@@ -15,7 +15,6 @@
     "postinstall": "node scripts/fix-electron-install.cjs",
     "dev": "concurrently \"npm:dev:web\" \"npm:dev:api\"",
     "dev:web": "vite",
-    "dev:api": "npm --prefix TatakaiAPI start",
     "build": "cross-env NODE_ENV=production NODE_OPTIONS=--max-old-space-size=6144 vite build",
     "build:dev": "cross-env NODE_OPTIONS=--max-old-space-size=6144 vite build --mode development",
     "lint": "eslint .",
@@ -36,9 +35,11 @@
     "mobile:sync:ios": "npm run build && npx cap sync ios",
     "mobile:build": "npm run build && npx cap sync android && cd android && chmod +x gradlew && ./gradlew assembleRelease",
     "mobile:build:ios": "npm run build && npx cap sync ios",
-    "mobile:build:ios:unsigned": "npm run build && npx cap sync ios && xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath ios/build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO clean build"
+    "mobile:build:ios:unsigned": "npm run build && npx cap sync ios && xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath ios/build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO clean build",
+    "altstore:generate": "node scripts/generate-altstore-source.mjs"
   },
   "dependencies": {
+    "@biwills/kittentts": "^1.0.0",
     "@capacitor-community/keep-awake": "^8.0.0",
     "@capacitor/android": "^8.0.2",
     "@capacitor/app": "^8.0.0",
@@ -106,6 +107,7 @@
     "animejs": "^4.5.0",
     "axios": "^1.13.4",
     "blurhash": "^2.0.5",
+    "cheerio": "^1.1.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -127,6 +129,8 @@
     "jszip": "^3.10.2",
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",
+    "onnxruntime-web": "^1.27.0",
+    "pako": "^3.0.2",
     "playwright": "^1.62.1",
     "playwright-extra": "^4.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
@@ -205,7 +209,10 @@
       "desktop/**/*",
       "resources/**/*",
       "!resources/bin/**",
-      "package.json"
+      "package.json",
+      "src/core/player/subtitle-core.js",
+      "src/core/download/candidate-scorer.cjs",
+      "src/core/download/candidate-evaluator.cjs"
     ],
     "extraResources": [
       {

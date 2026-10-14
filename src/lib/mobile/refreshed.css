@@ -25,6 +25,7 @@
   html[data-mobile-layout="refreshed"] [data-mobile-home] :is([data-mobile-home-rail="manga-genres"], [data-mobile-home-rail="discovery"]) { grid-auto-columns: clamp(156px, 44vw, 190px); }
   html[data-mobile-layout="refreshed"] [data-mobile-home] [data-mobile-browse-card] { height: 210px; grid-row: auto; }
   html[data-mobile-layout="refreshed"] [data-mobile-home] [data-mobile-home-rail="resume"] { grid-auto-columns: clamp(260px, 82vw, 360px); gap: 14px; }
+  html[data-mobile-layout="refreshed"] [data-mobile-home] [data-mobile-home-rail="followed-episodes"] { grid-auto-columns: clamp(240px, 76vw, 320px); gap: 14px; }
   html[data-mobile-layout="refreshed"] [data-mobile-home] [data-mobile-home-rail="resume"] > :not(.contents),
   html[data-mobile-layout="refreshed"] [data-mobile-home] [data-mobile-home-rail="resume"] > .contents > * { width: 100%; min-width: 0; min-height: 144px; }
   html[data-mobile-layout="refreshed"] [data-mobile-home] [data-mobile-home-rail="playlists"] { grid-auto-columns: clamp(170px, 48vw, 210px); gap: 14px; }

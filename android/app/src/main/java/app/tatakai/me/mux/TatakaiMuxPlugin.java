@@ -3,6 +3,7 @@ package app.tatakai.me.mux;
 import android.util.Log;
 
 import com.arthenica.ffmpegkit.FFmpegKit;
+import com.arthenica.ffmpegkit.FFmpegKitConfig;
 import com.arthenica.ffmpegkit.FFmpegSession;
 import com.arthenica.ffmpegkit.ReturnCode;
 import com.arthenica.ffmpegkit.Statistics;
@@ -18,6 +19,8 @@ import java.util.Deque;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -38,6 +41,35 @@ public class TatakaiMuxPlugin extends Plugin {
     private static final int LOG_TAIL_LINES = 12;
 
     private final Map<String, FFmpegSession> sessions = new ConcurrentHashMap<>();
+
+    @PluginMethod
+    public void extractSubtitle(PluginCall call) {
+        String input = call.getString("url", "");
+        int index = call.getInt("trackIndex", -1);
+        if (index < 0 || input.isEmpty()) { call.resolve(failure("Invalid subtitle track.")); return; }
+        if (input.startsWith("content://")) {
+            input = FFmpegKitConfig.getSafParameterForRead(getContext(), android.net.Uri.parse(input));
+        } else if (!input.startsWith("http://") && !input.startsWith("https://")) {
+            try {
+                File local = new File(input.replaceFirst("^file://", "")).getCanonicalFile();
+                String root = getContext().getFilesDir().getCanonicalPath() + File.separator;
+                if (!local.getPath().startsWith(root)) { call.resolve(failure("Media must be in app storage.")); return; }
+                input = local.getPath();
+            } catch (Exception error) { call.resolve(failure("Media is unavailable.")); return; }
+        }
+        File output = new File(getContext().getCacheDir(), "subtitle-" + UUID.randomUUID() + ".vtt");
+        FFmpegKit.executeWithArgumentsAsync(new String[] { "-y", "-i", input, "-map", "0:" + index, "-c:s", "webvtt", output.getPath() }, session -> {
+            try {
+                if (!ReturnCode.isSuccess(session.getReturnCode())) { call.resolve(failure("This subtitle track cannot be extracted as text. Bitmap subtitles require a compatible native player.")); return; }
+                String text = new String(Files.readAllBytes(output.toPath()), StandardCharsets.UTF_8);
+                if (!text.contains("-->")) { call.resolve(failure("No subtitle cues found.")); return; }
+                JSObject result = success();
+                result.put("url", "data:text/vtt;base64," + android.util.Base64.encodeToString(text.getBytes(StandardCharsets.UTF_8), android.util.Base64.NO_WRAP));
+                call.resolve(result);
+            } catch (Exception error) { call.resolve(failure("Unable to read extracted subtitles.")); }
+            finally { output.delete(); }
+        });
+    }
 
     @PluginMethod
     public void muxHlsToMp4(PluginCall call) {

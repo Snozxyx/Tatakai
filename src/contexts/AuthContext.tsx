@@ -48,7 +48,7 @@ interface AuthContextType {
   /** False until staff roles have been resolved for the current session. */
   rolesResolved: boolean;
   signIn: (email: string, password: string, captchaToken?: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, displayName?: string, captchaToken?: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, displayName?: string, captchaToken?: string) => Promise<{ error: Error | null; mode?: 'otp_required' | 'restricted' }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   // Passwordless / verification via 6-digit email codes (no email links → no redirect).
@@ -299,6 +299,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, displayName?: string, captchaToken?: string) => {
+    if (import.meta.env.VITE_OPERATIONS_AUTH_ENABLED === 'true') {
+      try {
+        const { resolveApiV3Base } = await import('@/lib/api/backendOrigin');
+        const response = await fetch(`${resolveApiV3Base()}/auth/signup`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, displayName, captchaToken }),
+        });
+        const result = await response.json();
+        if (!response.ok) return { error: new Error(result.error || 'Registration unavailable') };
+        if (result.mode !== 'restricted' && result.mode !== 'otp_required') return { error: new Error('Invalid registration response') };
+        return { error: null, mode: result.mode as 'restricted' | 'otp_required' };
+      } catch { return { error: new Error('Registration temporarily unavailable') }; }
+    }
     const redirectUrl = `${window.location.origin}/`;
 
     const { error } = await supabase.auth.signUp({

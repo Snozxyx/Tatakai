@@ -93,10 +93,26 @@ import { AdultWarningGate } from "@/components/content/AdultWarningGate";
 // title + format · year meta below) so related-media reads consistently across
 // the page. Relations carry no rating, so that segment is simply omitted.
 function RelationTree({ relations }: { relations: MediaRelation[] }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
   if (relations.length === 0) return null;
 
+  const scroll = (direction: 'left' | 'right') => {
+    scrollRef.current?.scrollBy({ left: direction === 'left' ? -450 : 450, behavior: 'smooth' });
+  };
+
   return (
-    <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide scroll-smooth">
+    <div className="relative group/rail">
+      <button
+        type="button"
+        onClick={() => scroll('left')}
+        aria-label="Scroll series tree left"
+        className="absolute -left-3 top-1/2 -translate-y-8 z-20 w-10 h-10 rounded-full bg-black/80 hover:bg-black text-white border border-white/10 hidden md:flex items-center justify-center opacity-0 group-hover/rail:opacity-100 transition-all shadow-xl backdrop-blur-md"
+      >
+        <ChevronLeft className="w-5 h-5" />
+      </button>
+
+      <div ref={scrollRef} className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide scroll-smooth">
       {relations.map((rel, index) => {
         const fmt = rel.format?.toUpperCase() || '';
         const isNovel = fmt.includes('NOVEL');
@@ -157,6 +173,16 @@ function RelationTree({ relations }: { relations: MediaRelation[] }) {
           </Link>
         );
       })}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => scroll('right')}
+        aria-label="Scroll series tree right"
+        className="absolute -right-3 top-1/2 -translate-y-8 z-20 w-10 h-10 rounded-full bg-black/80 hover:bg-black text-white border border-white/10 hidden md:flex items-center justify-center opacity-0 group-hover/rail:opacity-100 transition-all shadow-xl backdrop-blur-md"
+      >
+        <ChevronRight className="w-5 h-5" />
+      </button>
     </div>
   );
 }

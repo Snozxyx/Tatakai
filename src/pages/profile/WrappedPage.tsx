@@ -75,6 +75,7 @@ export default function WrappedPage() {
     manga: readingTotals?.manga ?? 0,
     manhwa: readingTotals?.manhwa ?? 0,
     comic: readingTotals?.comic ?? 0,
+    novel: readingTotals?.novel ?? 0,
   });
   const rankBadges = getRankBadges(rankScore);
   const isMobileApp = useIsMobileApp();

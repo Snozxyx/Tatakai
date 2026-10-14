@@ -111,10 +111,11 @@ export interface MangaBakaSeries {
 /**
  * Sources MangaBaka can be queried by.
  *
- * The endpoint only exposes `anilist`, which is what this app has on hand; the
- * type is kept for call sites that pass it explicitly.
+ * `mangabaka` selects a direct series lookup for imported library rows.
+ * Other sources use the existing AniList mapping endpoint.
  */
 export type MangaBakaSource =
+  | "mangabaka"
   | "anilist"
   | "my_anime_list"
   | "kitsu"
@@ -122,7 +123,7 @@ export type MangaBakaSource =
   | "anime_planet";
 
 /**
- * Resolve an AniList manga id to a MangaBaka series.
+ * Resolve an AniList manga id or a direct MangaBaka series id.
  *
  * Resolves to `null` on any failure or miss: this is enrichment layered on top of
  * AniList data, so a manga MangaBaka has never heard of must still render its page.
@@ -134,7 +135,9 @@ export async function fetchMangaBakaSeries(
   const id = Number(sourceId);
   if (!Number.isFinite(id) || id <= 0) return null;
 
-  return fetchMapping<MangaBakaSeries>(`/mapping/manga/${id}/mangabaka`, {
+  return fetchMapping<MangaBakaSeries>(options.source === "mangabaka"
+    ? `/mapping/mangabaka/series/${id}`
+    : `/mapping/manga/${id}/mangabaka`, {
     ttlMs: CACHE_TTL_MS,
     signal: options.signal,
     force: options.force,

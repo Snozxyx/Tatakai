@@ -10,7 +10,7 @@ import { ANILIST_GRAPHQL_ENDPOINT } from "@/lib/api/backendOrigin";
  * blurred-poster header, so the query never blocks the sheet.
  */
 export function useMediaBanner(
-  kind: "anime" | "manga" | undefined,
+  kind: "anime" | "manga" | "novel" | undefined,
   anilistId: number | null | undefined,
   enabled: boolean,
 ) {
@@ -23,7 +23,7 @@ export function useMediaBanner(
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
           query: `query ($id: Int, $type: MediaType) { Media(id: $id, type: $type) { bannerImage } }`,
-          variables: { id: anilistId, type: kind === "manga" ? "MANGA" : "ANIME" },
+          variables: { id: anilistId, type: kind === "anime" ? "ANIME" : "MANGA" },
         }),
       });
       if (!res.ok) return null;

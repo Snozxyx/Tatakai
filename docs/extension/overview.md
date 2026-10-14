@@ -46,28 +46,11 @@ and rendered by app-owned generic pages under `/x/:namespace/:sourceId/…`. Sta
 lives under separate React Query keys (`['custom', …]`) and never calls the
 media-list mutations. See [capabilities/custom-source.md](capabilities/custom-source.md).
 
-## Trust model
+## Installation and permissions
 
-Running an extension's code in-process (Node) or in the app's realm (renderer)
-means that code has **app privileges** — there is no hard sandbox for it. The
-security boundary is a **trust gate**, applied identically in both planes:
+All installed extensions use the same flow. Signing fields are ignored. Package structure, identifiers, archive limits, declared network access, publishing authentication, moderation, and kill switches remain enforced.
 
-> An extension is **trusted** iff `manifest.sideloaded === true` **or** it
-> carries a valid Ed25519 signature (curated/store-signed).
-
-- **Node bundle `require()`** (`host-server.cjs::findNamespaceEntry`) refuses to
-  mount an untrusted extension's `apiServer` namespace.
-- **Renderer bundle load** (`rendererLoader.ts::isTrusted` + the
-  `runtime:get-renderer-bundle` IPC) refuses to hand back or execute an
-  untrusted extension's `renderer.js`.
-
-Untrusted store extensions therefore stay **data-only** (sources/manga content
-served through the vetted host router) until signed. `custom/*` content routes
-themselves are ungated *per method*, but the namespace they live under is only
-mounted for trusted extensions — so untrusted code never runs.
-
-> ⚠️ **Renderer code has app privileges.** Only sideload extensions you trust.
-> This is documented plainly in [renderer-loader.md](renderer-loader.md).
+Native and Seanime code runs in the existing execution hosts. Renderer contributions and mobile providers run with application privileges. Stremio addons use HTTP/JSON only and execute no addon code.
 
 ## Loading & discovery
 

@@ -16,6 +16,9 @@ import { GlassPanel } from "@/components/ui/GlassPanel";
 import { useAniListGenres } from "@/hooks/api/useAniListGenres";
 import { useInfiniteSearch as useInfSearch, type AnimeSearchFilters, useEpisodeTitleSearch } from "@/hooks/api/useAnimeData";
 import { useInfiniteMangaSearch } from "@/hooks/api/useMangaData";
+import { useInfiniteNovelSearch } from "@/hooks/api/useNovelData";
+import type { NovelSearchOptions } from "@/core/content/novel-client";
+import { NovelSearchFilters } from '@/components/novel/NovelSearchFilters';
 import { useRef, useCallback, useState, useEffect, useMemo } from "react";
 import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import { searchCharacters } from "@/core/content/character-client";
@@ -128,9 +131,10 @@ export default function SearchPage() {
     }
   }, [searchInput]);
   const [page, setPage] = useState(1);
-  const [resultType, setResultType] = useState<'all' | 'anime' | 'manga' | 'character'>(() => {
+  const [resultType, setResultType] = useState<'all' | 'anime' | 'manga' | 'novel' | 'character'>(() => {
     const t = searchParams.get("type");
     if (t === 'manga') return 'manga';
+    if (t === 'novel') return 'novel';
     if (t === 'anime') return 'anime';
     if (t === 'character') return 'character';
     return 'all';
@@ -148,6 +152,9 @@ export default function SearchPage() {
     return g ? g.trim() : 'all';
   });
   const [mangaAdultFilter, setMangaAdultFilter] = useState(false);
+  const [novelFilters, setNovelFilters] = useState<NovelSearchOptions>({});
+  const [localNovelFilters, setLocalNovelFilters] = useState<NovelSearchOptions>({});
+  const novelFilterActive = Object.entries(novelFilters).some(([key, value]) => key !== 'tagSource' && (Array.isArray(value) ? value.length > 0 : Boolean(value)));
   const [minRating, setMinRating] = useState<number>(0);
   const [minReleaseYear, setMinReleaseYear] = useState<number>(0);
   const [maxRating, setMaxRating] = useState<number>(0);
@@ -181,7 +188,7 @@ export default function SearchPage() {
     const values = searchParams.getAll('animeTag');
     const packed = searchParams.get('animeTags');
     const typeParam = searchParams.get('type');
-    const generic = typeParam !== 'manga' ? searchParams.getAll('tag').concat(searchParams.get('tags')?.split(',') ?? []) : [];
+    const generic = typeParam !== 'manga' && typeParam !== 'novel' ? searchParams.getAll('tag').concat(searchParams.get('tags')?.split(',') ?? []) : [];
     return Array.from(new Set([...values, ...(packed ? packed.split(',') : []), ...generic].filter(Boolean)));
   });
   const [selectedMangaTags, setSelectedMangaTags] = useState<string[]>(() => {
@@ -230,6 +237,7 @@ export default function SearchPage() {
   const [localMangaAdult, setLocalMangaAdult] = useState(mangaAdultFilter);
 
   const applyFilters = () => {
+    setNovelFilters(localNovelFilters);
     setAnimeTypeFilter(localAnimeType);
     setAnimeStatusFilter(localAnimeStatus);
     // Keep anime + manga genre filters in sync so AniList results cover both media types
@@ -294,6 +302,7 @@ export default function SearchPage() {
 
   const shouldSearchAnime = resultType === 'all' || resultType === 'anime';
   const shouldSearchManga = (resultType === 'all' || resultType === 'manga') && !isProducerRoute;
+  const shouldSearchNovels = (resultType === 'all' || resultType === 'novel') && !isProducerRoute;
   const shouldSearchCharacters = (resultType === 'all' || resultType === 'character') && !isProducerRoute;
   const shouldDelaySecondaryStreams = resultType === 'all' && query.length > 0 && !isProducerRoute;
   const shouldEnableCharacterSearch =
@@ -617,13 +626,38 @@ export default function SearchPage() {
     refetch: retryMangaSearch,
   } = useInfiniteMangaSearch(query, 20, shouldEnableMangaSearch, mangaSearchOptions);
 
+  const shouldEnableNovelSearch =
+    shouldSearchNovels &&
+    (query.length > 0 || novelFilterActive || minReleaseYear > 0 || maxReleaseYear > 0 || minRating > 0 || maxRating > 0 || sortMode !== 'relevance') &&
+    (!shouldDelaySecondaryStreams || enableSecondaryResultStreams || novelFilterActive);
+
+  const novelSearchOptions = useMemo<NovelSearchOptions>(() => ({
+    ...novelFilters,
+    sort: novelFilters.sort || (sortMode === 'rating' ? 'SCORE_DESC' : sortMode === 'title' ? 'TITLE_ROMAJI' : undefined),
+    minYear: minReleaseYear || undefined,
+    maxYear: maxReleaseYear || undefined,
+    minScore: minRating || undefined,
+    maxScore: maxRating || undefined,
+    adult: novelFilters.adult || explicitMangaQuery || contentSafetySettings.showAdultEverywhere,
+  }), [novelFilters, sortMode, minReleaseYear, maxReleaseYear, minRating, maxRating, explicitMangaQuery, contentSafetySettings.showAdultEverywhere]);
+
+  const {
+    data: infiniteNovelData,
+    fetchNextPage: fetchNextNovelPage,
+    hasNextPage: hasNextNovelPage,
+    isFetchingNextPage: isFetchingNextNovelPage,
+    isLoading: isLoadingNovels,
+    error: novelSearchError,
+    refetch: retryNovelSearch,
+  } = useInfiniteNovelSearch(query, 20, shouldEnableNovelSearch, novelSearchOptions);
+
   const { data: extensionResults, isLoading: isLoadingExtensions } = useExtensionSearch(query, resultType === 'all' || resultType === 'anime');
 
 
   const observer = useRef<IntersectionObserver>();
   const loadMoreLockRef = useRef(false);
   const scrollRef = useCallback((node: HTMLDivElement) => {
-    if (isLoadingAnime || isLoadingManga) return;
+    if (isLoadingAnime || isLoadingManga || isLoadingNovels) return;
     if (observer.current) observer.current.disconnect();
     observer.current = new IntersectionObserver(entries => {
       const entry = entries[0];
@@ -654,6 +688,11 @@ export default function SearchPage() {
           fetchNextMangaPage();
           didRequestNextPage = true;
         }
+      } else if (resultType === 'novel') {
+        if (hasNextNovelPage && !isFetchingNextNovelPage) {
+          fetchNextNovelPage();
+          didRequestNextPage = true;
+        }
       } else {
         if (hasNextAnimePage && !isFetchingNextAnimePage) {
           if (isProducerRoute) {
@@ -665,6 +704,9 @@ export default function SearchPage() {
         } else if (hasNextMangaPage && !isFetchingNextMangaPage) {
           fetchNextMangaPage();
           didRequestNextPage = true;
+        } else if (hasNextNovelPage && !isFetchingNextNovelPage) {
+          fetchNextNovelPage();
+          didRequestNextPage = true;
         }
       }
 
@@ -673,7 +715,7 @@ export default function SearchPage() {
       }
     }, { rootMargin: '120px 0px' });
     if (node) observer.current.observe(node);
-  }, [isLoadingAnime, hasNextAnimePage, isFetchingNextAnimePage, isProducerRoute, fetchNextProducerPage, fetchNextSearchPage, isLoadingManga, hasNextMangaPage, isFetchingNextMangaPage, fetchNextMangaPage, resultType]);
+  }, [isLoadingAnime, hasNextAnimePage, isFetchingNextAnimePage, isProducerRoute, fetchNextProducerPage, fetchNextSearchPage, isLoadingManga, hasNextMangaPage, isFetchingNextMangaPage, fetchNextMangaPage, isLoadingNovels, hasNextNovelPage, isFetchingNextNovelPage, fetchNextNovelPage, resultType]);
 
   const allAnimeResults = useMemo(() => {
     if (isProducerRoute) {
@@ -739,6 +781,42 @@ export default function SearchPage() {
         .filter(Boolean);
     });
   }, [infiniteMangaData]);
+
+  const allNovelResults = useMemo(() => {
+    return (infiniteNovelData?.pages || []).flatMap((page: any) => {
+      const results = Array.isArray(page?.results) ? page.results : [];
+      return results
+        .map((novel: any) => {
+          const fallbackTitle =
+            novel?.canonicalTitle ||
+            novel?.title?.english ||
+            novel?.title?.romaji ||
+            novel?.title?.native;
+          const normalizedId = novel?.id || (novel?.anilistId ? `anilist:${novel.anilistId}` : novel?.malId ? `mal:${novel.malId}` : null);
+          if (!normalizedId || !fallbackTitle) return null;
+          return {
+            id: String(normalizedId),
+            name: fallbackTitle,
+            poster: novel?.poster || '',
+            type: 'novel',
+            status: novel?.status || undefined,
+            year: typeof novel?.year === 'number' ? novel.year : undefined,
+            rating:
+              typeof novel?.score === 'number'
+                ? (novel.score / 10).toFixed(1)
+                : undefined,
+            chapters:
+              typeof novel?.chapters === 'number' && novel.chapters > 0
+                ? novel.chapters
+                : undefined,
+            malId: typeof novel?.malId === 'number' ? novel.malId : undefined,
+            anilistId: typeof novel?.anilistId === 'number' ? novel.anilistId : undefined,
+            isAdult: inferMangaAdultFlag(novel),
+          };
+        })
+        .filter(Boolean);
+    });
+  }, [infiniteNovelData]);
   const { data: aniListCharacterSearch, isLoading: loadingAniListCharacters } = useAniListCharacterSearch(query);
 
   const characterResults = useMemo(() => {
@@ -818,6 +896,28 @@ export default function SearchPage() {
     return true;
   });
 
+  const filteredNovelResults = (allNovelResults || []).filter((novel: any) => {
+    const isAdult = Boolean(novel.isAdult);
+    if (isAdult && !novelSearchOptions.adult && query.trim().length === 0) return false;
+    const novelRating = Number.parseFloat(novel.rating || '0');
+    if (novelRating > 0 && novelRating < minRating) return false;
+    if (maxRating > 0 && novelRating > maxRating) return false;
+    if (minReleaseYear > 0 && Number(novel.year || 0) > 0 && Number(novel.year) < minReleaseYear) return false;
+    if (maxReleaseYear > 0 && Number(novel.year || 0) > 0 && Number(novel.year) > maxReleaseYear) return false;
+    if (novelFilters.statuses?.length) {
+      const s = String(novel.status || '').toLowerCase();
+      const norm =
+        s.includes('ongoing') || s.includes('releasing') ? 'ongoing'
+        : s.includes('completed') || s.includes('finished') ? 'completed'
+        : s.includes('hiatus') ? 'hiatus'
+        : s.includes('cancel') ? 'cancelled'
+        : s.includes('unreleased') || s.includes('not_yet') ? 'unreleased'
+        : 'unknown';
+      if (!novelFilters.statuses.includes(norm)) return false;
+    }
+    return true;
+  });
+
   const unifiedResults = useMemo(() => {
     const arr: any[] = [];
     if (resultType === 'all' || resultType === 'anime') {
@@ -852,6 +952,19 @@ export default function SearchPage() {
         }))
       );
     }
+    if (resultType === 'all' || resultType === 'novel') {
+      arr.push(
+        ...filteredNovelResults.map((n) => ({
+          ...n,
+          mediaType: 'novel' as const,
+          blurAdult:
+            Boolean(n.isAdult) &&
+            !contentSafetySettings.showAdultEverywhere &&
+            query.trim().length > 0 &&
+            contentSafetySettings.blurAdultInSearch,
+        }))
+      );
+    }
 
     if (sortMode === 'relevance') return arr;
 
@@ -872,6 +985,7 @@ export default function SearchPage() {
   }, [
     filteredAnimeResults,
     filteredMangaResults,
+    filteredNovelResults,
     resultType,
     sortMode,
     contentSafetySettings.showAdultEverywhere,
@@ -883,15 +997,18 @@ export default function SearchPage() {
   ]);
 
   // Only URL keys belonging to filters are rewritten; q/type/producer context survives.
-  const clearFilterUrl = (genre = false, animeTags: string[] = [], mangaTags: string[] = []) => {
+  const clearFilterUrl = (genre = false, animeTags: string[] = [], mangaTags: string[] = [], novelTags: string[] = novelFilters.tags || []) => {
     const next = new URLSearchParams(searchParams);
-    ['tag', 'tags', 'animeTag', 'animeTags', 'mangaTag', 'mangaTags', 'manwhaTag', 'manwhaTags'].forEach(key => next.delete(key));
+    ['tag', 'tags', 'animeTag', 'animeTags', 'mangaTag', 'mangaTags', 'manwhaTag', 'manwhaTags', 'novelTag', 'novelTags'].forEach(key => next.delete(key));
     animeTags.forEach(tag => next.append('animeTag', tag));
     mangaTags.forEach(tag => next.append('mangaTag', tag));
+    novelTags.forEach(tag => next.append('novelTag', tag));
     if (genre) next.delete('genre');
     setSearchParams(next, { replace: true });
   };
   const resetFilters = () => {
+    setNovelFilters({});
+    setLocalNovelFilters({});
     setLocalAnimeType('all');
     setLocalAnimeStatus('all');
     setLocalAnimeGenre('all');
@@ -932,7 +1049,7 @@ export default function SearchPage() {
     setSelectedMangaTags([]);
     setTagSearch('');
     setMangaTagSearch('');
-    clearFilterUrl(true);
+    clearFilterUrl(true, [], [], []);
     setDiscoverSort('for-you');
     setPage(1);
   };
@@ -1063,14 +1180,34 @@ export default function SearchPage() {
     setSearchInput(queryParam);
     setShowSuggestions(false);
     const typeParam = searchParams.get('type');
-    if (typeParam === 'anime' || typeParam === 'manga' || typeParam === 'character' || typeParam === 'all') {
+    if (typeParam === 'anime' || typeParam === 'manga' || typeParam === 'novel' || typeParam === 'character' || typeParam === 'all') {
       setResultType(typeParam as any);
     }
     const genericTags = searchParams.getAll('tag').concat(searchParams.get('tags')?.split(',') ?? []);
-    const animeTags = searchParams.getAll('animeTag').concat(typeParam !== 'manga' ? genericTags : []);
-    const mangaTags = searchParams.getAll('mangaTag').concat(searchParams.getAll('manwhaTag')).concat(typeParam === 'manga' ? genericTags : []);
+    const animeTags = searchParams.getAll('animeTag').concat(typeParam !== 'manga' && typeParam !== 'novel' ? genericTags : []);
+    const mangaTags = typeParam === 'novel' ? [] : searchParams.getAll('mangaTag').concat(searchParams.getAll('manwhaTag')).concat(typeParam === 'manga' ? genericTags : []);
     setSelectedAnimeTags(Array.from(new Set(animeTags.concat(searchParams.get('animeTags')?.split(',') ?? []).filter(Boolean))));
     setSelectedMangaTags(Array.from(new Set(mangaTags.concat((searchParams.get('mangaTags') || searchParams.get('manwhaTags'))?.split(',') ?? []).filter(Boolean))));
+    const novelTags = searchParams.getAll('novelTag').concat(searchParams.get('novelTags')?.split(',') ?? [], typeParam === 'novel' ? genericTags.concat(searchParams.getAll('mangaTag'), searchParams.get('mangaTags')?.split(',') ?? []) : []);
+    const novelTagSource = searchParams.get('novelTagSource') || (typeParam === 'novel' ? searchParams.get('mangaTagSource') : undefined);
+    const linkedNovelFilters: NovelSearchOptions = {
+      genre: typeParam === 'novel' ? searchParams.get('genre') || undefined : undefined,
+      tags: Array.from(new Set(novelTags.filter(Boolean))),
+      tagSource: novelTagSource === 'mangabaka' ? 'mangabaka' : 'anilist',
+    };
+    setNovelFilters(current => ({ ...current, ...linkedNovelFilters }));
+    setLocalNovelFilters(current => ({ ...current, ...linkedNovelFilters }));
+    // Novel deep-links (genre/tag chips on NovelPage) land here as
+    // `/search?genre=<g>&type=novel` — sync the shared genre filter so the
+    // novel lane actually scopes to it, same as the manga filter.
+    const urlGenre = searchParams.get('genre');
+    if (typeParam !== 'novel' && urlGenre && urlGenre.trim()) {
+      const slug = urlGenre.trim().toLowerCase();
+      setMangaGenreFilter(slug);
+      setLocalMangaGenre(slug);
+      setAnimeGenreFilter(slug);
+      setLocalAnimeGenre(slug);
+    }
   }, [queryParam, searchParams]);
 
   useEffect(() => {
@@ -1151,15 +1288,18 @@ export default function SearchPage() {
 
   const showAnimeResults = (resultType === 'all' || resultType === 'anime') && (query.length > 0 || animeFilterActive || genreFilterActive || tagFilterActive);
   const showMangaResults = shouldSearchManga && (query.length > 0 || mangaFilterActive || genreFilterActive || tagFilterActive);
+  const showNovelResults = shouldEnableNovelSearch;
   const showCharacterResults = shouldEnableCharacterSearch && query.length > 1;
   const isQuerylessMangaMode = showMangaResults && mangaSearchMode !== 'search';
-  const hasSearchContext = query.length > 0 || isQuerylessMangaMode || animeFilterActive || genreFilterActive || tagFilterActive;
+  const hasSearchContext = query.length > 0 || isQuerylessMangaMode || animeFilterActive || genreFilterActive || tagFilterActive || showNovelResults;
   const hasMoreResults =
     (showAnimeResults && !!hasNextAnimePage) ||
-    (showMangaResults && !!hasNextMangaPage);
+    (showMangaResults && !!hasNextMangaPage) ||
+    (showNovelResults && !!hasNextNovelPage);
   const isFetchingMoreResults =
     (showAnimeResults && !!isFetchingNextAnimePage) ||
-    (showMangaResults && !!isFetchingNextMangaPage);
+    (showMangaResults && !!isFetchingNextMangaPage) ||
+    (showNovelResults && !!isFetchingNextNovelPage);
   const hasMixedResults = unifiedResults.length > 0;
   const hasCharacterResults = characterResults.length > 0;
   const hasAnyResult = hasMixedResults || (showCharacterResults && hasCharacterResults);
@@ -1167,8 +1307,9 @@ export default function SearchPage() {
   // Keep search responsive even if one provider is slow/unavailable.
   const isAnimeInitialLoading = showAnimeResults && isLoadingAnime && allAnimeResults.length === 0;
   const isMangaInitialLoading = showMangaResults && isLoadingManga && allMangaResults.length === 0;
+  const isNovelInitialLoading = showNovelResults && isLoadingNovels && allNovelResults.length === 0;
   const isCharacterInitialLoading = showCharacterResults && loadingCharacters && characterResults.length === 0;
-  const hybridLoading = isAnimeInitialLoading || isMangaInitialLoading || isCharacterInitialLoading;
+  const hybridLoading = isAnimeInitialLoading || isMangaInitialLoading || isNovelInitialLoading || isCharacterInitialLoading;
 
   const { data: discoverData, isLoading: isLoadingDiscover } = useDiscoverMedia({
     sort: discoverSort,
@@ -1209,14 +1350,14 @@ export default function SearchPage() {
               <Input
                 id="tatakai-search-page-input"
                 type="text"
-                placeholder="Search anime, manga, manhwa or alternate titles..."
+                placeholder="Search anime, manga, novels, manhwa or alternate titles..."
                 value={searchInput}
                 onChange={(e) => {
                   setSearchInput(e.target.value);
                   setShowSuggestions(true);
                 }}
                 onFocus={() => setShowSuggestions(true)}
-                aria-label="Search anime, manga, manhwa and characters by title or alternate title"
+                aria-label="Search anime, manga, novels, manhwa and characters by title or alternate title"
                 autoComplete="off"
                 className="pl-14 pr-32 h-14 bg-card/85 hover:bg-card focus:bg-card border border-border hover:border-primary/40 focus:border-primary rounded-full text-base backdrop-blur-md transition-[color,background-color,border-color,opacity,transform]"
               />
@@ -1270,6 +1411,7 @@ export default function SearchPage() {
                   )}
                   {` • ${filteredAnimeResults.length} anime`}
                   {` • ${filteredMangaResults.length} manga`}
+                  {` • ${filteredNovelResults.length} novels`}
                   {showCharacterResults && ` • ${characterResults.length} characters`}
                   {activeFilterCount > 0 && ` • ${activeFilterCount} active filters`}
                   {!contentSafetySettings.showAdultEverywhere &&
@@ -1297,6 +1439,7 @@ export default function SearchPage() {
                 { id: 'all', label: 'All' },
                 { id: 'anime', label: 'Anime', icon: <Film className="w-3 h-3" /> },
                 { id: 'manga', label: 'Manga', icon: <BookOpen className="w-3 h-3" /> },
+                { id: 'novel', label: 'Novels', icon: <BookOpen className="w-3 h-3" /> },
                 { id: 'character', label: 'Characters' }
               ].map(type => (
                 <button
@@ -1778,6 +1921,8 @@ export default function SearchPage() {
                   </div>
                 </div>
 
+                <NovelSearchFilters value={localNovelFilters} onChange={setLocalNovelFilters} genres={anilistGenres} />
+
                 {/* Common Section */}
                 <div className="space-y-4 rounded-2xl border border-white/[0.06] bg-white/[0.015] p-4 md:p-5">
                   <div className="flex items-center gap-2 pb-2 border-b border-white/5">
@@ -2179,6 +2324,12 @@ export default function SearchPage() {
               </div>
             )}
 
+            {showNovelResults && novelSearchError && (
+              <div role="alert" className="my-6 rounded-2xl border border-destructive/30 p-5">
+                <p>{novelSearchError.message}</p>
+                <Button className="mt-3" onClick={() => void retryNovelSearch()}>Retry novel search</Button>
+              </div>
+            )}
             {showMangaResults && mangaSearchError && (
               <div role="alert" className="my-6 rounded-2xl border border-destructive/30 p-5">
                 <p>{mangaSearchError.message}</p>
@@ -2188,7 +2339,7 @@ export default function SearchPage() {
             {showMangaResults && infiniteMangaData?.pages[0]?.source === 'mangabaka' && (
               <p className="my-4 text-sm text-muted-foreground">Catalog: <a className="underline" href="https://mangabaka.org/data/api" target="_blank" rel="noreferrer">MangaBaka and its metadata providers</a>. Titles without a Tatakai mapping open on MangaBaka.</p>
             )}
-            {(showAnimeResults || showMangaResults) && (hasMixedResults || hasMoreResults) && (
+            {(showAnimeResults || showMangaResults || showNovelResults) && (hasMixedResults || hasMoreResults) && (
               <>
                 <div className={POSTER_GRID_CLASS}>
                   {unifiedResults.map((item) => (
@@ -2207,6 +2358,7 @@ export default function SearchPage() {
                     <Button variant="outline" onClick={() => {
                       if (hasNextAnimePage) void (isProducerRoute ? fetchNextProducerPage() : fetchNextSearchPage());
                       if (hasNextMangaPage) void fetchNextMangaPage();
+                      if (hasNextNovelPage) void fetchNextNovelPage();
                     }}>Load more results</Button>
                   ) : (
                     <div className="flex flex-col items-center gap-2 opacity-40">
@@ -2218,7 +2370,7 @@ export default function SearchPage() {
               </>
             )}
 
-            {!hasAnyResult && !hasMoreResults && !mangaSearchError && (
+            {!hasAnyResult && !hasMoreResults && !mangaSearchError && !novelSearchError && (
               <div className="text-center py-20">
                 <Search className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
                 <h2 className="text-xl font-semibold mb-2">No results found</h2>

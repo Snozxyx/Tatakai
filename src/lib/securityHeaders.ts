@@ -32,6 +32,15 @@ export const CSP_POLICY = {
   ],
   'connect-src': [
     "'self'",
+    'blob:', // Decode locally generated narration audio
+    'https:', // User-configured TTS servers and ElevenLabs
+    'http:', // Local model servers on the user's device or LAN
+    'http://localhost:*',
+    'http://127.0.0.1:*',
+    'http://[::1]:*',
+    'https://huggingface.co', // KittenTTS model downloads and CDN redirects
+    'https://*.huggingface.co',
+    'https://*.hf.co',
     "https://*.waifu.im",
     "https://cdn.nekosia.cat",
     'https://*.supabase.co',

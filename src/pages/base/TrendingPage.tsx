@@ -20,6 +20,7 @@ import { Background } from '@/components/layout/Background';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
 import { MangaTrendingSection } from '@/components/manga/MangaTrendingSection';
+import { NovelTrendingSection } from '@/components/novel/NovelTrendingSection';
 import { Sparkline } from '@/components/ui/Sparkline';
 import { PillGroup, type PillOption } from '@/components/anime/discover/PillGroup';
 import { PosterCard } from '@/components/anime/discover/PosterCard';
@@ -565,6 +566,15 @@ export default function TrendingPage() {
           <MangaTrendingSection
             title="Trending manga & manhwa"
             defaultTab="manga"
+            showTabs
+            limit={18}
+          />
+        </div>
+
+        <div className="mt-14">
+          <NovelTrendingSection
+            title="Trending light novels"
+            defaultTab="trending"
             showTabs
             limit={18}
           />

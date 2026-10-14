@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { getGlobalVideo } from '@/core/player/global-video-ref';
 import { SpoilerSpan } from '@/components/community/SpoilerSpan';
+import { splitCommentBlocks } from '@/lib/commentQuotes';
 
 /**
  * Comment body renderer. Comments are stored as plain text with a small,
@@ -193,11 +194,11 @@ export function CommentContent({
   clamp?: boolean;
 }) {
   const text = String(content ?? '').replace(/\r\n/g, '\n');
-  const lines = text.split('\n');
+  const blocks = splitCommentBlocks(text);
 
   const [expanded, setExpanded] = useState(false);
   const [overflows, setOverflows] = useState(false);
-  const ref = useRef<HTMLParagraphElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
 
   // While clamped, measure whether the body actually overflows so the toggle
   // only appears for genuinely long comments.
@@ -208,7 +209,7 @@ export function CommentContent({
   }, [clamp, expanded, content]);
 
   const body = (
-    <p
+    <div
       ref={ref}
       className={cn(
         'text-sm text-foreground/90 break-words whitespace-pre-wrap',
@@ -216,13 +217,10 @@ export function CommentContent({
         className,
       )}
     >
-      {lines.map((line, i) => (
-        <Fragment key={i}>
-          {i > 0 && <br />}
-          {renderInline(line, `l${i}`, timestampTarget)}
-        </Fragment>
-      ))}
-    </p>
+      {blocks.map((block, i) => block.quote
+        ? <blockquote key={i} className="my-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-muted-foreground">{block.text}</blockquote>
+        : <Fragment key={i}>{block.text.split('\n').map((line, j) => <Fragment key={j}>{j > 0 && <br />}{renderInline(line, `b${i}-l${j}`, timestampTarget)}</Fragment>)}</Fragment>)}
+    </div>
   );
 
   if (!clamp) return body;

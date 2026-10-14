@@ -1,3 +1,4 @@
+import { usePlaybackCoordinator } from '@/core/player/usePlaybackCoordinator';
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import Hls from "hls.js";
 import { toast } from "sonner";
@@ -190,6 +191,10 @@ export function VideoPlayer({
   // ---------------------------------------------------------------------------
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const { coordinator: playbackCoordinator, report: reportProgress } = usePlaybackCoordinator({
+    mediaId: animeId, episodeId: episodeId || (episodeNumber != null ? String(episodeNumber) : undefined),
+    url: sources[0]?.url, initialPosition: initialSeekSeconds, sink: onProgressUpdate,
+  });
   const containerRef = useRef<HTMLDivElement>(null);
   const controlsOverlayRef = useRef<HTMLDivElement>(null);
   const hlsRef = useRef<Hls | null>(null);
@@ -621,7 +626,7 @@ export function VideoPlayer({
     isPlaying,
     isNative,
     currentSource,
-    onProgressUpdate,
+    onProgressUpdate: reportProgress,
     animeName,
     episodeNumber,
     animeImageUrl: animePoster,
@@ -641,12 +646,6 @@ export function VideoPlayer({
       });
     }
   }, [isNative]);
-
-  useEffect(() => {
-    if (currentSource?.url && settings.alwaysUseExternalPlayer && externalPlayerPath && isNative) {
-      // Auto-launch handled by ExternalPlayerButton
-    }
-  }, [currentSource?.url, settings.alwaysUseExternalPlayer, externalPlayerPath, isNative]);
 
   // ---------------------------------------------------------------------------
   // Subtitle apply state ref
@@ -912,20 +911,25 @@ export function VideoPlayer({
         ? videoRef.current?.currentTime || initialSeekRef.current
         : initialSeekRef.current;
 
+      const lease = playbackCoordinator.begin({ id: currentSource.url, url: currentSource.url, mode, mediaId: animeId, episodeId: episodeId || String(episodeNumber ?? '') }, seekTime);
       await sourceAdapterRegistry.switchTo({
+        signal: lease.signal,
         source: {
           id: currentSource.url,
           url: currentSource.url,
           mode: mode,
           episodeNumber: currentSource.episodeNumber ?? episodeNumber,
           filenameHint: currentSource.filenameHint,
+          mediaId: animeId, episodeId, headers: { ...headers, ...currentSource.headers },
+          subtitles, sessionId: torrentSessionId,
+          debridResolved: currentSource.sourceType === 'debrid',
         },
         videoElement: videoRef.current,
-        startTime: seekTime,
+        startTime: lease.startTime,
         autoPlay: settings.autoplay,
       });
 
-      initialSeekDoneRef.current = true;
+      if (playbackCoordinator.isCurrent(lease)) initialSeekDoneRef.current = true;
     } catch (err: any) {
       setVideoError(err.message || "Failed to load video");
       setIsBuffering(false);
@@ -945,12 +949,14 @@ export function VideoPlayer({
     loadVideo();
   }, [currentSource?.url, currentSource?.isM3U8, currentSource?.sourceType, isOffline, settings.autoplay]);
 
+  useEffect(() => () => { void sourceAdapterRegistry.unload(); }, []);
+
   // Unload adapter when source becomes empty
   useEffect(() => {
     if (currentSource) return;
     const adapter = sourceAdapterRegistry.getCurrentAdapter();
     if (adapter) {
-      void adapter.unload();
+      void sourceAdapterRegistry.unload();
     }
     const video = videoRef.current;
     if (video) {
@@ -996,7 +1002,7 @@ export function VideoPlayer({
       const now = Date.now();
       if (onProgressUpdate && t > 1 && now - lastEmitRef.current >= 5000) {
         lastEmitRef.current = now;
-        onProgressUpdate(Math.floor(t), Math.floor(video.duration || 0) || 0, false);
+        reportProgress(Math.floor(t), Math.floor(video.duration || 0) || 0, false);
       }
     };
     const handleDurationChange = () => setDuration(video.duration);
@@ -1016,7 +1022,7 @@ export function VideoPlayer({
       // Save the exact position the moment playback stops so reopening resumes here.
       const t = Math.floor(video.currentTime || 0);
       if (t > 0 && onProgressUpdate) {
-        onProgressUpdate(t, Math.floor(video.duration || 0) || 0, false, true);
+        reportProgress(t, Math.floor(video.duration || 0) || 0, false, true);
       }
     };
     const handleWaiting = () => {
@@ -1044,7 +1050,7 @@ export function VideoPlayer({
     const handleEnded = () => {
       const dur = Math.floor(videoRef.current?.duration || 0) || undefined;
       const finalPos = Math.floor(videoRef.current?.currentTime || 0);
-      if (onProgressUpdate) onProgressUpdate(dur ?? finalPos, dur, true);
+      if (onProgressUpdate) reportProgress(dur ?? finalPos, dur, true);
       // "End of episode" sleep timer stops the chain here, overriding auto-next.
       if (settings.sleepTimer === "end-of-episode") {
         toast.info("Sleep timer: stopped at end of episode.", { id: "sleep-timer-end" });
@@ -1148,7 +1154,7 @@ export function VideoPlayer({
     onEpisodeEnd,
     onPlay,
     onPause,
-    onProgressUpdate,
+    reportProgress,
     onError,
     audioTracks.length,
     internalSubtitles.length,
@@ -1839,7 +1845,11 @@ export function VideoPlayer({
             {isNative && (
               <ExternalPlayerButton
                 videoRef={videoRef}
+                onSaveProgress={() => playbackCoordinator.flush()}
+                headers={{ ...headers }}
+                subtitles={subtitles}
                 externalPlayerPath={externalPlayerPath}
+                autoLaunch={settings.alwaysUseExternalPlayer}
                 currentSourceUrl={currentSource?.url}
                 isPlaying={isPlaying}
                 animeName={animeName}
@@ -1859,6 +1869,8 @@ export function VideoPlayer({
       <VideoSettingsPanel
         isOpen={showSettingsPanel}
         onClose={() => setShowSettingsPanel(false)}
+        currentSubtitle={currentSubtitle}
+        onSubtitleChange={handleSubtitleChange}
         availableSubtitles={visibleSubtitleOptions.map(({ sub, index }) => ({
           lang: sub.lang,
           label: sub.label || sub.lang,

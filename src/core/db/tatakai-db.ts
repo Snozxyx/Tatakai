@@ -93,6 +93,7 @@ export interface KeyValueEntry {
 }
 
 export interface DownloadRule {
+  scoringProfile?: 'balanced' | 'best-quality' | 'data-saver';
   id: string;
   animeId: number;
   animeTitle: string;
@@ -198,6 +199,33 @@ export interface DownloadHistoryEntry {
 }
 
 /**
+ * A single downloaded novel chapter (text), available for fully offline
+ * reading on desktop, mobile and web. Paragraphs live in this row directly —
+ * prose is kilobytes, so no filesystem round-trip is needed on any platform.
+ */
+export interface OfflineNovel {
+  /** Composite key: `${anilistId}:${chapterKey}` */
+  id: string;
+  anilistId: number;
+  /** Novel id as routed (`anilist:123`, `mal:456`, …) for reader links. */
+  novelId: string;
+  title: string;
+  /** Series poster captured at download time. */
+  posterUrl?: string | null;
+  chapterKey: string;
+  chapterNumber?: number | null;
+  chapterTitle?: string | null;
+  /** Sub-provider/translator that served the text. */
+  provider?: string | null;
+  translator?: string | null;
+  paragraphs: Array<{ index: number; text: string }>;
+  paragraphCount: number;
+  sizeBytes: number;
+  /** ISO timestamp of download completion. */
+  downloadedAt: string;
+}
+
+/**
  * A single downloaded manga chapter, available for fully offline reading.
  * Pages live on disk under `localDir`; the reader loads them through the
  * `tatakai-media://` protocol (no raw file paths reach the renderer).
@@ -260,6 +288,8 @@ class TatakaiDB extends Dexie {
   offlineChapters!: EntityTable<OfflineChapter, 'id'>;
   /** v6: Cached extension bundles for the in-WebView mobile runtime. */
   mobileExtensionBundles!: EntityTable<MobileExtensionBundle, 'id'>;
+  /** v7: Downloaded novel chapters (text) for offline reading. */
+  offlineNovels!: EntityTable<OfflineNovel, 'id'>;
 
   constructor() {
     super('tatakai');
@@ -331,6 +361,21 @@ class TatakaiDB extends Dexie {
       downloadHistory: 'id, animeId, status, startedAt',
       offlineChapters: 'id, anilistId, downloadedAt',
       mobileExtensionBundles: 'id, namespace, enabled, updatedAt',
+    });
+
+    // Version 7 adds offlineNovels for downloaded novels (offline reading).
+    // Append-only: every prior table is carried forward unchanged.
+    this.version(7).stores({
+      cachedMedia: 'id, anilistId, malId, *genres, cachedAt',
+      watchProgress: 'id, mediaId, updatedAt',
+      offlineEpisodes: 'id, mediaId, downloadedAt',
+      extensions: 'id, name',
+      kv: 'key',
+      downloadRules: 'id, animeId, enabled',
+      downloadHistory: 'id, animeId, status, startedAt',
+      offlineChapters: 'id, anilistId, downloadedAt',
+      mobileExtensionBundles: 'id, namespace, enabled, updatedAt',
+      offlineNovels: 'id, anilistId, downloadedAt',
     });
   }
 }

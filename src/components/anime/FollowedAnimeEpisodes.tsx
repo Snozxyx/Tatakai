@@ -214,7 +214,7 @@ export const FollowedAnimeEpisodes = memo(function FollowedAnimeEpisodes() {
 
       {isLoading ? (
         <div
-          data-mobile-home-rail
+          data-mobile-home-rail="followed-episodes"
           className="flex gap-3 overflow-x-auto pb-4 md:gap-4"
           style={{ scrollbarWidth: "none" }}
         >
@@ -234,7 +234,7 @@ export const FollowedAnimeEpisodes = memo(function FollowedAnimeEpisodes() {
       ) : (
         <div
           ref={scrollRef}
-          data-mobile-home-rail
+          data-mobile-home-rail="followed-episodes"
           className="flex gap-3 overflow-x-auto pb-4 pt-1 md:gap-4"
           style={{ scrollbarWidth: "none" }}
         >

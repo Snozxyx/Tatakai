@@ -1,3 +1,6 @@
+import { ExternalPlayerButton } from './controls/ExternalPlayerButton';
+import { uploadSubtitle, fetchSubtitle, decodeSubtitle } from '@/core/player/subtitle-service';
+import { usePlaybackCoordinator } from '@/core/player/usePlaybackCoordinator';
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
   Play,
@@ -187,7 +190,7 @@ export const MOBILE_PLAYER_FULLSCREEN_EVENT = 'tatakai-mobile-player-fullscreen'
 
 export function MobileVideoPlayer({
   sources,
-  subtitles = [],
+  subtitles: providedSubtitles = [],
   headers,
   poster,
   onError,
@@ -213,7 +216,16 @@ export function MobileVideoPlayer({
   sourceType,
   torrentUrl,
 }: MobileVideoPlayerProps) {
+  const [uploadedSubtitles, setUploadedSubtitles] = useState<Array<{ url: string; lang: string; label?: string }>>([]);
+  const uploadedUrls = useRef<string[]>([]);
+  const subtitleUploadInput = useRef<HTMLInputElement>(null);
+  const subtitles = useMemo(() => [...providedSubtitles, ...uploadedSubtitles], [providedSubtitles, uploadedSubtitles]);
+  useEffect(() => () => { uploadedUrls.current.forEach(url => URL.revokeObjectURL(url)); }, []);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const { coordinator: playbackCoordinator, report: reportProgress } = usePlaybackCoordinator({
+    mediaId: animeId, episodeId: episodeId || (episodeNumber != null ? String(episodeNumber) : undefined),
+    url: sources[0]?.url, initialPosition: initialSeekSeconds, sink: onProgressUpdate,
+  });
   const resolutionStarted = useRef<number | null>(null);
   const sourceReadyAt = useRef<number>(performance.now());
   const playbackPolicy = useRef({ metered: true, dataSaver: false });
@@ -327,7 +339,7 @@ export function MobileVideoPlayer({
   const metadataAutoplayCleanup = useRef<(() => void) | null>(null);
   const stallTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [currentSubtitle, setCurrentSubtitle] = useState<string>(settings.subtitleLanguage);
-  const [showSubtitleMenu, setShowSubtitleMenu] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<'playback' | 'subtitles'>('playback');
   const [showFullSettings, setShowFullSettings] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [videoZoom, setVideoZoom] = useState(1);
@@ -472,7 +484,7 @@ export function MobileVideoPlayer({
 
   // Hide controls after inactivity
   useEffect(() => {
-    if (showControls && (isPlaying || isLocked) && !showFullSettings && !showSubtitleMenu) {
+    if (showControls && (isPlaying || isLocked) && !showFullSettings) {
       controlsTimeoutRef.current = setTimeout(() => {
         setShowControls(false);
       }, isLocked ? 1800 : 4000);
@@ -482,7 +494,7 @@ export function MobileVideoPlayer({
         clearTimeout(controlsTimeoutRef.current);
       }
     };
-  }, [showControls, isPlaying, isLocked, controlsActivity, showFullSettings, showSubtitleMenu]);
+  }, [showControls, isPlaying, isLocked, controlsActivity, showFullSettings]);
 
   useEffect(() => {
     if (videoRef.current) {
@@ -1135,7 +1147,7 @@ export function MobileVideoPlayer({
               continue;
             }
 
-            normalizedText = normalizeSubtitleToVtt(await response.text());
+            normalizedText = await fetchSubtitle(candidateUrl, { read: async () => decodeSubtitle(await response.arrayBuffer()), signal: request.signal });
             if (normalizedText) {
               break;
             }
@@ -1226,7 +1238,7 @@ export function MobileVideoPlayer({
       const diff = video.currentTime - lastSavedProgressRef.current;
       if (Math.abs(diff) >= PROGRESS_SAVE_INTERVAL) {
         lastSavedProgressRef.current = video.currentTime;
-        onProgressUpdate?.(video.currentTime, video.duration, false);
+        reportProgress(video.currentTime, video.duration, false);
       }
     };
 
@@ -1236,7 +1248,7 @@ export function MobileVideoPlayer({
       setIsPlaying(false);
       // Save the exact position on stop so reopening resumes from here.
       const t = Math.floor(video.currentTime || 0);
-      if (t > 0) onProgressUpdate?.(t, Math.floor(video.duration || 0) || 0, false, true);
+      if (t > 0) reportProgress(t, Math.floor(video.duration || 0) || 0, false, true);
     };
     let bufferingStarted: number | null = null;
     const handleWaiting = () => {
@@ -1277,7 +1289,7 @@ export function MobileVideoPlayer({
       }
     };
     const handleEnded = () => {
-      onProgressUpdate?.(video.duration, video.duration, true);
+      reportProgress(video.duration, video.duration, true);
       if (settings.sleepTimer === "end-of-episode") return;
       if (settings.autoNextEpisode) {
         setUpNextCountdown(Math.max(1, Math.round(settings.autoNextCountdownSeconds || 10)));
@@ -1342,7 +1354,7 @@ export function MobileVideoPlayer({
       if (!video) return;
       const t = Math.floor(video.currentTime || 0);
       const dur = Math.floor(video.duration || 0) || undefined;
-      if (t > 0) progressCbRef.current?.(t, dur, false, true);
+      if (t > 0) reportProgress(t, dur, false, true);
     };
     const onVisibility = () => {
       if (document.visibilityState === "hidden") saveNow();
@@ -1728,7 +1740,6 @@ export function MobileVideoPlayer({
   const handleSubtitleChange = (lang: string) => {
     void triggerHaptic('select');
     setCurrentSubtitle(lang);
-    setShowSubtitleMenu(false);
   };
 
   // HLS alternate-audio switch (desktop Audio-tab parity).
@@ -1987,7 +1998,7 @@ export function MobileVideoPlayer({
                 )}
                 {/* Lock button */}
                 <button
-                  onClick={() => { clearPendingTap(); setIsLocked(true); setShowSubtitleMenu(false); setShowControls(true); setDoubleTapSide(null); }}
+                  onClick={() => { clearPendingTap(); setIsLocked(true);  setShowControls(true); setDoubleTapSide(null); }}
                   aria-label="Lock player"
                   className="p-2.5 rounded-full bg-white/10 backdrop-blur-md active:bg-white/20 border border-white/10"
                 >
@@ -2064,56 +2075,28 @@ export function MobileVideoPlayer({
               </span>
 
               <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
-                {/* Subtitles — quick switch; full styling lives in the settings sheet */}
-                <div className="relative">
-                  <button
-                    onClick={() => {
-                      setShowSubtitleMenu(!showSubtitleMenu);
-                    }}
-                    aria-label="Subtitles"
-                    className={cn(
-                      "p-2.5 rounded-full backdrop-blur-md active:scale-95 transition-transform border",
-                      currentSubtitle !== 'off'
-                        ? 'bg-primary border-white/20'
-                        : 'bg-white/10 border-white/10'
-                    )}
-                  >
-                    <Subtitles className="w-5 h-5 text-white" />
-                  </button>
-
-                  {showSubtitleMenu && (
-                    <div className="absolute bottom-14 right-0 bg-black/95 backdrop-blur-xl rounded-2xl p-2 min-w-[180px] max-h-[250px] overflow-y-auto border border-white/10 shadow-2xl z-30">
-                      <button
-                        onClick={() => handleSubtitleChange('off')}
-                        className={cn(
-                          "w-full px-4 py-3 text-left text-sm rounded-xl transition-colors",
-                          currentSubtitle === 'off' ? 'bg-primary text-white font-semibold' : 'text-white/80 hover:bg-white/5'
-                        )}
-                      >
-                        Off
-                      </button>
-                      {visibleSubtitles.map((sub, idx) => {
-                        const subtitleKey = getSubtitleSelectionKey(sub, idx);
-                        return (
-                        <button
-                          key={subtitleKey}
-                          onClick={() => handleSubtitleChange(subtitleKey)}
-                          className={cn(
-                            "w-full px-4 py-3 text-left text-sm rounded-xl transition-colors",
-                            currentSubtitle === subtitleKey ? 'bg-primary text-white font-semibold' : 'text-white/80 hover:bg-white/5'
-                          )}
-                        >
-                          {sub.label || sub.lang}
-                        </button>
-                      )})}
-                    </div>
-                  )}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => { setSettingsTab('subtitles'); setShowFullSettings(true); }}
+                  aria-label="Subtitle settings"
+                  className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 border border-white/10"
+                >
+                  <Subtitles className="h-5 w-5 text-white" />
+                </button>
 
                 {/* Settings — full desktop-parity sheet, bottom-sheet on mobile */}
+                {nativeMobile && <ExternalPlayerButton videoRef={videoRef} externalPlayerPath={null} currentSourceUrl={currentSource?.url}
+                  isPlaying={isPlaying} animeName={animeName} episodeNumber={episodeNumber} onSaveProgress={() => playbackCoordinator.flush()} headers={headers} subtitles={subtitles} />}
+                  <input ref={subtitleUploadInput} type="file" accept=".srt,.ass,.ssa,.vtt" className="sr-only" aria-label="Upload subtitle file" onChange={async event => {
+                    const file = event.target.files?.[0]; if (!file) return;
+                    const input = event.currentTarget;
+                    try { const sub = await uploadSubtitle(file); uploadedUrls.current.push(sub.url); setUploadedSubtitles(previous => [...previous, sub]); }
+                    catch (error) { toast.error(error instanceof Error ? error.message : 'Subtitle upload failed'); }
+                    input.value = '';
+                  }} />
                 <button
                   onClick={() => {
-                    setShowSubtitleMenu(false);
+                    setSettingsTab('playback');
                     setShowFullSettings(true);
                   }}
                   aria-label="Player settings"
@@ -2192,7 +2175,12 @@ export function MobileVideoPlayer({
       {/* Full settings — desktop parity (playback / video / subtitles / audio / keys) */}
       <VideoSettingsPanel
         isOpen={showFullSettings}
+        initialTab={settingsTab}
+        onSubtitleUpload={() => subtitleUploadInput.current?.click()}
+        portalContainer={isFullscreen ? containerRef.current : undefined}
         onClose={() => setShowFullSettings(false)}
+        currentSubtitle={currentSubtitle}
+        onSubtitleChange={handleSubtitleChange}
         availableSubtitles={settingsSubtitleOptions}
         audioTracks={hlsAudioTracks}
         currentAudioTrack={currentHlsAudioTrack}

@@ -37,6 +37,7 @@ export interface AniZipEpisode {
   number: number;
   isSpecial: boolean;
   seasonNumber: number | null;
+  seasonEpisodeNumber: number | null;
   absoluteNumber: number | null;
   /** Best available title: English → romaji (`x-jat`) → Japanese. */
   title: string | null;

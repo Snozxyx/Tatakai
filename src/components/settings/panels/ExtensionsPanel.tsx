@@ -1,3 +1,6 @@
+import { RemoteExtensionsPanel } from "@/components/extensions/RemoteExtensionsPanel";
+import { migrateExtensionStorage } from "@/core/extensions/ecosystems";
+migrateExtensionStorage();
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Puzzle, Shield, PackageOpen } from 'lucide-react';
@@ -14,8 +17,8 @@ import { isIOS } from '@/lib/platform/platform';
 
 /** Install state lives per-device in localStorage — same keys the runtime and
  *  the store hooks read/write, so this is a view of that truth, not a new one. */
-const SIDELOADED_KEY = 'tatakai_sideloaded_extensions';
-const SIDELOAD_EVENT = 'tatakai:extension-sideloaded';
+const SIDELOADED_KEY = 'tatakai_extension_manifests';
+const SIDELOAD_EVENT = 'tatakai:extension-installed';
 
 const TYPE_LABELS: Record<string, string> = {
   torrent: 'Torrent',
@@ -82,7 +85,7 @@ export function ExtensionsPanel() {
   };
 
   return (
-    <div className="space-y-6">
+    <><div className="space-y-6">
       <SettingsSection
         icon={Puzzle}
         eyebrow="Extensions"
@@ -96,10 +99,10 @@ export function ExtensionsPanel() {
       >
         <div className="flex items-start gap-2 rounded-xl border border-white/10 bg-white/[0.02] p-4 text-xs text-muted-foreground">
           <Shield className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-          <span>Only verified, curated extensions from the Tatakai team are allowed to run.</span>
+          <span>Choose source extensions from the marketplace or add a package or manifest URL.</span>
         </div>
       </SettingsSection>
-
+ <RemoteExtensionsPanel />
       <SettingsSection
         icon={PackageOpen}
         eyebrow="Installed"
@@ -147,5 +150,6 @@ export function ExtensionsPanel() {
         )}
       </SettingsSection>
     </div>
+  </>
   );
 }

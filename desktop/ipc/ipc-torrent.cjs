@@ -5,6 +5,10 @@ const { parseReleaseName } = require('../runtime/torrent/naming/release-parser.c
 
 module.exports = function registerTorrentHandlers(ipcMain, app, fs, path, logger, getMainWindow) {
     const facade = new TorrentFacade({ app, fs, path, logger, getMainWindow });
+    ipcMain.handle('torrent:preload-next', (_event, sessionId, nextEpisode, budget) => facade.preloadNext(sessionId, nextEpisode, budget));
+    ipcMain.handle('torrent:cancel-preload', (_event, sessionId) => facade.cancelPreload(sessionId));
+    ipcMain.handle('torrent:preload-source', (_event, magnet, episode, budget) => facade.preloadSource(magnet, episode, budget));
+    ipcMain.handle('torrent:release-preload', (_event, sessionId) => facade.releasePreload(sessionId));
 
     ipcMain.handle('torrent:start', async (_event, infoHash, options) => {
         if (infoHash && typeof infoHash === 'object' && !Array.isArray(infoHash)) {

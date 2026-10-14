@@ -35,6 +35,8 @@ import {
 } from './mobileDownloadService';
 
 export interface MobileDownloadInput {
+  wifiOnly?: boolean;
+  fileIndex?: number;
   animeId?: string;
   posterUrl?: string;
   episodeId: string;
@@ -611,13 +613,13 @@ async function downloadHlsAsMp4(
 async function downloadTorrentNative(
   episodeId: string,
   magnetOrHash: string,
-  isCancelled: () => boolean,
+  isCancelled: () => boolean, fileIndex?: number,
 ): Promise<{ uri: string }> {
-  const rt = (window as unknown as { tatakaiRuntime?: { startTorrentSession?: (infoHashOrMagnet: string, opts?: { magnet?: string }) => Promise<{ success?: boolean; sessionId?: string; id?: string; error?: string }> } }).tatakaiRuntime;
+  const rt = (window as unknown as { tatakaiRuntime?: { startTorrentSession?: (infoHashOrMagnet: string, opts?: { magnet?: string; fileIndex?: number; autoSelectLargest?: boolean }) => Promise<{ success?: boolean; sessionId?: string; id?: string; error?: string }> } }).tatakaiRuntime;
   if (!rt?.startTorrentSession) throw new Error('Torrent service not available on this device.');
   const infoMatch = String(magnetOrHash).match(/xt=urn:btih:([a-fA-F0-9]{40})/i);
   const infoHash = infoMatch?.[1] || ( /^[a-fA-F0-9]{40}$/i.test(String(magnetOrHash).trim()) ? String(magnetOrHash).trim() : '');
-  const res = await rt.startTorrentSession(infoHash || magnetOrHash, { magnet: String(magnetOrHash) });
+  const res = await rt.startTorrentSession(infoHash || magnetOrHash, { magnet: String(magnetOrHash), fileIndex, autoSelectLargest: fileIndex == null });
   const sessionId = (res as { sessionId?: string; id?: string }).sessionId || (res as { id?: string }).id;
   if (!res?.success || !sessionId) throw new Error(String((res as { error?: string })?.error || 'Failed to start torrent'));
   // Bridge native progress events into the download monitor until done/cancelled.
@@ -714,7 +716,7 @@ async function runMobileDownload(
     // Torrent path — native plugin owns storage + streaming.
     if (isTorrentUrl(target.url) || isTorrentUrl(input.url)) {
       try {
-        const { uri } = await downloadTorrentNative(input.episodeId, String(input.url), isCancelled);
+        const { uri } = await downloadTorrentNative(input.episodeId, String(input.url), isCancelled, input.fileIndex);
         if (isCancelled()) {
           downloadServiceFinish(input.episodeId, { ok: false, cancelled: true, label: svcLabel });
           return { ok: false, reason: 'cancelled' };

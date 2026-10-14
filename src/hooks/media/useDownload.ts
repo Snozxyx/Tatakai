@@ -113,6 +113,7 @@ export function useDownload() {
         });
         const { startMobileDownload } = await import('@/core/download/mobile/mobileDownloader');
         const res = await startMobileDownload({
+          fileIndex: payload.fileIndex,
           episodeId: payload.episodeId,
           url,
           animeName: payload.animeName,

@@ -18,6 +18,7 @@ const phones: PhoneShot[] = [
   { src: `${BRAND}/mobile_home.jpg`, name: "Home", line: "Pick up where you left off" },
   { src: `${BRAND}/mobile_watch.jpg`, name: "Continue watching", line: "Your queue, always current" },
   { src: `${BRAND}/mobile_animeinfo.jpg`, name: "Anime details", line: "Scores, genres & your status" },
+  { src: `${BRAND}/mobile_mangahome.jpg`, name: "Manga home", line: "Browse manga on the go" },
   { src: `${BRAND}/mobile_mangaread.jpg`, name: "Manga reader", line: "Chapters that remember you" },
   { src: `${BRAND}/mobile_community.jpg`, name: "Community", line: "The feed, on the go" },
   { src: `${BRAND}/mobile_download.jpg`, name: "Downloads", line: "Your offline shelf" },

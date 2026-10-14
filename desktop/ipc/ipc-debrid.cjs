@@ -9,6 +9,8 @@
 const ALLOWED_HOSTS = new Set([
     'api.real-debrid.com',
     'api.torbox.app',
+    'api.alldebrid.com',
+    'www.premiumize.me',
 ]);
 const ALLOWED_METHODS = new Set(['GET', 'POST']);
 const ALLOWED_HEADERS = new Set(['accept', 'authorization', 'content-type']);

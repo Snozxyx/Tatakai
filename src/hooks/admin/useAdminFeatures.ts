@@ -49,10 +49,12 @@ async function sendStatusIncidentWebhook(payload: {
 
     const endpoint = `${TATAKAI_API_URL}/webhooks/discord`;
     const affected = (payload.affectedServices || []).filter(Boolean);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
 
     await fetch(endpoint, {
       method: 'POST',
-      headers: withAdminSecretHeader({ 'Content-Type': 'application/json' }),
+      headers: withAdminSecretHeader({ 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` }),
       body: JSON.stringify({
         channel: 'status',
         username: 'Tatakai Status Bot',

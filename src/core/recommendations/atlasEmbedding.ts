@@ -18,12 +18,12 @@ export interface AtlasNode {
   averageScore?: number | null; // 0–100
   genres: string[];
   neighbors: string[]; // ids of nearest neighbors, for hover lines
-  mediaType?: 'anime' | 'manga';
+  mediaType?: 'anime' | 'manga' | 'novel';
   href?: string; // route target for the info card link
 }
 
 /** Metadata plus optional atlas-only routing fields. */
-export type AtlasInput = AnimeMeta & { mediaType?: 'anime' | 'manga'; href?: string };
+export type AtlasInput = AnimeMeta & { mediaType?: 'anime' | 'manga' | 'novel'; href?: string };
 
 export interface AtlasLayout {
   nodes: AtlasNode[];

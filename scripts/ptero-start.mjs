@@ -5,6 +5,7 @@ import { existsSync, createReadStream, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { matchEntityRoute } from './seo/routes.mjs';
 import { resolveMeta, renderTags, injectIntoHtml, SITE_ORIGIN, SHARE_API_ORIGIN } from './seo/inject.mjs';
+import { canonicalSitemapPath, looksXml, degradedSitemapBody, sitemapContentType } from './seo/sitemap-utils.mjs';
 
 const port = Number(process.env.PORT || process.env.SERVER_PORT || 8088);
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -15,7 +16,6 @@ const distIndex = join(distDir, 'index.html');
 
 /** Site default og:image, used when a matched entity has no image of its own. */
 const DEFAULT_OG_IMAGE = `${SITE_ORIGIN}/tatakaibanner.png`;
-const SITEMAP_RE = /^\/sitemap(-[\w.-]+)?\.(xml|xsl)$/;
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -68,7 +68,9 @@ function startStaticServer() {
 
   const server = createServer(async (req, res) => {
     const reqPath = (req.url || '/').split('?')[0];
-    const cleanPath = normalize(reqPath).replace(/^([.][.][/\\])+/, '');
+    // normalize() emits `\` separators on Windows (win32); canonicalize to `/`
+    // so sitemap matching + file joins behave identically on every platform.
+    const cleanPath = normalize(reqPath).replace(/\\/g, '/').replace(/^([.][.][/\\])+/, '');
     const sitemapMatch = cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}`;
 
     // Dynamic Sitemap: proxy to TatakaiAPI generator.
@@ -77,22 +79,24 @@ function startStaticServer() {
     // reports as "Sitemap is HTML". Every exit path ends with valid XML + an
     // XML content type; when neither upstream nor disk has usable XML we answer
     // 503+XML (crawlers retry instead of indexing an HTML error page).
-    if (SITEMAP_RE.test(sitemapMatch)) {
-      const isXsl = sitemapMatch.endsWith('.xsl');
-      const isIndex = sitemapMatch === '/sitemap.xml';
-      const expectedType = isXsl ? 'text/xsl; charset=utf-8' : 'application/xml; charset=utf-8';
-      const looksXml = (t) => {
-        const s = String(t || '').trimStart();
-        return s.startsWith('<?xml') || s.startsWith('<urlset') || s.startsWith('<sitemapindex') || s.startsWith('<xsl:stylesheet') || s.startsWith('<xsl:transform');
-      };
-      const degradedBody = isXsl
-        ? `<?xml version="1.0" encoding="UTF-8"?>\n<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"><xsl:template match="/"><html><body>temporarily unavailable</body></html></xsl:template></xsl:stylesheet>\n`
-        : isIndex
-          ? `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <sitemap>\n    <loc>${SITE_ORIGIN}/sitemap-static.xml</loc>\n  </sitemap>\n</sitemapindex>\n`
-          : `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n</urlset>\n`;
+    const canonicalSitemap = canonicalSitemapPath(sitemapMatch);
+    if (canonicalSitemap) {
+      // Tolerated trailing slash (/sitemap-anime-1.xml/): redirect to the
+      // canonical XML URL rather than serving SPA HTML for it.
+      if (canonicalSitemap !== sitemapMatch) {
+        const qs = (req.url || '').includes('?') ? (req.url || '').slice((req.url || '').indexOf('?')) : '';
+        res.statusCode = 301;
+        res.setHeader('Location', `${canonicalSitemap}${qs}`);
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        res.end();
+        return;
+      }
+      const expectedType = sitemapContentType(canonicalSitemap);
+      const isXsl = canonicalSitemap.endsWith('.xsl');
+      const degradedBody = degradedSitemapBody(canonicalSitemap, SITE_ORIGIN);
       let served = false;
       try {
-        const upstream = `${SHARE_API_ORIGIN}/api/public${sitemapMatch}`;
+        const upstream = `${SHARE_API_ORIGIN}/api/public${canonicalSitemap}`;
         const ctrl = new AbortController();
         const timer = setTimeout(() => ctrl.abort(), 8000);
         let r;

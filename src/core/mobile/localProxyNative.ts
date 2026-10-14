@@ -32,6 +32,7 @@ type LocalProxyPlugin = {
   configurePlayback(options: { source: string; dataSaver: boolean }): Promise<{ metered: boolean }>;
   cancelPrefetch(): Promise<void>;
   setCloudflareConfig(options: { enabled: boolean; flaresolverrUrl: string }): Promise<{ success: boolean }>;
+  prepareRequestHeaders(options: { url: string; headers: Record<string, string> }): Promise<{ headers: Record<string, string> }>;
 };
 
 let plugin: LocalProxyPlugin | null = null;
@@ -196,4 +197,12 @@ export async function registerNativeSource(
     /* fall through */
   }
   return null;
+}
+
+/** Replay native clearance for POST catalogs using the UA that earned it. */
+export async function prepareNativeRequestHeaders(url: string, headers: Record<string, string>): Promise<Record<string, string>> {
+  try {
+    const result = await loadPlugin()?.prepareRequestHeaders({ url, headers });
+    return result?.headers && typeof result.headers === 'object' ? result.headers : headers;
+  } catch { return headers; } // Older mobile builds do not expose this method.
 }

@@ -205,12 +205,18 @@ module.exports = function registerLibraryHandlers(ipcMain, app, dialog, shell, f
 
             const videoFiles = await scanDirectoryForVideos(directoryPath);
             const identified = identifyMediaFiles(videoFiles);
+            for (const item of identified) {
+                const stat = await fs.promises.stat(item.absolutePath);
+                item.size = stat.size;
+                item.modifiedAt = stat.mtimeMs;
+            }
             const grouped = groupMediaBySeries(identified);
 
             return {
                 success: true,
                 directory: directoryPath,
                 totalFiles: videoFiles.length,
+                files: identified,
                 seriesCount: Object.keys(grouped).length,
                 series: grouped
             };

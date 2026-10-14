@@ -1,3 +1,6 @@
+import { TorrentPreloadController } from '@/core/player/TorrentPreloadController';
+import { useDeveloperMode } from '@/hooks/ui/useDeveloperMode';
+import { SourceDebug } from '@/components/extensions/SourceDebug';
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import {
@@ -182,18 +185,7 @@ export default function WatchPage() {
   const isMobileViewport = useIsMobile();
   const torrentServiceAvailable = hasTorrentService();
   const queryClient = useQueryClient();
-  const isDeveloperMode = useMemo(() => {
-    if (import.meta.env.DEV) return true;
-    try {
-      if (!Capacitor.isNativePlatform()) return false;
-      const saved = localStorage.getItem('tatakai_mobile_config');
-      if (!saved) return false;
-      const config = JSON.parse(saved);
-      return config?.devMode === true;
-    } catch {
-      return false;
-    }
-  }, []);
+  const { enabled: isDeveloperMode } = useDeveloperMode();
 
   const isOfflineMode = useMemo(() => {
     const params = new URLSearchParams(location.search);
@@ -520,7 +512,8 @@ export default function WatchPage() {
       // as well as single-episode releases.
       const started = await runtime.startTorrentSession(magnet, {
         magnet,
-        autoSelectLargest: true,
+        fileIndex: source.fileIndex,
+        autoSelectLargest: source.fileIndex == null,
         optimizeStorage: optimizeTorrentStorage,
       });
 
@@ -1025,7 +1018,7 @@ export default function WatchPage() {
         try {
           if (mobileOfflinePath) {
             const nativeOffline = mobileOfflinePath.startsWith('native-offline://')
-              ? await (await import('@/core/download/mobile/nativeDownloads')).resolveNativeOfflineEpisode(decodedEpisodeId)
+              ? await (await import('@/core/download/mobile/nativeDownloads')).resolveNativeOfflineEpisode(decodedEpisodeId, mobileOfflinePath)
               : null;
             const manifest = {
               animeName: mobileOfflineMetadata.title,
@@ -1954,30 +1947,17 @@ export default function WatchPage() {
         ...(sourceDataForPlayback?.tracks || [])
       ];
       const seenUrls = new Set<string>();
-      const seenLanguages = new Set<string>();
-      const normalizeLanguage = (track: { lang?: string; label?: string }) => {
-        const raw = `${track.lang || ''} ${track.label || ''}`.toLowerCase();
-        const compact = raw.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
-        if (!compact) return '';
-        if (compact === 'en' || compact.includes('english') || compact.includes('eng')) return 'en';
-        if (compact === 'ja' || compact.includes('japanese') || compact.includes('jpn')) return 'ja';
-        if (compact === 'hi' || compact.includes('hindi')) return 'hi';
-        if (compact === 'es' || compact.includes('spanish') || compact.includes('espanol')) return 'es';
-        return compact;
-      };
-
       subs = allTracks.filter(s => {
         const urlKey = String(s.url || '').trim();
-        const languageKey = normalizeLanguage(s);
         if (!urlKey) return false;
         if (seenUrls.has(urlKey)) return false;
-        if (languageKey && seenLanguages.has(languageKey)) return false;
         seenUrls.add(urlKey);
-        if (languageKey) seenLanguages.add(languageKey);
         return true;
       });
     }
 
+    // Keep every addon track, including same-language releases and signs/songs.
+    subs.push(...[...(sourceDataForPlayback?.subtitles || []), ...(subSourcesData?.subtitles || [])].filter(s => (s as any).providerName));
     const languageRank = (sub: { lang?: string; label?: string }) => {
       const value = `${sub.lang || ''} ${sub.label || ''}`.toLowerCase();
       if (value.includes('english') || value.includes('eng') || value.trim() === 'en') return 0;
@@ -1988,13 +1968,13 @@ export default function WatchPage() {
 
     const seen = new Set<string>();
     return subs
+      .map(sub => ({ ...sub, lang: sub.lang || 'und' }))
       .filter(sub =>
-        sub.lang &&
         sub.lang.toLowerCase() !== 'thumbnails' &&
         !sub.url?.includes('thumbnails')
       )
       .filter((sub) => {
-        const key = `${String(sub.lang || '').toLowerCase()}|${String(sub.url || '').trim().toLowerCase()}`;
+        const key = String((sub as any).originalUrl || sub.url || '').trim();
         if (!String(sub.url || '').trim() || seen.has(key)) return false;
         seen.add(key);
         return true;
@@ -2890,7 +2870,11 @@ export default function WatchPage() {
   }, [animeId, decodedEpisodeId, category, user?.id, selectRegularServer]);
 
   // Progress update callback for VideoPlayer - must be defined outside JSX
+  const nextPreloadRef = useRef(new TorrentPreloadController());
+  useEffect(() => () => nextPreloadRef.current.cancel(), [torrentSessionId, decodedEpisodeId]);
   const handleProgressUpdate = useCallback((progressSeconds: number, durationSeconds: number, completed?: boolean) => {
+    void nextPreloadRef.current.update(torrentSessionId || undefined, nextEpisode?.number, progressSeconds, durationSeconds, { anilistId: Number((animeData as any)?.anilistID || animeData?.moreInfo.anilistId) || undefined, title: animeData?.info.name });
+
     // Track playback time for seamless torrent completion source switch
     if (Number.isFinite(progressSeconds) && progressSeconds > 0) {
       lastPlaybackTimeRef.current = progressSeconds;
@@ -2930,7 +2914,7 @@ export default function WatchPage() {
     } catch (e) {
       console.warn('Failed to save progress:', e);
     }
-  }, [user, animeData, currentEpisode, animeId, decodedEpisodeId, updateWatchHistory, currentServer, category, selectedLangCode]);
+  }, [user, animeData, currentEpisode, animeId, decodedEpisodeId, updateWatchHistory, currentServer, category, selectedLangCode, torrentSessionId, nextEpisode?.number]);
 
   const handleEpisodeChange = (epId: string) => {
     if (failoverTimeoutRef.current !== null) {
@@ -3159,6 +3143,8 @@ export default function WatchPage() {
                 || activePlaybackSource?.sourceType === 'debrid'
               ) ? (
                 <NativeTorrentPlayer
+                  mediaId={animeId}
+                  episodeId={decodedEpisodeId}
                   url={activePlaybackSource.url}
                   streamKind={activePlaybackSource.sourceType === 'debrid' ? 'debrid' : 'torrent'}
                   title={animeData?.info.name}
@@ -3701,6 +3687,7 @@ export default function WatchPage() {
                           </div>
                         )}
 
+                        <SourceDebug kind="anime" sources={sourcesData?.sources || []} diagnostics={(sourcesData as any)?.providerStatus || []} />
                         {isDeveloperMode && showSourceDebug && (
                           <div className="rounded-xl border border-white/10 bg-black/30 p-3 text-xs font-mono overflow-auto max-h-64">
                             <div>category: {category}</div>

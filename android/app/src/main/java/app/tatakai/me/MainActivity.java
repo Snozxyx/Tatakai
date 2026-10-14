@@ -28,6 +28,7 @@ public class MainActivity extends BridgeActivity {
         // HLS → MP4 remux for offline downloads (mobile parity with desktop's
         // ffmpeg `-c copy` path).
         registerPlugin(TatakaiMuxPlugin.class);
+        registerPlugin(app.tatakai.me.media.TatakaiMediaPlugin.class);
         super.onCreate(savedInstanceState);
 
         // Install the native anti-click-hijack clients, the mobile equivalent of

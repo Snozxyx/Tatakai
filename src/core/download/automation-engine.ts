@@ -1,342 +1,114 @@
+import { resolveExtensionApiBase, streamExtensionSources } from '@/hooks/media/useExtensionSourceStream';
 import { db } from '../db';
+import type { DownloadRule } from '../db/tatakai-db';
 import { contentGraph } from '../content/content-graph';
 import { extensionRegistry } from '../extensions/ExtensionRegistry';
-import { toast } from 'sonner';
-import { scoreAutoDownloadCandidate } from './automation-matcher';
+import { evaluateCandidates, type EvaluationCandidate } from '@tatakai/candidate-evaluator';
+import { parseReleaseName } from '@tatakai/release-parser';
 import { fetchEpisodes } from '@/lib/api/api-client';
 import { availableDownloadEpisodes } from '@/lib/episodeAvailability';
-import {
-  resolveExtensionForEpisode,
-  normalizeLanguage,
-  describeResolution,
-} from './language-resolver';
-import type { ExtensionSearchProvider } from '../extensions/ExtensionRegistry';
+import { startMobileDownload } from './mobile/mobileDownloader';
+import { automaticTransferAllowed } from './mobile/network-policy';
+import { Capacitor } from '@capacitor/core';
 
-/**
- * Normalizes title for comparison
- */
-function normalizeTitle(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+export async function simulateAutoDownload(ruleId: string, episode?: number) {
+  const rule = await db.downloadRules.get(ruleId);
+  if (!rule) {
+    const api = (window as any).electron?.autoDownload;
+    if (api?.simulate) return api.simulate(ruleId, episode);
+    throw new Error('Download rule not found');
+  }
+  const media = await contentGraph.getMedia(String(rule.animeId));
+  if (!media) throw new Error('Series metadata is unavailable');
+  const target = episode ?? rule.lastCheckedEpisode + 1;
+  if (!Number.isInteger(target) || target < 1) throw new Error('Invalid episode number');
+  const episodeList = await fetchEpisodes(String(rule.animeId));
+  const available = availableDownloadEpisodes(episodeList.episodes).find(e => e.number === target);
+  if (!available) return { ranked: [], selected: null, message: 'Episode is not confirmed available' };
+  const titles = [media.titleEnglish, media.titleRomaji, media.titleNative, ...(media.synonyms || [])].filter((title): title is string => !!title);
+  const candidates: EvaluationCandidate[] = [];
+  const language = rule.preferredLanguages?.[0] || rule.audioLanguage || 'ja';
+  const base = await resolveExtensionApiBase(Capacitor.isNativePlatform());
+  const namespaces = (base.namespaces || []).filter(ns => (ns.routes || []).some(route => route === 'sources' || route === 'stream'));
+  const resolved = await Promise.allSettled(namespaces.map(async ns => {
+    const sources = await streamExtensionSources(ns.namespace, { anilistId: media.anilistId, titles, episode: target,
+      resolution: rule.scoringProfile === 'data-saver' ? '720p' : rule.preferredQuality,
+      preferredLanguage: language === 'ja' || language === 'sub' ? 'sub' : 'dub', route: 'sources' }, 15000);
+    return sources.map(source => makeCandidate(source, ns.namespace, titles[0], target));
+  }));
+  for (const result of resolved) if (result.status === 'fulfilled') candidates.push(...result.value);
+  const searches = await Promise.allSettled(extensionRegistry.getSearchProviders().map(async provider => {
+    const results = await provider.search(`${titles[0]} ${target}`);
+    return (results || []).filter(source => source.url || source.magnet || source.magnetLink).map(source => makeCandidate(source, provider.id));
+  }));
+  for (const result of searches) if (result.status === 'fulfilled') candidates.push(...result.value);
+  const unique = [...new Map(candidates.map(c => [c.id, c])).values()];
+  return { ...evaluateCandidates(rule, unique, target, titles), episode: target, media };
 }
 
-/**
- * Checks if a parsed torrent title matches the target anime title
- */
-function isTitleMatch(parsedTitle: string, targetTitles: string[]): boolean {
-  if (!parsedTitle) return false;
-  const normParsed = normalizeTitle(parsedTitle);
-  return targetTitles.some(target => {
-    const normTarget = normalizeTitle(target);
-    return normParsed === normTarget || normParsed.includes(normTarget) || normTarget.includes(normParsed);
-  });
+function makeCandidate(source: any, providerId: string, contextualTitle?: string, contextualEpisode?: number): EvaluationCandidate {
+  const parsed = parseReleaseName(source.title || source.name || contextualTitle || '');
+  const url = source.url || source.magnet || source.magnetLink;
+  const torrent = /^magnet:/i.test(url);
+  return { id: `${providerId}:${url}`, payload: { ...source, url }, candidate: {
+    title: contextualTitle && !torrent ? contextualTitle : parsed.title || contextualTitle,
+    episodeNumber: source.episodeNumber ?? (torrent ? parsed.episodeNumber ?? contextualEpisode : contextualEpisode ?? parsed.episodeNumber),
+    seasonNumber: source.seasonNumber ?? parsed.season, quality: source.quality || parsed.resolution,
+    language: source.audioLanguage || source.language || parsed.audio,
+    providerId, sourceType: torrent ? 'torrent' : 'hls', releaseGroup: parsed.releaseGroup, subtitles: source.subtitles,
+  } };
 }
 
-/**
- * Reads the global default language from localStorage.
- * Set in Desktop Settings → "Default Language".
- */
-function getGlobalDefaultLanguage(): string {
-  return localStorage.getItem('tatakai_default_language') || 'ja';
+let running: Promise<void> | null = null;
+export function checkAndRunAutomation(): Promise<void> {
+  if (running) return running;
+  running = runAutomation().finally(() => { running = null; });
+  return running;
 }
-
-export async function checkAndRunAutomation() {
-  const isDesktop = typeof window !== 'undefined' && !!(window as any).electron?.startDownload;
-  if (!isDesktop) return;
-
-  try {
-    // 1. Get all active rules
-    const activeRules = await db.downloadRules.where('enabled').equals(1).toArray();
-    if (activeRules.length === 0) return;
-
-    console.log(`[AutomationEngine] Running auto-download checks for ${activeRules.length} rules...`);
-    const globalDefaultLang = getGlobalDefaultLanguage();
-    let enqueuedCount = 0;
-
-    for (const rule of activeRules) {
-      try {
-        // 2. Fetch media info from Content Graph
-        const media = await contentGraph.getMedia(String(rule.animeId));
-        if (!media) continue;
-
-        // Determine target titles list for matching
-        const targetTitles = [
-          media.titleEnglish,
-          media.titleRomaji,
-          media.titleNative,
-          ...(media.synonyms || [])
-        ].filter((t): t is string => typeof t === 'string' && !!t.trim());
-
-        // 3. Determine latest available episode number
-        const episodeList = await fetchEpisodes(String(rule.animeId));
-        const available = availableDownloadEpisodes(episodeList.episodes);
-        const availableNumbers = new Set(available.map(episode => episode.number));
-        const latestEpisode = Math.max(0, ...availableNumbers);
-
-        if (latestEpisode <= rule.lastCheckedEpisode) {
-          continue;
-        }
-
-        // Cap lookahead to 3 episodes at a time to prevent queue flooding
-        const startEp = rule.lastCheckedEpisode + 1;
-        const endEp = Math.min(latestEpisode, startEp + 2);
-
-        console.log(`[AutomationEngine] Checked "${rule.animeTitle}": Needs episodes ${startEp} to ${endEp}`);
-
-        for (let ep = startEp; ep <= endEp; ep++) {
-          if (!availableNumbers.has(ep)) continue;
-          let downloaded = false;
-
-          // ── Build the ordered extension provider list ──────────────────────
-          // Prefer extensions listed in rule.sourceExtensionIds (v3 field),
-          // fall back to the legacy rule.providerPriority list.
-          const allProviders = extensionRegistry.getSearchProviders();
-
-          const extensionPriorityIds: string[] =
-            Array.isArray(rule.sourceExtensionIds) && rule.sourceExtensionIds.length > 0
-              ? rule.sourceExtensionIds
-              : Array.isArray(rule.providerPriority)
-                ? rule.providerPriority
-                : [];
-
-          const prioritizedProviders: ExtensionSearchProvider[] = [...allProviders].sort((a, b) => {
-            const aIdx = extensionPriorityIds.indexOf(a.id);
-            const bIdx = extensionPriorityIds.indexOf(b.id);
-            if (aIdx === -1 && bIdx === -1) return 0;
-            if (aIdx === -1) return 1;
-            if (bIdx === -1) return -1;
-            return aIdx - bIdx;
-          });
-
-          if (prioritizedProviders.length === 0) {
-            console.warn(`[AutomationEngine] No extensions registered — cannot download "${rule.animeTitle}" ep ${ep}`);
-            toast.error(`No extensions installed for "${rule.animeTitle}" ep ${ep}`, {
-              description: 'Install an extension from the Extension Hub to enable auto-downloads.',
-            });
-            break;
-          }
-
-          // ── Build the preferred language list ──────────────────────────────
-          // Use v3 preferredLanguages if present, otherwise build from legacy fields.
-          const preferredLanguages: string[] =
-            Array.isArray(rule.preferredLanguages) && rule.preferredLanguages.length > 0
-              ? rule.preferredLanguages
-              : buildLegacyLanguageList(rule.audioLanguage, rule.fallbackLanguage);
-
-          const fallbackMode = rule.languageFallbackMode ?? 'switch-source';
-
-          // ── Step 1: Run the language resolution engine ─────────────────────
-          console.log(
-            `[AutomationEngine] Resolving language for "${rule.animeTitle}" ep ${ep}` +
-            ` | Preferred: [${preferredLanguages.join(', ')}]` +
-            ` | Extensions: [${prioritizedProviders.map(p => p.name).join(', ')}]`,
-          );
-
-          let resolution = await resolveExtensionForEpisode(
-            prioritizedProviders,
-            media.anilistId ?? rule.animeId,
-            ep,
-            preferredLanguages,
-            globalDefaultLang,
-          );
-
-          if (!resolution) {
-            if (fallbackMode === 'error') {
-              const msg = `No source found for "${rule.animeTitle}" ep ${ep} in preferred languages [${preferredLanguages.join(', ')}]`;
-              console.error(`[AutomationEngine] ${msg}`);
-              toast.error(msg, { description: 'Check your extension language settings.' });
-              continue;
-            }
-
-            if (fallbackMode === 'switch-source') {
-              // Try any provider regardless of language
-              if (prioritizedProviders.length > 0) {
-                resolution = {
-                  provider: prioritizedProviders[0],
-                  resolvedLanguage: normalizeLanguage(preferredLanguages[0] ?? globalDefaultLang),
-                  languageLabel: preferredLanguages[0] ?? globalDefaultLang,
-                  matchType: 'heuristic',
-                  capabilities: [],
-                };
-                console.warn(`[AutomationEngine] Language-agnostic fallback for "${rule.animeTitle}" ep ${ep} — using ${resolution.provider.name}`);
-              } else {
-                continue;
-              }
-            }
-          }
-
-          if (!resolution) continue;
-
-          console.log(
-            `[AutomationEngine] Resolved: ${describeResolution(resolution)} for "${rule.animeTitle}" ep ${ep}`,
-          );
-
-          // ── Step 2: Search for the episode using the resolved extension ────
-          const { provider } = resolution;
-          const queryTitle = media.titleEnglish || media.titleRomaji;
-          const queries = [
-            `"${queryTitle}" ${ep}`,
-            `"${queryTitle}" episode ${ep}`,
-          ];
-
-          for (const query of queries) {
-            if (downloaded) break;
-
-            try {
-              console.log(`[AutomationEngine] Searching "${provider.name}" for: ${query}`);
-              const searchResults = await provider.search(query);
-              if (!Array.isArray(searchResults) || searchResults.length === 0) continue;
-
-              const scoredResults: Array<{ result: any; score: number; reasons: string[]; filename: string }> = [];
-
-              for (const result of searchResults) {
-                const filename = result.title || result.name || '';
-                const parseRes = await (window as any).electron.parseReleaseName(filename);
-                if (!parseRes?.success || !parseRes.parsed) continue;
-
-                const parsed = parseRes.parsed;
-                const parsedEp = parsed.episodeNumber;
-                if (parsedEp !== ep) continue;
-                if (!isTitleMatch(parsed.title, targetTitles)) continue;
-
-                // Language filter: if the resolution is a strict match, filter for that language
-                if (resolution.matchType === 'strict') {
-                  const resultLang = normalizeLanguage(
-                    result.audioLanguage || parsed.audio || result.language || '',
-                  );
-                  const isDubRequested = resolution.resolvedLanguage !== 'ja';
-                  if (isDubRequested) {
-                    const isDub =
-                      resultLang === resolution.resolvedLanguage ||
-                      filename.toLowerCase().includes('dub') ||
-                      filename.toLowerCase().includes('dual audio') ||
-                      filename.toLowerCase().includes('multi audio');
-                    if (!isDub) continue;
-                  }
-                }
-
-                const scoreInfo = scoreAutoDownloadCandidate(
-                  rule,
-                  {
-                    title: parsed.title,
-                    episodeNumber: parsedEp,
-                    seasonNumber: parsed.season ?? null,
-                    quality: parsed.resolution,
-                    language: resolution.resolvedLanguage,
-                    providerId: provider.id,
-                    sourceType: result.sourceType || parsed.source || 'torrent',
-                    source: parsed.source,
-                    releaseGroup: parsed.releaseGroup,
-                    subtitles: result.subtitles,
-                  },
-                  targetTitles,
-                );
-
-                scoredResults.push({
-                  result,
-                  score: scoreInfo.score,
-                  reasons: scoreInfo.reasons,
-                  filename,
-                });
-              }
-
-              const bestMatch = scoredResults.sort((a, b) => b.score - a.score)[0];
-              if (!bestMatch) continue;
-
-              const { result, filename } = bestMatch;
-              const downloadPath = localStorage.getItem('tatakai_download_path') || undefined;
-              const posterUrl = media.coverImageLarge;
-              const subtitles = rule.autoDownloadSubtitles && result.subtitles
-                ? result.subtitles.map((s: any) => ({
-                    url: s.url,
-                    lang: s.language || s.lang,
-                    label: s.label,
-                  }))
-                : [];
-
-              // Determine source type for the download handler
-              const resultSourceType: 'hls' | 'torrent' =
-                (result.sourceType === 'torrent' ||
-                  result.url?.startsWith('magnet:') ||
-                  result.magnet)
-                  ? 'torrent'
-                  : 'hls';
-
-              console.log(
-                `[AutomationEngine] Matched "${filename}" score=${bestMatch.score}` +
-                ` (${bestMatch.reasons.join(', ')}) lang=${resolution.resolvedLanguage}` +
-                ` type=${resultSourceType}. Downloading...`,
-              );
-
-              const episodeId = `auto-${media.anilistId || media.malId}-${ep}`;
-              const meta = {
-                animeId: media.anilistId || media.malId || rule.animeId,
-                animeTitle: media.titleEnglish || media.titleRomaji,
-                episodeNumber: ep,
-                sourceType: resultSourceType,
-                resolvedLanguage: resolution.resolvedLanguage || 'ja',
-                startedAt: new Date().toISOString()
-              };
-              localStorage.setItem(`tatakai:dl:meta:${episodeId}`, JSON.stringify(meta));
-
-              const startRes = await (window as any).electron.startDownload({
-                episodeId,
-                animeName: media.titleEnglish || media.titleRomaji,
-                episodeNumber: ep,
-                url: result.url,
-                magnet: result.magnet || (result.url?.startsWith('magnet:') ? result.url : undefined),
-                sourceType: resultSourceType,
-                headers: result.headers || {},
-                downloadPath,
-                posterUrl,
-                subtitles,
-              });
-
-              if (startRes?.success || startRes?.ok) {
-                const langLabel = resolution.languageLabel;
-                toast.success(
-                  `Auto-downloading "${media.titleEnglish || media.titleRomaji}" Episode ${ep} [${langLabel}]!`,
-                );
-                rule.lastCheckedEpisode = ep;
-                await db.downloadRules.put(rule);
-                downloaded = true;
-                enqueuedCount++;
-                break;
-              } else {
-                console.warn(`[AutomationEngine] Start download failed for ${filename}:`, startRes?.error);
-                localStorage.removeItem(`tatakai:dl:meta:${episodeId}`);
-              }
-            } catch (searchErr) {
-              console.error(`[AutomationEngine] Provider search error:`, searchErr);
-            }
-          }
-        }
-      } catch (ruleErr) {
-        console.error(`[AutomationEngine] Error running rule for "${rule.animeTitle}":`, ruleErr);
-      }
-    }
-
-    console.log(`[AutomationEngine] Done. Enqueued ${enqueuedCount} downloads.`);
-    localStorage.setItem('tatakai_auto_download_last_checked', new Date().toISOString());
-  } catch (err) {
-    console.error('[AutomationEngine] Global automation check failed:', err);
+async function runAutomation() {
+  if (!Capacitor.isNativePlatform() && !(window as any).electron?.startDownload) return;
+  if (!await automaticTransferAllowed()) return;
+  const rules = (await db.downloadRules.toArray()).filter(rule => rule.enabled);
+  const legacy = await (window as any).electron?.autoDownload?.list?.() || [];
+  for (const rule of rules) {
+    // Main-process subscriptions retain their sole scheduler ownership.
+    if (legacy.some((sub: any) => String(sub.animeId || sub.id) === String(rule.animeId))) continue;
+    try {
+      const simulation = await simulateAutoDownload(rule.id);
+      if (!simulation.selected) continue;
+      const source = simulation.selected.payload;
+      const episode = rule.lastCheckedEpisode + 1;
+      const episodeId = `auto-${rule.animeId}-${episode}`;
+      if ((await db.offlineEpisodes.get(episodeId))) continue;
+      const input = { episodeId, animeId: String(rule.animeId), animeName: rule.animeTitle, episodeNumber: episode,
+        wifiOnly: localStorage.getItem('tatakai:automation-wifi-only') !== 'false',
+        url: source.url || source.magnet, magnet: source.magnet, sourceType: simulation.selected.candidate.sourceType,
+        headers: source.headers || {}, subtitles: rule.autoDownloadSubtitles ? source.subtitles || [] : [], posterUrl: simulation.media?.coverImageLarge };
+      const result = Capacitor.isNativePlatform() ? await startMobileDownload(input) : await (window as any).electron.startDownload(input);
+      if (!result?.ok && !result?.success) throw new Error(result?.error || 'Download could not start');
+      // Advance only after the native queue has accepted this episode.
+      await db.downloadRules.update(rule.id, { lastCheckedEpisode: episode, lastError: undefined });
+    } catch (error) { await db.downloadRules.update(rule.id, { lastError: error instanceof Error ? error.message : String(error) }); }
   }
 }
 
-/**
- * Builds a legacy-compatible language priority list from old audioLanguage / fallbackLanguage fields.
- * Used when a rule was created before v3 of the DB schema.
- */
-function buildLegacyLanguageList(audioLanguage: string, fallbackLanguage: string): string[] {
-  const list: string[] = [];
-  if (audioLanguage && audioLanguage !== 'none') list.push(audioLanguage);
-  if (fallbackLanguage && fallbackLanguage !== 'none' && fallbackLanguage !== audioLanguage) {
-    list.push(fallbackLanguage);
-  }
-  // Ensure 'ja' is always last as ultimate default
-  if (!list.includes('ja') && !list.includes('sub')) list.push('ja');
-  return list;
-}
+export const autoDownloadApi = {
+  async list() {
+    if ((window as any).electron?.autoDownload) return (window as any).electron.autoDownload.list();
+    return (await db.downloadRules.toArray()).map(rule => ({ id: rule.id, animeId: String(rule.animeId), title: rule.animeTitle,
+      nextEpisode: rule.lastCheckedEpisode + 1, scoringProfile: rule.scoringProfile, enqueuedEpisodes: [], addedAt: Date.parse(rule.createdAt) }));
+  },
+  async subscribe(animeId: string, title: string, nextEpisode: number, anilistId?: number) {
+    if ((window as any).electron?.autoDownload) return (window as any).electron.autoDownload.subscribe(animeId, title, nextEpisode, anilistId);
+    const id = `mobile-auto:${animeId}`;
+    const rule: DownloadRule = { id, animeId: anilistId || Number(animeId), animeTitle: title, enabled: true, preferredQuality: '1080p',
+      scoringProfile: 'balanced', preferredLanguages: ['ja'], sourceExtensionIds: [], languageFallbackMode: 'switch-source',
+      audioLanguage: 'ja', fallbackLanguage: '', providerPriority: [], autoDownloadSubtitles: true, lastCheckedEpisode: nextEpisode - 1, createdAt: new Date().toISOString() };
+    if (!Number.isFinite(rule.animeId) || rule.animeId <= 0) throw new Error('A catalog identifier is required');
+    await db.downloadRules.put(rule);
+  },
+  async unsubscribe(animeId: string) {
+    if ((window as any).electron?.autoDownload) return (window as any).electron.autoDownload.unsubscribe(animeId);
+    await db.downloadRules.where('animeId').equals(Number(animeId)).delete();
+  },
+};

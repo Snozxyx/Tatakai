@@ -12,7 +12,7 @@
  */
 
 /** Media whose consumption feeds the shared rank score. */
-export type MediaKind = 'anime' | 'manga' | 'manhwa' | 'comic';
+export type MediaKind = 'anime' | 'manga' | 'manhwa' | 'comic' | 'novel';
 /** @deprecated kept as an alias; ranks are no longer per-track. */
 export type RankTrack = MediaKind;
 
@@ -47,6 +47,7 @@ export const MEDIA_WEIGHT: Record<MediaKind, number> = {
   manga: 0.35,  // per chapter read
   manhwa: 0.5,  // per chapter read
   comic: 0.65,  // per issue read
+  novel: 0.45,  // per chapter read (longer than manga, shorter than anime)
 };
 
 export const MEDIA_LABEL: Record<MediaKind, string> = {
@@ -54,6 +55,7 @@ export const MEDIA_LABEL: Record<MediaKind, string> = {
   manga: 'Manga',
   manhwa: 'Manhwa',
   comic: 'Comic',
+  novel: 'Novel',
 };
 
 export const MEDIA_UNIT: Record<MediaKind, string> = {
@@ -61,6 +63,7 @@ export const MEDIA_UNIT: Record<MediaKind, string> = {
   manga: 'chapters',
   manhwa: 'chapters',
   comic: 'issues',
+  novel: 'chapters',
 };
 
 /** Raw units consumed per medium. */
@@ -69,6 +72,7 @@ export interface RankUnits {
   manga?: number;
   manhwa?: number;
   comic?: number;
+  novel?: number;
 }
 
 /** Combined, difficulty-weighted rank score across every medium. */
@@ -77,7 +81,8 @@ export function computeRankScore(u: RankUnits): number {
     (u.episodes ?? 0) * MEDIA_WEIGHT.anime +
     (u.manga ?? 0) * MEDIA_WEIGHT.manga +
     (u.manhwa ?? 0) * MEDIA_WEIGHT.manhwa +
-    (u.comic ?? 0) * MEDIA_WEIGHT.comic;
+    (u.comic ?? 0) * MEDIA_WEIGHT.comic +
+    (u.novel ?? 0) * MEDIA_WEIGHT.novel;
   return Math.floor(score);
 }
 
@@ -88,6 +93,7 @@ export function rankScoreBreakdown(u: RankUnits): { kind: MediaKind; units: numb
     { kind: 'manga', units: u.manga ?? 0, points: Math.floor((u.manga ?? 0) * MEDIA_WEIGHT.manga) },
     { kind: 'manhwa', units: u.manhwa ?? 0, points: Math.floor((u.manhwa ?? 0) * MEDIA_WEIGHT.manhwa) },
     { kind: 'comic', units: u.comic ?? 0, points: Math.floor((u.comic ?? 0) * MEDIA_WEIGHT.comic) },
+    { kind: 'novel', units: u.novel ?? 0, points: Math.floor((u.novel ?? 0) * MEDIA_WEIGHT.novel) },
   ];
   return rows.filter((r) => r.units > 0);
 }
@@ -113,10 +119,11 @@ export function classifyReadingFormat(meta?: {
   format?: string | null;
   countryOfOrigin?: string | null;
   mediaType?: string | null;
-}): 'manga' | 'manhwa' | 'comic' | 'unknown' {
+}): 'manga' | 'manhwa' | 'comic' | 'novel' | 'unknown' {
   const fmt = String(meta?.format || meta?.mediaType || '').trim().toUpperCase();
   const country = String(meta?.countryOfOrigin || '').trim().toUpperCase();
 
+  if (fmt === 'NOVEL' || fmt === 'LIGHT_NOVEL') return 'novel';
   if (country === 'KR' || fmt === 'MANHWA') return 'manhwa';
   if (country === 'CN' || country === 'TW' || fmt === 'MANHUA') return 'manhwa';
   if (fmt === 'OEL' || fmt === 'COMIC' || fmt === 'COMICS') return 'comic';

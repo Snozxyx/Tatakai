@@ -1,3 +1,6 @@
+import { isMangaExtension } from '@/core/extensions/store-category';
+import { ECOSYSTEMS } from "@/core/extensions/ecosystems";
+import { RemoteExtensionsPanel } from "@/components/extensions/RemoteExtensionsPanel";
 /**
  * The extension store (`/extensions`), laid out the way the Microsoft Store lays
  * out its home page: a wide spotlight card with stacked promo tiles beside it,
@@ -62,6 +65,9 @@ import {
  * `StoreExtension`.
  */
 export interface ExtensionManifest {
+  upstreamType?: string;
+  ecosystem?: import("@/core/extensions/ecosystems").ExtensionEcosystem;
+  manifestUrl?: string;
   id: string;
   name: string;
   description: string;
@@ -85,11 +91,12 @@ export interface ExtensionManifest {
   mainUrl?: string;
 }
 
-type TypeFilter = StoreExtensionType | 'all';
+type TypeFilter = StoreExtensionType | 'all' | 'manga';
 
 const TYPE_FILTERS: ReadonlyArray<PillOption<TypeFilter>> = [
   { id: 'all', label: 'All' },
   { id: 'onlinestream', label: 'Streaming' },
+  { id: 'manga', label: 'Manga' },
   { id: 'torrent', label: 'Torrent' },
   { id: 'custom', label: 'Utilities' },
 ];
@@ -163,35 +170,40 @@ export default function ExtensionHubPage() {
   const isDesktopApp = useIsDesktopApp();
   const isIos = isIOS();
 
+  const [ecosystem, setEcosystem] = useState('all');
+  const [compatibility, setCompatibility] = useState('all');
   const [search, setSearch] = useState('');
   const [type, setType] = useState<TypeFilter>('all');
   const [sideloadOpen, setSideloadOpen] = useState(false);
 
-  const catalogue = useStoreCatalogue({ search, type });
+  const catalogue = useStoreCatalogue({ search, type: type === 'manga' ? 'all' : type, ecosystem, compatibility });
   const installer = useExtensionInstaller();
   const typeFilters = isIos ? TYPE_FILTERS.filter((option) => option.id !== 'torrent') : TYPE_FILTERS;
   const visibleItems = useMemo(
-    () => (isIos ? catalogue.items.filter((item) => item.type !== 'torrent') : catalogue.items),
-    [catalogue.items, isIos],
+    () => (isIos ? catalogue.items.filter((item) => item.type !== 'torrent') : catalogue.items).filter(item => (type !== 'manga' || isMangaExtension(item)) && (ecosystem === 'all' || (item.ecosystem || 'tatakai') === ecosystem) && (compatibility === 'all' || (item.compatibility || 'supported') === compatibility)),
+    [catalogue.items, isIos, ecosystem, compatibility, type],
   );
   const visibleFeatured = useMemo(
-    () => (isIos ? catalogue.featured.filter((item) => item.type !== 'torrent') : catalogue.featured),
-    [catalogue.featured, isIos],
+    () => visibleItems.filter(item => item.isFeatured),
+    [visibleItems],
   );
 
   const isSearching = search.trim().length > 0;
 
   const handleInstall = (extension: StoreExtension) => installer.toggle(extension);
 
-  const { spotlight, promos, streaming, torrent, utilities, installed } = useMemo(() => {
+  const { spotlight, promos, streaming, manga, torrent, utilities, installed } = useMemo(() => {
     const items = visibleItems;
     const featured = visibleFeatured;
+    const bannerExtension = featured.find(item => item.banner) || items.find(item => item.banner);
+    const hero = bannerExtension || featured[0];
     return {
-      spotlight: featured[0],
-      promos: featured.slice(1, 3),
+      spotlight: hero,
+      promos: featured.filter(item => item.id !== hero?.id).slice(0, 2),
       streaming: items.filter((item) => item.type === 'onlinestream'),
       torrent: items.filter((item) => item.type === 'torrent'),
-      utilities: items.filter((item) => item.type === 'custom'),
+      manga: items.filter(isMangaExtension),
+      utilities: items.filter((item) => item.type === 'custom' && !isMangaExtension(item)),
       installed: items.filter((item) => installer.isInstalled(item)),
     };
   }, [visibleItems, visibleFeatured, installer]);
@@ -199,6 +211,7 @@ export default function ExtensionHubPage() {
   return (
     <div className="relative min-h-screen">
       <Background />
+
 
       <div
         className={cn(
@@ -252,14 +265,14 @@ export default function ExtensionHubPage() {
                 </button>
               ) : null}
             </div>
-            {isNative ? (
+            {true ? (
               <Button
                 variant="outline"
                 onClick={() => setSideloadOpen(true)}
                 className="h-10 gap-2 rounded-full border-border bg-muted/30"
               >
                 <FolderUp className="h-4 w-4" />
-                Sideload
+                Add extension
               </Button>
             ) : null}
             {/*
@@ -284,6 +297,10 @@ export default function ExtensionHubPage() {
             </Button>
           </div>
         </header>
+      <div className="mt-5 space-y-4"><div className="flex flex-wrap gap-3">
+        <label className="text-sm">Ecosystem <select className="rounded border border-border bg-background p-2" value={ecosystem} onChange={e => setEcosystem(e.target.value)}><option value="all">All ecosystems</option>{ECOSYSTEMS.map(e => <option key={e} value={e}>{e}</option>)}</select></label>
+        <label className="text-sm">Compatibility <select className="rounded border border-border bg-background p-2" value={compatibility} onChange={e => setCompatibility(e.target.value)}><option value="all">All compatibility</option>{['supported','limited','external','unavailable'].map(e => <option key={e} value={e}>{e}</option>)}</select></label>
+      </div></div>
 
         {catalogue.serviceError || !catalogue.isServiceConfigured ? (
           <div className="mt-6 flex items-start gap-3 rounded-2xl border border-amber/25 bg-amber/10 p-4">
@@ -296,8 +313,8 @@ export default function ExtensionHubPage() {
               </p>
               <p className="mt-0.5 text-muted-foreground">
                 {catalogue.isServiceConfigured
-                  ? 'Showing sideloaded extensions only. The catalogue will fill in once the service responds.'
-                  : 'Set VITE_EXTENSION_API_URL to browse the published catalogue. Sideloaded extensions still work.'}
+                  ? 'Showing installed extensions only. The catalogue will fill in once the service responds.'
+                  : 'Set VITE_EXTENSION_API_URL to browse the published catalogue. Installed extensions remain available.'}
               </p>
             </div>
           </div>
@@ -403,6 +420,8 @@ export default function ExtensionHubPage() {
               onInstall={handleInstall}
             />
 
+            <RowShelf title="Manga sources" eyebrow="Reading" items={manga} installer={installer} onInstall={handleInstall} />
+
             {!isIos ? (
               <RowShelf
                 title="Torrent providers"
@@ -445,6 +464,7 @@ export default function ExtensionHubPage() {
         )}
       </div>
 
+      <div className="mx-auto max-w-7xl px-4 pb-8"><RemoteExtensionsPanel /></div>
       <SideloadExtensionModal isOpen={sideloadOpen} onClose={() => setSideloadOpen(false)} />
     </div>
   );

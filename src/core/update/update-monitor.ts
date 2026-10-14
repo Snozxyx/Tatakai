@@ -1,3 +1,4 @@
+import { normalizeReleaseNotes, normalizeRolloutPercentage } from './release-details';
 import { useSyncExternalStore } from 'react';
 
 /**
@@ -23,6 +24,11 @@ export type UpdatePhase =
 
 export interface UpdateState {
   phase: UpdatePhase;
+  releaseNotes?: string;
+  stagingPercentage?: number;
+  checkedAt?: number;
+  channel?: string;
+  eligibility?: 'offered' | 'not-offered' | 'unknown';
   /** Target version once known, e.g. "5.2.0". */
   version?: string;
   /** 0-100 download progress; only meaningful while phase === 'downloading'. */
@@ -59,6 +65,7 @@ function set(patch: Partial<UpdateState>) {
 
 /** Raw shape of the `updater-event` broadcast from update-manager.cjs. */
 export interface UpdaterEvent {
+  channel?: string;
   type:
     | 'checking'
     | 'available'
@@ -67,7 +74,7 @@ export interface UpdaterEvent {
     | 'downloading'
     | 'downloaded'
     | 'error';
-  info?: { version?: string } | null;
+  info?: { version?: string; releaseNotes?: unknown; stagingPercentage?: unknown; channel?: string } | null;
   progress?: { percent?: number } | null;
   message?: string;
   dismissible?: boolean;
@@ -79,6 +86,10 @@ export interface UpdaterEvent {
  * Dynamic Island and the Settings panel read one source of truth.
  */
 export function ingestUpdaterEvent(event: UpdaterEvent): void {
+  if (event.channel) set({ channel: event.channel });
+  if (event.info || event.type === 'not-available' || event.type === 'error') {
+    set({ checkedAt: Date.now(), ...(event.info ? { releaseNotes: normalizeReleaseNotes(event.info.releaseNotes), stagingPercentage: normalizeRolloutPercentage(event.info.stagingPercentage), channel: event.info.channel || event.channel || state.channel } : {}) });
+  }
   switch (event.type) {
     case 'checking':
       // Don't stomp a download already in flight with a late re-check.
@@ -89,6 +100,7 @@ export function ingestUpdaterEvent(event: UpdaterEvent): void {
     case 'available':
       set({
         phase: 'available',
+        eligibility: 'offered',
         version: event.info?.version ?? state.version,
         mandatory: false,
         manual: event.manual === true,
@@ -100,6 +112,7 @@ export function ingestUpdaterEvent(event: UpdaterEvent): void {
     case 'mandatory-update':
       set({
         phase: 'available',
+        eligibility: 'offered',
         version: event.info?.version ?? state.version,
         mandatory: true,
         dismissed: false,
@@ -110,7 +123,7 @@ export function ingestUpdaterEvent(event: UpdaterEvent): void {
     case 'not-available':
       // Only reset when we weren't mid-download; a stray not-available shouldn't
       // wipe a real pending install.
-      if (state.phase === 'checking' || state.phase === 'idle') set({ ...IDLE });
+      if (state.phase === 'checking' || state.phase === 'idle') set({ ...IDLE, checkedAt: Date.now(), eligibility: 'not-offered', releaseNotes: normalizeReleaseNotes(event.info?.releaseNotes), stagingPercentage: normalizeRolloutPercentage(event.info?.stagingPercentage) });
       break;
 
     case 'downloading':

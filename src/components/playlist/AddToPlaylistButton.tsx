@@ -55,7 +55,8 @@ export function AddToPlaylistButton({
   const { data: inPlaylists = [] } = useAnimeInPlaylists(animeId);
   const createPlaylist = useCreatePlaylist();
   const addToPlaylist = useAddToPlaylist();
-  const mediaLabel = mediaType === 'manga' ? 'Manga' : 'Anime';
+  const mediaLabel =
+    mediaFormat === 'novel' ? 'Novel' : mediaType === 'manga' ? 'Manga' : 'Anime';
 
   // Show a visual indication if this anime is already in any of the user's playlists
   const isInAnyPlaylist = (inPlaylists || []).length > 0;

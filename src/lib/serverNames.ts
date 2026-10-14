@@ -95,6 +95,7 @@ export function getFriendlyServerName(serverName: string): string {
 export function getSimpleServerDisplayName(serverName: string, fallback?: string): string {
   const key = normalizeKey(serverName);
   const fallbackKey = normalizeKey(fallback);
+  if (/^(stremio|seanime)[- ]/i.test(key) && String(fallback || "").trim()) return String(fallback).trim();
 
   for (const candidate of [key, fallbackKey]) {
     if (!candidate) continue;

@@ -1,3 +1,4 @@
+import { SourceDebug } from '@/components/extensions/SourceDebug';
 /**
  * Custom-source read page (`kind: 'read'`).
  *
@@ -103,6 +104,7 @@ export default function CustomReadPage() {
       </div>
 
       <div className="mx-auto w-full max-w-5xl px-3 py-4">
+        <SourceDebug kind="custom" unit="pages" sources={pages.map(() => ({ providerKey: namespace, providerName: source?.name }))} />
         {isLoading ? (
           <div className="flex items-center justify-center gap-2 py-24 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" /> Loading pages…

@@ -1,35 +1,16 @@
 # Renderer Loader & `ExtensionContext`
 
 The renderer loader (`src/core/extensions/rendererLoader.ts`) is how
-**code-driven** contributions enter the app. It fetches a trusted extension's
+**code-driven** contributions enter the app. It fetches a installed extension's
 `renderer.js`, loads it as an ES module, and calls its `activate(ctx)`.
 
-## ⚠️ Security — read this first
+## Execution and validation
 
-A renderer contribution is **arbitrary JavaScript that runs in the app's own
-realm** — same window, same React runtime, same DOM, same privileges as the app
-itself. `import(blobURL)` is **not** a sandbox.
-
-The **only** security boundary is the **trust gate**:
-
-```ts
-isTrusted(ext) = ext.sideloaded === true
-              || (typeof ext.signature === 'string' && ext.signature.length > 0)
-```
-
-- The bundle is fetched over the `runtime:get-renderer-bundle` IPC, which
-  **main-side refuses** for untrusted extensions (and rejects path traversal in
-  `rendererEntry`).
-- The loader itself re-checks `isTrusted` before executing.
-
-Untrusted store extensions never reach the loader — they stay **data-only**
-(their content is served through the vetted host router). Do not weaken this
-gate; there is no in-realm sandbox behind it. Only sideload extensions you
-trust. See [overview.md](overview.md#trust-model).
+Renderer contributions execute JavaScript in the application's realm; importing a module is not a sandbox. Every installed native extension can declare a renderer entry. The bridge validates identifiers and paths, and kill switches still prevent loading. Legacy signing fields are ignored.
 
 ## Loading flow
 
-1. `bootstrapExtensions` finds trusted rows with `contributes.rendererEntry`.
+1. `bootstrapExtensions` finds installed rows with `contributes.rendererEntry`.
 2. `loadRendererContribution(ext)` calls `window.electron.getRendererBundle(ext.id)`.
 3. The source is wrapped in a `Blob({ type: 'text/javascript' })`; the loader
    `import(/* @vite-ignore */ blobUrl)`s it.

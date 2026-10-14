@@ -170,9 +170,13 @@ export default function AuthPage() {
           navigate('/');
         }
       } else {
-        const { error } = await signUp(email, password, displayName, captchaToken ?? undefined);
+        const { error, mode } = await signUp(email, password, displayName, captchaToken ?? undefined);
         if (error) {
           toast.error(error.message.includes('already registered') ? 'This email is already registered' : error.message);
+          resetCaptcha();
+        } else if (mode === 'restricted') {
+          toast.info('Account created. Sign in to browse; verify your email later to post or upload.');
+          setIsLogin(true);
           resetCaptcha();
         } else {
           toast.success(`Almost there — we sent a 6-digit code to ${email}`);

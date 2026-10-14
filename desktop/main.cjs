@@ -221,7 +221,7 @@ function startDeferredRuntimeServices() {
     }
 
     // Start the generic extension-API host. Runs after extensions auto-load
-    // (above) so installed namespaces (e.g. Toko) mount, and passes
+    // (above) so installed namespaces (e.g. Extensions) mount, and passes
     // ensureExtensionFetchProxy so emitted media URLs get proxied through the
     // in-app proxy. No-op if no installed extension declares `apiServer`.
     if (extensionRuntimeApi?.extensionApiHost) {
@@ -263,6 +263,7 @@ require('./ipc/ipc-download-manager.cjs')(ipcMain, app, fs, path, logger, getMai
 require('./ipc/ipc-manga-download-manager.cjs')(ipcMain, app, fs, path, logger, getMainWindow, extensionRuntimeApi);
 // Offline manga library: reads on-disk manifests + serves pages via tatakai-media://.
 require('./ipc/ipc-manga-library.cjs')(ipcMain, app, shell, fs, path, logger);
+require('./services/kitten-tts.cjs')(ipcMain, app, fs, path, logger, getMainWindow);
 const torrentRuntimeApi = require('./ipc/ipc-torrent.cjs')(ipcMain, app, fs, path, logger, getMainWindow);
 require('./ipc/ipc-system.cjs')(ipcMain, app, dialog, autoUpdater, fs, path, logger, getMainWindow, appCID, isDev);
 require('./ipc/ipc-theme.cjs')(ipcMain, app, fs, path);

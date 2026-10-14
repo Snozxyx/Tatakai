@@ -46,14 +46,11 @@ every field.
     "themes": [ /* see themes.md */ ],
     "analytics": [ { "ingestUrl": "https://…/ingest", "events": [] } ]
   },
-  "sideloaded": true,
   "permissions": ["network:domain:example.com"]
 }
 ```
 
-> `sideloaded: true` makes the extension **trusted**, so its namespace mounts and
-> its renderer bundle loads. Without it (and without a signature) the extension
-> stays data-only.
+Install through **Add extension** or the marketplace. No signing step is required.
 
 ## 2. `src/index.ts` — the Node bundle
 
@@ -165,8 +162,7 @@ This writes `dist/bundle.js`, `dist/renderer.js`, and `dist/myext.kai`.
 - Your `/myext` page routes; your slot renders at its mount point.
 - Your module `init` and analytics provider fire (check the console — logs are
   prefixed `[ext:tatakai.extension.myext]`).
-- Confirm a **non**-sideloaded, unsigned build's renderer bundle and apiServer
-  namespace are **refused** (the trust gate).
+- Confirm an unsigned package installs and its declared contributions load.
 
 ## The `.kai` format
 

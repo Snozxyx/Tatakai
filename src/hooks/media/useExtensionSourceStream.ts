@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { applyMobileProxyToSource } from '@/core/extensions/mobile/mobileProxy';
+import { isElectron } from '@/lib/platform/platform';
 import {
   readCachedItemsSync,
   hydrateCachedItems,
@@ -176,6 +177,8 @@ async function probeHealth(baseUrl: string, timeoutMs = 1200): Promise<ResolvedB
  */
 async function probeExtensionApiBase(): Promise<ResolvedBase | null> {
   if (typeof fetch !== "function") return null;
+  if (typeof window !== 'undefined' && !isElectron() &&
+      !['localhost','127.0.0.1'].includes(window.location.hostname)) return null;
   const results = await Promise.all(
     PROBE_PORTS.map((port) => probeHealth(`http://127.0.0.1:${port}`)),
   );

@@ -19,6 +19,39 @@ import {
   GITHUB_RELEASES_URL,
 } from "@/lib/github";
 
+const ALTSTORE_SOURCE_URL = "https://tatakai.me/altstore/apps.json";
+const OBTAINIUM_ADD_URL =
+  "https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/snozxyx/tatakai";
+
+const ALT_INSTALLS = [
+  {
+    name: "AltStore / SideStore",
+    tag: "iOS",
+    description:
+      "Add our official source in AltStore, SideStore, or StikStore to install Tatakai on iPhone & iPad with your own Apple ID.",
+    actionLabel: "Add Source",
+    actionHref: `altstore://source?url=${ALTSTORE_SOURCE_URL}`,
+    copyValue: ALTSTORE_SOURCE_URL,
+    copyLabel: "Copy source URL",
+  },
+  {
+    name: "Obtainium",
+    tag: "Android",
+    description:
+      "Track GitHub Releases in Obtainium to get notified of new APKs. One tap to follow snozxyx/tatakai.",
+    actionLabel: "Track in Obtainium",
+    actionHref: OBTAINIUM_ADD_URL,
+  },
+  {
+    name: "F-Droid",
+    tag: "Android · soon",
+    description:
+      "Official F-Droid listing is in preparation (submission pack is in the repo). Until then, use the APK above or Obtainium.",
+    actionLabel: "Release notes",
+    actionHref: GITHUB_RELEASES_URL,
+  },
+];
+
 interface DownloadItem {
   id?: string;
   name: string;
@@ -335,6 +368,62 @@ export function DownloadSection() {
               </button>
             );
           })}
+        </div>
+
+        {/* Alternative install channels — sideload stores & open-source clients */}
+        <div className="mb-20">
+          <div className="flex items-end justify-between gap-4 mb-6">
+            <div>
+              <p className="text-xs font-mono uppercase tracking-widest text-white/40 mb-2">
+                Sideload & open-source
+              </p>
+              <h2 className="text-2xl md:text-3xl font-display text-white">
+                More ways to install
+              </h2>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {ALT_INSTALLS.map((alt) => (
+              <div
+                key={alt.name}
+                className="relative overflow-hidden p-6 border border-white/10 rounded-2xl bg-white/[0.03] hover:border-white/30 transition-all duration-500"
+              >
+                <span className="absolute top-4 right-4 text-[10px] font-mono px-2.5 py-1 rounded-full border bg-white/10 text-white/70 border-white/10">
+                  {alt.tag}
+                </span>
+                <h3 className="font-bold text-lg text-white mb-2 pr-20">{alt.name}</h3>
+                <p className="text-sm text-white/60 leading-relaxed mb-5">{alt.description}</p>
+                <div className="flex items-center gap-3">
+                  <a
+                    href={alt.actionHref}
+                    target={alt.actionHref.startsWith("http") ? "_blank" : undefined}
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
+                  >
+                    {alt.actionLabel} <ArrowRight className="w-3.5 h-3.5" />
+                  </a>
+                  {"copyValue" in alt && alt.copyValue && (
+                    <button
+                      onClick={() => {
+                        try {
+                          void navigator.clipboard?.writeText(alt.copyValue as string);
+                        } catch {
+                          /* clipboard unavailable — user can long-press the link */
+                        }
+                      }}
+                      className="text-xs font-mono text-white/50 hover:text-white border border-white/10 hover:border-white/30 rounded-full px-3 py-1.5 transition-colors"
+                    >
+                      {(alt as { copyLabel: string }).copyLabel}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-4 text-xs text-white/40 font-mono leading-relaxed">
+            Source URL for AltStore / SideStore / StikStore: {ALTSTORE_SOURCE_URL} · TrollStore
+            users can open the unsigned .ipa from GitHub Releases directly.
+          </p>
         </div>
 
         {/* Bottom CTA section */}

@@ -1,3 +1,4 @@
+import { usePlaybackCoordinator } from '@/core/player/usePlaybackCoordinator';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, ArrowLeft, Loader2, RotateCcw } from 'lucide-react';
 import { closeNativePlayer, onNativePlayerEvent, openNativePlayer } from '@/core/player/mobile/nativePlayerBridge';
@@ -21,8 +22,9 @@ export type NativeTorrentStats = {
 };
 
 type Props = {
+  mediaId?: string; episodeId?: string;
   url: string;
-  streamKind?: 'torrent' | 'debrid';
+  streamKind?: 'torrent' | 'debrid' | 'offline';
   title?: string;
   poster?: string;
   subtitles?: Subtitle[];
@@ -75,6 +77,7 @@ function formatRate(bytesPerSecond?: number): string {
  * support.
  */
 export function NativeTorrentPlayer({
+  mediaId, episodeId,
   url,
   streamKind = 'torrent',
   title,
@@ -90,6 +93,8 @@ export function NativeTorrentPlayer({
   onBack,
   onError,
 }: Props) {
+  const { coordinator } = usePlaybackCoordinator({ mediaId, episodeId, url, initialPosition: initialSeekSeconds,
+    sink: (position, duration, completed) => progressRef.current?.(position, duration || 0, completed) });
   const { settings } = useVideoSettings();
   const openedUrlRef = useRef<string | null>(null);
   const completedRef = useRef(false);
@@ -176,16 +181,17 @@ export function NativeTorrentPlayer({
 
     if (streamKind === 'debrid') setMessage('Opening debrid stream...');
 
+    const lease = coordinator.begin({ id: url, url, mode: streamKind, mediaId, episodeId }, initialSeekSeconds, 'native');
     unsubscribe = onNativePlayerEvent((event: any) => {
       if (cancelled) return;
       const position = Number(event?.positionMs || 0) / 1000;
       const duration = Number(event?.durationMs || 0) / 1000;
       if (event?.type === 'playerProgress' || event?.type === 'playerClosed') {
-        progressRef.current?.(position, duration, Boolean(event?.completed));
+        coordinator.reportNative(event, lease.generation, event?.type === 'playerClosed');
       }
       if (event?.type === 'playerEnded' && !completedRef.current) {
         completedRef.current = true;
-        progressRef.current?.(position, duration, true);
+        coordinator.reportNative({ ...event, completed: true }, lease.generation);
         endedRef.current?.();
       }
       if (event?.type === 'playerClosed') {

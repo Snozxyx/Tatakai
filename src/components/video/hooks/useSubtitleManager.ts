@@ -1,3 +1,4 @@
+import { uploadSubtitle, fetchSubtitle, decodeSubtitle } from '@/core/player/subtitle-service';
 import { useCallback, useEffect, useRef, useMemo } from "react";
 import { toast } from "sonner";
 import { fetchViaChain } from "@/core/network/proxyChain";
@@ -191,6 +192,8 @@ export function useSubtitleManager({
   setCustomSubtitles,
   setSubtitleBlobs,
 }: UseSubtitleManagerParams) {
+  const uploadedSubtitleUrls = useRef<string[]>([]);
+  useEffect(() => () => { uploadedSubtitleUrls.current.forEach(url => URL.revokeObjectURL(url)); }, []);
   const subtitleApplyStateRef = useRef<{ lang: string; selectedIndex: number; trackCount: number } | null>(null);
   const subtitleTrackSignatureRef = useRef<string>("");
   const extractedSubtitleCacheRef = useRef<Record<string, string>>({});
@@ -204,27 +207,15 @@ export function useSubtitleManager({
     [subtitles, customSubtitles],
   );
 
-  const internalSubtitleDisplayKeys = useMemo(
-    () => new Set(internalSubtitles.map(getSubtitleDisplayKey)),
-    [internalSubtitles],
-  );
-
   const visibleSubtitleOptions = useMemo(() => {
-    const seen = new Set(internalSubtitleDisplayKeys);
-    return allRenderedSubtitles
-      .map((sub, index) => ({ sub, index }))
-      .filter(({ sub }) => {
-        if ((sub as { internalTrackId?: number }).internalTrackId != null) return false;
-        const key = getSubtitleDisplayKey(sub);
-        if (seen.has(key)) return false;
-        seen.add(key);
-        const url = String(sub.url || "").trim();
-        if (!url) return false;
-        if (isBrowserReadyVttUrl(url)) return true;
-        if (subtitleBlobs[url]) return true;
-        return false;
-      });
-  }, [allRenderedSubtitles, internalSubtitleDisplayKeys, subtitleBlobs]);
+    const seen = new Set<string>();
+    return allRenderedSubtitles.map((sub, index) => ({ sub, index })).filter(({ sub }) => {
+      if ((sub as { internalTrackId?: number }).internalTrackId != null) return false;
+      const key = String(sub.originalUrl || sub.url || '').trim();
+      if (!key || seen.has(key)) return false;
+      seen.add(key); return true;
+    });
+  }, [allRenderedSubtitles]);
 
   const currentInternalSubtitleTrackId = useMemo(() => {
     const index = allRenderedSubtitles.findIndex(
@@ -357,19 +348,22 @@ export function useSubtitleManager({
         trackCount: tracks.length,
       };
 
-      setCurrentSubtitle((prev) => (prev === lang ? prev : lang));
+      setCurrentSubtitle(lang);
     },
     [allRenderedSubtitles, subtitleBlobs, videoRef, setCurrentSubtitle],
   );
 
   const handleCustomSubtitleUpload = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
 
-      const url = URL.createObjectURL(file);
+      let prepared;
+      try { prepared = await uploadSubtitle(file); } catch (error) { toast.error(error instanceof Error ? error.message : 'Could not read subtitle'); return; }
+      const url = prepared.url;
+      uploadedSubtitleUrls.current.push(url);
       const newSub: CustomSubtitle = {
-        lang: "custom",
+        lang: prepared.lang,
         url: url,
         label: file.name,
       };
@@ -410,8 +404,10 @@ export function useSubtitleManager({
       return changed ? next : prev;
     });
 
-    (async () => {
-      for (const sub of allSubs) {
+    let nextSubtitle = 0;
+    const loadSubtitles = async () => {
+      while (nextSubtitle < allSubs.length) {
+        const sub = allSubs[nextSubtitle++];
         if (!mounted) break;
 
         try {
@@ -465,7 +461,7 @@ export function useSubtitleManager({
 
               if (!response.ok) continue;
 
-              normalizedText = normalizeSubtitleToVtt(await response.text());
+              normalizedText = await fetchSubtitle(candidateUrl, { read: async () => decodeSubtitle(await response.arrayBuffer()) });
               if (normalizedText) break;
             } catch {
               // Continue trying the next candidate URL.
@@ -473,6 +469,7 @@ export function useSubtitleManager({
           }
 
           if (normalizedText) {
+            if (!mounted) continue;
             const blob = new Blob([normalizedText], { type: "text/vtt" });
             const blobUrl = URL.createObjectURL(blob);
             createdBlobUrls.push(blobUrl);
@@ -487,7 +484,8 @@ export function useSubtitleManager({
           console.warn("Error prefetching subtitle", sub.lang, e);
         }
       }
-    })();
+    };
+    void Promise.all(Array.from({ length: Math.min(4, allSubs.length) }, loadSubtitles));
 
     return () => {
       mounted = false;
@@ -537,7 +535,7 @@ export function useSubtitleManager({
         const signature =
           Array.from({ length: tracks.length }, (_, index) => {
             const track = tracks[index];
-            return `${track.language}|${track.label}|${track.kind}|${track.readyState}|${track.cues?.length ?? 0}`;
+            return `${track.language}|${track.label}|${track.kind}|${track.cues?.length ?? 0}`;
           }).join("||") + `||select:${currentSubtitle}`;
 
         if (!signature || signature === subtitleTrackSignatureRef.current) return;

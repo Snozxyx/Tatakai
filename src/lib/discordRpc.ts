@@ -446,3 +446,81 @@ export function setViewingMangaRpc(options: {
 
   updateDiscordRpc(details, 'Browsing details', extra);
 }
+
+/**
+ * Set RPC when reading a light novel chapter.
+ */
+export function setReadingNovelRpc(options: {
+  novelTitle: string;
+  chapter?: number | null;
+  /** External URL of the novel cover — shown as the large image in Discord. Falls back to the app logo. */
+  novelImageUrl?: string | null;
+  novelUrl?: string;
+}): void {
+  if (!canShowDiscordRpc()) return;
+
+  const s = getDiscordRpcSettings();
+
+  const details = s.showAnimeTitle ? `Reading ${options.novelTitle}` : 'Reading Novel';
+  const state =
+    s.showEpisode && options.chapter != null
+      ? `Chapter ${options.chapter}`
+      : 'Reading';
+
+  const largeImageKey = options.novelImageUrl || 'logo';
+
+  const extra: RpcExtra = {
+    largeImageKey,
+    largeImageText: s.showAnimeTitle ? options.novelTitle : 'Tatakai',
+    smallImageKey: 'logo',
+    smallImageText: 'Tatakai',
+    startTime: new Date(),
+  };
+
+  if (s.showButtons) {
+    const buttons: Array<{ label: string; url: string }> = [];
+    if (options.novelUrl) {
+      buttons.push({ label: 'Show in Tatakai', url: options.novelUrl });
+    }
+    buttons.push({ label: 'Download Tatakai', url: 'https://tatakai.me/download' });
+    extra.buttons = buttons.slice(0, 2);
+  }
+
+  updateDiscordRpc(details, state, extra);
+}
+
+/**
+ * Set RPC when viewing a novel detail / info page (not yet reading).
+ */
+export function setViewingNovelRpc(options: {
+  novelTitle: string;
+  /** External URL of the novel cover — shown as the large image in Discord. Falls back to the app logo. */
+  novelImageUrl?: string | null;
+  novelUrl?: string;
+}): void {
+  if (!canShowDiscordRpc()) return;
+
+  const s = getDiscordRpcSettings();
+
+  const details = s.showAnimeTitle ? `Viewing ${options.novelTitle}` : 'Viewing Novel';
+
+  const largeImageKey = options.novelImageUrl || 'logo';
+
+  const extra: RpcExtra = {
+    largeImageKey,
+    largeImageText: s.showAnimeTitle ? options.novelTitle : 'Tatakai',
+    smallImageKey: 'logo',
+    smallImageText: 'Tatakai',
+  };
+
+  if (s.showButtons) {
+    const buttons: Array<{ label: string; url: string }> = [];
+    if (options.novelUrl) {
+      buttons.push({ label: 'Show in Tatakai', url: options.novelUrl });
+    }
+    buttons.push({ label: 'Download Tatakai', url: 'https://tatakai.me/download' });
+    extra.buttons = buttons.slice(0, 2);
+  }
+
+  updateDiscordRpc(details, 'Browsing details', extra);
+}

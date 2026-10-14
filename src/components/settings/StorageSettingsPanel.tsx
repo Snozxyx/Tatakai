@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { clearMediaMetadataCache } from '@/lib/queryClient';
 import {
   FolderOpen,
   Trash2,
@@ -176,6 +177,7 @@ export function StorageSettingsPanel() {
 
     setClearingCategory(category);
     try {
+      if (category === 'app_cache') await clearMediaMetadataCache();
       if (isNative && (window as any).electron?.clearStorageCategory) {
         const path = category === 'torrent_cache' ? torrentCachePath : category === 'video_downloads' ? downloadsPath : undefined;
         const res = await (window as any).electron.clearStorageCategory(category, path);
@@ -186,7 +188,7 @@ export function StorageSettingsPanel() {
           toast.error(`Failed to clear: ${res.error || 'Unknown error'}`);
         }
       } else {
-        toast.success(`Cleared virtual ${labels[category]}`);
+        toast.success(category === 'app_cache' ? 'Cleared cached title metadata' : `Cleared virtual ${labels[category]}`);
       }
     } catch (err: any) {
       toast.error(`Error: ${err.message}`);

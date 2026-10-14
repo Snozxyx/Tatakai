@@ -208,6 +208,11 @@ public final class MobileDownloadStore {
         return caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             && (!wifiOnly || !cm.isActiveNetworkMetered());
     }
+    private boolean isWifi() {
+        ConnectivityManager manager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkCapabilities capabilities = manager.getNetworkCapabilities(manager.getActiveNetwork());
+        return capabilities != null && capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
+    }
     public int concurrency() {
         ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
         return playbackActive || dataSaver ? 1 : cm.isActiveNetworkMetered() ? 2 : 6;
@@ -218,7 +223,7 @@ public final class MobileDownloadStore {
         try {
             File dir = new File(root, job.getString("folder")); dir.mkdirs();
             while (active(job)) {
-                if (!networkAllowed()) { Thread.sleep(1000); continue; }
+                if (!networkAllowed() || (job.optBoolean("wifiOnly", false) && !isWifi())) { Thread.sleep(1000); continue; }
                 List<JSONObject> batch = new ArrayList<>();
                 synchronized (this) {
                     JSONArray resources = job.getJSONArray("resources");

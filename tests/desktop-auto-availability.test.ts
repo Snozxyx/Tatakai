@@ -1,3 +1,5 @@
+import { createRequire } from 'node:module';
+const actualRequire = createRequire(import.meta.url);
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
@@ -10,7 +12,7 @@ function fixture(media: unknown, fails = false) {
   runInNewContext(readFileSync('desktop/services/auto-downloader.cjs', 'utf8'), {
     module, exports, Date, Map, AbortSignal,
     require: (name: string) => name === 'electron' ? { app: { getPath: () => '.' }, ipcMain }
-      : name === 'fs' ? { existsSync: () => false, writeFileSync() {} } : path,
+      : name === 'fs' ? { existsSync: () => false, writeFileSync() {} } : name === 'path' ? path : actualRequire(path.resolve('desktop/services', name)),
     fetch: async () => {
       if (fails) throw new Error('offline');
       return { ok: true, json: async () => ({ data: { Media: media } }) };

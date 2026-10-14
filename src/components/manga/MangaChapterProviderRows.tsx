@@ -1,3 +1,4 @@
+import { languageLabel } from '@/core/extensions/remote/metadata';
 /**
  * MangaChapterProviderRows.tsx
  *
@@ -24,20 +25,13 @@ const normalizeLanguageKey = (value: string | null | undefined): string => {
 };
 
 /** Returns a human-readable language label from a raw language value */
-const formatLanguageLabel = (value: string | null | undefined): string => {
-  const key = normalizeLanguageKey(value);
-  if (key === "jp") return "Japanese";
-  if (key === "kr") return "Korean";
-  if (key === "zh") return "Chinese";
-  if (key === "en") return "English";
-  if (key === "unknown") return "Unknown";
-  return key.toUpperCase();
-};
+const formatLanguageLabel = (value: string | null | undefined): string => languageLabel(value);
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface ChapterSource {
   provider: string;
+  providerName?: string;
   chapterKey: string;
   providerChapterId: string;
   language?: string | null;
@@ -46,6 +40,7 @@ export interface ChapterSource {
 
 export interface MangaChapterProviderRowsProps {
   chapter: {
+    metadataSource?: 'mangaupdates';
     chapterNumber: number | null;
     chapterTitle?: string | null;
     sources: ChapterSource[];
@@ -98,7 +93,7 @@ export function MangaChapterProviderRows({
   });
 
   // If all sub-rows are filtered out, hide the whole chapter (Req 2.7.9)
-  if (filteredSources.length === 0) return null;
+  if (filteredSources.length === 0 && (chapter.sources.length > 0 || chapter.metadataSource !== 'mangaupdates')) return null;
 
   return (
     <div className={cn("rounded-xl border border-white/5 overflow-hidden", className)}>
@@ -107,6 +102,7 @@ export function MangaChapterProviderRows({
         {chapterLabel}
         {titleSuffix}
       </div>
+      {chapter.sources.length === 0 && <p className="px-4 py-3 text-sm text-muted-foreground">Release listed on MangaUpdates. No reading source available yet.</p>}
 
       {/* Sub-rows — one per filtered source (Req 2.7.1, 2.7.2) */}
       {filteredSources.map((src, idx) => {
@@ -121,12 +117,12 @@ export function MangaChapterProviderRows({
         // Req 2.7.3 / 2.7.4 — label format
         const label =
           src.scanlator && src.scanlator.trim()
-            ? `${src.provider} • ${src.scanlator} (${langLabel})`
-            : `${src.provider} (${langLabel})`;
+            ? `${src.providerName || src.provider} • ${src.scanlator} (${langLabel})`
+            : `${src.providerName || src.provider} (${langLabel})`;
 
         return (
           <button
-            key={`${src.provider}-${src.chapterKey || "empty"}-${idx}`}
+            key={`${src.providerName || src.provider}-${src.chapterKey || "empty"}-${idx}`}
             type="button"
             disabled={!isReadable} // Req 2.7.6
             onClick={

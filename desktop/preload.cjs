@@ -1,6 +1,14 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electron', {
+    configureExtension: (url) => ipcRenderer.invoke('extension:configure', url),
+    onConfiguredExtension: (callback) => {
+        const handler = (_event, url) => callback(url);
+        ipcRenderer.on('extension:configured', handler);
+        return () => ipcRenderer.removeListener('extension:configured', handler);
+    },
+    proxyExtensionSource: (payload) => ipcRenderer.invoke('extension:proxy-source', payload),
+    fetchExtensionResource: (payload) => ipcRenderer.invoke('extension:fetch-resource', payload),
     // Synchronous platform flag (available in sandboxed preload) so the renderer
     // can branch on macOS at first paint without awaiting an IPC round-trip —
     // used by the title bar to yield to native traffic lights.
@@ -59,6 +67,9 @@ contextBridge.exposeInMainWorld('electron', {
     autoDownload: {
         subscribe: (animeId, title, nextEpisode, anilistId) => ipcRenderer.invoke('auto-download:subscribe', animeId, title, nextEpisode, anilistId),
         unsubscribe: (animeId) => ipcRenderer.invoke('auto-download:unsubscribe', animeId),
+        simulate: (id, episode) => ipcRenderer.invoke('auto-download:simulate', id, episode),
+        setProfile: (id, profile) => ipcRenderer.invoke('auto-download:profile', id, profile),
+        checkNow: () => ipcRenderer.invoke('auto-download:check'),
         list: () => ipcRenderer.invoke('auto-download:list')
     },
     
@@ -245,6 +256,9 @@ contextBridge.exposeInMainWorld('tatakaiRuntime', {
         ipcRenderer.invoke('extension:unload', extensionId),
     invokeExtension: (extensionId, method, args) =>
         ipcRenderer.invoke('extension:invoke', { extensionId, method, args }),
+    setExtensionEnabled: (id, enabled) => ipcRenderer.invoke('extension:set-enabled', id, enabled),
+    removeExtension: (id) => ipcRenderer.invoke('extension:remove', id),
+    installManifest: (manifest, bundleCode) => ipcRenderer.invoke('extension:install-manifest', manifest, bundleCode),
     sideloadManifest: (manifest, bundleCode) =>
         ipcRenderer.invoke('extension:sideload-manifest', manifest, bundleCode),
     setExtensionKillSwitch: (extensionId, blocked) =>
@@ -275,6 +289,19 @@ contextBridge.exposeInMainWorld('tatakaiRuntime', {
         ipcRenderer.invoke('runtime:get-renderer-bundle', extensionId),
 
     // Local cache (Phase 4)
+    kittenTts: {
+        status: () => ipcRenderer.invoke('kitten-tts:status'),
+        download: payload => ipcRenderer.invoke('kitten-tts:download', payload),
+        cancelDownload: payload => ipcRenderer.invoke('kitten-tts:cancel-download', payload),
+        deleteModel: payload => ipcRenderer.invoke('kitten-tts:delete-model', payload),
+        synthesize: payload => ipcRenderer.invoke('kitten-tts:synthesize', payload),
+        stop: () => ipcRenderer.invoke('kitten-tts:stop'),
+        onProgress: callback => {
+            const handler = (_event, progress) => callback(progress);
+            ipcRenderer.on('kitten-tts:progress', handler);
+            return () => ipcRenderer.removeListener('kitten-tts:progress', handler);
+        },
+    },
     readLocalCache: (key) => ipcRenderer.invoke('cache:read', key),
     writeLocalCache: (key, value) => ipcRenderer.invoke('cache:write', { key, value }),
 
@@ -293,6 +320,10 @@ contextBridge.exposeInMainWorld('tatakaiRuntime', {
     getTorrentStats: (sessionId) => ipcRenderer.invoke('torrent:stats', sessionId),
     updateTorrentPlayback: (sessionId, currentTime, duration) =>
         ipcRenderer.invoke('torrent:update-playback', sessionId, currentTime, duration),
+    preloadNextTorrentEpisode: (sessionId, nextEpisode, budget) => ipcRenderer.invoke('torrent:preload-next', sessionId, nextEpisode, budget),
+    cancelTorrentPreload: (sessionId) => ipcRenderer.invoke('torrent:cancel-preload', sessionId),
+    preloadTorrentSource: (magnet, episode, budget) => ipcRenderer.invoke('torrent:preload-source', magnet, episode, budget),
+    releaseTorrentPreload: (sessionId) => ipcRenderer.invoke('torrent:release-preload', sessionId),
     getTorrentStreamUrl: (sessionId, fileIndex, options) => ipcRenderer.invoke('torrent:stream', sessionId, fileIndex, options),
     clearAllTorrentData: () => ipcRenderer.invoke('torrent:clear-all'),
     restartTorrentService: () => ipcRenderer.invoke('torrent:restart-service'),

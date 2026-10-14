@@ -8,19 +8,25 @@ import {
   mangaJobId,
   type MangaDownloadEntry,
 } from "@/core/download/manga-download-monitor";
+import {
+  useNovelDownloadStates,
+  markNovelCancelled,
+  type NovelDownloadEntry,
+} from "@/core/download/novel-download-monitor";
 import { useActivityStates, type ActivityKind } from "@/core/activity/activity-monitor";
 import { useUpdateState, dismissUpdateNotice } from "@/core/update/update-monitor";
 import { useUpdateOrchestrator, installUpdateNow } from "@/core/update/useUpdateOrchestrator";
 
 /**
- * Apple-Dynamic-Island-style widget for the desktop titlebar. It fuses three
+ * Apple-Dynamic-Island-style widget for the desktop titlebar. It fuses four
  * app-lifetime singletons — the anime download-monitor, the manga
- * download-monitor and the live-activity monitor — so it stays live regardless
- * of which pages/modals mount. Collapsed it's a compact pill; on hover it morphs
- * into a panel with: animated activity pills (Streaming / Watching / Torrenting),
- * a rich row per active download (poster, name, kind/torrent badge, speeds,
- * peers, progress, cancel) and a compact recently-finished list. Manga rows are
- * badged Manga | Manhwa | Manhua. Tatakai tokens: black glass + primary accent.
+ * download-monitor, the novel download-monitor and the live-activity monitor
+ * — so it stays live regardless of which pages/modals mount. Collapsed it's a
+ * compact pill; on hover it morphs into a panel with: animated activity pills
+ * (Streaming / Watching / Torrenting), a rich row per active download
+ * (poster, name, kind/torrent badge, speeds, peers, progress, cancel) and a
+ * compact recently-finished list. Manga rows are badged Manga | Manhwa |
+ * Manhua, novel rows Novel. Tatakai tokens: black glass + primary accent.
  */
 
 const fmtBps = (b?: number): string | null => {
@@ -37,7 +43,7 @@ const fmtBytes = (b?: number): string | null => {
 };
 
 type DlStatus = "downloading" | "queued" | "completed" | "failed" | "cancelled";
-type DlKind = "anime" | "manga" | "manhwa" | "manhua";
+type DlKind = "anime" | "manga" | "manhwa" | "manhua" | "novel";
 
 /** Normalized row shape both download monitors map into. */
 interface UIItem {
@@ -65,6 +71,7 @@ const KIND_BADGE: Record<DlKind, { label: string; cls: string } | null> = {
   manga: { label: "Manga", cls: "bg-sky-500/20 text-sky-300" },
   manhwa: { label: "Manhwa", cls: "bg-fuchsia-500/20 text-fuchsia-300" },
   manhua: { label: "Manhua", cls: "bg-amber-500/20 text-amber-300" },
+  novel: { label: "Novel", cls: "bg-violet-500/20 text-violet-300" },
 };
 
 const ACTIVITY_META: Record<
@@ -99,6 +106,12 @@ function cancelManga(entry: MangaDownloadEntry) {
   markMangaCancelled(jobId);
 }
 
+function cancelNovel(jobId: string) {
+  // Novel downloads run in the renderer on every platform — flagging the job
+  // cancelled stops the queue; there is no main-process job to kill.
+  markNovelCancelled(jobId);
+}
+
 /** A single pulsing status dot (the "live" indicator on activity pills). */
 function PulseDot({ className }: { className: string }) {
   return (
@@ -114,11 +127,12 @@ export function DynamicIsland() {
   useUpdateOrchestrator();
   const animeStates = useDownloadStates();
   const mangaStates = useMangaDownloadStates();
+  const novelStates = useNovelDownloadStates();
   const activities = useActivityStates();
   const update = useUpdateState();
   const [hovered, setHovered] = useState(false);
 
-  // Fuse both download monitors into one normalized list.
+  // Fuse all three download monitors into one normalized list.
   const items = useMemo<UIItem[]>(() => {
     const anime: UIItem[] = Object.values(animeStates).map((s) => ({
       id: s.episodeId,
@@ -150,8 +164,19 @@ export function DynamicIsland() {
       isTorrent: false,
       cancel: () => cancelManga(s),
     }));
-    return [...anime, ...manga];
-  }, [animeStates, mangaStates]);
+    const novels: UIItem[] = Object.values(novelStates).map((s: NovelDownloadEntry) => ({
+      id: s.jobId,
+      kind: "novel",
+      status: s.status as DlStatus,
+      progress: s.progress ?? 0,
+      title: s.title,
+      posterUrl: s.posterUrl,
+      subtitle: s.chapterLabel,
+      isTorrent: false,
+      cancel: () => cancelNovel(s.jobId),
+    }));
+    return [...anime, ...manga, ...novels];
+  }, [animeStates, mangaStates, novelStates]);
 
   const active = useMemo(
     () =>

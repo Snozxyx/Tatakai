@@ -86,10 +86,10 @@ export async function verifyTurnstileToken(token: string | null | undefined): Pr
       | { success?: boolean; data?: { ok?: boolean } }
       | null;
     // Envelope: { success, data: { ok } }. Missing shape → allow (fail open).
-    if (!json) return true;
+    if (!res.ok || !json) return false;
     if (json.data && typeof json.data.ok === "boolean") return json.data.ok;
-    return true;
+    return false;
   } catch {
-    return true;
+    return false;
   }
 }

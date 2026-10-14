@@ -5,4 +5,5 @@
     <!-- In-app updater APKs live in the app-private external files dir (no
          storage permission needed). Served to the package installer. -->
     <external-files-path name="tatakai_updates" path="tatakai-updates/" />
+    <files-path name="tatakai_media" path="." />
 </paths>

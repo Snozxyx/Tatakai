@@ -27,6 +27,7 @@ import { getHistoryByStatus } from '@/core/download/download-history-service';
 import { peekAutoDownloadNext } from '@/core/download/mobile/autoDownloadNext';
 import { evictWatchedAnime } from '@/core/download/mobile/storageManager';
 import { triggerHaptic } from '@/lib/haptics';
+import { getMobileOfflineEpisodeId } from '@/core/download/mobile/offlineEpisodeId';
 
 function formatBytes(bytes?: number | null): string {
   const v = Number(bytes || 0);
@@ -247,7 +248,9 @@ export default function MobileOfflinePage() {
     const torrentSession = localPath.match(/^torrent-session:\/\/(.+)$/i)?.[1];
     if (torrentSession) params.set('sessionId', torrentSession);
 
-    const offlineEpisodeId = `mobile-${entry.animeId}?ep=${entry.episodeNumber}`;
+    const offlineEpisodeId = getMobileOfflineEpisodeId(
+      localPath, entry.episodeId || `mobile-${entry.animeId}?ep=${entry.episodeNumber}`,
+    );
     navigate(`/watch/${encodeURIComponent(offlineEpisodeId)}?${params.toString()}`);
   };
 

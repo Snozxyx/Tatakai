@@ -4,6 +4,13 @@ import java.nio.charset.StandardCharsets;
 import org.junit.Test;
 import static org.junit.Assert.*;
 public final class MediaPayloadValidatorTest {
+    @Test public void detectsExtensionlessOfflineContainers() {
+        byte[] mp4 = new byte[]{0, 0, 0, 24, 'f', 't', 'y', 'p', 'i', 's', 'o', 'm'};
+        assertEquals("video/mp4", MediaPayloadValidator.contentType(mp4, mp4.length));
+        byte[] webm = new byte[]{0x1a, 0x45, (byte) 0xdf, (byte) 0xa3, 'w', 'e', 'b', 'm'};
+        assertEquals("video/webm", MediaPayloadValidator.contentType(webm, webm.length));
+        assertEquals("application/octet-stream", MediaPayloadValidator.contentType(new byte[0], 0));
+    }
     private void validate(String text, String mime) throws IOException {
         byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
         MediaPayloadValidator.validate(bytes, bytes.length, mime);

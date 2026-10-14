@@ -12,6 +12,7 @@ export interface PersistedAppSettings {
   };
   video?: Record<string, unknown>;
   reader?: Record<string, unknown>;
+  novelReader?: Record<string, unknown>;
   theme?: {
     theme?: string;
     reduceMotion?: boolean;
@@ -50,6 +51,10 @@ const mergeSettings = (
   reader: {
     ...(isObject(base.reader) ? base.reader : {}),
     ...(isObject(patch.reader) ? patch.reader : {}),
+  },
+  novelReader: {
+    ...(isObject(base.novelReader) ? base.novelReader : {}),
+    ...(isObject(patch.novelReader) ? patch.novelReader : {}),
   },
   theme: {
     ...(isObject(base.theme) ? base.theme : {}),

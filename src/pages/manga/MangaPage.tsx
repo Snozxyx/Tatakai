@@ -1,3 +1,5 @@
+import { languageLabel } from '@/core/extensions/remote/metadata';
+import { SourceDebug } from '@/components/extensions/SourceDebug';
 /**
  * MangaPage.tsx
  * Comprehensive Manga information and chapter listing page.
@@ -8,9 +10,10 @@
  * 4. User Readlist (Progress tracking)
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from 'sonner';
 import { motion } from "framer-motion";
 import { resolveApiV3Base } from "@/lib/api/backendOrigin";
 import { Button } from "@/components/ui/button";
@@ -27,10 +30,10 @@ import { Comments } from "@/components/comments/Comments";
 import { AddToPlaylistButton } from "@/components/playlist/AddToPlaylistButton";
 import { getProxiedImageUrl, fetchJikanCover } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { searchManga } from "@/core/content/manga-client";
+import { searchManga, clearMangaChaptersCache } from "@/core/content/manga-client";
 import { inferMangaAdultFlag } from "@/lib/contentSafety";
 import { AdultWarningGate } from "@/components/content/AdultWarningGate";
-import type { MangaSearchItem, MangaChapterResponse, MangaChapterSource } from "@/types/manga";
+import type { MangaSearchItem, MangaChapterSource } from "@/types/manga";
 import {
   ArrowLeft,
   BookOpen,
@@ -41,12 +44,14 @@ import {
   BookmarkPlus,
   BookmarkCheck,
   Loader2,
+  RefreshCw,
   Search,
   ExternalLink as ExternalLinkIcon,
   Globe,
   Palette,
   PenTool,
   GitGraph,
+  ChevronLeft,
   ChevronRight,
   Puzzle,
   ChevronDown,
@@ -64,11 +69,27 @@ import { sortMangaChapterSources } from "@/lib/reader/mangaSourceSelection";
 // --- Helper Component: Relation Tree ---
 function RelationTree({ relations }: { relations: MediaRelation[] }) {
   const navigate = useNavigate();
+  void navigate;
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   if (relations.length === 0) return null;
 
+  const scroll = (direction: 'left' | 'right') => {
+    scrollRef.current?.scrollBy({ left: direction === 'left' ? -420 : 420, behavior: 'smooth' });
+  };
+
   return (
-    <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+    <div className="relative group/rail">
+      <button
+        type="button"
+        onClick={() => scroll('left')}
+        aria-label="Scroll series tree left"
+        className="absolute -left-3 top-[38%] -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/80 hover:bg-black text-white border border-white/10 hidden md:flex items-center justify-center opacity-0 group-hover/rail:opacity-100 transition-all shadow-xl backdrop-blur-md"
+      >
+        <ChevronLeft className="w-5 h-5" />
+      </button>
+
+      <div ref={scrollRef} className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide scroll-smooth">
       {relations.map((rel) => {
         const isNovel = rel.format?.toUpperCase().includes('NOVEL');
         const isManga = rel.format?.toUpperCase().includes('MANGA') || rel.format?.toUpperCase().includes('ONE_SHOT');
@@ -82,14 +103,24 @@ function RelationTree({ relations }: { relations: MediaRelation[] }) {
                 poster: rel.coverImage || "",
                 type: rel.relationType,
                 status: rel.format || undefined,
-                mediaType: isManga ? 'manga' : (isNovel ? 'manga' : 'anime'),
-                href: isNovel ? '/novel/comingsoon' : undefined
+                mediaType: isManga ? 'manga' : (isNovel ? 'novel' : 'anime'),
+                href: isNovel ? `/novel/${rel.id}` : undefined
               }}
               className="flex-1"
             />
           </div>
         );
       })}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => scroll('right')}
+        aria-label="Scroll series tree right"
+        className="absolute -right-3 top-[38%] -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/80 hover:bg-black text-white border border-white/10 hidden md:flex items-center justify-center opacity-0 group-hover/rail:opacity-100 transition-all shadow-xl backdrop-blur-md"
+      >
+        <ChevronRight className="w-5 h-5" />
+      </button>
     </div>
   );
 }
@@ -114,10 +145,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  fetchExtensionMangaChapters,
-  mergeChaptersWithExtensions,
-} from "@/core/content/manga-extension-runtime";
 import { MangaChapterProviderRows } from "@/components/manga/MangaChapterProviderRows";
 
 const normalizeLanguageKey = (value: string | null | undefined) => {
@@ -130,15 +157,7 @@ const normalizeLanguageKey = (value: string | null | undefined) => {
   return normalized;
 };
 
-const formatLanguageLabel = (value: string | null | undefined) => {
-  const key = normalizeLanguageKey(value);
-  if (key === "jp") return "Japanese";
-  if (key === "kr") return "Korean";
-  if (key === "zh") return "Chinese";
-  if (key === "en") return "English";
-  if (key === "unknown") return "Unknown";
-  return key.toUpperCase();
-};
+const formatLanguageLabel = (value: string | null | undefined): string => languageLabel(value);
 
 const normalizePreferredMangaLanguage = (value: string | null | undefined) => {
   const normalized = normalizeLanguageKey(value);
@@ -195,6 +214,8 @@ type ChapterSortMode = "newest" | "oldest";
 const CHAPTERS_PER_GROUP = 20;
 
 export default function MangaPage() {
+  const queryClient = useQueryClient();
+  const [refreshingChapters, setRefreshingChapters] = useState(false);
   const { mangaId } = useParams<{ mangaId: string }>();
   const navigate = useNavigate();
   const isNative = useIsNativeApp();
@@ -209,6 +230,20 @@ export default function MangaPage() {
 
   const { data: mangaData, isLoading: loadingInfo, error } = useMangaDetail(mangaId);
   const { data: chapterData, isLoading: loadingChapters } = useMangaChapters(mangaId);
+  const refreshChapters = async () => {
+    if (!mangaId || refreshingChapters) return;
+    setRefreshingChapters(true);
+    try {
+      await queryClient.cancelQueries({queryKey:['manga-chapters', mangaId]});
+      await clearMangaChaptersCache(mangaId);
+      await queryClient.resetQueries({queryKey:['manga-chapters', mangaId]});
+      await queryClient.invalidateQueries({queryKey:['followed-manga-chapters',mangaId],refetchType:'none'});
+    } catch {
+      toast.error('Could not refresh chapters. Please try again.');
+    } finally {
+      setRefreshingChapters(false);
+    }
+  };
   const { data: mangaBakaData } = useMangaBakaSeries(mangaData?.detail?.anilistId);
   const { data: kitsuHierarchy } = useMangaKitsuHierarchy(mangaData?.detail?.anilistId);
   const { data: anilistMangaMeta } = useQuery({
@@ -270,27 +305,6 @@ export default function MangaPage() {
       }));
   }, [directAniListMangaTags, anilistMangaMeta?.tags, mangaBakaData?.tags]);
 
-  // Fetch extension manga chapters (Toko + other installed manga extensions) and merge
-  // with API data before rendering. Requirements: 8.4, 8.5
-  const [extensionChapterPayload, setExtensionChapterPayload] = useState<
-    Awaited<ReturnType<typeof fetchExtensionMangaChapters>> | null
-  >(null);
-
-  useEffect(() => {
-    if (!mangaData?.detail) return;
-    const { anilistId, malId, canonicalTitle, title } = mangaData.detail;
-    const titleStr = canonicalTitle || title?.english || title?.romaji || '';
-    const reqParams = {
-      anilistId: typeof anilistId === 'number' ? anilistId : undefined,
-      malId: typeof malId === 'number' ? malId : undefined,
-      title: titleStr || undefined,
-    };
-    fetchExtensionMangaChapters(reqParams)
-      .then((payload) => {
-        setExtensionChapterPayload(payload);
-      })
-      .catch(() => { /* extension chapters are best-effort */ });
-  }, [mangaData?.detail]);
   const { data: readlistEntry } = useMangaReadlistItem(mangaId);
   const addToReadlist = useUpsertMangaReadlist();
   const removeFromReadlist = useRemoveFromMangaReadlist();
@@ -379,7 +393,8 @@ export default function MangaPage() {
       if (!kc) return ch;
       return {
         ...ch,
-        chapterTitle: ch.chapterTitle || kc.title || ch.chapterTitle,
+        chapterTitle: ch.chapterTitle && !/^chapter\s+\d+(?:\.\d+)?$/i.test(ch.chapterTitle)
+          ? ch.chapterTitle : kc.title || ch.chapterTitle,
         _kitsuSynopsis: kc.synopsis,
         _kitsuThumbnail: kc.thumbnail,
         _kitsuPublished: kc.published,
@@ -387,36 +402,8 @@ export default function MangaPage() {
       };
     });
 
-    if (!extensionChapterPayload?.chapters?.length) return enriched;
-    // Merge Toko/extension chapters into the enriched list (req 8.4, 8.5).
-    // The base API mapping is usually empty (mappings schema unreachable), so
-    // merge against a synthetic empty base when chapterData hasn't loaded —
-    // otherwise the extension's chapters would never surface.
-    const effectiveBase: MangaChapterResponse = chapterData ?? {
-      anilistId: mangaData?.detail?.anilistId ?? 0,
-      partial: false,
-      failedProviders: [],
-      chapters: [],
-      mappedChapters: [],
-    };
-    const merged = mergeChaptersWithExtensions(effectiveBase, extensionChapterPayload);
-    const mergedBase = merged.mappedChapters ?? base;
-    // Re-apply Kitsu enrichment on the merged list
-    return mergedBase.map((ch) => {
-      const num = ch.chapterNumber;
-      if (num == null) return ch;
-      const kc = kitsuByNumber.get(num);
-      if (!kc) return ch;
-      return {
-        ...ch,
-        chapterTitle: ch.chapterTitle || kc.title || ch.chapterTitle,
-        _kitsuSynopsis: kc.synopsis,
-        _kitsuThumbnail: kc.thumbnail,
-        _kitsuPublished: kc.published,
-        _kitsuPageCount: kc.pageCount,
-      };
-    });
-  }, [chapterData, extensionChapterPayload, kitsuHierarchy, mangaData?.detail?.anilistId]);
+    return enriched;
+  }, [chapterData, kitsuHierarchy]);
   const isChapterListLoading = loadingChapters && !chapterData;
   const [preferredProvider, setPreferredProvider] = useState<string>("auto");
   const [preferredLanguage, setPreferredLanguage] = useState<string>("auto");
@@ -428,8 +415,9 @@ export default function MangaPage() {
     () => normalizePreferredMangaLanguage(profile?.preferred_manga_language),
     [profile?.preferred_manga_language],
   );
-  const effectivePreferredLanguage =
-    preferredLanguage === "auto" ? profilePreferredMangaLanguage : preferredLanguage;
+  // Auto ranks the profile language first without hiding other translations.
+  const effectivePreferredLanguage = preferredLanguage;
+  const rankedLanguage = preferredLanguage === 'auto' ? profilePreferredMangaLanguage : preferredLanguage;
 
   const providerOptions = useMemo(() => {
     const providers = new Set<string>();
@@ -466,7 +454,7 @@ export default function MangaPage() {
       const sourceLanguage = normalizeLanguageKey(source?.language);
 
       if (preferredProvider !== "auto" && source?.provider === preferredProvider) score += 100;
-      if (effectivePreferredLanguage !== "auto" && sourceLanguage === effectivePreferredLanguage) score += 60;
+      if (rankedLanguage !== "auto" && sourceLanguage === rankedLanguage) score += 60;
       if (sourceLanguage !== "unknown") score += 5;
 
       return score;
@@ -490,7 +478,7 @@ export default function MangaPage() {
         if (chapterDiff !== 0) return chapterDiff;
         return (left.canonicalOrder ?? Number.MAX_SAFE_INTEGER) - (right.canonicalOrder ?? Number.MAX_SAFE_INTEGER);
       });
-  }, [chapters, preferredProvider, effectivePreferredLanguage]);
+  }, [chapters, preferredProvider, rankedLanguage]);
 
   const visibleChapters = useMemo(() => {
     return sortedChapters.filter((chapter) =>
@@ -511,14 +499,14 @@ export default function MangaPage() {
   const volumeScopedDisplayChapters = useMemo(() => {
     if (selectedVolumeFilter == null) return displayChapters;
 
-    const scoped = sortedChapters.filter((chapter) => {
+    const scoped = displayChapters.filter((chapter) => {
+      if (chapter.volume == null) return false;
       const volumeValue = Number(chapter.volume);
       return Number.isFinite(volumeValue) && Math.trunc(volumeValue) === selectedVolumeFilter;
     });
 
-    if (chapterSortMode === "oldest") return scoped;
-    return [...scoped].reverse();
-  }, [selectedVolumeFilter, displayChapters, sortedChapters, chapterSortMode]);
+    return scoped;
+  }, [selectedVolumeFilter, displayChapters]);
 
   const filteredDisplayChapters = useMemo(() => {
     const normalizedSearchTerm = chapterSearchTerm.trim().toLowerCase();
@@ -530,7 +518,7 @@ export default function MangaPage() {
       const volumeNumber = chapter.volume != null ? String(chapter.volume).toLowerCase() : "";
       const chapterTitle = String(chapter.chapterTitle || "").toLowerCase();
       const sourceText = (chapter.sources || [])
-        .map((source) => `${source.provider || ""} ${formatLanguageLabel(source.language)}`.toLowerCase())
+        .map((source) => `${source.providerName || source.provider || ""} ${formatLanguageLabel(source.language)}`.toLowerCase())
         .join(" ");
 
       return (
@@ -827,7 +815,8 @@ export default function MangaPage() {
     setSelectedVolumeFilter(null);
   }, [selectedVolumeFilter, volumeSections]);
 
-  const info = mangaData?.detail;
+  const knownChapterCount = chapterData?.mangaUpdates?.latestChapter ?? chapterData?.mappedChapters.length;
+  const info = mangaData?.detail ? { ...mangaData.detail, totalChapters: knownChapterCount || mangaData.detail.totalChapters } : undefined;
 
   const displayTitle =
     info?.canonicalTitle ||
@@ -836,14 +825,13 @@ export default function MangaPage() {
     info?.title?.native ||
     "Unknown Title";
 
-  // Precise media format for the playlist item label (manga/manhwa/manhua/comic/novel).
+  // Manga routes represent readable manga formats only. AniList can return
+  // NOVEL for a record under the broad MANGA type, which must not relabel this
+  // page as a novel.
   const playlistMediaFormat = (() => {
-    const f = String(info?.format || "").toUpperCase();
     const c = String(info?.origin || "").toUpperCase();
-    if (f === "NOVEL" || f === "LIGHT_NOVEL") return "novel";
-    if (f === "OEL") return "comic";
-    if (f === "MANHWA" || c === "KR") return "manhwa";
-    if (f === "MANHUA" || c === "CN" || c === "TW") return "manhua";
+    if (c === "KR") return "manhwa";
+    if (c === "CN" || c === "TW") return "manhua";
     return "manga";
   })();
 
@@ -1599,13 +1587,23 @@ export default function MangaPage() {
 
               {/* Chapters List */}
               <section id="manga-chapters-section">
+                {chapterData?.mangaUpdates && <p className="mb-3 text-sm text-muted-foreground">
+                  Latest chapter: {chapterData.mangaUpdates.latestChapter ?? 'Unknown'} · MangaUpdates
+                  {chapterData.mangaUpdates.latestReleaseDate ? ` · Latest recorded release: ${chapterData.mangaUpdates.latestReleaseDate}` : ''}
+                </p>}
                 <div className="mb-4 space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <h3 className="font-display text-xl md:text-2xl font-bold flex items-center gap-2">
                       <Layers className="w-5 h-5 text-primary" />
                       Chapters
                     </h3>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button type="button" size="sm" variant="outline" onClick={refreshChapters}
+                        disabled={refreshingChapters || loadingChapters} title="Clear chapter cache and reload from MangaDex"
+                        className="min-h-11 gap-1.5 rounded-lg text-xs font-bold" aria-label="Refresh chapters">
+                        {refreshingChapters ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                        {refreshingChapters ? 'Refreshing…' : 'Refresh chapters'}
+                      </Button>
                       {isNative && (
                         <Button
                           size="sm"
@@ -1632,7 +1630,7 @@ export default function MangaPage() {
                         {isChapterListLoading
                           ? "Loading..."
                           : hasChapterFilters
-                            ? `${filteredDisplayChapters.length} of ${displayChapters.length} matches`
+                            ? `${filteredDisplayChapters.length} of ${sortedChapters.length} matches`
                             : `${displayChapters.length} available`}
                       </span>
                     </div>
@@ -1757,10 +1755,12 @@ export default function MangaPage() {
                         <MangaChapterProviderRows
                           key={`${chapter.canonicalOrder}-${chapter.chapterNumber ?? "?"}`}
                           chapter={{
+                          metadataSource: chapter.metadataSource,
                           chapterNumber: chapter.chapterNumber ?? null,
                           chapterTitle: chapter.chapterTitle ?? null,
                           sources: (chapter.sources || []).map((src) => ({
                             provider: src.provider,
+                            providerName: src.providerName,
                             chapterKey: src.chapterKey || "",
                             providerChapterId: src.providerChapterId || src.chapterKey || "",
                             language: src.language ?? null,
@@ -1935,11 +1935,12 @@ export default function MangaPage() {
                     <option value="auto">Auto (Best source per chapter)</option>
                     {providerOptions.map((provider) => (
                       <option key={provider} value={provider}>
-                        {provider}
+                        {chapters.flatMap(ch => ch.sources || []).find(s => s.provider === provider)?.providerName || provider}
                       </option>
                     ))}
                   </select>
                 </div>
+                <SourceDebug kind="manga" sources={chapters.flatMap(ch => ch.sources || [])} />
                 <div className="mb-4">
                   <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                     Preferred language
@@ -1949,11 +1950,7 @@ export default function MangaPage() {
                     onChange={(event) => setPreferredLanguage(event.target.value)}
                     className="w-full rounded-xl border border-white/10 bg-background/70 px-3 py-2 text-sm font-medium text-foreground focus:border-primary/50 focus:outline-none"
                   >
-                    <option value="auto">
-                      {profilePreferredMangaLanguage === "auto"
-                        ? "Auto (All languages)"
-                        : `Auto (Display setting: ${formatLanguageLabel(profilePreferredMangaLanguage)})`}
-                    </option>
+                    <option value="auto">All languages</option>
                     {languageOptions.map((language) => (
                       <option key={language.value} value={language.value}>
                         {language.label}

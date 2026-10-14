@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 
 export function TorrentSettings() {
     const confirm = useConfirm();
+    const [preload, setPreload] = useState(() => localStorage.getItem('tatakai:preload-next-episode') === 'true');
     const [maxConns, setMaxConns] = useState(() => Number(localStorage.getItem('tatakai_torrent_max_conns') || 3));
     const [bgBehavior, setBgBehavior] = useState(() => localStorage.getItem('tatakai_torrent_bg_behavior') || 'prompt');
     const [enableUpnp, setEnableUpnp] = useState(() => localStorage.getItem('tatakai_torrent_upnp') !== 'false');
@@ -154,6 +155,7 @@ export function TorrentSettings() {
             description="Configure the internal WebTorrent engine for professional streaming."
             bodyClassName="space-y-1"
         >
+            <SettingRow title="Preload next episode" description="Warm the next episode after 80% playback. Uses at most 20 MiB; mobile defaults to Wi-Fi only." control={<Switch checked={preload} onCheckedChange={value => { setPreload(value); localStorage.setItem('tatakai:preload-next-episode', String(value)); }} />} />
             <SettingRow
                 title="Torrent Storage Location"
                 description="Where torrent files and cache are stored. New sessions use this path."

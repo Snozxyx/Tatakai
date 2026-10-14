@@ -1,3 +1,6 @@
+import { normalizeUpdateState } from '@/core/update/normalized-update';
+import { ReleaseDetails } from './ReleaseDetails';
+import { useDeveloperMode } from '@/hooks/ui/useDeveloperMode';
 import { useState, useEffect } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -54,6 +57,7 @@ export function DesktopSettings() {
     // background download that finished before this page mounted still shows the
     // correct "Restart to Install" state.
     const update = useUpdateState();
+    const release = normalizeUpdateState(update, __APP_VERSION__);
     const isDownloading = update.phase === 'downloading';
     const updateReady = update.phase === 'downloaded';
     const downloadProgress = update.progress;
@@ -65,7 +69,7 @@ export function DesktopSettings() {
 
     const [downloadPath, setDownloadPath] = useState<string>('');
     const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
-    const [devMode, setDevMode] = useState(false);
+    const { enabled: devMode, setEnabled: setDevMode } = useDeveloperMode();
     const [autoLaunch, setAutoLaunch] = useState(false);
 
     const [systemInfo, setSystemInfo] = useState<any>(null);
@@ -507,6 +511,7 @@ export function DesktopSettings() {
                         </div>
                     }
                 >
+                    <ReleaseDetails notes={release.releaseNotes} percentage={release.rolloutPercentage} channel={release.channel} checkedAt={release.checkedAt} />
                     {updateAvailable && (
                         <p className="text-xs text-success flex items-center gap-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />

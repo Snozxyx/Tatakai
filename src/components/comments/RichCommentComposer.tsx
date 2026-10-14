@@ -1,5 +1,6 @@
 import { usePersistentState } from '@/hooks/ui/usePersistentState';
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
+import { appendCommentQuote, type CommentQuoteDraft } from '@/lib/commentQuotes';
 import { useQuery } from '@tanstack/react-query';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -69,6 +70,7 @@ interface RichCommentComposerProps {
   onCancel?: () => void;
   /** Prefill the draft (e.g. an `@mention` when replying to a reply). */
   initialContent?: string;
+  quoteDraft?: CommentQuoteDraft;
   /** Stable thread/reply identity. Drafts are scoped to the signed-in user. */
   draftKey?: string;
   /**
@@ -111,6 +113,7 @@ export function RichCommentComposer({
   showSpoiler = true,
   onCancel,
   initialContent = '',
+  quoteDraft,
   draftKey,
   allowTimestamp = false,
   allowEmbeds = false,
@@ -122,6 +125,20 @@ export function RichCommentComposer({
   const draftPrefix = user && draftKey ? `tatakai_comment_draft:${user.id}:${draftKey}` : null;
   const fieldKey = (field: string) => draftPrefix ? `${draftPrefix}:${field}` : null;
   const [content, setContent] = usePersistentState(fieldKey('content'), initialContent);
+  const lastQuote = useRef<string | null>(null);
+  useEffect(() => {
+    if (!quoteDraft) return;
+    if (lastQuote.current !== quoteDraft.id) {
+      lastQuote.current = quoteDraft.id;
+      setContent(previous => appendCommentQuote(previous, quoteDraft.text));
+    }
+    const timer = window.setTimeout(() => {
+      const textarea = textareaRef.current;
+      textarea?.focus();
+      if (textarea) textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [quoteDraft, setContent]);
   const [attachments, setAttachments] = usePersistentState<CommentAttachment[]>(fieldKey('attachments'), []);
   const [isSpoiler, setIsSpoiler] = usePersistentState(fieldKey('spoiler'), false);
   const [dropActive, setDropActive] = useState(false);

@@ -1,3 +1,4 @@
+import { AutomationScheduler } from '@/core/download/AutomationScheduler';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, HashRouter } from "react-router-dom";
 import { Capacitor } from '@capacitor/core';
@@ -111,6 +112,7 @@ const App = () => {
         <AuthProvider>
             <TooltipProvider>
               <Router future={routerFutureFlags}>
+                <AutomationScheduler />
                 <DesktopDeepLinkBridge />
                 <MobileDeepLinkBridge />
                 <SettingsModalProvider>
@@ -118,7 +120,7 @@ const App = () => {
                     <MainLayout>
                       <AppRoutes />
                     </MainLayout>
-                    <ExtensionUpdateSheet />
+            <ExtensionUpdateSheet />
                   </LightboxProvider>
                 </SettingsModalProvider>
               </Router>

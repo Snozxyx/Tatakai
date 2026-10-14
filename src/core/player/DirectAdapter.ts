@@ -21,7 +21,7 @@ export class DirectAdapter extends AbstractSourceAdapter {
     // failover fired. Advance through candidates on `<video>` error instead.
     // Loopback (desktop proxy / native mobile proxy / torrent server) plays
     // directly — wrapping it would strip the headers that make it work.
-    if (source.url.startsWith('http') && !isLoopbackProxyUrl(source.url)) {
+    if (source.url.startsWith('http') && !source.debridResolved && !isLoopbackProxyUrl(source.url)) {
         this.candidates = buildProxyCandidateUrls(
           source.url, referer, userAgent, undefined, undefined, refererCandidates,
         ).slice(0, 8);

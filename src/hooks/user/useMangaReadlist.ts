@@ -85,9 +85,9 @@ const normalizeString = (value: unknown) => {
   return normalized.length > 0 ? normalized : null;
 };
 
-const VALID_FORMATS = ['manga', 'manhwa', 'comic', 'unknown'] as const;
+const VALID_FORMATS = ['manga', 'manhwa', 'comic', 'novel', 'unknown'] as const;
 
-/** Normalize a stored/incoming format to one of the four allowed values. */
+/** Normalize a stored/incoming format to one of the allowed values (incl. novels). */
 const normalizeFormat = (value: unknown): string => {
   const v = String(value || '').trim().toLowerCase();
   return (VALID_FORMATS as readonly string[]).includes(v) ? v : 'unknown';
@@ -268,12 +268,13 @@ export function useMangaReadlist(statuses: MangaReadlistStatus[] = EXPLICIT_READ
         .from('manga_readlist')
         .select('*')
         .eq('user_id', user.id)
+        .neq('format', 'novel')
         .in('status', statusFilter)
         .order('updated_at', { ascending: false });
 
       if (error) {
         if (isMissingTableError(error)) {
-          return getLocalMangaReadlist().filter((row) => statusFilter.includes(normalizeStatus(row.status)));
+          return getLocalMangaReadlist().filter((row) => row.format !== 'novel' && statusFilter.includes(normalizeStatus(row.status)));
         }
         throw error;
       }
@@ -295,7 +296,7 @@ export function useMangaContinueReading(limit: number = 6) {
       const byManga = new Map<string, MangaReadlistItem>();
       try {
         for (const row of getLocalMangaReadlist()) {
-          if (!row.last_chapter_key) continue;
+          if (!row.last_chapter_key || row.format === 'novel') continue;
           byManga.set(row.manga_id, row);
         }
       } catch {
@@ -313,12 +314,14 @@ export function useMangaContinueReading(limit: number = 6) {
           .from('manga_readlist')
           .select('*')
           .eq('user_id', user.id)
+          .neq('format', 'novel')
           .not('last_chapter_key', 'is', null)
           .order('updated_at', { ascending: false })
           .limit(Math.max(limit, 30));
 
         if (error) throw error;
         for (const row of (data || []) as MangaReadlistItem[]) {
+          if ((row as any)?.format === 'novel') continue;
           const existing = byManga.get(row.manga_id);
           if (!existing || new Date(row.updated_at).getTime() >= new Date(existing.updated_at).getTime()) {
             byManga.set(row.manga_id, row);
@@ -350,11 +353,12 @@ export function useMangaReadlistItem(mangaId: string | undefined) {
         .select('*')
         .eq('user_id', user.id)
         .eq('manga_id', mangaId)
+        .neq('format', 'novel')
         .maybeSingle();
 
       if (error) {
         if (isMissingTableError(error)) {
-          return getLocalMangaReadlist().find((row) => row.manga_id === mangaId) || null;
+          return getLocalMangaReadlist().find((row) => row.manga_id === mangaId && row.format !== 'novel') || null;
         }
         throw error;
       }
@@ -437,9 +441,15 @@ export function useUpsertMangaReadlist() {
       const chapterProgress = toPositiveIntOrNull(data?.last_chapter_number) ?? undefined;
       const statusForSync = normalizeSyncStatusWithProgress(normalizeStatus(data?.status), chapterProgress);
 
+      // Both helpers below POST to TatakaiAPI single-sync, which now also fans
+      // out to MangaBaka server-side — so a MangaBaka-only push is needed only
+      // when neither of them fires.
+      let singleSyncPosted = false;
+
       if (profile?.mal_access_token) {
         const targetMalId = toPositiveIntOrNull(data?.mal_id ?? variables?.malId);
         if (targetMalId) {
+          singleSyncPosted = true;
           updateMalMangaStatus(targetMalId, statusForSync, undefined, chapterProgress)
             .catch((error) => console.error('[useMangaReadlist] MAL auto-sync failed:', error));
         }
@@ -448,6 +458,7 @@ export function useUpsertMangaReadlist() {
       if (profile?.anilist_access_token) {
         const targetAniListId = toPositiveIntOrNull(data?.anilist_id ?? variables?.anilistId);
         if (targetAniListId) {
+          singleSyncPosted = true;
           updateAniListMangaStatus(
             profile.anilist_access_token,
             targetAniListId,
@@ -455,6 +466,20 @@ export function useUpsertMangaReadlist() {
             chapterProgress,
           ).catch((error) => console.error('[useMangaReadlist] AniList auto-sync failed:', error));
         }
+      }
+
+      // MangaBaka-only users: hit single-sync directly (server resolves the
+      // series id and pushes with the stored OAuth token). Skipped when a
+      // POST above already covered it, and no-ops server-side when unlinked.
+      if (!singleSyncPosted) {
+        void import('@/lib/mangabaka').then(({ pushMangaProgressViaServer }) => {
+          pushMangaProgressViaServer({
+            anilistId: toPositiveIntOrNull(data?.anilist_id ?? variables?.anilistId),
+            malId: toPositiveIntOrNull(data?.mal_id ?? variables?.malId),
+            status: statusForSync,
+            chapter: chapterProgress ?? null,
+          }).catch((error) => console.error('[useMangaReadlist] MangaBaka auto-sync failed:', error));
+        }).catch((error) => console.error('[useMangaReadlist] MangaBaka auto-sync failed:', error));
       }
 
       if (!variables.silentToast) {
@@ -627,9 +652,12 @@ export function useSaveMangaReadingProgress() {
       const chapterProgress = toPositiveIntOrNull(data.last_chapter_number) ?? undefined;
       const statusForSync = normalizeSyncStatusWithProgress(normalizeStatus(data.status), chapterProgress);
 
+      let singleSyncPosted = false;
+
       if (profile?.mal_access_token) {
         const targetMalId = toPositiveIntOrNull(data.mal_id);
         if (targetMalId) {
+          singleSyncPosted = true;
           updateMalMangaStatus(targetMalId, statusForSync, undefined, chapterProgress)
             .catch((error) => console.error('[useMangaReadlist] MAL progress sync failed:', error));
         }
@@ -638,6 +666,7 @@ export function useSaveMangaReadingProgress() {
       if (profile?.anilist_access_token) {
         const targetAniListId = toPositiveIntOrNull(data.anilist_id);
         if (targetAniListId) {
+          singleSyncPosted = true;
           updateAniListMangaStatus(
             profile.anilist_access_token,
             targetAniListId,
@@ -645,6 +674,18 @@ export function useSaveMangaReadingProgress() {
             chapterProgress,
           ).catch((error) => console.error('[useMangaReadlist] AniList progress sync failed:', error));
         }
+      }
+
+      // MangaBaka-only users: hit single-sync directly (no-op when unlinked).
+      if (!singleSyncPosted) {
+        void import('@/lib/mangabaka').then(({ pushMangaProgressViaServer }) => {
+          pushMangaProgressViaServer({
+            anilistId: toPositiveIntOrNull(data.anilist_id),
+            malId: toPositiveIntOrNull(data.mal_id),
+            status: statusForSync,
+            chapter: chapterProgress ?? null,
+          }).catch((error) => console.error('[useMangaReadlist] MangaBaka progress sync failed:', error));
+        }).catch((error) => console.error('[useMangaReadlist] MangaBaka progress sync failed:', error));
       }
     },
   });
@@ -700,15 +741,16 @@ export interface ReadingTrackTotals {
   manga: number;
   manhwa: number;
   comic: number;
+  novel: number;
 }
 
-const EMPTY_READING_TOTALS: ReadingTrackTotals = { manga: 0, manhwa: 0, comic: 0 };
+const EMPTY_READING_TOTALS: ReadingTrackTotals = { manga: 0, manhwa: 0, comic: 0, novel: 0 };
 
 function sumChaptersByFormat(rows: MangaReadlistItem[]): ReadingTrackTotals {
-  const totals: ReadingTrackTotals = { manga: 0, manhwa: 0, comic: 0 };
+  const totals: ReadingTrackTotals = { manga: 0, manhwa: 0, comic: 0, novel: 0 };
   for (const row of rows) {
     const fmt = normalizeFormat(row.format);
-    if (fmt === 'manga' || fmt === 'manhwa' || fmt === 'comic') {
+    if (fmt === 'manga' || fmt === 'manhwa' || fmt === 'comic' || fmt === 'novel') {
       const n = Number(row.last_chapter_number);
       if (Number.isFinite(n) && n > 0) totals[fmt] += n;
     }

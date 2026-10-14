@@ -23,7 +23,7 @@ import {
   Play,
   Pause,
 } from "lucide-react";
-import { getMangaReadByKey, storeMangaTotalChapters } from "@/core/content/manga-client";
+import { getMangaReadByKey } from "@/core/content/manga-client";
 import { useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
 import { useReaderSettings, DEFAULT_READER_SETTINGS } from "@/hooks/media/useReaderSettings";
 import { getProfileKnobs } from "@/lib/memoryProfile";
@@ -366,6 +366,19 @@ export default function MangaReaderPage() {
   const displayNumber = activeMeta ? activeMeta.number : resolvedNumber;
   const displayTitle = activeMeta ? activeMeta.title : title;
   const displayProvider = activeMeta ? activeMeta.provider : resolvedProvider;
+  const [chapterNotification, setChapterNotification] = useState<string | null>(null);
+  const notifiedChapterRef = useRef<string | null>(null);
+  const notificationChapterKey = activeMeta?.key || chapterKey;
+  useEffect(() => {
+    if (!notificationChapterKey || total === 0 || isLoading) return;
+    const previous = notifiedChapterRef.current;
+    notifiedChapterRef.current = notificationChapterKey;
+    if (!settings.showNotifications) { setChapterNotification(null); return; }
+    if (!previous || previous === notificationChapterKey) return;
+    setChapterNotification(displayTitle || `Chapter ${displayNumber ?? navIndex + 1}`);
+    const timer = setTimeout(() => setChapterNotification(null), 3000);
+    return () => { clearTimeout(timer); setChapterNotification(null); };
+  }, [notificationChapterKey, total, isLoading, settings.showNotifications, displayTitle, displayNumber, navIndex]);
 
   const prevChapter = navIndex > 0 ? chapters[navIndex - 1] : null;
   const nextChapter =
@@ -680,24 +693,6 @@ export default function MangaReaderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageIndex, navIndex]);
 
-  // Store the manga's total chapter count in the mirror ("Tiger DB"), once per
-  // manga per mount. Extension chapter lists are scraped client-side, so this is
-  // the only path by which the backend learns the real total. Upward-only on the
-  // server, so it's safe to fire whenever a chapter list is available.
-  const totalChaptersRef = useRef<string>("");
-  useEffect(() => {
-    if (!mangaId || !chapters.length) return;
-    if (totalChaptersRef.current === mangaId) return;
-    const maxNum = chapters.reduce(
-      (m, c) => (c.chapterNumber != null && c.chapterNumber > m ? c.chapterNumber : m),
-      0,
-    );
-    const totalCh = Math.floor(maxNum > 0 ? maxNum : chapters.length);
-    if (totalCh <= 0) return;
-    totalChaptersRef.current = mangaId;
-    void storeMangaTotalChapters(mangaId, totalCh);
-  }, [mangaId, chapters]);
-
   // ── Fullscreen: OS-level in Electron (hides titlebar + sidebar + tray via the
   // `app-fullscreen` class, mirroring EmbedPlayer), DOM Fullscreen on the web. ──
   const [isFs, setIsFs] = useState(false);
@@ -774,8 +769,7 @@ export default function MangaReaderPage() {
     }
   }, [settings.autoFullscreen, total, enterFullscreen]);
 
-  // Fullscreen is a reading surface: only its exit control stays visible.
-  const chromeVisible = !isFs;
+  const chromeVisible = !isFs || !settings.hideChromeInFullscreen;
   const [fullscreenExitVisible, setFullscreenExitVisible] = useState(true);
   useEffect(() => {
     if (!isFs) { setFullscreenExitVisible(true); return; }
@@ -877,7 +871,7 @@ export default function MangaReaderPage() {
       String(chapter.chapterNumber ?? "").includes(query) ||
       String(chapter.chapterTitle ?? "").toLowerCase().includes(query) ||
       chapter.sources?.some((source) =>
-        String(source.provider ?? "").toLowerCase().includes(query) ||
+        String(source.providerName || source.provider || "").toLowerCase().includes(query) ||
         String(source.scanlator ?? "").toLowerCase().includes(query),
       ),
     );
@@ -1218,10 +1212,11 @@ export default function MangaReaderPage() {
 
   return (
     <div ref={containerRef} data-reader-fullscreen={isFs || undefined} className="relative min-h-screen text-foreground" style={{ backgroundColor: settings.backgroundColor }}>
+      {chapterNotification && settings.showNotifications && <div role="status" className="pointer-events-none fixed left-1/2 top-20 z-50 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-xl border border-border bg-background/95 px-4 py-3 text-sm shadow-lg">{chapterNotification}</div>}
       {/* Top nav — comick layout: Prev · Manga Info · Next (compact on mobile) */}
-      {!isFs && <div
+      {chromeVisible && <div
         className={`reader-topbar z-40 flex items-center gap-1.5 sm:gap-2 border-b border-border bg-background/95 px-2 sm:px-3 py-2 backdrop-blur transition-[transform,opacity] duration-200 pt-[max(0.5rem,env(safe-area-inset-top))] ${
-          isFs ? "fixed inset-x-0 top-0" : "sticky top-0"
+          "sticky top-0"
         } ${chromeVisible ? "" : reducedMotion ? "opacity-0 pointer-events-none" : "-translate-y-full"}`}
       >
         <button
@@ -1252,7 +1247,7 @@ export default function MangaReaderPage() {
             ) : null}
           </span>
           <span className="w-full truncate text-[11px] sm:text-xs text-muted-foreground">
-            {displayTitle}{displayProvider ? ` · ${displayProvider}` : ""}{total > 0 ? ` · Page ${pageIndex + 1} / ${activeMeta?.total || total}` : ""}
+            {displayTitle}{displayProvider ? ` · ${alternatives.find(s => s.provider === displayProvider)?.providerName || displayProvider}` : ""}{total > 0 ? settings.progressIndicator === 'chapter' ? ` · Chapter ${displayNumber ?? navIndex + 1}` : ` · Page ${pageIndex + 1} / ${activeMeta?.total || total}` : ""}
           </span>
         </button>
         <button
@@ -1271,17 +1266,23 @@ export default function MangaReaderPage() {
         </button>
       </div>}
 
+      {settings.showProgressBar && total > 0 && (
+        <div role="progressbar" aria-label="Chapter reading progress" aria-valuemin={0} aria-valuemax={activeMeta?.total || total} aria-valuenow={pageIndex + 1} className="pointer-events-none fixed inset-x-0 bottom-0 z-50 h-1 bg-muted/40">
+          <div className="h-full bg-primary" style={{ width: `${Math.min(100, (pageIndex + 1) / (activeMeta?.total || total) * 100)}%` }} />
+        </div>
+      )}
+
       {/* Right vertical toolbar — slimmer + lower on mobile so it never covers pages */}
       <div
         className={`reader-tools fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 z-40 flex max-w-[calc(100vw-1rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-2xl border border-border bg-background/95 p-1.5 shadow-lg backdrop-blur-xl transition-opacity duration-200 sm:bottom-auto sm:left-auto sm:right-3 sm:top-1/2 sm:-translate-x-0 sm:-translate-y-1/2 sm:flex-col sm:gap-2 ${
-          !isFs || fullscreenExitVisible ? "opacity-100" : "pointer-events-none opacity-0"
+          chromeVisible || fullscreenExitVisible ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
       >
-        {!isFs && <ToolBtn label="Settings" onClick={() => setShowSettings(true)}><Settings2 className="h-5 w-5" /></ToolBtn>}
+        {chromeVisible && <ToolBtn label="Settings" onClick={() => setShowSettings(true)}><Settings2 className="h-5 w-5" /></ToolBtn>}
         <ToolBtn label={isFs ? "Exit fullscreen" : "Fullscreen"} onClick={toggleFullscreen} active={isFs}>
           {isFs ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
         </ToolBtn>
-        {!isFs && <>
+        {chromeVisible && <>
         <ToolBtn label="Reading tools" onClick={() => setShowReaderNavigator(true)}><List className="h-5 w-5" /></ToolBtn>
         <ToolBtn label="Manga info" onClick={() => navigate(`/manga/${mangaId}`)}><Info className="h-5 w-5" /></ToolBtn>
         <ToolBtn label="Home" onClick={() => navigate("/")}><Home className="h-5 w-5" /></ToolBtn>
@@ -1372,7 +1373,7 @@ export default function MangaReaderPage() {
 
             <div data-ch={currentIndex} data-reader-entry>
               {continuous && before.length ? (
-                <ChapterDivider label={resolvedNumber != null ? `Chapter ${resolvedNumber}` : "Chapter"} sub={resolvedProvider} />
+                <ChapterDivider label={resolvedNumber != null ? `Chapter ${resolvedNumber}` : "Chapter"} sub={alternatives.find(s => s.provider === resolvedProvider)?.providerName || resolvedProvider} />
               ) : null}
               {continuous && data?.data?.readMeta?.fallbackUsed && provider !== resolvedProvider ? (
                 <ProviderFallbackNotice
@@ -1549,7 +1550,7 @@ export default function MangaReaderPage() {
                 {navigatorSources.map((source) => {
                   const active = source.provider === displayProvider && source.chapterKey === (activeMeta?.key || chapterKey);
                   return <button key={`${source.provider}:${source.chapterKey}:${source.providerChapterId || ''}`} onClick={() => { switchProvider(source, navigatorChapter); setShowReaderNavigator(false); }} className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left ${active ? 'border-primary/50 bg-primary/10' : 'border-border bg-muted/30 hover:bg-muted/60'}`}>
-                    <span className="font-medium">{source.provider}</span><span className="text-xs text-muted-foreground">{source.scanlator || 'Chapter source'}</span>
+                    <span className="font-medium">{source.providerName || source.provider}</span><span className="text-xs text-muted-foreground">{source.scanlator || 'Chapter source'}</span>
                   </button>;
                 })}
                 {!navigatorSources.length && <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">No alternative providers are available for this chapter.</p>}

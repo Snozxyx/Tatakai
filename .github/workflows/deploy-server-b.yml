@@ -1,0 +1,43 @@
+name: Build Tatakai website for Server B
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: tatakai-website-production
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Build production website
+        run: npm run build -- --mode web
+        env:
+          VITE_SUPABASE_URL: https://db.tatakai.me
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_BACKEND_ORIGIN: https://api.tatakai.me
+          VITE_TATAKAI_API_URL: https://api.tatakai.me/api/v3
+          VITE_OPERATIONS_AUTH_ENABLED: 'true'
+          VITE_TURNSTILE_SITE_KEY: ${{ secrets.VITE_TURNSTILE_SITE_KEY }}
+          VITE_POSTHOG_KEY: ${{ secrets.VITE_POSTHOG_KEY }}
+          VITE_POSTHOG_HOST: https://us.i.posthog.com
+      - name: Package verified release
+        run: |
+          test -s dist/index.html
+          mkdir -p server-release
+          cp -a dist server-release/website
+          node -e 'require("fs").writeFileSync("server-release/release.json", JSON.stringify({component:"website",commit:process.env.GITHUB_SHA}))'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tatakai-server-b
+          path: server-release/
+          retention-days: 7
+          if-no-files-found: error

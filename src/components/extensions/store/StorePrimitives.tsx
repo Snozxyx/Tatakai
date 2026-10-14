@@ -161,7 +161,7 @@ export function ExtensionChips({
   className,
   showHealth = true,
 }: {
-  extension: Pick<StoreExtension, 'type' | 'isFeatured' | 'healthScore'>;
+  extension: Pick<StoreExtension, 'type' | 'isFeatured' | 'healthScore' | 'ecosystem' | 'compatibility'>;
   className?: string;
   showHealth?: boolean;
 }) {
@@ -170,6 +170,8 @@ export function ExtensionChips({
 
   return (
     <div className={cn('flex flex-wrap items-center gap-1.5', className)}>
+      <span className="rounded-full border border-border px-2 py-0.5 text-[11px] capitalize">{extension.ecosystem || 'tatakai'}</span>
+      {extension.compatibility && extension.compatibility !== 'supported' && <span className="rounded-full border border-border px-2 py-0.5 text-[11px] capitalize">{extension.compatibility}</span>}
       <span
         className={cn(
           'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold',
@@ -249,7 +251,7 @@ export function ExtensionHeroCard({
           {extension.description || 'No description provided.'}
         </p>
         <div className="flex flex-wrap items-center gap-3">
-          <InstallButton state={state} onClick={onInstall} size="lg" />
+          <InstallButton state={state} label={extension.compatibility === "external" ? "Open externally" : extension.compatibility === "unavailable" ? "Unavailable" : undefined} onClick={onInstall} size="lg" />
           <span className="text-xs font-semibold text-muted-foreground">
             {formatCompact(extension.installs || extension.downloads)} installs · v{extension.version}
           </span>
@@ -290,7 +292,7 @@ export function ExtensionPromoTile({
           {visual.label} · {formatCompact(extension.installs || extension.downloads)} installs
         </p>
       </div>
-      <InstallButton state={state} onClick={onInstall} size="sm" className="relative" />
+      <InstallButton state={state} label={extension.compatibility === "external" ? "Open externally" : extension.compatibility === "unavailable" ? "Unavailable" : undefined} onClick={onInstall} size="sm" className="relative" />
     </Link>
   );
 }
@@ -336,7 +338,7 @@ export function ExtensionRow({
           {formatCompact(extension.installs || extension.downloads)}
         </p>
       </div>
-      <InstallButton state={state} onClick={onInstall} size="sm" />
+      <InstallButton state={state} label={extension.compatibility === "external" ? "Open externally" : extension.compatibility === "unavailable" ? "Unavailable" : undefined} onClick={onInstall} size="sm" />
     </Link>
   );
 }
@@ -385,7 +387,7 @@ export function ExtensionTile({
         <span className="text-[11px] font-semibold text-muted-foreground">
           v{extension.version} · {formatCompact(extension.installs || extension.downloads)} installs
         </span>
-        <InstallButton state={state} onClick={onInstall} size="sm" />
+        <InstallButton state={state} label={extension.compatibility === "external" ? "Open externally" : extension.compatibility === "unavailable" ? "Unavailable" : undefined} onClick={onInstall} size="sm" />
       </div>
     </Link>
   );

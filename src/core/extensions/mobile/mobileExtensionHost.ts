@@ -9,6 +9,7 @@
  *   sources / stream / torrent      -> bundle.sourcesAll / streamAll / torrentAll
  *   providers, providers/:name      -> bundle.listProviders / runProvider
  *   manga/chapters, manga/pages     -> bundle.getMangaChapters / getMangaPages
+ *   novel/chapters, novel/content   -> bundle.getNovelChapters / getNovelContent
  *   custom/*                        -> bundle.customHome/Search/Info/Watch/Read
  *
  * Network goes through `createNativeFetch` (CapacitorHttp — no CORS, real
@@ -18,8 +19,7 @@
  * runtime can route to it without a real server.
  *
  * SECURITY: like the desktop renderer loader, there is NO sandbox — the bundle
- * runs in the app realm. Only load bundles the user trusts (signed marketplace
- * bundles, or explicit sideloads). The manifest's `network:domain:*` permissions
+ * runs in the app realm. Installed bundles do not require signing. Network permissions
  * still gate every request via `createNativeFetch`.
  */
 
@@ -90,7 +90,11 @@ async function evaluateBundle(
     })
     .filter(Boolean);
 
-  const fetchShim = createNativeFetch(allowedDomains);
+  const fetchShim = isCapacitor() ? createNativeFetch(allowedDomains) : async (url: string, init?: any) => {
+    const host = new URL(url).hostname;
+    if (!allowedDomains.includes('*') && !allowedDomains.some(d => host === d || host.endsWith('.' + d))) throw new Error('Network permission denied');
+    return fetch(url, init);
+  };
   const anitomy = await makeAnitomy();
   // Bundles are esbuild `platform:'node', format:'cjs'`, so Node built-ins are
   // left external and emitted as bare `require(...)`. Desktop runs them in a
@@ -131,7 +135,7 @@ async function evaluateBundle(
   // `fetch.ts`'s `loadHtml` uses its own bundled cheerio (the desktop/API-
   // identical path, pure JS, already proven), rather than switching HTML parsing
   // to the DOMParser adapter as a side effect of this fetch fix.
-  (globalThis as any).__tatakai_fetch__ = fetchShim;
+  if (!manifest.id.startsWith('seanime-')) (globalThis as any).__tatakai_fetch__ = fetchShim;
 
   const module = { exports: {} as any };
   // eslint-disable-next-line no-new-func
@@ -147,6 +151,7 @@ async function evaluateBundle(
     'global',
     'setImmediate',
     'clearImmediate',
+    'fetch',
     code,
   );
   fn(
@@ -161,6 +166,7 @@ async function evaluateBundle(
     nodeGlobals.global,
     nodeGlobals.setImmediate,
     nodeGlobals.clearImmediate,
+    fetchShim,
   );
 
   const exported = module.exports?.default || module.exports;
@@ -217,10 +223,12 @@ function inferRoutes(instance: Record<string, unknown>): string[] {
   if (typeof instance.listProviders === 'function') routes.push('providers');
   if (typeof instance.getMangaChapters === 'function') routes.push('manga/chapters');
   if (typeof instance.getMangaPages === 'function') routes.push('manga/pages');
+  if (typeof instance.getNovelChapters === 'function') routes.push('novel/chapters');
+  if (typeof instance.getNovelContent === 'function') routes.push('novel/content');
   return routes;
 }
 
-async function callMethod(
+export async function invokeMobileExtension(
   namespace: string,
   method: string,
   args: unknown[],
@@ -409,7 +417,7 @@ export const mobileExtensionDispatch = {
           }
         : undefined;
 
-    const out = await callMethod(namespace, method, relay ? [enriched, relay] : [enriched]);
+    const out = await invokeMobileExtension(namespace, method, relay ? [enriched, relay] : [enriched]);
     if (streamed) {
       writeSourceCache(cacheKey, collected);
       return collected;
@@ -436,7 +444,33 @@ export const mobileExtensionDispatch = {
 
   /** `/api/v3/<ns>/manga/chapters`. */
   async mangaChapters(namespace: string, params: Record<string, unknown>): Promise<any> {
-    return callMethod(namespace, 'getMangaChapters', [params]);
+    const ext = registry.get(namespace);
+    if (typeof ext?.instance.debugMangaChapters === 'function') {
+      const result: any = await invokeMobileExtension(namespace, 'debugMangaChapters', [params]);
+      return { chapters: result.results || [], providerStatus: result.diagnostics || [] };
+    }
+    return invokeMobileExtension(namespace, 'getMangaChapters', [params]);
+  },
+
+  /** `/api/v3/<ns>/novel/chapters` — flat chapter rows for a novel title. */
+  async novelChapters(namespace: string, params: Record<string, unknown>): Promise<any> {
+    const ext = registry.get(namespace);
+    if (typeof ext?.instance.debugNovelChapters === 'function') {
+      const result: any = await invokeMobileExtension(namespace, 'debugNovelChapters', [params]);
+      return { chapters: result.results || [], partial: result.complete === false, providerStatus: result.diagnostics || [] };
+    }
+    return invokeMobileExtension(namespace, 'getNovelChapters', [params]);
+  },
+  async novelSearch(namespace: string, params: Record<string, unknown>): Promise<any> {
+    return invokeMobileExtension(namespace, 'getNovelSearch', [params]);
+  },
+  async novelDiagnostics(namespace: string, params: Record<string, unknown>): Promise<any> {
+    return invokeMobileExtension(namespace, 'debugNovelChapters', [{ ...params, fullScan: true }]);
+  },
+
+  /** `/api/v3/<ns>/novel/content` — ordered paragraphs for one novel chapter. */
+  async novelContent(namespace: string, params: Record<string, unknown>): Promise<any> {
+    return invokeMobileExtension(namespace, 'getNovelContent', [params]);
   },
 
   /**
@@ -446,7 +480,7 @@ export const mobileExtensionDispatch = {
    * desktop `{ pages }` wrapper and the mobile bundle's bare array.
    */
   async mangaPages(namespace: string, params: Record<string, unknown>): Promise<any> {
-    const out = await callMethod(namespace, 'getMangaPages', [params]);
+    const out = await invokeMobileExtension(namespace, 'getMangaPages', [params]);
     const rawPages = Array.isArray(out)
       ? out
       : Array.isArray((out as any)?.pages)
@@ -460,7 +494,7 @@ export const mobileExtensionDispatch = {
 
   /** `/api/v3/<ns>/providers` + `/providers/:name`. */
   async listProviders(namespace: string): Promise<any[]> {
-    const out = await callMethod(namespace, 'listProviders', []);
+    const out = await invokeMobileExtension(namespace, 'listProviders', []);
     return Array.isArray(out) ? out : (out as any)?.providers ?? [];
   },
   async runProvider(
@@ -468,7 +502,7 @@ export const mobileExtensionDispatch = {
     provider: string,
     options: Record<string, unknown>,
   ): Promise<any> {
-    const out = await callMethod(namespace, 'runProvider', [provider, options]);
+    const out = await invokeMobileExtension(namespace, 'runProvider', [provider, options]);
     if (out && typeof out === 'object' && Array.isArray((out as any).sources)) {
       return {
         ...(out as any),
@@ -488,7 +522,7 @@ export const mobileExtensionDispatch = {
     op: 'Home' | 'Search' | 'Info' | 'Watch' | 'Read',
     args: unknown[],
   ): Promise<any> {
-    const out = await callMethod(namespace, `custom${op}`, args);
+    const out = await invokeMobileExtension(namespace, `custom${op}`, args);
     if (out && typeof out === 'object') {
       if (Array.isArray((out as any).sources)) {
         return {

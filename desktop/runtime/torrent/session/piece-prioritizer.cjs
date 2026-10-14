@@ -30,7 +30,7 @@ function prioritizePlaybackPieces(torrent, fileIndex = 0, options = {}) {
     try {
         // 1. Select the file — deselects all others and focuses bandwidth
         if (typeof file.select === 'function') {
-            file.select();
+            file.select(10);
         }
 
         // 2. Mark first ~15MB of the file as critical pieces (Requirement 10.1)
@@ -40,7 +40,7 @@ function prioritizePlaybackPieces(torrent, fileIndex = 0, options = {}) {
         const fileOffset = file.offset ?? 0;
         const startPiece = Math.floor(fileOffset / pieceLength);
         const criticalPieces = Math.ceil(prebufferBytes / pieceLength);
-        const endPiece = startPiece + criticalPieces;
+        const endPiece = Math.min(Math.floor((fileOffset + file.length - 1) / pieceLength), startPiece + criticalPieces - 1);
 
         if (typeof torrent.critical === 'function') {
             torrent.critical(startPiece, endPiece);
@@ -53,7 +53,7 @@ function prioritizePlaybackPieces(torrent, fileIndex = 0, options = {}) {
         // times overwrites the previous range, which would remove the high priority from the start pieces.
         // Instead, we use torrent.select() with a higher priority (1) for these pieces.
         const fileEndOffset = fileOffset + file.length;
-        const lastPiece = Math.floor(fileEndOffset / pieceLength);
+        const lastPiece = Math.floor((fileEndOffset - 1) / pieceLength);
         const metadataPieces = Math.ceil((options.metadataBytes ?? 2 * 1024 * 1024) / pieceLength); // last 2MB
         const metadataStartPiece = Math.max(startPiece, lastPiece - metadataPieces);
 
@@ -109,7 +109,7 @@ function prioritizeSeekPoint(torrent, fileIndex, currentTime, duration) {
     const lookbehindPieces = Math.ceil(lookbehindBytes / pieceLength);
     
     const start = Math.max(Math.floor(fileOffset / pieceLength), centerPiece - lookbehindPieces);
-    const end = Math.min(Math.floor((fileOffset + fileLength) / pieceLength), centerPiece + lookaheadPieces);
+    const end = Math.min(Math.floor((fileOffset + fileLength - 1) / pieceLength), centerPiece + lookaheadPieces);
     
     if (typeof torrent.critical === 'function') {
         torrent.critical(start, end);

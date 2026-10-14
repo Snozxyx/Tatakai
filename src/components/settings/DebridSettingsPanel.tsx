@@ -1,157 +1,62 @@
-import { useState, useEffect } from 'react';
-import { ShieldCheck, ShieldAlert, RefreshCw, EyeOff } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Check, Loader2, Trash2 } from 'lucide-react';
+import { CloudDebridClient } from '@/core/providers/cloud-debrid-client';
 import { debridOrchestrator } from '@/core/providers/debrid-orchestrator';
-import { RealDebridClient, DebridAccount } from '@/core/providers/realdebrid-client';
+import { RealDebridClient, DEBRID_PROVIDERS, type DebridAccount, type DebridProvider } from '@/core/providers/realdebrid-client';
 import { TorboxClient } from '@/core/providers/torbox-client';
 import { useP2PDisabled } from '@/lib/torrent/p2pPolicy';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { SettingsSection } from '@/components/settings/SettingsPrimitives';
+import { SettingRow, SettingsSection } from '@/components/settings/SettingsPrimitives';
 
+const PROVIDERS: DebridProvider[] = ['realdebrid', 'torbox', 'alldebrid', 'premiumize'];
 export function DebridSettingsPanel() {
   const [accounts, setAccounts] = useState<DebridAccount[]>([]);
-  const [rdKey, setRdKey] = useState('');
-  const [tbKey, setTbKey] = useState('');
-  const [verifying, setVerifying] = useState<'realdebrid' | 'torbox' | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [keys, setKeys] = useState<Record<DebridProvider, string>>({ realdebrid: '', torbox: '', alldebrid: '', premiumize: '' });
+  const [verifying, setVerifying] = useState<DebridProvider>();
+  const [message, setMessage] = useState<{ text: string; error?: boolean }>();
   const [p2pDisabled, setP2PDisabled] = useP2PDisabled();
-  const hasActiveDebrid = accounts.some((a) => a.isActive);
-
   useEffect(() => {
     const saved = debridOrchestrator.getAccounts();
     setAccounts(saved);
-    
-    const rd = saved.find(a => a.provider === 'realdebrid');
-    if (rd) setRdKey(rd.apiKey);
-    
-    const tb = saved.find(a => a.provider === 'torbox');
-    if (tb) setTbKey(tb.apiKey);
+    setKeys(current => ({ ...current, ...Object.fromEntries(saved.map(account => [account.provider, account.apiKey])) }));
   }, []);
-
-  const handleVerify = async (provider: 'realdebrid' | 'torbox', key: string) => {
-    const normalizedKey = key.trim();
-    if (!normalizedKey) return;
-    setVerifying(provider);
-    setMessage(null);
-
+  const verify = async (provider: DebridProvider) => {
+    const key = keys[provider].trim(); if (!key) return;
+    setVerifying(provider); setMessage(undefined);
     try {
-      if (provider === 'realdebrid') {
-        await new RealDebridClient(normalizedKey).verifyToken();
-      } else {
-        await new TorboxClient(normalizedKey).verifyToken();
-      }
-
-      // Exactly one provider is active. Previously both could stay active while
-      // the orchestrator silently preferred Real-Debrid, making a valid TorBox
-      // setup look broken.
-      const updated = debridOrchestrator.getAccounts()
-        .filter((account) => account.provider !== provider)
-        .map((account) => ({ ...account, isActive: false }));
-      updated.push({ provider, apiKey: normalizedKey, isActive: true });
-      setAccounts(updated);
-      debridOrchestrator.saveAccounts(updated, provider);
-      setMessage(`${provider === 'torbox' ? 'TorBox' : 'Real-Debrid'} verified and selected.`);
-    } catch (error: any) {
-      setMessage(error?.message || `Could not verify ${provider === 'torbox' ? 'TorBox' : 'Real-Debrid'}.`);
-    } finally {
-      setVerifying(null);
-    }
+      if (provider === 'realdebrid') await new RealDebridClient(key).verifyToken();
+      else if (provider === 'torbox') await new TorboxClient(key).verifyToken();
+      else await new CloudDebridClient(provider, key).verifyToken();
+      const updated = debridOrchestrator.getAccounts().filter(account => account.provider !== provider).map(account => ({ ...account, isActive: false }));
+      updated.push({ provider, apiKey: key, isActive: true });
+      debridOrchestrator.saveAccounts(updated, provider); setAccounts(updated);
+      setMessage({ text: `${DEBRID_PROVIDERS[provider]} verified and selected.` });
+    } catch (error) { setMessage({ text: error instanceof Error ? error.message : 'Could not verify this account. Check your API key and try again.', error: true }); }
+    finally { setVerifying(undefined); }
   };
-
-  const getStatusIcon = (provider: string) => {
-    const acc = accounts.find(a => a.provider === provider);
-    if (!acc) return null;
-    if (verifying === provider) return <RefreshCw className="w-4 h-4 animate-spin text-muted-foreground" />;
-    return acc.isActive ? <ShieldCheck className="w-4 h-4 text-success" /> : <ShieldAlert className="w-4 h-4 text-destructive" />;
-  };
-
-  return (
-    <SettingsSection
-      title="Premium Debrid Services"
-      description="Link a Real-Debrid or TorBox account to directly stream premium cached torrents without relying on browser extensions or local client downloads."
-      bodyClassName="space-y-4"
-    >
-      {/* Real-Debrid */}
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-        <div className="w-32 text-sm font-semibold flex items-center gap-2">
-          Real-Debrid
-          {getStatusIcon('realdebrid')}
-        </div>
-        <Input
-          type="password"
-          aria-label="Real-Debrid API Token"
-          placeholder="Real-Debrid API Token"
-          value={rdKey}
-          onChange={(e) => setRdKey(e.target.value)}
-          autoComplete="off"
-          autoCapitalize="none"
-          autoCorrect="off"
-          spellCheck={false}
-          className="min-w-0 flex-1 h-9"
-        />
-        <Button
-          onClick={() => handleVerify('realdebrid', rdKey)}
-          disabled={verifying !== null || !rdKey.trim()}
-        >
-          Verify & Use
-        </Button>
-      </div>
-
-      {/* TorBox */}
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-        <div className="w-32 text-sm font-semibold flex items-center gap-2">
-          TorBox
-          {getStatusIcon('torbox')}
-        </div>
-        <Input
-          type="password"
-          aria-label="TorBox API Token"
-          placeholder="TorBox API Token"
-          value={tbKey}
-          onChange={(e) => setTbKey(e.target.value)}
-          autoComplete="off"
-          autoCapitalize="none"
-          autoCorrect="off"
-          spellCheck={false}
-          className="min-w-0 flex-1 h-9"
-        />
-        <Button
-          onClick={() => handleVerify('torbox', tbKey)}
-          disabled={verifying !== null || !tbKey.trim()}
-        >
-          Verify & Use
-        </Button>
-      </div>
-
-      <p className="text-xs text-muted-foreground bg-primary/5 p-3 rounded-md border border-primary/10">
-        Paste the full API key, including dashes. Tokens stay on this device and are never synced to your Tatakai account. The selected service is used for torrent releases without joining a peer-to-peer swarm.
-      </p>
-
-      {/* P2P kill-switch — hard guarantee, not a preference hint */}
-      <div className="flex items-start sm:items-center justify-between gap-3 rounded-md border border-white/10 bg-white/[0.02] p-3">
-        <div className="flex items-start gap-2.5">
-          <EyeOff className="w-4 h-4 mt-0.5 shrink-0 text-muted-foreground" />
-          <div>
-            <p className="text-sm font-semibold">Disable P2P torrents</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Never join a peer-to-peer swarm. Torrent streaming, torrent downloads, and magnet
-              imports are blocked app-wide.
-              {p2pDisabled
-                ? hasActiveDebrid
-                  ? ' Your debrid service keeps working — releases resolve server-side.'
-                  : ' Without a debrid service above, torrent releases will not play at all.'
-                : ''}
-            </p>
+  return <SettingsSection title="Debrid services" description="Stream cached torrent releases over HTTP with your preferred provider." bodyClassName="space-y-4">
+    <p className="text-xs leading-relaxed text-muted-foreground">API keys stay on this device. Select one service for playback; your other accounts remain saved.</p>
+    <div className="divide-y divide-border border-y border-border">
+      {PROVIDERS.map(provider => {
+        const account = accounts.find(item => item.provider === provider);
+        return <div key={provider} className="space-y-2.5 py-4">
+          <div className="flex items-center gap-3"><label htmlFor={`debrid-key-${provider}`} className="flex-1 text-sm font-semibold">{DEBRID_PROVIDERS[provider]}</label>
+            {account && <span className={`flex items-center gap-1 text-xs ${account.isActive ? 'text-primary' : 'text-muted-foreground'}`}>{account.isActive && <Check className="h-3.5 w-3.5" />}{account.isActive ? 'Selected' : 'Saved'}</span>}
+            {account && <Button size="icon" variant="ghost" aria-label={`Remove ${DEBRID_PROVIDERS[provider]} account`} disabled={!!verifying} onClick={() => {
+              const remaining = debridOrchestrator.getAccounts().filter(item => item.provider !== provider);
+              debridOrchestrator.saveAccounts(remaining); setAccounts(remaining); setKeys(current => ({ ...current, [provider]: '' })); setMessage({ text: `${DEBRID_PROVIDERS[provider]} removed from this device.` });
+            }}><Trash2 className="h-4 w-4 text-muted-foreground" /></Button>}
           </div>
-        </div>
-        <Switch checked={p2pDisabled} onCheckedChange={setP2PDisabled} aria-label="Disable P2P torrents" />
-      </div>
-      {message && (
-        <p className="break-words text-xs text-muted-foreground" role="status">
-          {message}
-        </p>
-      )}
-    </SettingsSection>
-  );
+          <div className="flex flex-wrap gap-2">
+            <Input id={`debrid-key-${provider}`} type="password" aria-label={`${DEBRID_PROVIDERS[provider]} API key`} placeholder="API key" value={keys[provider]} autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} className="min-w-0 flex-1 basis-48" onChange={event => setKeys(current => ({ ...current, [provider]: event.target.value }))} />
+            <Button variant={account?.isActive ? 'outline' : 'default'} disabled={!!verifying || !keys[provider].trim()} onClick={() => void verify(provider)}>{verifying === provider ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Verifying...</> : 'Verify & use'}</Button>
+          </div>
+        </div>;
+      })}
+    </div>
+    {message && <p role={message.error ? 'alert' : 'status'} className={`break-words text-sm ${message.error ? 'text-destructive' : 'text-muted-foreground'}`}>{message.text}</p>}
+    <SettingRow className="[&_.settings-row-main]:flex-nowrap [&_.settings-row-label]:min-w-0" title="Disable P2P torrents" description={`Block torrent streaming, torrent downloads, and magnet imports. Debrid HTTP playback remains available.${p2pDisabled && !accounts.some(account => account.isActive) ? ' Select a debrid account above to play torrent releases.' : ''}`} control={({ labelId, descriptionId }) => <Switch aria-labelledby={labelId} aria-describedby={descriptionId} checked={p2pDisabled} onCheckedChange={setP2PDisabled} />} />
+  </SettingsSection>;
 }

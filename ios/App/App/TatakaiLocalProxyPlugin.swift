@@ -244,9 +244,21 @@ public final class TatakaiLocalProxyPlugin: CAPPlugin, CAPBridgedPlugin {
         ,CAPPluginMethod(name: "configurePlayback", returnType: CAPPluginReturnPromise)
         ,CAPPluginMethod(name: "cancelPrefetch", returnType: CAPPluginReturnPromise)
         ,CAPPluginMethod(name: "setCloudflareConfig", returnType: CAPPluginReturnPromise)
+        ,CAPPluginMethod(name: "prepareRequestHeaders", returnType: CAPPluginReturnPromise)
     ]
 
     private let proxy = TatakaiLocalProxy.shared
+
+    @objc func prepareRequestHeaders(_ call: CAPPluginCall) {
+        guard let raw = call.getString("url"), let url = URL(string: raw),
+              url.scheme == "https" || url.scheme == "http" else {
+            call.reject("A valid http(s) URL is required.")
+            return
+        }
+        var headers: [String: String] = [:]
+        for (name, value) in call.getObject("headers") ?? [:] { headers[name] = String(describing: value) }
+        call.resolve(["headers": CloudflareBypass.prepare(url, headers: headers)])
+    }
 
     @objc func configurePlayback(_ call: CAPPluginCall) {
         MobileStreamCache.shared.configure(source: call.getString("source") ?? "", saver: call.getBool("dataSaver") ?? false)
@@ -619,6 +631,17 @@ private final class TatakaiLocalProxy {
         var headers = corsHeaders()
         let types = ["m3u8": "application/vnd.apple.mpegurl", "mp4": "video/mp4", "m4s": "video/mp4", "ts": "video/mp2t", "vtt": "text/vtt", "aac": "audio/aac", "webm": "video/webm"]
         headers["Content-Type"] = types[file.pathExtension.lowercased()] ?? "application/octet-stream"
+        if headers["Content-Type"] == "application/octet-stream" {
+            let prefix = handle.readData(ofLength: 512)
+            let bytes = [UInt8](prefix)
+            if bytes.count >= 8 && String(bytes: bytes[4..<8], encoding: .ascii) == "ftyp" {
+                headers["Content-Type"] = "video/mp4"
+            } else if bytes.count >= 4 && Array(bytes[0..<4]) == [0x1a, 0x45, 0xdf, 0xa3] {
+                headers["Content-Type"] = prefix.range(of: Data("webm".utf8)) != nil ? "video/webm" : "video/x-matroska"
+            } else if bytes.count > 188 && bytes[0] == 0x47 && bytes[188] == 0x47 {
+                headers["Content-Type"] = "video/mp2t"
+            }
+        }
         headers["Content-Length"] = String(end - start + 1); headers["Accept-Ranges"] = "bytes"
         if range != nil { headers["Content-Range"] = "bytes \(start)-\(end)/\(size)" }
         var head = "HTTP/1.1 \(range == nil ? "200 OK" : "206 Partial Content")\r\n"
@@ -768,7 +791,12 @@ private enum CloudflareBypass {
         "watchanimeworld.com", "desidubbed.in", "hindidubbed.in", "reanime.to", "reanime.net", "anikoto.to",
         "weebcentral.com", "nelomanga.com", "toongod.org", "www.toongod.org",
         "mangadot.net", "www.mangadot.net", "mangaball.net", "www.mangaball.net",
-        "bulbasaur.poke-black-and-white.net", "heracross.red-and-blue.net", "api.comick.dev"
+        "bulbasaur.poke-black-and-white.net", "heracross.red-and-blue.net", "api.comick.dev",
+        "webnovel.com", "novelfull.com", "royalroad.com", "justlightnovels.com",
+        "lightnovel.to", "novelbuddy.me", "novelbuddy.com", "novelfire.net",
+        "novelbin.com", "readnovelfull.com", "novelcool.com", "novgo.net",
+        "re-library.com", "woopread.com", "wuxiaworld.site", "divinedaolibrary.com",
+        "toonily.com", "onisaga.com"
     ]
     static func applies(_ url: URL) -> Bool {
         guard let host = url.host?.lowercased() else { return false }
@@ -784,9 +812,12 @@ private enum CloudflareBypass {
         }
     }
     static func isChallenge(_ status: Int, body: Data) -> Bool {
-        guard [403, 503, 429].contains(status) else { return false }
+        guard [200, 403, 503, 429].contains(status) else { return false }
         let text = String(decoding: body, as: UTF8.self).lowercased()
-        return ["cf-browser-verification", "cf_chl_", "cf-chl-", "challenge-platform", "turnstile", "just a moment", "attention required", "__cf_chl_tk"].contains(where: text.contains)
+        let markers = status == 200
+            ? ["cf-browser-verification", "cf_chl_", "cf-chl-", "challenge-platform", "just a moment", "__cf_chl_tk"]
+            : ["cf-browser-verification", "cf_chl_", "cf-chl-", "challenge-platform", "turnstile", "just a moment", "attention required", "__cf_chl_tk"]
+        return markers.contains(where: text.contains)
     }
     static func prepare(_ url: URL, headers: [String: String]) -> [String: String] {
         guard enabled, applies(url), let host = url.host?.lowercased() else { return headers }
@@ -980,7 +1011,9 @@ private final class UpstreamRelay: NSObject, URLSessionDataDelegate {
         guard dataTask.taskIdentifier == activeTaskID else { completionHandler(.cancel); return }
         self.response = response as? HTTPURLResponse
         if !sentHead, !didRetryChallenge, CloudflareBypass.enabled,
-           CloudflareBypass.applies(entry.url), [403, 503, 429].contains(self.response?.statusCode ?? 0) {
+           CloudflareBypass.applies(entry.url),
+           ([403, 503, 429].contains(self.response?.statusCode ?? 0)
+            || (self.response?.statusCode == 200 && response.mimeType?.lowercased() == "text/html")) {
             challengeCandidate = true
             completionHandler(.allow)
             return

@@ -1,0 +1,45 @@
+{
+  "name": "Tatakai",
+  "identifier": "me.tatakai.altstore",
+  "subtitle": "Extension-based anime & manga app for iOS",
+  "description": "Official Tatakai source for AltStore, SideStore and StikStore. Tatakai is an extension-based otaku community for tracking anime & manga — install the iOS build with your own Apple ID. Free accounts must refresh every 7 days.",
+  "iconURL": "https://tatakai.me/assets/logo/tatakai-logo-square.png",
+  "headerURL": "https://tatakai.me/assets/logo/tatakaibanner.png",
+  "website": "https://tatakai.me",
+  "tintColor": "#a855f7",
+  "featuredApps": [
+    "app.tatakai.me"
+  ],
+  "apps": [
+    {
+      "name": "Tatakai",
+      "bundleIdentifier": "app.tatakai.me",
+      "developerName": "Snozxyx",
+      "subtitle": "Discover, watch, and read — your way",
+      "localizedDescription": "Tatakai brings anime discovery, streaming, manga reading, and community features together in one customizable app. Its extension-first design lets you choose your sources.\n\nTHIS IS AN UNSIGNED BUILD for sideloading only: it cannot be installed directly. Add this source in AltStore / SideStore (or open the IPA in TrollStore) to sign it with your own Apple ID. Tatakai does not host media files; users access media through third-party extensions and are responsible for complying with applicable laws.",
+      "iconURL": "https://tatakai.me/assets/logo/tatakai-logo-square.png",
+      "tintColor": "#a855f7",
+      "category": "entertainment",
+      "version": "6.1.0",
+      "versionDate": "2026-10-14T02:39:50.681Z",
+      "versionDescription": "Tatakai 6.1.0 for iPhone & iPad. Unsigned build: sideload with AltStore, SideStore or TrollStore using your own Apple ID, then refresh before the 7-day free-account expiry. See the GitHub release notes for the full changelog.",
+      "downloadURL": "https://github.com/snozxyx/tatakai/releases/download/v6.1.0/Tatakai-v6.1.0-ios-unsigned.ipa",
+      "size": 0,
+      "screenshots": [],
+      "permissions": []
+    }
+  ],
+  "news": [
+    {
+      "identifier": "tatakai-6.1.0-ios-source",
+      "title": "Tatakai 6.1.0 available for sideloading",
+      "caption": "Add this source in AltStore or SideStore to install on iPhone & iPad.",
+      "date": "2026-10-14T02:39:50.681Z",
+      "tintColor": "#a855f7",
+      "imageURL": "https://tatakai.me/assets/logo/tatakaibanner.png",
+      "notify": false,
+      "url": "https://github.com/snozxyx/tatakai/releases/tag/v6.1.0",
+      "appID": "app.tatakai.me"
+    }
+  ]
+}

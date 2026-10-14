@@ -86,13 +86,14 @@ export default function MalRedirectPage() {
         if (errorParam) {
             setStatus('error');
             // MAL answers `invalid_client` (often as a native HTTP-auth prompt
-            // upstream) when the authorize redirect_uri doesn't exactly match the
-            // single URL registered in the MAL app settings. A comma-separated
-            // pair counts as one literal URL and always fails — surface that,
-            // naming the URI this build actually sent.
+            // upstream) when the authorize redirect_uri doesn't exactly match an
+            // entry in the MAL app settings. A comma/space-joined pair sent as
+            // one literal URL always fails — surface that, naming the URI this
+            // build actually sent. MAL supports MULTIPLE registered URLs (one
+            // per line) in the same app.
             const sentRedirect = safeReadMalRedirect();
             const hint = /invalid_client|redirect/i.test(errorParam)
-                ? `${errorParam} — the MAL app's registered redirect URI must exactly match the one sent (${sentRedirect || 'unknown'}): one URL, no comma-separated pair.`
+                ? `${errorParam} — the MAL app must list the sent URI (${sentRedirect || 'unknown'}) on its own line in App Redirect URL (multiple URLs go one per line, never comma-joined).`
                 : errorParam;
             setError(hint);
             toast.error(`MAL Error: ${errorParam}`);
@@ -162,7 +163,7 @@ export default function MalRedirectPage() {
                 // exactly what to check instead of leaving them retrying login.
                 const sentRedirect = safeReadMalRedirect();
                 const hinted = /invalid_client|redirect_uri|redirect/i.test(raw)
-                    ? `${raw} — check that the MAL app registers exactly one redirect URI matching the one sent (${sentRedirect || 'unknown'}), then reconnect from Settings → Integrations.`
+                    ? `${raw} — in the MAL app settings, list the sent URI (${sentRedirect || 'unknown'}) on its own line in App Redirect URL (one URL per line; canonical prod: https://tatakai.me/api/mal/redirect), then reconnect from Settings → Integrations.`
                     : raw;
                 setError(hinted);
                 toast.error('Failed to link MyAnimeList');

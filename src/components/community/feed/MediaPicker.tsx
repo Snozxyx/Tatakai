@@ -10,7 +10,7 @@ import { useSearch } from '@/hooks/api/useAnimeData';
 import { useAniListCharacterSearch } from '@/hooks/user/useProfileFeatures';
 import { ANILIST_GRAPHQL_ENDPOINT } from '@/lib/api/backendOrigin';
 
-export type MediaType = 'anime' | 'manga' | 'manhwa' | 'manhua' | 'comics' | 'character';
+export type MediaType = 'anime' | 'manga' | 'manhwa' | 'manhua' | 'comics' | 'novel' | 'character';
 export interface SelectedMedia {
   id: string;
   name: string;
@@ -18,14 +18,16 @@ export interface SelectedMedia {
   type: MediaType;
 }
 
-type Tab = 'anime' | 'manga' | 'character';
+type Tab = 'anime' | 'manga' | 'novel' | 'character';
 
 /** AniList classifies Korean/Chinese manga by country of origin, not format. */
 function classifyManga(countryOfOrigin?: string, format?: string): MediaType {
+  const f = (format || '').toUpperCase();
+  if (f === 'NOVEL' || f === 'LIGHT_NOVEL') return 'novel';
   const c = (countryOfOrigin || '').toUpperCase();
   if (c === 'KR') return 'manhwa';
   if (c === 'CN') return 'manhua';
-  if ((format || '').toUpperCase() === 'ONE_SHOT') return 'comics';
+  if (f === 'ONE_SHOT') return 'comics';
   return 'manga';
 }
 
@@ -89,18 +91,27 @@ export function MediaPicker({
   const manga = useQuery({
     queryKey: ['media-picker-manga', query],
     queryFn: () => searchAniListManga(query),
-    enabled: tab === 'manga' && query.length > 1,
+    enabled: (tab === 'manga' || tab === 'novel') && query.length > 1,
     staleTime: 5 * 60 * 1000,
   });
   const characters = useAniListCharacterSearch(tab === 'character' ? query : '', tab === 'character');
 
-  const loading = tab === 'anime' ? anime.isLoading : tab === 'manga' ? manga.isLoading : characters.isLoading;
+  const loading =
+    tab === 'anime'
+      ? anime.isLoading
+      : tab === 'character'
+        ? characters.isLoading
+        : manga.isLoading;
+  const mangaRows = (manga.data ?? []).filter((m) => m.type !== 'novel');
+  const novelRows = (manga.data ?? []).filter((m) => m.type === 'novel');
   const rows: SelectedMedia[] =
     tab === 'anime'
       ? (anime.data?.animes ?? []).map((a: any) => ({ id: String(a.id), name: a.name, poster: a.poster || null, type: 'anime' as MediaType }))
-      : tab === 'manga'
-        ? (manga.data ?? [])
-        : (characters.data ?? []).map((c: any) => ({
+      : tab === 'novel'
+        ? novelRows
+        : tab === 'manga'
+          ? mangaRows
+          : (characters.data ?? []).map((c: any) => ({
             id: String(c.id),
             name: c.name?.full || 'Unknown Character',
             poster: c.image?.large || c.image?.medium || null,
@@ -119,14 +130,14 @@ export function MediaPicker({
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       <PopoverContent align="start" className="w-80 p-3">
         <div className="mb-2 flex gap-1 rounded-lg bg-muted/40 p-1">
-          {(['anime', 'manga', 'character'] as Tab[]).map((t) => (
+          {(['anime', 'manga', 'novel', 'character'] as Tab[]).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setTab(t)}
               className={cn('flex-1 rounded-md px-2 py-1.5 text-xs font-medium capitalize transition-colors', tab === t ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground')}
             >
-              {t === 'manga' ? 'Manga' : t === 'character' ? 'Character' : 'Anime'}
+              {t === 'manga' ? 'Manga' : t === 'novel' ? 'Novels' : t === 'character' ? 'Character' : 'Anime'}
             </button>
           ))}
         </div>

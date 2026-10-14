@@ -110,18 +110,9 @@ Renderer + data contributions.
 - **`analytics`** *(data-driven)* — each `{ ingestUrl, events? }` becomes an
   ingest-POST analytics provider. See [analytics.md](capabilities/analytics.md).
 
-## Trust & permissions
+## Permissions
 
-```jsonc
-"sideloaded": true,
-"permissions": ["network:domain:commondatastorage.googleapis.com"]
-```
-
-- **`sideloaded`** *(boolean)* — when `true`, the extension is **trusted** (its
-  namespace mounts and its renderer bundle loads). Otherwise it must carry a
-  valid signature. See [overview.md](overview.md#trust-model).
-- **`permissions`** *(string[])* — capability grants; `network:domain:<host>`
-  scopes the `ctx.fetch` given to renderer code and documents host access.
+`permissions: ["network:domain:example.com"]` declares network access. Native packages still require id, name, version, type, and a permissions array. Legacy signature, signedBy, and sideloaded fields are accepted for migration and ignored.
 
 ## Full example
 

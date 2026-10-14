@@ -20,6 +20,7 @@ export class TorrentAdapter extends AbstractSourceAdapter {
   async load(options: AdapterLoadOptions): Promise<void> {
     await super.load(options);
     const { source, videoElement, startTime } = options;
+    options.signal?.throwIfAborted();
 
     // WatchPage may already resolve torrent playback to a playable HTTP URL.
     // In that case, treat the URL as final media and do not start a new session.
@@ -136,6 +137,7 @@ export class TorrentAdapter extends AbstractSourceAdapter {
 
       // 3. Get stream URL
       const stream = await (window as any).tatakaiRuntime.getTorrentStreamUrl(this.sessionId);
+      options.signal?.throwIfAborted();
       if (!stream.success) {
         throw new Error(stream.error || 'Failed to get torrent stream URL');
       }
@@ -179,7 +181,7 @@ export class TorrentAdapter extends AbstractSourceAdapter {
       videoElement.onerror = (e) => playbackEventBus.emit(PlayerEvents.ERROR, e);
 
     } catch (err: any) {
-      playbackEventBus.emit(PlayerEvents.ERROR, err.message);
+      if (!options.signal?.aborted) playbackEventBus.emit(PlayerEvents.ERROR, err.message);
       throw err;
     }
   }

@@ -258,10 +258,11 @@ export interface ExtensionContributions {
 
 /**
  * JSON descriptor stored on disk alongside the extension bundle.
- * Curated extensions include a `signature` and `signedBy` field;
- * sideloaded extensions set `sideloaded: true` and omit the signature.
+ * Packages install without signing; legacy signing fields are ignored.
  */
 export interface ExtensionManifest {
+  /** Scoped website hosts for desktop Seanime browser sessions. */
+  browserDomains?: string[];
   /** Unique, URL-safe identifier (e.g. "nyaasearch"). */
   id: string;
 
@@ -287,16 +288,16 @@ export interface ExtensionManifest {
    */
   permissions: string[];
 
-  /** Ed25519 signature of the extension bundle (curated extensions only). */
+  /** @deprecated Ignored legacy signing metadata. */
   signature?: string;
 
-  /** Identity of the signing authority (e.g. "tatakai-marketplace"). */
+  /** @deprecated Ignored legacy signing metadata. */
   signedBy?: string;
 
   /** ISO 8601 timestamp when the extension was approved. */
   approvedAt?: string;
 
-  /** `true` for extensions installed via sideloading. */
+  /** @deprecated Ignored legacy installation metadata. */
   sideloaded?: boolean;
 
   /** `true` if the extension has been deprecated and should not be installed. */

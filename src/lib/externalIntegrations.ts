@@ -564,7 +564,8 @@ export interface AniListMedia {
   favourites?: number | null;
   trending?: number | null;
   countryOfOrigin?: string | null;
-  startDate?: { year?: number | null };
+  startDate?: { year?: number | null; month?: number | null; day?: number | null };
+  studios?: { nodes?: Array<{ name?: string | null } | null> | null } | null;
 }
 
 // Search anime on AniList
@@ -728,6 +729,42 @@ export async function fetchAniListDiscover(filters: AniListSearchFilters = {}): 
 
   const data = await anilistQuery(query, variables);
   return data.Page?.media || [];
+}
+
+// Upcoming anime on AniList (NOT_YET_RELEASED by popularity). Routed through
+// the TatakaiAPI GraphQL proxy like every other AniList call — never directly
+// from the browser (avoids CORS + shared rate budget). Replaces the retired
+// direct-Jikan seasons/upcoming fetch.
+export async function fetchUpcomingAniListAnime(
+  page = 1,
+  perPage = 12,
+): Promise<AniListMedia[]> {
+  const query = `
+    query ($page: Int, $perPage: Int) {
+      Page(page: $page, perPage: $perPage) {
+        media(type: ANIME, status: NOT_YET_RELEASED, sort: [POPULARITY_DESC]) {
+          id
+          idMal
+          format
+          title { romaji english native }
+          coverImage { medium large }
+          episodes
+          status
+          seasonYear
+          season
+          genres
+          averageScore
+          popularity
+          countryOfOrigin
+          startDate { year month day }
+          studios { nodes { name } }
+        }
+      }
+    }
+  `;
+
+  const upcoming = await anilistQuery(query, { page, perPage });
+  return upcoming.Page?.media || [];
 }
 
 export async function fetchAniListMediaById(ids: {

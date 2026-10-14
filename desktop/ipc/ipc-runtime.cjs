@@ -15,7 +15,6 @@
  *   require('./ipc-runtime.cjs')(ipcMain, app, fs, path, logger, getMainWindow)
  */
 
-const crypto = require('crypto');
 const axios = require('axios');
 const { ExtensionRegistry } = require('../runtime/extension/extension-registry.cjs');
 const { ExtensionWorkerPool } = require('../runtime/extension/extension-worker-pool.cjs');
@@ -31,49 +30,6 @@ const { createShareTunnel } = require('../runtime/share-tunnel/share-tunnel.cjs'
 // Resolves to https://api.tatakai.me/api/v3 (VITE_BACKEND_ORIGIN); no localhost fallback.
 const TATAKAI_API_BASE = (process.env.VITE_BACKEND_ORIGIN || 'https://api.tatakai.me') + '/api/v3';
 
-// ── Tatakai Extension Marketplace Public Key (Ed25519) ────────────────────────
-// This is the public key used to verify signatures on curated extensions.
-// Extensions signed by the Tatakai marketplace will have their bundle content
-// verified against this key before being registered.
-//
-// Property 9: Signature verification gates installation
-// Validates: Requirements 6.3, 6.4, 10.1
-//
-const TATAKAI_PUBLIC_KEY_PEM = process.env.TATAKAI_EXT_PUBLIC_KEY ||
-    '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\n-----END PUBLIC KEY-----';
-
-/**
- * Verifies an Ed25519 signature on an extension bundle.
- *
- * The manifest's `signature` field must be a base64-encoded Ed25519 signature
- * over the raw UTF-8 bytes of the bundle file content.
- *
- * @param {string} bundleContent - Raw UTF-8 content of the extension bundle.
- * @param {string} signatureBase64 - Base64-encoded Ed25519 signature from the manifest.
- * @returns {boolean} `true` if the signature is valid, `false` otherwise.
- */
-function verifyExtensionSignature(bundleContent, signatureBase64) {
-    try {
-        const signatureBuffer = Buffer.from(signatureBase64, 'base64');
-        const bundleBuffer = Buffer.from(bundleContent, 'utf8');
-        return crypto.verify(
-            null, // Ed25519 does not use a separate hash algorithm
-            bundleBuffer,
-            {
-                key: TATAKAI_PUBLIC_KEY_PEM,
-                format: 'pem',
-                type: 'spki',
-                dsaEncoding: 'ieee-p1363',
-            },
-            signatureBuffer
-        );
-    } catch (_err) {
-        // Any error during verification (malformed key, bad signature format, etc.)
-        // is treated as a verification failure.
-        return false;
-    }
-}
-
 module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger, getMainWindow) {
     const emitRuntimeEvent = (event) => {
         const win = getMainWindow();
@@ -81,6 +37,24 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
             win.webContents.send('player:event', event);
         }
     };
+
+    ipcMain.handle('extension:configure', (_event, url) => {
+        const { BrowserWindow } = require('electron');
+        return require('../runtime/extension/configure-window.cjs').openConfigureWindow(BrowserWindow, getMainWindow(), url);
+    });
+
+    ipcMain.handle('extension:fetch-resource', async (_event, payload) => {
+        const url = new URL(payload.url);
+        if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) throw new Error('Invalid extension resource URL');
+        const response = await axios({ url: url.href, method: payload.method || 'GET', headers: payload.headers || {}, data: payload.body,
+            timeout: 15000, maxContentLength: 10 * 1024 * 1024, maxBodyLength: 1024 * 1024, responseType: 'text', validateStatus: () => true });
+        return { status: response.status, headers: response.headers, body: response.data };
+    });
+    ipcMain.handle('extension:proxy-source', async (_event, payload) => {
+        if (!/^https?:\/\//i.test(payload.url)) throw new Error('Invalid media URL');
+        await localProxy.ensureStarted();
+        return localProxy.registerSource({ url: payload.url, headers: payload.headers || {} });
+    });
 
     // ── Extension runtime singletons ──────────────────────────────────────────
     const registry = new ExtensionRegistry();
@@ -140,7 +114,7 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
     // Return shape: Array<{ id, name, version, type, capabilities: string[] }>
     //
     // `capabilities` is populated from manifest.capabilities (Task 1 — new optional
-    // string[] field on ExtensionManifest).  Toko sets ["manga","preview","websiteIndex"].
+    // string[] field on ExtensionManifest).   sets ["manga","preview","websiteIndex"].
     // Extensions that have no capabilities field get an empty array.
     //
     // Requirements: 1.5, 12.3
@@ -185,7 +159,7 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
 
     // ── share:* — host-hosted watch-party tunnel ──────────────────────────────
     //
-    // WS2: the desktop host resolves a stream locally (toko + localProxy), then
+    // WS2: the desktop host resolves a stream locally ( localProxy), then
     // exposes the loopback proxy to the internet via a Cloudflare quick tunnel so
     // every participant plays the host's single public URL, synced to the host
     // clock. Hosting requires the bundled/PATH `cloudflared`; if it's missing the
@@ -376,7 +350,7 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
                 : loaded.slice(); // copy so we can mutate without affecting registry state
 
             // Requirements: 13.1 — priority-ordered resolution (lower = earlier).
-            // Replaces the former hardcoded Toko-first splice: extensions declare
+            // Replaces the former hardcoded Extension-first splice: extensions declare
             // `priority` in their manifest (default 100); the primary extension ships
             // `priority: 0` to lead. Stable tiebreak preserves the registry order.
             const origOrder = new Map(targetExtensionIds.map((id, i) => [id, i]));
@@ -537,66 +511,12 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
             const extensionsDir = path.join(app.getPath('userData'), 'extensions');
             const bundlePath = path.join(extensionsDir, extensionId, 'bundle.js');
 
-            // Step 2/3 — Signature verification for curated (non-sideloaded) extensions
-            if (!manifest.sideloaded) {
-                if (fs.existsSync(bundlePath)) {
-                    // Bundle is already on disk — verify its signature before (re-)registering.
-                    const bundleContent = fs.readFileSync(bundlePath, 'utf8');
-                    const signature = manifest.signature;
-
-                    if (!signature) {
-                        logger.warn(`[Extension] Load rejected — missing signature: ${extensionId}`);
-                        return {
-                            success: false,
-                            error: 'Extension signature invalid — installation aborted',
-                        };
-                    }
-
-                    const valid = verifyExtensionSignature(bundleContent, signature);
-                    if (!valid) {
-                        logger.warn(`[Extension] Load rejected — invalid signature: ${extensionId}`);
-                        return {
-                            success: false,
-                            error: 'Extension signature invalid — installation aborted',
-                        };
-                    }
-
-                    logger.info(`[Extension] Signature verified: ${extensionId}`);
-                } else {
-                    // Bundle not yet on disk — verify the signature field is present so
-                    // that when the bundle is later written and the extension is re-loaded,
-                    // the signature check will have something to verify against.
-                    if (!manifest.signature) {
-                        logger.warn(`[Extension] Load rejected — missing signature (no bundle): ${extensionId}`);
-                        return {
-                            success: false,
-                            error: 'Extension signature invalid — installation aborted',
-                        };
-                    }
-
-                    // Persist the manifest directory so the bundle can be written later.
-                    const extDir = path.join(extensionsDir, extensionId);
-                    if (!fs.existsSync(extDir)) fs.mkdirSync(extDir, { recursive: true });
-                    fs.writeFileSync(
-                        path.join(extDir, 'manifest.json'),
-                        JSON.stringify(manifest, null, 2),
-                        'utf8'
-                    );
-                }
-            } else {
-                // Step 4 — Sideloaded extension: skip signature verification.
-                // Persist manifest directory if bundle is not yet present.
-                if (!fs.existsSync(bundlePath)) {
-                    const extDir = path.join(extensionsDir, extensionId);
-                    if (!fs.existsSync(extDir)) fs.mkdirSync(extDir, { recursive: true });
-                    fs.writeFileSync(
-                        path.join(extDir, 'manifest.json'),
-                        JSON.stringify(manifest, null, 2),
-                        'utf8'
-                    );
-                }
-                logger.info(`[Extension] Sideloaded (signature skipped): ${extensionId}`);
+            if (!isValidExtensionId(extensionId) || manifest?.id !== extensionId) {
+                return { success: false, error: 'Invalid extension identifier' };
             }
+            const extDir = path.join(extensionsDir, extensionId);
+            if (!fs.existsSync(extDir)) fs.mkdirSync(extDir, { recursive: true });
+            fs.writeFileSync(path.join(extDir, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
 
             // Step 5 — Register in the in-memory registry
             registry.register(extensionId, manifest, bundlePath);
@@ -683,7 +603,7 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
         }
 
         // ── Manga IPC methods (generic across extensions) ─────────────────────
-        // Manga is NOT Toko-specific: any loaded extension whose manifest
+        // Manga is NOT specific: any loaded extension whose manifest
         // advertises the `manga`/`chapters` capability answers here. This IPC
         // path is the fallback for when the in-app extension-API host (the
         // primary HTTP transport) has not come up; it fans out across every
@@ -803,11 +723,125 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
             }
         }
 
+        // ── Novel IPC methods (generic across extensions) ─────────────────────
+        // Novels are NOT Toko-specific: any loaded extension whose manifest
+        // advertises the `novel`/`chapters` capability answers here. This IPC
+        // path mirrors the manga fan-out so 4+ providers can contribute at
+        // once when the in-app extension-API host has not come up.
+        const listNovelExtensionEntries = () => {
+            const out = [];
+            for (const id of registry.listLoaded()) {
+                if (registry.isKillSwitched(id)) continue;
+                const entry = registry.lookup(id);
+                const caps = Array.isArray(entry?.manifest?.capabilities) ? entry.manifest.capabilities : [];
+                if (!caps.includes('novel') && !caps.includes('chapters')) continue;
+                if (!entry.bundlePath || !fs.existsSync(entry.bundlePath)) continue;
+                out.push({ id, entry });
+            }
+            return out;
+        };
+
+        if (method === 'getNovelChapters') {
+            try {
+                const novelExts = listNovelExtensionEntries();
+                if (novelExts.length === 0) return { chapters: [] };
+                await ensureExtensionFetchProxy();
+
+                // The bundle returns nested NovelChapterEntry[] ({ number,
+                // title, volume, sources: [{ provider, chapterKey, ... }]}).
+                // Flatten to one row per (chapter, source) like the manga
+                // path so the layers agree.
+                const chapters = [];
+                const seenKeys = new Set();
+                for (const { id, entry } of novelExts) {
+                    try {
+                        const code = fs.readFileSync(entry.bundlePath, 'utf8');
+                        await workerPool.getOrSpawn(id, code, entry.manifest);
+                        const result = await workerPool.invoke(id, 'getNovelChapters', [tokoPayload]);
+                        const entries = Array.isArray(result) ? result : (result?.chapters || result?.data || []);
+                        for (const ch of Array.isArray(entries) ? entries : []) {
+                            const sources = Array.isArray(ch?.sources) ? ch.sources : [];
+                            for (const src of sources) {
+                                if (!src?.chapterKey || seenKeys.has(src.chapterKey)) continue;
+                                seenKeys.add(src.chapterKey);
+                                chapters.push({
+                                    number: ch.number,
+                                    title: ch.title ?? null,
+                                    volume: ch.volume ?? null,
+                                    provider: src.provider ?? null,
+                                    chapterKey: src.chapterKey,
+                                    providerChapterId: src.providerChapterId ?? src.chapterKey,
+                                    language: src.language ?? null,
+                                    translator: src.translator ?? src.scanlator ?? null,
+                                    releaseDate: src.releaseDate ?? null,
+                                });
+                            }
+                        }
+                    } catch (extErr) {
+                        logger.warn(`[Extension] getNovelChapters failed for ${id}:`, extErr.message);
+                    }
+                }
+                return { chapters };
+            } catch (err) {
+                logger.error('[Extension] getNovelChapters error:', err.message);
+                return { success: false, error: err.message };
+            }
+        }
+
+        if (method === 'getNovelContent') {
+            try {
+                const novelExts = listNovelExtensionEntries();
+                if (novelExts.length === 0) return { paragraphs: [] };
+                await ensureExtensionFetchProxy();
+
+                // A chapter is owned by exactly one provider; a non-owning
+                // one rejects the foreign chapterKey. Try each until one
+                // yields paragraphs.
+                for (const { id, entry } of novelExts) {
+                    let content = null;
+                    try {
+                        const code = fs.readFileSync(entry.bundlePath, 'utf8');
+                        await workerPool.getOrSpawn(id, code, entry.manifest);
+                        content = await workerPool.invoke(id, 'getNovelContent', [tokoPayload]);
+                    } catch (extErr) {
+                        logger.warn(`[Extension] getNovelContent failed for ${id}:`, extErr.message);
+                        continue;
+                    }
+                    const paragraphs = Array.isArray(content)
+                        ? content
+                        : Array.isArray(content?.paragraphs)
+                            ? content.paragraphs
+                            : [];
+                    const texts = paragraphs
+                        .map((p, idx) => typeof p === 'string'
+                            ? { index: idx, text: p }
+                            : { index: typeof p?.index === 'number' ? p.index : idx, text: String(p?.text || '') })
+                        .filter((p) => p.text.trim());
+                    if (texts.length === 0) continue;
+                    return {
+                        paragraphs: texts,
+                        title: content?.title ?? null,
+                        number: content?.number ?? null,
+                        provider: content?.provider ?? id,
+                    };
+                }
+                return { paragraphs: [] };
+            } catch (err) {
+                logger.error('[Extension] getNovelContent error:', err.message);
+                return { success: false, error: err.message };
+            }
+        }
+
         // ── Generic extension invoke fallthrough ──────────────────────────────
         const entry = registry.lookup(extensionId);
         if (!entry) return { success: false, error: 'Extension not loaded' };
         if (registry.isKillSwitched(extensionId)) return { success: false, error: 'Extension is blocked by kill-switch' };
-        if (entry.suspendedAt !== null) return { success: false, error: 'Extension is suspended (cumulative timeout exceeded)' };
+        // Clear the retired lifetime-timeout suspension on the next request.
+        // Kill-switch blocks above remain authoritative.
+        if (entry.suspendedAt !== null) {
+            entry.suspendedAt = null;
+            entry.cumulativeMs = 0;
+        }
 
         try {
             if (!fs.existsSync(entry.bundlePath)) {
@@ -818,23 +852,15 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
             await workerPool.getOrSpawn(extensionId, extensionCode, entry.manifest);
 
             const startedAt = Date.now();
+            const browserWaitAtStart = workerPool.getBrowserWaitMs(extensionId);
             const rawResult = await withCallTimeout(
                 workerPool.invoke(extensionId, method, Array.isArray(args) ? args : [args]),
                 extensionId,
-                CALL_TIMEOUT_MS
+                workerPool.getCallTimeoutMs(extensionId)
             );
-            const elapsed = Date.now() - startedAt;
+            const elapsed = Math.max(0, Date.now() - startedAt - (workerPool.getBrowserWaitMs(extensionId) - browserWaitAtStart));
 
             entry.cumulativeMs += elapsed;
-            if (entry.cumulativeMs >= 120_000) {
-                entry.suspendedAt = Date.now();
-                workerPool.terminate(extensionId);
-                const win = getMainWindow();
-                if (win && !win.isDestroyed()) {
-                    win.webContents.send('player:event', { type: 'extension-suspended', extensionId });
-                }
-                logger.warn(`[Extension] Suspended (cumulative timeout): ${extensionId}`);
-            }
 
             return enforcePayloadLimit({ success: true, result: rawResult });
         } catch (err) {
@@ -846,6 +872,7 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
 
     ipcMain.handle('extension:set-kill-switch', async (_event, extensionId, blocked) => {
         registry.setKillSwitch(extensionId, !!blocked);
+        if (blocked) workerPool.terminate(extensionId);
         appendAudit('extension-kill-switch', { extensionId, blocked: !!blocked });
         return { success: true, extensionId, blocked: !!blocked };
     });
@@ -862,30 +889,54 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
         }
     });
 
-    ipcMain.handle('extension:sideload-manifest', async (_event, manifestInput, bundleCode) => {
+    const installManifestHandler = async (_event, manifestInput, bundleCode) => {
         try {
             const manifest = typeof manifestInput === 'string' ? JSON.parse(manifestInput) : manifestInput;
             const required = ['id', 'name', 'version', 'type', 'permissions'];
             const missing = required.filter((k) => manifest?.[k] == null || manifest?.[k] === '');
             if (missing.length > 0) return { success: false, error: `missing_fields:${missing.join(',')}` };
+            if (!Array.isArray(manifest.permissions) || !manifest.permissions.every(p => typeof p === 'string') || (bundleCode != null && (typeof bundleCode !== 'string' || bundleCode.length > 50 * 1024 * 1024))) return { success: false, error: 'invalid_package' };
             const extensionId = String(manifest.id);
             if (!isValidExtensionId(extensionId)) {
                 return { success: false, error: 'invalid_extension_id' };
             }
             const extensionsDir = path.join(app.getPath('userData'), 'extensions', extensionId);
             if (!fs.existsSync(extensionsDir)) fs.mkdirSync(extensionsDir, { recursive: true });
-            const normalizedManifest = { ...manifest, sideloaded: true };
+            if (registry.isKillSwitched(extensionId)) return { success: false, error: 'extension_kill_switched' };
+            const normalizedManifest = { ...manifest };
+            delete normalizedManifest.signature; delete normalizedManifest.signedBy; delete normalizedManifest.sideloaded;
             fs.writeFileSync(path.join(extensionsDir, 'manifest.json'), JSON.stringify(normalizedManifest, null, 2), 'utf8');
             if (bundleCode && typeof bundleCode === 'string') {
                 fs.writeFileSync(path.join(extensionsDir, 'bundle.js'), bundleCode, 'utf8');
             }
             registry.register(extensionId, normalizedManifest, path.join(extensionsDir, 'bundle.js'));
-            appendAudit('extension-sideload', { extensionId });
+            appendAudit('extension-install', { extensionId });
             return { success: true, extensionId };
         } catch (err) {
             return { success: false, error: err.message };
         }
+    };
+
+    ipcMain.handle('extension:set-enabled', async (_event, id, enabled) => {
+        if (!isValidExtensionId(id)) return { success: false, error: 'invalid_extension_id' };
+        const manifestPath = path.join(app.getPath('userData'), 'extensions', id, 'manifest.json');
+        if (!fs.existsSync(manifestPath)) return { success: false, error: 'not_installed' };
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+        manifest.enabled = !!enabled; fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+        if (!enabled) { workerPool.terminate(id); registry.unregister(id); }
+        return { success: true };
     });
+    ipcMain.handle('extension:remove', async (_event, id) => {
+        if (!isValidExtensionId(id)) return { success: false, error: 'invalid_extension_id' };
+        const root = path.resolve(app.getPath('userData'), 'extensions');
+        const target = path.resolve(root, id);
+        if (!target.startsWith(root + path.sep)) return { success: false, error: 'invalid_path' };
+        workerPool.terminate(id); registry.unregister(id);
+        fs.rmSync(target, { recursive: true, force: true });
+        return { success: true };
+    });
+    ipcMain.handle('extension:sideload-manifest', installManifestHandler);
+    ipcMain.handle('extension:install-manifest', installManifestHandler);
 
     // ── network:get-warp-status ───────────────────────────────────────────────
     ipcMain.handle('network:get-warp-status', async () => {
@@ -1021,6 +1072,7 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
             const { bundlePath } = installKaiExtension(parsed, extensionsDir, fs, path);
 
             registry.register(extensionId, parsed.manifest, bundlePath);
+            extensionApiHost.refresh();
             appendAudit('extension-load-kai', {
                 extensionId,
                 version: parsed.manifest.version,
@@ -1028,7 +1080,7 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
                 signatureValid: parsed.signatureValid,
             });
 
-            logger.info(`[Extension] .kai loaded: ${extensionId} v${parsed.manifest.version} sideloaded=${parsed.isSideloaded}`);
+            logger.info(`[Extension] .kai loaded: ${extensionId} v${parsed.manifest.version} `);
 
             return {
                 success: true,
@@ -1267,15 +1319,6 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
             if (!entry) return { success: false, error: 'Extension not loaded' };
 
             const manifest = entry.manifest || {};
-            // Trust gate — renderer code executes with app privileges.
-            const trusted =
-                manifest.sideloaded === true ||
-                (typeof manifest.signature === 'string' && manifest.signature.length > 0);
-            if (!trusted) {
-                logger.warn(`[Extension] get-renderer-bundle refused (untrusted): ${extensionId}`);
-                return { success: false, error: 'Extension not trusted (renderer code requires sideloaded or signed)' };
-            }
-
             const rendererEntry = manifest.contributes && manifest.contributes.rendererEntry;
             if (!rendererEntry || typeof rendererEntry !== 'string') {
                 return { success: false, error: 'No renderer entry declared' };
@@ -1438,7 +1481,7 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
 
                 registry.register(extensionId, manifest, bundlePath);
                 console.log('[AutoLoad] ✅ Registered:', extensionId, 'bundlePath:', bundlePath);
-                loggerArg.info(`[Toko] Auto-loaded ${manifest.id} v${manifest.version}`);
+                loggerArg.info(`[Extensions] Auto-loaded ${manifest.id} v${manifest.version}`);
             } catch (err) {
                 console.error('[AutoLoad] Unexpected error for', dirName, err.message);
                 loggerArg.warn(`[Extensions] Auto-load skipped ${dirName}: ${err.message}`);
@@ -1488,6 +1531,7 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
                 }
 
                 const manifest = JSON.parse(fsArg.readFileSync(manifestPath, 'utf8'));
+                if (manifest.enabled === false) continue;
                 const extensionId = manifest.id;
                 if (!extensionId) {
                     console.warn('[AutoLoadInstalled] Manifest missing id for', dirName);
@@ -1507,7 +1551,7 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
 
                 registry.register(extensionId, manifest, bundlePath);
                 console.log('[AutoLoadInstalled] ✅ Registered:', extensionId);
-                loggerArg.info(`[Toko] Auto-loaded installed extension ${manifest.id} v${manifest.version}`);
+                loggerArg.info(`[Extensions] Auto-loaded installed extension ${manifest.id} v${manifest.version}`);
             } catch (err) {
                 console.error('[AutoLoadInstalled] Unexpected error for', dirName, err);
             }

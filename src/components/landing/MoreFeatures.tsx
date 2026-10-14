@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useMotionPreference } from "@/hooks/ui/useMotionPreference";
 import { animate, stagger } from "animejs";
 import { gsap } from "gsap";
@@ -40,13 +40,12 @@ const extras: Extra[] = [
 // Breadth strip — scrolled by GSAP, kept honest against the feature list.
 const marquee = [
   "Airing calendar", "Plan to watch", "25+ themes", "Web", "Desktop",
-  "Android soon", "trace.moe search", "Watch parties", "Tier lists",
+  "Android", "IOS", "trace.moe search", "Watch parties", "Tier lists",
   "Forums", "Leaderboards", "Playlists", "MAL & AniList sync", "Lite mode",
 ];
 
 export function MoreFeatures() {
   const reduceMotion = useMotionPreference();
-  const [marqueePaused, setMarqueePaused] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
   const marqueeRef = useRef<HTMLDivElement>(null);
 
@@ -90,12 +89,12 @@ export function MoreFeatures() {
   // GSAP: seamless auto-scrolling breadth strip. Static under reduced motion.
   useEffect(() => {
     const track = marqueeRef.current;
-    if (!track || reduceMotion || marqueePaused) return;
+    if (!track || reduceMotion) return;
     const ctx = gsap.context(() => {
       gsap.to(track, { xPercent: -50, ease: "none", duration: 28, repeat: -1 });
     }, track);
     return () => ctx.revert();
-  }, [reduceMotion, marqueePaused]);
+  }, [reduceMotion]);
 
   return (
     <section className="py-16 lg:py-24">
@@ -129,11 +128,6 @@ export function MoreFeatures() {
       </div>
 
       {/* GSAP marquee — the breadth, at a glance */}
-      {!reduceMotion && (
-        <button type="button" onClick={() => setMarqueePaused(value => !value)} aria-pressed={marqueePaused} className="mt-8 min-h-11 rounded-xl border border-white/20 px-4 text-sm text-white hover:bg-white/10">
-          {marqueePaused ? "Resume feature strip" : "Pause feature strip"}
-        </button>
-      )}
       <div className="relative mt-12 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] py-4">
         <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-24 bg-gradient-to-r from-black to-transparent" />
         <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-24 bg-gradient-to-l from-black to-transparent" />

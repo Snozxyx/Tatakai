@@ -26,6 +26,7 @@ module.exports = function registerMediaHandlers(ipcMain, app, logger) {
             try {
                 const content = await fs.promises.readFile(outputPath, 'utf8');
                 const dataUrl = `data:text/vtt;charset=utf-8,${encodeURIComponent(content)}`;
+                await fs.promises.unlink(outputPath).catch(() => {});
                 return { success: true, url: dataUrl };
             } catch {
                 const normalizedPath = outputPath.replace(/\\/g, '/');
@@ -88,7 +89,9 @@ module.exports = function registerMediaHandlers(ipcMain, app, logger) {
                 return { success: false, error: 'Access denied: subtitles must be inside Tatakai library or temp media folder' };
             }
 
-            const content = await fs.promises.readFile(normalizedPath, 'utf8');
+            const { normalizeSubtitleToVtt } = await import('../../src/core/player/subtitle-core.js');
+            const content = normalizeSubtitleToVtt(await fs.promises.readFile(normalizedPath, 'utf8'));
+            if (!content || !content.includes('-->')) return { success: false, error: 'Subtitle contains no readable cues' };
             // Return as data URL
             const dataUrl = `data:text/vtt;charset=utf-8,${encodeURIComponent(content)}`;
             return { success: true, url: dataUrl };

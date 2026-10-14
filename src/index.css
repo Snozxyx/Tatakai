@@ -432,6 +432,16 @@ html.high-contrast a {
     display: none;
   }
 
+  /* Home rails remain swipeable without browser scrollbar chrome. */
+  [data-mobile-home] :is([data-mobile-home-rail], [data-mobile-poster-grid], [data-mobile-trending-grid], .overflow-x-auto) {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  [data-mobile-home] :is([data-mobile-home-rail], [data-mobile-poster-grid], [data-mobile-trending-grid], .overflow-x-auto)::-webkit-scrollbar {
+    display: none;
+  }
+
   /* Alias used by the profile tabs, community rails and forum sidebar. Same
      intent as .scrollbar-hide — scroll horizontally without a visible bar. */
   .no-scrollbar {
@@ -976,8 +986,10 @@ html.mobile-player-fullscreen [data-mobile-nav] {
   display: none !important;
 }
 
-/* Remove the top padding added for the titlebar */
-.app-fullscreen>div,
+/* Remove the top padding added for the titlebar. NOTE: `.app-fullscreen>div`
+   never matched anything (<html>'s children are <head>/<body>), so the reset
+   keys off an explicit MainLayout hook instead. */
+.app-fullscreen [data-main-layout],
 .app-fullscreen .min-h-screen {
   padding-top: 0 !important;
 }
@@ -996,6 +1008,14 @@ html.mobile-player-fullscreen [data-mobile-nav] {
 .titlebar-hidden [data-titlebar] {
   display: none !important;
 }
+
+.novel-reader-shell { height: calc(100dvh - var(--novel-titlebar-offset, 0px)); }
+/* NOTE: `.desktop-app` lives on <body> but `.app-fullscreen` / `.mac-app` /
+   `.titlebar-hidden` live on <html> — the guards must be evaluated on <html>,
+   otherwise the 32px titlebar offset survives into fullscreen (and on macOS /
+   hidden-titlebar) and leaves a 32px gap at the bottom of the reader. */
+html:not(.app-fullscreen):not(.mac-app):not(.titlebar-hidden) body.desktop-app .novel-reader-shell { --novel-titlebar-offset: 32px; }
+.novel-reader-shell:fullscreen { height: 100dvh; }
 
 /* Mobile subtitle adjustments */
 @media (max-width: 768px) {

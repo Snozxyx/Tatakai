@@ -109,6 +109,10 @@ function applyDataDriven(row: InstalledRow) {
 export async function bootstrapExtensions(navigate: (path: string) => void): Promise<void> {
   if (booted) return;
   booted = true;
+  const { migrateExtensionStorage } = await import("./ecosystems");
+  migrateExtensionStorage();
+  const { hydrateRemoteExtensions } = await import("./remote/installed");
+  await hydrateRemoteExtensions().catch(() => undefined);
 
   const w = (typeof window !== 'undefined' ? window : {}) as BootRuntime;
   const list = w.electron?.listInstalledExtensions;

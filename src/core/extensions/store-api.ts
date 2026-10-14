@@ -1,3 +1,4 @@
+import { ecosystemOf, type ExtensionEcosystem, type Compatibility } from "./ecosystems";
 /**
  * Client for the extension service (docs/Plans.md §3 — "Extension Service API").
  *
@@ -16,6 +17,7 @@ import { Capacitor, CapacitorHttp } from '@capacitor/core';
 
 /** A published build. `download_url` is the release asset itself. */
 export interface StoreVersionRow {
+  manifest_url?: string | null;
   id: string;
   version: string;
   changelog?: string | null;
@@ -30,6 +32,8 @@ export interface StoreVersionRow {
 }
 
 export interface StoreExtensionRow {
+  ecosystem?: string; manifest_url?: string | null; compatibility?: Compatibility; compatibility_reason?: string | null; source_url?: string | null; catalog_available?: boolean;
+  upstream_type?: string | null;
   id: string;
   /** The publisher's own id — `Toko`, not the service's uuid. */
   extension_id?: string | null;
@@ -77,6 +81,7 @@ interface StoreListEnvelope<T> {
 export type StoreExtensionType = 'torrent' | 'onlinestream' | 'custom';
 
 export interface StoreVersion {
+  manifestUrl?: string;
   id: string;
   version: string;
   changelog: string;
@@ -93,6 +98,8 @@ export interface StoreVersion {
 
 /** The shape every store surface renders. */
 export interface StoreExtension {
+  upstreamType?: string;
+  ecosystem?: ExtensionEcosystem; manifestUrl?: string; compatibility?: Compatibility; compatibilityReason?: string; sourceUrl?: string;
   /** Service uuid — what `/extension/:extension` and the routes key on. */
   id: string;
   /** Publisher id, used by the runtime's installed-extension bookkeeping. */
@@ -221,6 +228,7 @@ function toVersion(row: StoreVersionRow): StoreVersion {
     downloadUrl: row.download_url ?? undefined,
     downloadEndpoint: row.download_endpoint ?? undefined,
     publishedAt: row.created_at ?? undefined,
+    manifestUrl: row.manifest_url ?? undefined,
   };
 }
 
@@ -238,6 +246,9 @@ export function toStoreExtension(row: StoreExtensionRow): StoreExtension {
 
   return {
     id: row.id,
+    ecosystem: ecosystemOf(row.ecosystem), manifestUrl: row.manifest_url ?? undefined,
+    compatibility: row.catalog_available === false ? "unavailable" : row.compatibility ?? "supported", compatibilityReason: row.compatibility_reason ?? undefined, sourceUrl: row.source_url ?? undefined,
+    upstreamType: row.upstream_type || undefined,
     slug: String(row.extension_id ?? row.id ?? '').trim() || row.id,
     name: String(row.name ?? '').trim() || 'Untitled extension',
     description: String(row.description ?? '').trim(),
@@ -349,6 +360,8 @@ export function extensionAliases(extension: Pick<StoreExtension, 'id' | 'slug'>)
 }
 
 export interface StoreListParams {
+  search?: string;
+  ecosystem?: string; compatibility?: string;
   limit?: number;
   offset?: number;
   type?: StoreExtensionType | 'all';
@@ -381,13 +394,15 @@ export async function fetchStoreExtensions(
   signal?: AbortSignal,
 ): Promise<StoreListResult> {
   const query = new URLSearchParams();
+  if (params.ecosystem && params.ecosystem !== 'all') query.set('ecosystem', params.ecosystem);
+  if (params.compatibility && params.compatibility !== 'all') query.set('compatibility', params.compatibility);
   if (params.limit) query.set('limit', String(params.limit));
   if (params.offset) query.set('offset', String(params.offset));
   if (params.type && params.type !== 'all') query.set('type', params.type);
 
   const suffix = query.toString();
   const envelope = await requestJson<StoreListEnvelope<StoreExtensionRow>>(
-    `/extension${suffix ? `?${suffix}` : ''}`,
+    `/extension${params.search ? `/search/${encodeURIComponent(params.search)}` : ""}${suffix ? `?${suffix}` : ''}`,
     signal,
   );
   return toListResult(envelope, params);

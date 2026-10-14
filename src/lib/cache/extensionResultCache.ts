@@ -45,6 +45,7 @@ interface MemEntry {
 }
 
 const mem = new Map<string, MemEntry>();
+let cacheEpoch = 0;
 
 // Debounced Dexie writers, coalesced per key so a burst of per-event writes
 // during streaming collapses into one IndexedDB put.
@@ -100,8 +101,10 @@ export function readCachedItemsSync<T = any>(key: string): T[] | null {
  */
 export async function hydrateCachedItems<T = any>(key: string): Promise<T[] | null> {
   if (!ENABLED) return null;
+  const epoch = cacheEpoch;
   try {
     const row = await db.kv.get(K(key));
+    if (epoch !== cacheEpoch) return null;
     if (!row) return null;
     const ttlMs = (row.ttl ?? 0) * 1000;
     const createdAt = row.createdAt ? new Date(row.createdAt).getTime() : 0;
@@ -123,6 +126,18 @@ export async function hydrateCachedItems<T = any>(key: string): Promise<T[] | nu
   } catch {
     return null;
   }
+}
+
+/** Delete matching chapter snapshots from memory and storage, including queued writes. */
+export async function clearCachedItemsByPrefix(prefix: string): Promise<void> {
+  cacheEpoch++;
+  for (const key of mem.keys()) if (key.startsWith(prefix)) mem.delete(key);
+  for (const [key, timer] of pendingTimers) {
+    if (!key.startsWith(prefix)) continue;
+    clearTimeout(timer);
+    pendingTimers.delete(key);
+  }
+  await db.kv.where('key').startsWith(K(prefix)).delete();
 }
 
 /**

@@ -424,6 +424,9 @@ jobs:
       (needs.build-desktop.result == 'success' || needs.build-desktop.result == 'failure')
 
     steps:
+      - name: Checkout code (for AltStore source generator)
+        uses: actions/checkout@v4
+
       - name: Download desktop artifacts — Windows
         uses: actions/download-artifact@v4
         with:
@@ -457,6 +460,25 @@ jobs:
           name: tatakai-ios-unsigned
           path: mobile-artifacts/ios
 
+      # Regenerate the AltStore/SideStore/StikStore source with the real IPA
+      # byte size (the committed file ships size 0 as a placeholder). The
+      # script auto-detects mobile-artifacts/ios/*.ipa. This copy is attached
+      # to the release as a fallback; the canonical hosted source is
+      # public/altstore/apps.json served at https://tatakai.me/altstore/apps.json
+      # (updated whenever the version bump commit lands + Vercel deploys).
+      - name: Setup Node.js (release job)
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Regenerate AltStore source with real IPA size
+        shell: bash
+        run: |
+          set -e
+          node scripts/generate-altstore-source.mjs --out altstore-apps.json
+          node -e "JSON.parse(require('fs').readFileSync('altstore-apps.json','utf8')); console.log('apps.json is valid JSON')"
+          ls -la altstore-apps.json mobile-artifacts/ios/
+
       - name: Upload all artifacts to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -475,6 +497,7 @@ jobs:
             desktop-artifacts/linux/latest-linux.yml
             mobile-artifacts/android/*.apk
             mobile-artifacts/ios/*.ipa
+            altstore-apps.json
           draft: false
           prerelease: false
           append_body: true
@@ -511,6 +534,16 @@ jobs:
               with your own Apple account/tool (AltStore / SideStore / TrollStore).
               iOS cannot install an unsigned IPA directly.
             - Mobile update checks open this release page; the app never self-installs.
+
+            ### Sideload stores & open-source clients
+            - iOS (AltStore / SideStore / StikStore): add the official source
+              `https://tatakai.me/altstore/apps.json` (Sources tab → + → paste URL),
+              or use the `altstore-apps.json` file attached to this release.
+              TrollStore users can open the unsigned `.ipa` directly — no Apple ID refresh needed.
+            - Android (Obtainium / Droid-ify / Neo Store): track
+              `github.com/snozxyx/tatakai` in your client to get update notices for
+              the APK above. F-Droid listing is in preparation — note its builds will
+              be F-Droid-signed and cannot update over this developer-signed APK.
 
             ### Web
             - Visit [tatakai.me](https://tatakai.me)

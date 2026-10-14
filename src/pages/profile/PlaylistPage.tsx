@@ -103,10 +103,13 @@ function isUuidLike(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
-type PlaylistMediaKind = 'anime' | 'manga';
+type PlaylistMediaKind = 'anime' | 'manga' | 'novel';
 
 function parsePlaylistMediaRef(value: string): { kind: PlaylistMediaKind; id: string } {
   const raw = String(value || '').trim();
+  if (raw.toLowerCase().startsWith('novel:')) {
+    return { kind: 'novel', id: raw.slice(6) };
+  }
   if (raw.toLowerCase().startsWith('manga:')) {
     return { kind: 'manga', id: raw.slice(6) };
   }
@@ -118,6 +121,9 @@ function parsePlaylistMediaRef(value: string): { kind: PlaylistMediaKind; id: st
 
 function getPlaylistItemHref(animeId: string): string {
   const media = parsePlaylistMediaRef(animeId);
+  if (media.kind === 'novel') {
+    return `/novel/${encodeURIComponent(media.id)}`;
+  }
   if (media.kind === 'manga') {
     return `/manga/${encodeURIComponent(media.id)}`;
   }

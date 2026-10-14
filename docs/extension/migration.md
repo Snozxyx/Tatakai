@@ -50,17 +50,11 @@ None are required; all are validated only if present
 | `priority` | Ordering (see above) |
 | `capabilities[]` | Explicit capability declarations |
 
-Manifest validation (`kai-format.cjs`) did **not** add these to
-`REQUIRED_MANIFEST_FIELDS` and did **not** change the signature model. Existing
-`.kai` files remain valid.
+Manifest validation retains the required package fields. Existing packages and cached bundles remain usable; signing metadata is ignored. Local installation records migrate to neutral keys without changing enabled state. The old install-manifest bridge alias remains available for one release.
 
-## 4. Trust boundary unchanged in spirit, wider in reach
+## 4. Ecosystem adapters
 
-The `sideloaded === true || valid signature` gate already governed whether a
-bundle could be `require()`d in-process. The overhaul reuses the **same gate**
-for the new renderer loader and for mounting an `apiServer` namespace. Untrusted
-store extensions stay data-only until signed — no new trust surface was opened.
-See [security.md](security.md).
+Stremio uses hosted manifests and HTTP resources. Seanime JS/TS providers compile into the existing worker/mobile bundle format. Preferences and title matches are local and retained across updates. See [ecosystems.md](ecosystems.md).
 
 ## 5. Nothing touches the watchlist/readlist
 
@@ -74,4 +68,4 @@ mutations. See [custom-source.md](capabilities/custom-source.md).
 - [`docs/Plans.md`](../Plans.md) §1 "Extension Overhaul" — the roadmap item this
   work implements.
 - [overview.md](overview.md) — the full architecture and trust model.
-- [security.md](security.md) — the security model and sideloading warning.
+- [security.md](security.md) — the security model and execution privileges.

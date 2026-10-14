@@ -55,18 +55,28 @@ function getItemDetails(item: any) {
       /^(manga[-_:/])/i.test(rawId)
     );
 
+  const isNovel =
+    !isCharacter && !isManga && (
+      itemType === 'novel' ||
+      itemType === 'light_novel' ||
+      /^(novel[-_:/])/i.test(rawId)
+    );
+
   const cleanCharId = rawId.replace(/^(char[-_:/]|character[-_:/])/i, '');
   const cleanMangaId = rawId.replace(/^manga[-_:/]/i, '');
+  const cleanNovelId = rawId.replace(/^novel[-_:/]/i, '');
   const title = item.anime_title || item.title || item.name || '';
 
   let linkTo = `/anime/${rawId}`;
   if (isCharacter) {
     linkTo = `/char/${encodeURIComponent(cleanCharId)}?name=${encodeURIComponent(title)}`;
+  } else if (isNovel) {
+    linkTo = `/novel/${encodeURIComponent(cleanNovelId)}`;
   } else if (isManga) {
     linkTo = `/manga/${encodeURIComponent(cleanMangaId)}`;
   }
 
-  return { isCharacter, isManga, linkTo, title };
+  return { isCharacter, isManga, isNovel, linkTo, title };
 }
 
 // Main Tier Lists page - list all public tier lists + user's own
@@ -335,9 +345,9 @@ export function TierListViewPage() {
   };
 
   const handleWatchWithFriends = (item: any) => {
-    const { isCharacter, isManga, title } = getItemDetails(item);
+    const { isCharacter, isManga, isNovel, title } = getItemDetails(item);
     
-    if (isCharacter || isManga) {
+    if (isCharacter || isManga || isNovel) {
       toast.info('Watch rooms can only be launched for anime entries');
       return;
     }
@@ -704,7 +714,7 @@ export function TierListViewPage() {
                 {/* Tier Content Grid */}
                 <div className="flex-1 p-3 flex flex-wrap items-center gap-2.5">
                   {tierItems.map(item => {
-                    const { isCharacter, isManga, linkTo, title } = getItemDetails(item);
+                    const { isCharacter, isManga, isNovel, linkTo, title } = getItemDetails(item);
 
                     return (
                       <div 
@@ -724,7 +734,7 @@ export function TierListViewPage() {
                           </div>
                         </Link>
 
-                        {!isCharacter && !isManga && (
+                        {!isCharacter && !isManga && !isNovel && (
                           <button
                             type="button"
                             onClick={(event) => {

@@ -1,3 +1,4 @@
+import { normalizeReleaseNotes } from './release-details';
 import { useEffect, useSyncExternalStore } from 'react';
 import { App } from '@capacitor/app';
 import { Browser } from '@capacitor/browser';
@@ -20,6 +21,10 @@ export type MobileUpdatePhase =
 
 export interface MobileUpdateState {
   phase: MobileUpdatePhase;
+  releaseNotes?: string;
+  stagingPercentage?: number;
+  channel?: string;
+  eligibility?: 'offered' | 'not-offered' | 'unknown';
   currentVersion?: string;
   latestVersion?: string;
   releaseUrl: string;
@@ -133,6 +138,8 @@ export async function checkMobileUpdate(
       const available = compareAppVersions(latestVersion, currentVersion) > 0;
       const next = publish({
         phase: available ? 'available' : 'current',
+        releaseNotes: normalizeReleaseNotes(response.data?.body),
+        channel: 'stable', stagingPercentage: undefined, eligibility: available ? 'offered' : 'not-offered',
         currentVersion,
         latestVersion,
         releaseUrl,

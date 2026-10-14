@@ -1,3 +1,6 @@
+import { installRemoteExtension, listRemoteExtensions, removeRemoteExtension } from "@/core/extensions/remote/installed";
+import { migrateExtensionStorage } from "@/core/extensions/ecosystems";
+migrateExtensionStorage();
 /**
  * Query and install hooks for the extension store (docs/Plans.md §3).
  *
@@ -37,7 +40,7 @@ import {
 import type { ExtensionManifest } from "@/pages/base/ExtensionHubPage";
 
 const INSTALLED_KEY = "tatakai_installed_extensions";
-const SIDELOADED_KEY = "tatakai_sideloaded_extensions";
+const SIDELOADED_KEY = "tatakai_extension_manifests";
 
 /**
  * Alias groups: `[[serviceUuid, publisherId, manifestId], ...]`, lowercased.
@@ -52,7 +55,22 @@ const SIDELOADED_KEY = "tatakai_sideloaded_extensions";
 const ALIASES_KEY = "tatakai_extension_aliases";
 
 /** Fired by the sideload modal and by `install` below; `useExtensions` listens. */
-const SIDELOAD_EVENT = "tatakai:extension-sideloaded";
+const SIDELOAD_EVENT = "tatakai:extension-installed";
+
+/** localStorage changes in this window need an explicit React subscription. */
+function useLocalCatalogueRevision() {
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    const changed = () => setRevision(value => value + 1);
+    window.addEventListener(SIDELOAD_EVENT, changed);
+    window.addEventListener('storage', changed);
+    return () => {
+      window.removeEventListener(SIDELOAD_EVENT, changed);
+      window.removeEventListener('storage', changed);
+    };
+  }, []);
+  return revision;
+}
 
 function readJson<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -85,6 +103,7 @@ export function manifestToStoreExtension(
     id: manifest.id,
     slug: manifest.id,
     name: manifest.name,
+    ecosystem: manifest.ecosystem, manifestUrl: manifest.manifestUrl,
     description: manifest.description ?? "",
     author: manifest.author || "Unknown",
     type: (manifest.type ?? "custom") as StoreExtensionType,
@@ -113,6 +132,7 @@ function storeToManifest(extension: StoreExtension): ExtensionManifest {
   return {
     id: extension.slug || extension.id,
     name: extension.name,
+    ecosystem: extension.ecosystem, manifestUrl: extension.manifestUrl,
     description: extension.description,
     version: extension.version,
     author: extension.author,
@@ -235,7 +255,7 @@ export interface StoreCatalogueOptions {
   /** Free text; routed to `/extension/search/:search` when non-empty. */
   search?: string;
   type?: StoreExtensionType | "all";
-  limit?: number;
+  limit?: number; ecosystem?: string; compatibility?: string;
 }
 
 export interface StoreCatalogue {
@@ -262,16 +282,22 @@ export interface StoreCatalogue {
 export function useStoreCatalogue({
   search = "",
   type = "all",
-  limit = 48,
+  limit = 100, ecosystem = "all", compatibility = "all",
 }: StoreCatalogueOptions = {}): StoreCatalogue {
   const needle = search.trim();
+  const localRevision = useLocalCatalogueRevision();
 
   const query = useQuery({
-    queryKey: ["extension-store", "catalogue", needle, type, limit],
-    queryFn: ({ signal }) =>
-      needle
-        ? searchStoreExtensions(needle, signal)
-        : fetchStoreExtensions({ type, limit }, signal),
+    queryKey: ["extension-store", "catalogue", needle, type, limit, ecosystem, compatibility],
+    queryFn: async ({ signal }) => {
+      const first = await fetchStoreExtensions({ type, limit, ecosystem, compatibility, search: needle }, signal);
+      for (let offset = first.items.length; offset < first.count; offset = first.items.length) {
+        const page = await fetchStoreExtensions({ type, limit, offset, ecosystem, compatibility, search: needle }, signal);
+        if (!page.items.length) break;
+        first.items.push(...page.items);
+      }
+      return first;
+    },
     enabled: isExtensionStoreConfigured,
     staleTime: 5 * 60 * 1000,
     retry: 1,
@@ -305,7 +331,7 @@ export function useStoreCatalogue({
         right.installs + right.downloads - (left.installs + left.downloads)
       );
     });
-  }, [query.data, needle, type]);
+  }, [query.data, needle, type, localRevision]);
 
   const featured = useMemo(
     () =>
@@ -318,7 +344,7 @@ export function useStoreCatalogue({
   return {
     items,
     featured: featured.length > 0 ? featured : items.slice(0, 3),
-    isLoading: query.isLoading && isExtensionStoreConfigured,
+    isLoading: query.isLoading && isExtensionStoreConfigured && items.length === 0,
     isFetching: query.isFetching,
     serviceError: (query.error as Error) ?? null,
     isServiceConfigured: isExtensionStoreConfigured,
@@ -341,6 +367,7 @@ export function useStoreTags() {
  * should not inflate the number it is displaying.
  */
 export function useStoreExtensionDetail(idOrSlug?: string) {
+  const localRevision = useLocalCatalogueRevision();
   const query = useQuery({
     queryKey: ["extension-store", "detail", idOrSlug],
     queryFn: ({ signal }) => fetchStoreExtension(idOrSlug!, signal),
@@ -362,7 +389,7 @@ export function useStoreExtensionDetail(idOrSlug?: string) {
     return localExtensions().find((item) =>
       extensionAliases(item).some((alias) => group.includes(alias))
     );
-  }, [idOrSlug]);
+  }, [idOrSlug, localRevision]);
 
   return {
     extension: query.data ?? local ?? null,
@@ -516,6 +543,24 @@ export function useExtensionInstaller() {
         prev.filter((id) => !known.includes(String(id ?? "").toLowerCase()))
       );
 
+      if (extension.ecosystem && extension.ecosystem !== 'tatakai') {
+        if (!['stremio', 'seanime'].includes(extension.ecosystem) || ['external', 'unavailable'].includes(extension.compatibility || '')) {
+          throw new Error('This extension requires its original application');
+        }
+        const endpoint = version?.manifestUrl || extension.manifestUrl || extension.latestVersion?.manifestUrl;
+        if (!endpoint) throw new Error('Extension manifest URL unavailable');
+        const remoteManifest = await (await import('@/core/extensions/remote/transport')).fetchExtensionJson(endpoint);
+        if (extension.ecosystem === 'stremio' && remoteManifest.behaviorHints?.configurationRequired) {
+          const config = new URL(endpoint); config.pathname = config.pathname.replace(/manifest\.json$/, 'configure');
+          window.open(config.href, '_blank', 'noopener,noreferrer');
+          throw new Error('Configure the addon, then use Add extension with its configured manifest URL');
+        }
+        const remote = await installRemoteExtension(remoteManifest, endpoint);
+        rememberAliases([extension.id, extension.slug, remote.id]);
+        const next = [...readJson<string[]>(INSTALLED_KEY, []).filter(id => !known.includes(id.toLowerCase())), remote.id];
+        writeJson(INSTALLED_KEY, next); setInstalledIds(next); setAliasEpoch(value => value + 1);
+        return { targetId: remote.id, loaded: true };
+      }
       const url = resolveInstallUrl(extension, version);
       const buffer = await downloadExtensionKai(url);
 
@@ -630,6 +675,8 @@ export function useExtensionInstaller() {
 
       // Unload every id the runtime might have registered it under, then drop
       // the grouping so a reinstall re-derives it from the runtime.
+      const remoteRows = await listRemoteExtensions();
+      await Promise.all(remoteRows.filter(row => matches(row.id)).map(row => removeRemoteExtension(row.id)));
       const unload = (window as any).tatakaiRuntime?.unloadExtension;
       if (isCapacitor()) {
         const { uninstallMobileExtension } = await import(
@@ -665,6 +712,9 @@ export function useExtensionInstaller() {
 
   const toggle = useCallback(
     (extension: StoreExtension, version?: StoreVersion) => {
+      if (['external', 'unavailable'].includes(extension.compatibility || '') || (extension.ecosystem && !['tatakai','stremio','seanime'].includes(extension.ecosystem))) {
+        window.open(extension.latestVersion?.downloadUrl || extension.manifestUrl || extension.githubRepoUrl, '_blank', 'noopener,noreferrer'); return;
+      }
       if (isInstalled(extension)) uninstall.mutate(extension);
       else install.mutate({ extension, version });
     },
@@ -684,7 +734,7 @@ const DISMISSED_UPDATES_KEY = "tatakai_dismissed_ext_updates";
  * lexically; a leading `v` and `-pre`/`.pre` suffixes are tolerated. Returns
  * >0 when `a` is newer than `b`.
  */
-function compareVersions(a: string, b: string): number {
+export function compareVersions(a: string, b: string): number {
   const parts = (v: string) =>
     String(v).trim().replace(/^v/i, "").split(/[.+-]/);
   const pa = parts(a);
@@ -846,5 +896,129 @@ export function useExtensionUpdates() {
     pendingUpdates,
     dismiss,
     isLoading: catalogueQuery.isLoading || installedQuery.isLoading,
+  };
+}
+
+// ── Remote (Stremio / Seanime) update detection ──────────────────────────────
+
+const DISMISSED_REMOTE_UPDATES_KEY = "tatakai_dismissed_remote_ext_updates";
+
+/** Bound a single manifest re-fetch: a hung host must not stall app launch. */
+const REMOTE_MANIFEST_TIMEOUT_MS = 15_000;
+
+export interface RemoteExtensionUpdate {
+  /** The installed Dexie row (id, ecosystem, preferences preserved on update). */
+  row: import("@/core/extensions/remote/installed").RemoteExtension;
+  installedVersion: string;
+  latestVersion: string;
+  /** The freshly fetched manifest — passed straight back into the installer. */
+  latestManifest: Record<string, unknown>;
+}
+
+/**
+ * Which installed remote extensions (Stremio add-ons, Seanime providers —
+ * Dexie `TatakaiRemoteExtensions`, both desktop and mobile) have a newer
+ * `version` at their `manifestUrl`.
+ *
+ * Runs once on mount (the sheet mounts at the app root, so this is the
+ * app-load check), never retries — a failed re-fetch means offline or a dead
+ * host, and the correct behaviour is silence, not a nag. Failures resolve to
+ * "no update" per row.
+ */
+export function useRemoteExtensionUpdates() {
+  const queryClient = useQueryClient();
+
+  const [dismissed, setDismissed] = useState<Record<string, string>>(() =>
+    readJson<Record<string, string>>(DISMISSED_REMOTE_UPDATES_KEY, {})
+  );
+
+  const checkQuery = useQuery({
+    queryKey: ["extension-store", "remote-updates"],
+    queryFn: async (): Promise<RemoteExtensionUpdate[]> => {
+      const { listRemoteExtensions } = await import(
+        "@/core/extensions/remote/installed"
+      );
+      const { fetchExtensionJson } = await import(
+        "@/core/extensions/remote/transport"
+      );
+      const rows = await listRemoteExtensions();
+      const settled = await Promise.allSettled(
+        rows.map(async (row): Promise<RemoteExtensionUpdate | null> => {
+          if (!row?.manifestUrl) return null;
+          const fresh = (await Promise.race([
+            fetchExtensionJson(row.manifestUrl),
+            new Promise<never>((_, reject) =>
+              window.setTimeout(
+                () => reject(new Error("manifest check timed out")),
+                REMOTE_MANIFEST_TIMEOUT_MS
+              )
+            ),
+          ])) as Record<string, unknown>;
+          const installedVersion = String(
+            (row.manifest as Record<string, unknown>)?.version ?? ""
+          );
+          const latestVersion = String(fresh?.version ?? "");
+          if (!installedVersion || !latestVersion) return null;
+          if (compareVersions(latestVersion, installedVersion) <= 0)
+            return null;
+          return { row, installedVersion, latestVersion, latestManifest: fresh };
+        })
+      );
+      const out: RemoteExtensionUpdate[] = [];
+      for (const s of settled) {
+        if (s.status === "fulfilled" && s.value) out.push(s.value);
+      }
+      return out;
+    },
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  const pendingRemote = useMemo(
+    () =>
+      (checkQuery.data ?? []).filter((update) => {
+        const key = `${update.row.id}::${update.latestVersion}`.toLowerCase();
+        return dismissed[key] !== update.latestVersion;
+      }),
+    [checkQuery.data, dismissed]
+  );
+
+  const dismissRemote = useCallback((targets: RemoteExtensionUpdate[]) => {
+    setDismissed((prev) => {
+      const next = { ...prev };
+      for (const update of targets) {
+        const key = `${update.row.id}::${update.latestVersion}`.toLowerCase();
+        next[key] = update.latestVersion;
+      }
+      writeJson(DISMISSED_REMOTE_UPDATES_KEY, next);
+      return next;
+    });
+  }, []);
+
+  /** Re-install from the fresh manifest, preserving id/preferences/matches. */
+  const applyRemoteUpdate = useCallback(
+    async (update: RemoteExtensionUpdate) => {
+      const { installRemoteExtension } = await import(
+        "@/core/extensions/remote/installed"
+      );
+      await installRemoteExtension(
+        update.latestManifest,
+        update.row.manifestUrl,
+        update.row.id
+      );
+      await queryClient.invalidateQueries({
+        queryKey: ["extension-store", "remote-updates"],
+      });
+    },
+    [queryClient]
+  );
+
+  return {
+    pendingRemote,
+    dismissRemote,
+    applyRemoteUpdate,
+    isLoading: checkQuery.isLoading,
   };
 }

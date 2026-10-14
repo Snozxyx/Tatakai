@@ -1,3 +1,4 @@
+import { rankSetupExtensions } from '@/core/extensions/setup-ranking';
 import { usePersistentState } from '@/hooks/ui/usePersistentState';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -367,9 +368,9 @@ function NavButtons({
 }
 
 function SetupExtensionsList() {
-  const { items, isLoading, isServiceConfigured } = useStoreCatalogue({ limit: 6 });
+  const { items, isLoading, isServiceConfigured } = useStoreCatalogue({ limit: 100 });
   const installer = useExtensionInstaller();
-  const top = items.slice(0, 5);
+  const top = useMemo(() => rankSetupExtensions(items).slice(0, 5), [items]);
 
   if (!isServiceConfigured) return null;
 

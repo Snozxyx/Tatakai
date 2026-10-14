@@ -17,16 +17,19 @@ const footerLinks = {
     { name: "Privacy Policy", href: "/privacy" },
     { name: "DMCA", href: "/dmca" },
   ],
+  FAQ: [
+    { name: "Tatakai vs Seanime", href: "/faq/seanime-vs-tatakai" },
+    { name: "Extension support", href: "/faq/extension-support" },
+  ],
   Apps: [
     { name: "Download Apps", href: "/download" },
+   { name: "Developer", href: "https://dev.tatakai.me" },
+
     { name: "Desktop & Mobile", href: "/download" },
     { name: "Web Version", href: "/browse" },
     { name: "System Status", href: "/status" },
   ],
-  Socials: [
-    { name: "Discord", href: "https://discord.gg/Mt2jG5QuGP", isExternal: true },
-    { name: "GitHub", href: "https://github.com/snozxyx/tatakai", isExternal: true },
-  ],
+
 };
 
 const socialLinks = [
@@ -190,4 +193,3 @@ export function FooterSection() {
     </footer>
   );
 }
-

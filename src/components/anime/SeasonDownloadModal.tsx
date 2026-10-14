@@ -1,3 +1,4 @@
+import { autoDownloadApi } from '@/core/download/automation-engine';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -306,7 +307,7 @@ function AutoDownloadTab({
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(false);
 
-  const electron = typeof window !== 'undefined' ? (window as any).electron : null;
+  const electron = { autoDownload: autoDownloadApi };
 
   useEffect(() => {
     if (!animeId || !electron?.autoDownload?.list) { setLoading(false); return; }

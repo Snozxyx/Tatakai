@@ -3,6 +3,7 @@ import { triggerHaptic } from '@/lib/haptics';
 import { db } from '@/core/db/tatakai-db';
 import type { MangaKind } from '@/types/electron-bridge';
 import { recordDownload } from './download-history-service';
+import { isElectron } from '@/lib/platform/platform';
 
 /**
  * Global manga-chapter download monitor — a single app-lifetime subscription to
@@ -152,7 +153,7 @@ async function persistOfflineChapter(data: {
 
 /** Subscribe to the dedicated manga IPC channels exactly once, app-lifetime. */
 export function ensureMangaDownloadMonitor() {
-  if (started || typeof window === 'undefined') return;
+  if (started || typeof window === 'undefined' || !isElectron()) return;
   const bridge = (window as { electron?: any }).electron?.manga;
   if (!bridge?.onProgress || !bridge.onCompleted || !bridge.onError) {
     console.warn('[MangaDL] monitor: manga bridge listeners missing — download events will not be received', {

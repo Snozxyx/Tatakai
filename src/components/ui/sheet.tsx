@@ -52,11 +52,12 @@ interface SheetContentProps
     VariantProps<typeof sheetVariants> {
   /** Extra classes for the overlay (e.g. raise nested sheets above a parent dialog). */
   overlayClassName?: string;
+  portalContainer?: React.ComponentPropsWithoutRef<typeof SheetPrimitive.Portal>['container'];
 }
 
 const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Content>, SheetContentProps>(
-  ({ side = "right", className, overlayClassName, children, ...props }, ref) => (
-    <SheetPortal>
+  ({ side = "right", className, overlayClassName, portalContainer, children, ...props }, ref) => (
+    <SheetPortal container={portalContainer}>
       <SheetOverlay className={overlayClassName} />
       <SheetPrimitive.Content
         ref={ref}

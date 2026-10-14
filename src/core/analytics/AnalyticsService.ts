@@ -1,5 +1,6 @@
 import { datadogLogs } from '@datadog/browser-logs';
 import type { AnalyticsProvider } from '@/core/extensions/ExtensionRegistry';
+import {captureProductEvent,routeGroup} from '@/lib/posthog';
 
 declare global {
     interface Window {
@@ -70,10 +71,12 @@ class AnalyticsService {
         this.initDatadog();
 
         this.initialized = true;
+        captureProductEvent('app_started',{surface:typeof (window as any).electron==='object'?'desktop':'web'});
         console.log('[Analytics] Service initialized');
     }
 
     private initGA() {
+        if (!GA_MEASUREMENT_ID) return;
         // Inject GA script
         const script = document.createElement('script');
         script.async = true;
@@ -125,6 +128,7 @@ class AnalyticsService {
     // --- Tracking Methods ---
 
     public trackPageView(path: string, title?: string) {
+        captureProductEvent('page_view',{route_group:routeGroup(path)});
         // Skip tracking when offline
         if (!isOnline()) return;
 

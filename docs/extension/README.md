@@ -35,10 +35,8 @@ This directory documents the whole ecosystem.
 
 - **[renderer-loader.md](renderer-loader.md)** — how code-driven contributions
   load into the app's React runtime, the `ExtensionContext` API, and the
-  **security model** (renderer code runs with app privileges — trust-gated).
-- **[security.md](security.md)** — the sideloading warning, the trust model, how
-  the app defends against a malicious extension, and what you can and can't rely
-  on. **Read before sideloading anything.**
+  **security model** (renderer code runs with app privileges).
+- **[security.md](security.md)** — execution privileges and retained validation.
 - **[migration.md](migration.md)** — what changed for existing extensions:
   `priority` replacing the hardcoded leader ordering, and `preview`/`websiteIndex`
   now being capability-gated.

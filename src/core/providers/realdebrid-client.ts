@@ -4,7 +4,10 @@ import {
   type DebridHttpRequestInit,
 } from './debrid-http';
 
-export type DebridProvider = 'realdebrid' | 'torbox';
+export type DebridProvider = 'realdebrid' | 'torbox' | 'alldebrid' | 'premiumize';
+export const DEBRID_PROVIDERS: Record<DebridProvider, string> = {
+  realdebrid: 'Real-Debrid', torbox: 'TorBox', alldebrid: 'AllDebrid', premiumize: 'Premiumize',
+};
 
 export interface DebridAccount {
   provider: DebridProvider;
@@ -40,7 +43,7 @@ export class DebridApiError extends Error {
   readonly provider: DebridProvider;
 
   constructor(provider: DebridProvider, status: number, detail: string) {
-    super(`${provider === 'torbox' ? 'TorBox' : 'Real-Debrid'} API Error (${status}): ${detail}`);
+    super(`${DEBRID_PROVIDERS[provider]} API Error (${status}): ${detail}`);
     this.name = 'DebridApiError';
     this.status = status;
     this.provider = provider;
@@ -65,6 +68,15 @@ function errorDetail(body: any, fallback: string): string {
  * Docs: https://api.real-debrid.com/
  */
 export class RealDebridClient {
+  readonly id: DebridProvider = 'realdebrid';
+  readonly capabilities = { instantAvailability: false };
+  async checkAvailability(hashes: string[]): Promise<Record<string, import('./cloud-debrid-client').AvailabilityState>> {
+    return Object.fromEntries(hashes.map(hash => [hash, 'unknown']));
+  }
+  async resolve(magnet: string, options: import('./debrid-orchestrator').DebridResolveOptions): Promise<string> {
+    const { resolveRealDebridMagnet } = await import('./debrid-orchestrator');
+    return (await resolveRealDebridMagnet(this, magnet, options)).url;
+  }
   private readonly apiKey: string;
   private readonly baseUrl = 'https://api.real-debrid.com/rest/1.0';
   private readonly request: DebridHttpRequest;

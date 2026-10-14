@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { getProxiedImageUrl } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { MANGA_STATUS_LABELS, TAB_PANEL_CLASS } from './statusLabels';
+import { useResolvedMangaReadlist } from '@/hooks/api/useResolvedMangaReadlist';
 
 interface HistoryTabProps {
   history: any[];
@@ -31,17 +32,18 @@ export function HistoryTab({ history, mangaHistoryEntries, loading, isViewingOth
   const [filter, setFilter] = useState<HistoryFilter>('all');
   const [search, setSearch] = useState('');
   const term = search.trim().toLowerCase();
+  const { data: resolvedMangaHistory, isLoading: metadataLoading } = useResolvedMangaReadlist(mangaHistoryEntries);
 
   const hasAnyAnime = (history?.length || 0) > 0;
-  const hasAnyManga = mangaHistoryEntries.length > 0;
+  const hasAnyManga = resolvedMangaHistory.length > 0;
 
   const animeFiltered = useMemo(
     () => (history || []).filter((i: any) => !term || (i.anime_name || '').toLowerCase().includes(term)),
     [history, term],
   );
   const mangaFiltered = useMemo(
-    () => mangaHistoryEntries.filter((i: any) => !term || (i.manga_title || '').toLowerCase().includes(term)),
-    [mangaHistoryEntries, term],
+    () => resolvedMangaHistory.filter((i: any) => !term || (i.manga_title || '').toLowerCase().includes(term)),
+    [resolvedMangaHistory, term],
   );
 
   const showAnime = filter !== 'manga' && animeFiltered.length > 0;
@@ -94,7 +96,7 @@ export function HistoryTab({ history, mangaHistoryEntries, loading, isViewingOth
             </div>
           )}
         </div>
-        {loading ? (
+        {loading || (filter !== 'anime' && metadataLoading) ? (
           <div className="space-y-4">
             {[...Array(3)].map((_, i) => (
               <div key={i} className="h-28 bg-white/[0.02] rounded-2xl animate-pulse" />
@@ -203,6 +205,7 @@ export function HistoryTab({ history, mangaHistoryEntries, loading, isViewingOth
                         : item.last_chapter_title || 'Reading progress updated';
                     const chapterKey = String(item.last_chapter_key || '').trim();
                     const nextPage = Math.max(0, Number(item.last_page_index || 0));
+                    const mangaId = encodeURIComponent(item.resolved_manga_id || item.manga_id);
 
                     return (
                       <motion.button
@@ -213,10 +216,10 @@ export function HistoryTab({ history, mangaHistoryEntries, loading, isViewingOth
                         className="w-full text-left rounded-2xl border border-white/[0.05] bg-white/[0.02] p-4 hover:bg-white/[0.04] transition-colors shadow-lg group"
                         onClick={() => {
                           if (chapterKey) {
-                            onNavigate(`/manga/read/${item.manga_id}?chapterKey=${encodeURIComponent(chapterKey)}&page=${nextPage}`);
+                            onNavigate(`/manga/read/${mangaId}?chapterKey=${encodeURIComponent(chapterKey)}&page=${nextPage}`);
                             return;
                           }
-                          onNavigate(`/manga/${item.manga_id}`);
+                          onNavigate(`/manga/${mangaId}`);
                         }}
                       >
                         <div className="flex items-center gap-4">

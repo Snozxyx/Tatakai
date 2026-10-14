@@ -20,6 +20,7 @@ import org.libtorrent4j.Sha1Hash;
 import org.libtorrent4j.TorrentHandle;
 import org.libtorrent4j.TorrentInfo;
 import org.libtorrent4j.TorrentStatus;
+import org.libtorrent4j.TorrentFlags;
 import org.libtorrent4j.swig.add_torrent_params;
 import org.libtorrent4j.swig.error_code;
 import org.libtorrent4j.swig.libtorrent;
@@ -352,6 +353,8 @@ public class TatakaiTorrentPlugin extends Plugin {
     }
 
     private SelectedFile selectFile(TorrentSession session, TorrentHandle handle, @Nullable Integer requestedIndex) {
+        boolean wasPreload = session.preloadOnly;
+        cancelPreloadPieces(session, handle);
         TorrentInfo info = handle.torrentFile();
         FileStorage files = info.files();
         int count = files.numFiles();
@@ -360,7 +363,9 @@ public class TatakaiTorrentPlugin extends Plugin {
         Integer preferred = requestedIndex != null ? requestedIndex : session.preferredFileIndex;
         int chosen = preferred != null && preferred >= 0 && preferred < count ? preferred : findLargestMediaFile(files);
         if (chosen < 0) throw new IllegalArgumentException("No playable file was found in this torrent.");
-        if (session.selectedFile != null && session.selectedFile.index == chosen) return session.selectedFile;
+        if (session.selectedFile != null && session.selectedFile.index == chosen && !wasPreload) return session.selectedFile;
+        session.preloadOnly = false;
+        handle.unsetFlags(TorrentFlags.UPLOAD_MODE);
 
         File safeFile = fileInsideStore(session.store, files.filePath(chosen));
         long length = files.fileSize(chosen);
@@ -373,6 +378,97 @@ public class TatakaiTorrentPlugin extends Plugin {
         session.selectedFile = selected;
         session.preferredFileIndex = chosen;
         return selected;
+    }
+
+    @PluginMethod public void preloadNext(PluginCall call) {
+        run(call, () -> {
+            TorrentSession session = requireSession(call.getString("sessionId", ""));
+            TorrentHandle handle = requireHandle(session);
+            cancelPreloadPieces(session, handle);
+            int episode = call.getInt("nextEpisode", -1);
+            if (episode < 1 || session.selectedFile == null) return failure("Next episode unavailable.");
+            TorrentInfo info = handle.torrentFile(); FileStorage files = info.files();
+            int currentIndex = session.selectedFile.index;
+            int chosen = -1;
+            java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("(?i)(?:S\\d{1,2}E|\\bE(?:P)?[ ._-]*|[ ._-])(\\d{1,3})(?:v\\d+)?(?=[ ._\\[\\]\\-]|\\.[A-Za-z]+$)");
+            for (int i = 0; i < files.numFiles(); i++) {
+                if (i == currentIndex || !files.fileName(i).toLowerCase(java.util.Locale.ROOT).matches(".*\\.(mkv|mp4|webm|avi|m4v)$")) continue;
+                java.util.regex.Matcher matcher = pattern.matcher(files.fileName(i));
+                while (matcher.find()) if (Integer.parseInt(matcher.group(1)) == episode) { chosen = i; break; }
+                if (chosen >= 0) break;
+            }
+            if (chosen < 0) return failure("Next episode is not in this torrent.");
+            int pieceLength = info.pieceLength();
+            long budget = Math.min(20L * 1024 * 1024, Math.max(0, call.getInt("budgetBytes", 20 * 1024 * 1024)));
+            int count = (int)(budget / pieceLength);
+            int start = files.pieceIndexAtFile(chosen);
+            int end = Math.min(files.lastPieceIndexAtFile(chosen), start + count - 1);
+            int currentStart = files.pieceIndexAtFile(currentIndex), currentEnd = files.lastPieceIndexAtFile(currentIndex);
+            for (int piece = start; piece <= end; piece++) {
+                if (piece >= currentStart && piece <= currentEnd) continue;
+                session.preloadPieces.put(piece, handle.piecePriority(piece));
+                handle.piecePriority(piece, Priority.LOW);
+            }
+            JSObject result = success(); result.put("budgetBytes", session.preloadPieces.size() * (long)pieceLength); result.put("fileIndex", chosen); return result;
+        });
+    }
+    @PluginMethod public void cancelPreload(PluginCall call) {
+        run(call, () -> { TorrentSession session = requireSession(call.getString("sessionId", "")); cancelPreloadPieces(session, requireHandle(session)); return success(); });
+    }
+    @PluginMethod public void preloadSource(PluginCall call) {
+        run(call, () -> {
+            ParsedMagnet parsed = parseMagnet(call.getString("magnet", ""));
+            for (TorrentSession existing : sessions.values()) if (existing.infoHash.equals(parsed.infoHash)) {
+                JSObject result = started(existing); result.put("ownsSession", false); return result;
+            }
+            int episode = call.getInt("episode", -1);
+            if (episode < 1) return failure("Invalid episode.");
+            File store = new File(torrentRoot(), parsed.infoHash);
+            if (!store.exists() && !store.mkdirs()) return failure("Torrent cache unavailable.");
+            requireManager().download(parsed.magnet, store, libtorrent.getDefault_flags().or_(TorrentFlags.UPLOAD_MODE));
+            TorrentSession session = new TorrentSession(UUID.randomUUID().toString(), parsed.infoHash, parsed.hash, store, null);
+            session.preloadOnly = true; sessions.put(session.sessionId, session);
+            try {
+                long deadline = System.currentTimeMillis() + METADATA_WAIT_MS;
+                TorrentHandle handle = requireHandle(session);
+                while (!handle.status().hasMetadata() && System.currentTimeMillis() < deadline) sleep(150);
+                if (!handle.status().hasMetadata()) throw new IllegalArgumentException("Torrent metadata is still buffering.");
+                TorrentInfo info = handle.torrentFile(); FileStorage files = info.files();
+                int chosen = -1;
+                java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("(?i)(?:S\\d{1,2}E|\\bE(?:P)?[ ._-]*|[ ._-])(\\d{1,3})(?:v\\d+)?(?=[ ._\\[\\]\\-]|\\.[A-Za-z]+$)");
+                for (int index = 0; index < files.numFiles(); index++) {
+                    if (!files.fileName(index).toLowerCase(Locale.ROOT).matches(".*\\.(mkv|mp4|webm|avi|m4v)$")) continue;
+                    java.util.regex.Matcher match = pattern.matcher(files.fileName(index));
+                    while (match.find()) if (Integer.parseInt(match.group(1)) == episode) { chosen = index; break; }
+                    if (chosen >= 0) break;
+                }
+                if (chosen < 0 && files.numFiles() == 1 && isVideoFile(files.fileName(0))) chosen = 0;
+                if (chosen < 0) throw new IllegalArgumentException("Next episode file could not be identified.");
+                handle.prioritizeFiles(Priority.array(Priority.IGNORE, files.numFiles()));
+                int count = Math.max(0, Math.min(20 * 1024 * 1024, call.getInt("budgetBytes", 20 * 1024 * 1024))) / info.pieceLength();
+                if (count == 0) throw new IllegalArgumentException("Preload budget too small.");
+                int first = files.pieceIndexAtFile(chosen), last = Math.min(files.lastPieceIndexAtFile(chosen), first + count - 1);
+                for (int piece = first; piece <= last; piece++) { session.preloadPieces.put(piece, Priority.IGNORE); handle.piecePriority(piece, Priority.LOW); }
+                session.selectedFile = new SelectedFile(chosen, fileInsideStore(store, files.filePath(chosen)), files.fileSize(chosen));
+                session.preferredFileIndex = chosen;
+                handle.setSequentialRange(first, last); handle.unsetFlags(TorrentFlags.UPLOAD_MODE);
+                JSObject result = started(session); result.put("ownsSession", true); return result;
+            } catch (Throwable error) {
+                sessions.remove(session.sessionId); removeFromEngine(session);
+                return failure(error.getMessage());
+            }
+        });
+    }
+    @PluginMethod public void releasePreload(PluginCall call) {
+        run(call, () -> {
+            TorrentSession session = sessions.get(call.getString("sessionId", ""));
+            if (session != null && session.preloadOnly) { sessions.remove(session.sessionId); removeFromEngine(session); }
+            return success();
+        });
+    }
+    private void cancelPreloadPieces(TorrentSession session, TorrentHandle handle) {
+        for (Map.Entry<Integer, Priority> piece : session.preloadPieces.entrySet()) handle.piecePriority(piece.getKey(), piece.getValue());
+        session.preloadPieces.clear();
     }
 
     private int findLargestMediaFile(FileStorage files) {
@@ -435,27 +531,46 @@ public class TatakaiTorrentPlugin extends Plugin {
     }
 
     private long availableBytes(TorrentSession session) {
+        return availableBytesFrom(session, 0L);
+    }
+    private long availableBytesFrom(TorrentSession session, long start) {
         SelectedFile file = session.selectedFile;
-        if (file == null || !file.file.exists()) return 0L;
+        if (file == null || !file.file.exists()) return start;
         try {
-            long[] progress = requireHandle(session).fileProgress();
-            if (file.index >= 0 && file.index < progress.length) {
-                return Math.min(file.length, Math.max(0L, progress[file.index]));
-            }
+            TorrentHandle handle = requireHandle(session);
+            TorrentInfo info = handle.torrentFile();
+            return TorrentPieceWindow.verifiedEnd(info.files().fileOffset(file.index), file.length, start, info.pieceLength(), handle::havePiece);
         } catch (Throwable ignored) {
             // Session stopped while a range was being served.
         }
-        return 0L;
+        return start;
     }
 
     private long waitForAvailable(TorrentSession session, long requiredExclusive, long timeoutMs) {
+        return waitForRange(session, 0L, requiredExclusive, timeoutMs);
+    }
+    private long waitForRange(TorrentSession session, long start, long requiredExclusive, long timeoutMs) {
         long deadline = System.currentTimeMillis() + timeoutMs;
-        long available = availableBytes(session);
+        long available = availableBytesFrom(session, start);
         while (available < requiredExclusive && System.currentTimeMillis() < deadline) {
             sleep(150L);
-            available = availableBytes(session);
+            available = availableBytesFrom(session, start);
         }
         return available;
+    }
+    private void prioritizeRange(TorrentSession session, long start) {
+        try {
+            TorrentHandle handle = requireHandle(session);
+            TorrentInfo info = handle.torrentFile();
+            SelectedFile file = session.selectedFile;
+            if (file == null) return;
+            int first = (int)((info.files().fileOffset(file.index) + start) / info.pieceLength());
+            int last = Math.min(info.files().lastPieceIndexAtFile(file.index), first + Math.max(1, (20 * 1024 * 1024) / info.pieceLength()) - 1);
+            handle.setSequentialRange(first, last);
+            for (int piece = first; piece <= Math.min(last, first + 31); piece++) {
+                if (!handle.havePiece(piece)) handle.setPieceDeadline(piece, (piece - first) * 100);
+            }
+        } catch (Throwable ignored) { /* The session may close during a seek. */ }
     }
 
     private double currentProgress(TorrentSession session) {
@@ -562,6 +677,8 @@ public class TatakaiTorrentPlugin extends Plugin {
     }
 
     private static final class TorrentSession {
+        volatile boolean preloadOnly;
+        final Map<Integer, Priority> preloadPieces = new java.util.HashMap<>();
         final String sessionId;
         final String infoHash;
         final Sha1Hash hash;
@@ -673,7 +790,8 @@ public class TatakaiTorrentPlugin extends Plugin {
                     return;
                 }
                 long start = requested[0];
-                long available = waitForAvailable(source.session, Math.min(source.file.length, start + 1L), METADATA_WAIT_MS);
+                prioritizeRange(source.session, start);
+                long available = waitForRange(source.session, start, Math.min(source.file.length, start + 1L), METADATA_WAIT_MS);
                 if (available <= start) {
                     writeError(output, 503, "Torrent data is buffering");
                     return;
@@ -691,7 +809,7 @@ public class TatakaiTorrentPlugin extends Plugin {
                     // Wait for the (capped) end rather than truncating to
                     // whatever exists now, so the copy never reads sparse zeros
                     // and the client does not have to re-request the same bytes.
-                    long reached = waitForAvailable(source.session, Math.min(source.file.length, end + 1L), STREAM_EDGE_WAIT_MS);
+                    long reached = waitForRange(source.session, start, Math.min(source.file.length, end + 1L), STREAM_EDGE_WAIT_MS);
                     end = Math.min(end, Math.max(start, reached - 1L));
                 }
                 if (end < start) {

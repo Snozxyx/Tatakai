@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
 
   // Keep React dev JSX runtime consistent; production env strips jsxDEV.
-  if (mode !== "production") {
+  if (mode !== "production" && mode !== "web") {
     process.env.NODE_ENV = "development";
   }
 
@@ -23,11 +23,17 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), seoPreviewPlugin()],
+    // ONNX Runtime model files for the on-device KittenTTS narrator.
+    assetsInclude: ['**/*.wasm'],
+    worker: { format: 'es' },
     // Production console/debugger stripping (terser `drop_console` parity).
-    esbuild: mode === 'production' ? { drop: ['console', 'debugger'] } : {},
+    esbuild: mode === 'production' || mode === 'web' ? { drop: ['console', 'debugger'] } : {},
     base: isElectronBuild ? './' : '/',
     resolve: {
       alias: {
+        "@tatakai/release-parser": path.resolve(__dirname, "./desktop/runtime/torrent/naming/release-parser.cjs"),
+        "@tatakai/candidate-scorer": path.resolve(__dirname, "./src/core/download/candidate-scorer.cjs"),
+        "@tatakai/candidate-evaluator": path.resolve(__dirname, "./src/core/download/candidate-evaluator.cjs"),
         "@": path.resolve(__dirname, "./src"),
       },
       // Guarantee a SINGLE physical copy of React and any library that reads
@@ -49,6 +55,9 @@ export default defineConfig(({ mode }) => {
     // re-optimization that spawns a second React instance under a new `?v=` hash.
     optimizeDeps: {
       include: [
+        '@tatakai/release-parser',
+        '@tatakai/candidate-scorer',
+        '@tatakai/candidate-evaluator',
         'react',
         'react-dom',
         'react-dom/client',
@@ -58,6 +67,7 @@ export default defineConfig(({ mode }) => {
       ],
     },
     build: {
+      commonjsOptions: { include: [/node_modules/, /desktop[\\/]runtime[\\/]torrent[\\/]naming/, /src[\\/]core[\\/]download/], extensions: ['.js', '.cjs'] },
       // Only generate sourcemaps if explicitly enabled (for debugging)
       sourcemap: mode === 'production' && ((process.env.ENABLE_SOURCEMAPS || env.ENABLE_SOURCEMAPS) === 'true'),
       // Skip the gzip-size pass: it re-compresses every chunk in memory after
@@ -83,6 +93,7 @@ export default defineConfig(({ mode }) => {
           // React internals resolve before any consumer chunk evaluates.
           manualChunks(id) {
             if (!id.includes('node_modules')) return;
+            if (/[\\/]node_modules[\\/]typescript[\\/]/.test(id)) return 'extension-typescript';
             // React + the whole router stack (incl. @remix-run/router, the core
             // that react-router/react-router-dom re-export) MUST stay together.
             // Splitting @remix-run/router into the catch-all `vendor` chunk while

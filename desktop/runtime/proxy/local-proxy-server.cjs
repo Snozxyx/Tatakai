@@ -13,44 +13,6 @@ const { EmbeddedFlareSolverr } = require('./embedded-flaresolverr.cjs');
 const DEFAULT_USER_AGENT =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
 
-// Domains that are known to use Cloudflare protection
-const CLOUDFLARE_DOMAINS = new Set([
-    'animepahe.com',
-    'animepahe.ru',
-    'senshi.live',
-    'senshianime.com',
-    'aniworld.to',
-    '4anime.gg',
-    'mkissa.com',
-    'anizone.to',
-    'animesalt.com',
-    'animeya.cc',
-    'animeya.to',
-    'toonstream.co',
-    'animelok.xyz',
-    'animelok.com',
-    'watchanimeworld.com',
-    'desidubbed.in',
-    'hindidubbed.in',
-    'reanime.to',
-    'reanime.net',
-    'anikoto.to',
-    // Manga sites (Toko) fronted by Cloudflare — the worker-path proxy applies
-    // the same challenge bypass so `getChapters`/`getPages` reach them.
-    'weebcentral.com',
-    'nelomanga.com',
-    'toongod.org',
-    'www.toongod.org',
-    'mangadot.net',
-    'www.mangadot.net',
-    'mangaball.net',
-    'www.mangaball.net',
-    // mangaball serves pages/images off rotating Pokémon-themed CDN hosts.
-    'bulbasaur.poke-black-and-white.net',
-    'heracross.red-and-blue.net',
-    'api.comick.dev',
-]);
-
 // Local video file extensions → MIME. mp4/webm/ogg play in a browser <video>
 // (so cross-device watch-party participants can watch them); mkv/avi/mov are
 // served faithfully but only play where the client has a demuxer for them
@@ -150,6 +112,38 @@ class LocalProxyServer {
      */
     getBypassMode() {
         return this._bypassMode;
+    }
+
+    async _applyCloudflareBypass(targetUrl, requestHeaders) {
+        const FlareSolverrClientClass = require('./flaresolverr-client.cjs').FlareSolverrClient;
+        let cookies;
+        let userAgent;
+
+        if (this._bypassMode === 'flaresolverr' && this._flaresolverr.getConfig().enabled) {
+            const solution = await this._flaresolverr.solve(targetUrl);
+            cookies = solution.cookies;
+            userAgent = solution.userAgent;
+        } else if (this._bypassMode === 'embedded' && this._embeddedFlaresolverr.isRunning()) {
+            const embeddedClient = new FlareSolverrClientClass(this._logger, {
+                url: this._embeddedFlaresolverr.getUrl(),
+                enabled: true,
+            });
+            const solution = await embeddedClient.solve(targetUrl);
+            cookies = solution.cookies;
+            userAgent = solution.userAgent;
+        } else {
+            const result = await bypassCloudflare(targetUrl, this._logger);
+            cookies = result.cookies;
+            userAgent = result.userAgent;
+        }
+
+        const cookieHeader = cookiesToHeader(cookies);
+        if (cookieHeader) {
+            requestHeaders.Cookie = requestHeaders.Cookie
+                ? `${requestHeaders.Cookie}; ${cookieHeader}`
+                : cookieHeader;
+        }
+        if (userAgent) requestHeaders['User-Agent'] = userAgent;
     }
 
     /**
@@ -434,7 +428,11 @@ class LocalProxyServer {
         ]);
         for (const [key, value] of Object.entries(req.headers || {})) {
             if (blocked.has(key.toLowerCase()) || value == null) continue;
-            headers[key] = Array.isArray(value) ? value.join(', ') : value;
+            // Challenge cookies and user agents are merged later using canonical
+            // keys. HTTP server input is lowercase; keeping both casings would
+            // send duplicate Cookie/User-Agent values to protected providers.
+            const canonical = { cookie: 'Cookie', 'user-agent': 'User-Agent', referer: 'Referer', origin: 'Origin' }[key.toLowerCase()] || key;
+            headers[canonical] = Array.isArray(value) ? value.join(', ') : value;
         }
         return headers;
     }
@@ -520,85 +518,8 @@ class LocalProxyServer {
         const method = String(req.method || 'GET').toUpperCase();
         const body = ['GET', 'HEAD'].includes(method) ? undefined : await this._readRequestBody(req);
         
-        // Check if this domain needs Cloudflare bypass
-        const needsBypass = this._cloudflareBypassEnabled && CLOUDFLARE_DOMAINS.has(target.hostname);
         let requestHeaders = this._extensionRequestHeaders(req);
-        
-        console.log(`[LocalProxy] Request to ${target.hostname} - CF bypass: ${needsBypass}`);
-        
-        if (needsBypass) {
-            try {
-                this._logger.info(`[LocalProxy] Using Cloudflare bypass (${this._bypassMode}) for ${target.hostname}`);
-                
-                let cookies, userAgent;
-                const FlareSolverrClientClass = require('./flaresolverr-client.cjs').FlareSolverrClient;
-                
-                if (this._bypassMode === 'flaresolverr' && this._flaresolverr.getConfig().enabled) {
-                    // Use external FlareSolverr
-                    const solution = await this._flaresolverr.solve(targetUrl);
-                    cookies = solution.cookies;
-                    userAgent = solution.userAgent;
-                    
-                    // Convert FlareSolverr cookies to header string
-                    const cookieHeader = FlareSolverrClientClass.cookiesToHeader(cookies);
-                    if (cookieHeader) {
-                        requestHeaders['Cookie'] = requestHeaders['Cookie'] 
-                            ? `${requestHeaders['Cookie']}; ${cookieHeader}`
-                            : cookieHeader;
-                    }
-                } else if (this._bypassMode === 'embedded' && this._embeddedFlaresolverr.isRunning()) {
-                    // Use embedded FlareSolverr
-                    const embeddedClient = new FlareSolverrClientClass(this._logger, {
-                        url: this._embeddedFlaresolverr.getUrl(),
-                        enabled: true
-                    });
-                    const solution = await embeddedClient.solve(targetUrl);
-                    cookies = solution.cookies;
-                    userAgent = solution.userAgent;
-                    
-                    // Convert FlareSolverr cookies to header string
-                    const cookieHeader = FlareSolverrClientClass.cookiesToHeader(cookies);
-                    if (cookieHeader) {
-                        requestHeaders['Cookie'] = requestHeaders['Cookie'] 
-                            ? `${requestHeaders['Cookie']}; ${cookieHeader}`
-                            : cookieHeader;
-                    }
-                } else {
-                    // Use Playwright bypass
-                    const result = await bypassCloudflare(targetUrl, this._logger);
-                    cookies = result.cookies;
-                    userAgent = result.userAgent;
-                    
-                    // Merge bypassed cookies with request headers
-                    const cookieHeader = cookiesToHeader(cookies);
-                    if (cookieHeader) {
-                        requestHeaders['Cookie'] = requestHeaders['Cookie'] 
-                            ? `${requestHeaders['Cookie']}; ${cookieHeader}`
-                            : cookieHeader;
-                    }
-                }
-                
-                // Use the browser's user agent
-                if (userAgent) {
-                    requestHeaders['User-Agent'] = userAgent;
-                }
-                
-                this._emit('runtime-proxy-cloudflare-bypass', {
-                    targetHost: target.hostname,
-                    success: true,
-                    mode: this._bypassMode,
-                });
-            } catch (err) {
-                this._logger.warn(`[LocalProxy] Cloudflare bypass failed for ${target.hostname}, continuing anyway:`, err.message);
-                this._emit('runtime-proxy-cloudflare-bypass', {
-                    targetHost: target.hostname,
-                    success: false,
-                    error: err.message,
-                    mode: this._bypassMode,
-                });
-            }
-        }
-        
+        let bypassed = false;
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30_000);
         let upstream;
@@ -619,32 +540,20 @@ class LocalProxyServer {
             clearTimeout(timeoutId);
         }
 
-        // A cached cf_clearance can go stale between solves (Cloudflare rotates it,
-        // or the failure cooldown handed us nothing). When the upstream answers with
-        // a challenge instead of the asset, drop the session and re-solve once with a
-        // forced refresh — otherwise we'd forward the challenge HTML as the "page".
-        // Only the Playwright path self-solves; the FlareSolverr modes own their own
-        // challenge handling. We only peek on the challenge status codes so ordinary
-        // 200 image bytes are never buffered.
+        // Detect Cloudflare from the response rather than maintaining a hostname list.
         if (
-            needsBypass &&
-            this._bypassMode !== 'flaresolverr' &&
-            this._bypassMode !== 'embedded' &&
+            this._cloudflareBypassEnabled &&
             [403, 503, 429].includes(upstream.status)
         ) {
-            const peeked = Buffer.from(await upstream.arrayBuffer());
+            const peeked = Buffer.from(await upstream.clone().arrayBuffer());
             const originalHeaders = upstream.headers;
             if (isChallengeResponse(upstream.status, peeked.toString('utf8'))) {
-                this._logger.warn(`[LocalProxy] Stale Cloudflare clearance for ${target.hostname}; re-solving`);
+                bypassed = true;
+                this._logger.info(`[LocalProxy] Cloudflare challenge detected for ${target.hostname}; solving`);
                 clearSession(target.hostname);
                 try {
-                    const result = await bypassCloudflare(targetUrl, this._logger, { forceRefresh: true });
                     const retryHeaders = { ...requestHeaders };
-                    // Overwrite Cookie outright so the stale cf_clearance we just
-                    // merged in is gone, not appended alongside the fresh one.
-                    const cookieHeader = cookiesToHeader(result.cookies);
-                    if (cookieHeader) retryHeaders['Cookie'] = cookieHeader;
-                    if (result.userAgent) retryHeaders['User-Agent'] = result.userAgent;
+                    await this._applyCloudflareBypass(targetUrl, retryHeaders);
 
                     const retryController = new AbortController();
                     const retryTimeoutId = setTimeout(() => retryController.abort(), 30_000);
@@ -674,7 +583,7 @@ class LocalProxyServer {
             status: upstream.status,
             method,
             targetHost: target.hostname,
-            cloudflareBypass: needsBypass,
+            cloudflareBypass: bypassed,
         });
         await this._forwardResponse(res, upstream);
     }
@@ -882,7 +791,9 @@ class LocalProxyServer {
                 return;
             }
             
-            const needsBypass = this._cloudflareBypassEnabled && CLOUDFLARE_DOMAINS.has(streamTarget.hostname);
+            // Probe normally first; a challenge response below decides whether
+            // this host needs Cloudflare solving.
+            const needsBypass = false;
             if (needsBypass) {
                 try {
                     this._logger.info(`[LocalProxy] Using Cloudflare bypass (${this._bypassMode}) for stream ${streamTarget.hostname}`);
@@ -950,6 +861,30 @@ class LocalProxyServer {
             } finally {
                 clearTimeout(timeoutId);
             }
+
+            if (
+                this._cloudflareBypassEnabled &&
+                [403, 503, 429].includes(upstream.status) &&
+                isChallengeResponse(
+                    upstream.status,
+                    Buffer.from(await upstream.clone().arrayBuffer()).toString('utf8'),
+                )
+            ) {
+                this._logger.info(`[LocalProxy] Cloudflare challenge detected for ${streamTarget.hostname}; solving`);
+                clearSession(streamTarget.hostname);
+                try {
+                    await this._applyCloudflareBypass(entry.url, outboundHeaders);
+                    const retryController = new AbortController();
+                    const retryTimeoutId = setTimeout(() => retryController.abort(), 18_000);
+                    try {
+                        upstream = await this._fetchStreamUpstream(entry.url, outboundHeaders, retryController.signal);
+                    } finally {
+                        clearTimeout(retryTimeoutId);
+                    }
+                } catch (err) {
+                    this._logger.warn(`[LocalProxy] Cloudflare re-solve failed for ${streamTarget.hostname}:`, err.message);
+                }
+            }
             this._emit('runtime-proxy-upstream', {
                 status: upstream.status,
                 targetHost: (() => {
@@ -1002,4 +937,3 @@ class LocalProxyServer {
 }
 
 module.exports = { LocalProxyServer };
-

@@ -20,6 +20,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.RandomAccessFile;
 import java.net.HttpURLConnection;
 import java.net.InetAddress;
@@ -100,6 +101,23 @@ public class TatakaiLocalProxyPlugin extends Plugin {
     @PluginMethod public void cancelPrefetch(PluginCall call) { mediaCache.cancel(); call.resolve(); }
 
     // ── Plugin API ──────────────────────────────────────────────────────
+
+    @PluginMethod
+    public void prepareRequestHeaders(PluginCall call) {
+        String target = call.getString("url", "");
+        if (target == null || (!target.startsWith("https://") && !target.startsWith("http://"))) {
+            call.reject("A valid http(s) URL is required.");
+            return;
+        }
+        JSObject input = call.getObject("headers", new JSObject());
+        Map<String, String> headers = new HashMap<>();
+        Iterator<String> keys = input.keys();
+        while (keys.hasNext()) { String key = keys.next(); headers.put(key, input.getString(key, "")); }
+        if (CloudflareBypass.isEnabled(getContext())) CloudflareBypass.prepare(target, headers);
+        JSObject output = new JSObject();
+        for (Map.Entry<String, String> header : headers.entrySet()) output.put(header.getKey(), header.getValue());
+        call.resolve(new JSObject().put("headers", output));
+    }
 
     @PluginMethod
     public void ensureStarted(PluginCall call) {
@@ -473,7 +491,7 @@ public class TatakaiLocalProxyPlugin extends Plugin {
                     return;
                 }
                 if (path.startsWith("/proxy")) {
-                    handleExtensionFetch(output, method, path);
+                    handleExtensionFetch(output, method, reqHeaders, path);
                     return;
                 }
                 if (path.startsWith("/stream/")) {
@@ -494,7 +512,7 @@ public class TatakaiLocalProxyPlugin extends Plugin {
             }
         }
 
-        private void handleExtensionFetch(OutputStream output, String method, String path) throws IOException {
+        private void handleExtensionFetch(OutputStream output, String method, Map<String, String> reqHeaders, String path) throws IOException {
             String target = queryParam(path, "url");
             if (target == null || target.isEmpty()) {
                 writeText(output, 400, "missing target url");
@@ -504,11 +522,54 @@ public class TatakaiLocalProxyPlugin extends Plugin {
                 writeText(output, 400, "unsupported target protocol");
                 return;
             }
-            try {
-                byte[] body = upstreamFetch(target, new HashMap<>(), !"HEAD".equals(method));
-                // Extension JSON / manga API payloads are small; forward as-is.
-                writeHead(output, 200,
-                    "Content-Type: application/octet-stream\r\n"
+            // Forward the caller's headers (desktop `_extensionRequestHeaders`
+            // parity): WAF-walled novel/manga origins 403 without the bundle's
+            // Referer/User-Agent/Cookie. Hop-by-hop + framing headers never
+            // survive a proxy hop.
+            Map<String, String> outbound = new HashMap<>();
+            for (Map.Entry<String, String> h : reqHeaders.entrySet()) {
+                String name = h.getKey();
+                if (name.equals("host") || name.equals("connection") || name.equals("keep-alive")
+                        || name.equals("proxy-authenticate") || name.equals("proxy-authorization")
+                        || name.equals("te") || name.equals("trailers") || name.equals("transfer-encoding")
+                        || name.equals("upgrade") || name.equals("content-length")) continue;
+                if (h.getValue() == null) continue;
+                String canonical;
+                if (name.equals("cookie")) canonical = "Cookie";
+                else if (name.equals("user-agent")) canonical = "User-Agent";
+                else if (name.equals("referer")) canonical = "Referer";
+                else if (name.equals("origin")) canonical = "Origin";
+                else canonical = h.getKey();
+                outbound.put(canonical, h.getValue());
+            }
+            // WebView `fetch()` cannot set forbidden headers (Referer,
+            // User-Agent, Cookie are stripped), so the JS shim passes the
+            // bundle's scraping headers as query params when the transport
+            // cannot carry them — same names the hosted streaming proxy uses.
+            String qReferer = queryParam(path, "referer");
+            String qAgent = queryParam(path, "userAgent");
+            String qCookie = queryParam(path, "cookie");
+            if (qReferer != null && !qReferer.isEmpty() && !hasHeader(outbound, "referer")) outbound.put("Referer", qReferer);
+            if (qAgent != null && !qAgent.isEmpty() && !hasHeader(outbound, "user-agent")) outbound.put("User-Agent", qAgent);
+            if (qCookie != null && !qCookie.isEmpty()) {
+                String prev = null;
+                for (Map.Entry<String, String> h : outbound.entrySet()) {
+                    if (h.getKey().equalsIgnoreCase("cookie")) { prev = h.getValue(); break; }
+                }
+                outbound.put("Cookie", prev != null && !prev.isEmpty() ? prev + "; " + qCookie : qCookie);
+            }
+            if (!hasHeader(outbound, "user-agent")) outbound.put("User-Agent", DEFAULT_UA);
+            try (UpstreamResponse res = upstreamFetchResponse(target, outbound)) {
+                byte[] body = !"HEAD".equals(method) ? readAll(res.body) : new byte[0];
+                res.markConsumed();
+                // Relay the real upstream status: a 403/404 is a real answer
+                // the bundle reports ("access blocked") instead of a 200 with
+                // an error page that parses to zero chapters. The CF solver
+                // already retried genuine challenges inside upstreamFetchResponse.
+                String contentType = res.contentType != null && !res.contentType.isEmpty()
+                        ? res.contentType : guessContentType(target);
+                writeHead(output, res.status,
+                    "Content-Type: " + contentType + "\r\n"
                     + "Content-Length: " + body.length + "\r\n"
                     + CORS_HEADERS + "Cache-Control: no-store\r\nConnection: close\r\n\r\n",
                     body);
@@ -534,7 +595,12 @@ public class TatakaiLocalProxyPlugin extends Plugin {
                 } catch (Exception e) { writeHead(output, 416, "Content-Range: bytes */" + size + "\r\nContent-Length: 0\r\n" + CORS_HEADERS + "Connection: close\r\n\r\n", null); return; }
             }
             long length = end - start + 1;
-            writeHead(output, range == null ? 200 : 206, "Content-Type: " + guessContentType(file.getName()) + "\r\n"
+            String offlineType = guessContentType(file.getName());
+            if ("application/octet-stream".equals(offlineType)) try (FileInputStream input = new FileInputStream(file)) {
+                byte[] prefix = new byte[512]; int count = input.read(prefix);
+                offlineType = app.tatakai.me.download.MediaPayloadValidator.contentType(prefix, Math.max(0, count));
+            }
+            writeHead(output, range == null ? 200 : 206, "Content-Type: " + offlineType + "\r\n"
                 + "Content-Length: " + length + "\r\nAccept-Ranges: bytes\r\n"
                 + (range == null ? "" : "Content-Range: bytes " + start + "-" + end + "/" + size + "\r\n")
                 + CORS_HEADERS + "Connection: close\r\n\r\n", null);
@@ -766,6 +832,13 @@ public class TatakaiLocalProxyPlugin extends Plugin {
                         throw new UpstreamException(502, "proxy error: " + e.getMessage());
                     }
                     long contentLength = conn.getHeaderFieldLong("Content-Length", -1L);
+                    // Some novel sites serve the challenge with HTTP 200.
+                    if (attempt == 0 && contentType != null && contentType.toLowerCase(Locale.US).contains("text/html")
+                            && tryCloudflareChallenge(conn, (BufferedInputStream) in, target, headers)) {
+                        in.close();
+                        conn.disconnect();
+                        continue;
+                    }
                     // Ownership moves to UpstreamResponse. Its close() releases
                     // both the body and the HttpURLConnection after relay/cancel.
                     UpstreamResponse response = new UpstreamResponse(

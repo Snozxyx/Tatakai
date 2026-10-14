@@ -35,6 +35,7 @@ const OnboardingPage = lazy(() => import("../pages/auth/OnboardingPage"));
 const SetupPage = lazy(() => import("../pages/auth/SetupPage"));
 const AniListRedirectPage = lazy(() => import("../pages/auth/AniListRedirectPage"));
 const MalRedirectPage = lazy(() => import("../pages/auth/MalRedirectPage"));
+const MangaBakaRedirectPage = lazy(() => import("../pages/auth/MangaBakaRedirectPage"));
 
 // Watch & Streaming
 const WatchPage = lazy(() => import("../pages/watch/WatchPage"));
@@ -47,7 +48,10 @@ const MangaHomePage = lazy(() => import("../pages/manga/MangaHomePage"));
 const MangaGenreBrowsePage = lazy(() => import("../pages/manga/MangaGenreBrowsePage"));
 const MangaPage = lazy(() => import("../pages/manga/MangaPage"));
 const MangaReaderPage = lazy(() => import("../pages/manga/MangaReaderPage"));
-const NovelComingSoon = lazy(() => import("../pages/novel/NovelComingSoon"));
+const NovelHomePage = lazy(() => import("../pages/novel/NovelHomePage"));
+const NovelGenreBrowsePage = lazy(() => import("../pages/novel/NovelGenreBrowsePage"));
+const NovelPage = lazy(() => import("../pages/novel/NovelPage"));
+const NovelReaderPage = lazy(() => import("../pages/novel/NovelReaderPage"));
 
 // Custom Sources (extension-provided, isolated read/watch verticals)
 const CustomHomePage = lazy(() => import("../pages/custom/CustomHomePage"));
@@ -85,6 +89,10 @@ const TermsPage = lazy(() => import("../pages/legal/TermsPage"));
 const PrivacyPage = lazy(() => import("../pages/legal/PrivacyPage"));
 const DMCAPage = lazy(() => import("../pages/legal/DMCAPage"));
 const CommunityGuidelinesPage = lazy(() => import("../pages/legal/CommunityGuidelinesPage"));
+
+// FAQ
+const SeanimeVsTatakaiPage = lazy(() => import("../pages/faq/SeanimeVsTatakaiPage"));
+const ExtensionSupportPage = lazy(() => import("../pages/faq/ExtensionSupportPage"));
 
 // Admin & Error
 const AdminPage = lazy(() => import("../pages/admin/AdminPage"));
@@ -216,6 +224,8 @@ export function GlobalListeners() {
       queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] });
       queryClient.invalidateQueries({ queryKey: ['manga-readlist'] });
       queryClient.invalidateQueries({ queryKey: ['manga-readlist-item'] });
+      queryClient.invalidateQueries({ queryKey: ['novel-readlist'] });
+      queryClient.invalidateQueries({ queryKey: ['novel-readlist-item'] });
     };
 
     let unsubState: (() => Promise<void>) | null = null;
@@ -278,6 +288,8 @@ export function GlobalListeners() {
               queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] });
               queryClient.invalidateQueries({ queryKey: ['manga-readlist'] });
               queryClient.invalidateQueries({ queryKey: ['manga-readlist-item'] });
+              queryClient.invalidateQueries({ queryKey: ['novel-readlist'] });
+              queryClient.invalidateQueries({ queryKey: ['novel-readlist-item'] });
             },
           );
         await channel.subscribe();
@@ -355,10 +367,16 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     isNativeApp &&
     location.pathname.startsWith('/manga/read') &&
     location.search.includes('offline=true');
+  // Downloaded novels live in on-device Dexie storage (see novelOffline), so
+  // the novel reader is offline-capable on every platform — web included.
+  const isOfflineNovelRead =
+    location.pathname.startsWith('/novel/read') &&
+    location.search.includes('offline=true');
   const isOfflineCapablePath =
     offlineCapablePaths.some(path => location.pathname.startsWith(path)) ||
     isOfflineWatch ||
-    isOfflineMangaRead;
+    isOfflineMangaRead ||
+    isOfflineNovelRead;
   const strictLoadingPaths = [
     '/admin',
     '/onboarding',
@@ -366,6 +384,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     '/integration/mal/redirect',
     '/api/mal/redirect',
     '/integration/anilist/redirect',
+    '/integration/mangabaka/redirect',
   ];
   const requiresStrictBootstrap = strictLoadingPaths.some((path) =>
     location.pathname.startsWith(path)
@@ -447,6 +466,9 @@ const AppRoutes = () => {
         <Route path="/" element={<HomeGate />} />
         <Route path="/welcome" element={<LandingPage />} />
         <Route path="/download" element={<DownloadPage />} />
+        {/* Public FAQ — readable without an account, like the landing page. */}
+        <Route path="/faq/seanime-vs-tatakai" element={<SeanimeVsTatakaiPage />} />
+        <Route path="/faq/extension-support" element={<ExtensionSupportPage />} />
         <Route path="/browse" element={<ProtectedRoute><Index /></ProtectedRoute>} />
         <Route path="/mal/:id" element={<ExternalIdRedirect type="mal" />} />
         <Route path="/anilist/:id" element={<ExternalIdRedirect type="anilist" />} />
@@ -458,7 +480,13 @@ const AppRoutes = () => {
         <Route path="/manga/genre/:genre" element={<ProtectedRoute><MangaGenreBrowsePage /></ProtectedRoute>} />
         <Route path="/manga/:mangaId" element={<ProtectedRoute><MangaPage /></ProtectedRoute>} />
         <Route path="/manga/read/:mangaId" element={<ProtectedRoute><WebWatchGate mode="read"><MangaReaderPage /></WebWatchGate></ProtectedRoute>} />
-        <Route path="/novel/comingsoon" element={<ProtectedRoute><NovelComingSoon /></ProtectedRoute>} />
+        <Route path="/novel" element={<ProtectedRoute><NovelHomePage /></ProtectedRoute>} />
+        <Route path="/novel/discover" element={<ProtectedRoute><NovelGenreBrowsePage /></ProtectedRoute>} />
+        <Route path="/novel/genre" element={<ProtectedRoute><NovelGenreBrowsePage /></ProtectedRoute>} />
+        <Route path="/novel/genre/:genre" element={<ProtectedRoute><NovelGenreBrowsePage /></ProtectedRoute>} />
+        <Route path="/novel/comingsoon" element={<ProtectedRoute><NovelHomePage /></ProtectedRoute>} />
+        <Route path="/novel/:novelId" element={<ProtectedRoute><NovelPage /></ProtectedRoute>} />
+        <Route path="/novel/read/:novelId" element={<ProtectedRoute><WebWatchGate mode="read"><NovelReaderPage /></WebWatchGate></ProtectedRoute>} />
         {/* Custom sources — isolated extension verticals, addressed by (namespace, sourceId). */}
         <Route path="/x/:namespace/:sourceId" element={<ProtectedRoute><CustomHomePage /></ProtectedRoute>} />
         <Route path="/x/:namespace/:sourceId/info/:id" element={<ProtectedRoute><CustomInfoPage /></ProtectedRoute>} />
@@ -483,6 +511,7 @@ const AppRoutes = () => {
         <Route path="/integration/mal/redirect" element={<ProtectedRoute><MalRedirectPage /></ProtectedRoute>} />
         <Route path="/api/mal/redirect" element={<ProtectedRoute><MalRedirectPage /></ProtectedRoute>} />
         <Route path="/integration/anilist/redirect" element={<ProtectedRoute><AniListRedirectPage /></ProtectedRoute>} />
+        <Route path="/integration/mangabaka/redirect" element={<ProtectedRoute><MangaBakaRedirectPage /></ProtectedRoute>} />
         <Route path="/recommendations" element={<ProtectedRoute><RecommendationsPage /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute><AdminRoute><AdminPage /></AdminRoute></ProtectedRoute>} />
         <Route path="/admin/user/:userId" element={<ProtectedRoute><AdminRoute><AdminUserPage /></AdminRoute></ProtectedRoute>} />
@@ -523,5 +552,4 @@ const AppRoutes = () => {
 };
 
 export default AppRoutes;
-
 

@@ -23,6 +23,8 @@ import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer } fro
 import { AnimeAtlasPanel } from '@/components/atlas/AnimeAtlasPanel';
 import { useMangaRecommendationEngine } from '@/hooks/api/useMangaRecommendationEngine';
 import { MangaRecommendationGrid } from '@/components/manga/MangaRecommendationGrid';
+import { useNovelRecommendationEngine } from '@/hooks/api/useNovelRecommendationEngine';
+import { NovelRecommendationGrid } from '@/components/novel/NovelRecommendationGrid';
 import { BookOpen } from 'lucide-react';
 
 type RecommendationFeedback = 'like' | 'dislike' | 'already_seen' | 'skip';
@@ -265,6 +267,7 @@ export default function RecommendationsPage() {
 
   const { recommendations, profile, isLoading } = useRecommendationEngine({ nicheBoost, limit: 40 });
   const { recommendations: mangaRecs, isLoading: loadingManga } = useMangaRecommendationEngine({ nicheBoost, limit: 30 });
+  const { recommendations: novelRecs, isLoading: loadingNovels } = useNovelRecommendationEngine({ nicheBoost, limit: 24 });
 
   const { data: recommendationFeedback = {} } = useQuery({
     queryKey: ['recommendation-feedback', user?.id],
@@ -382,6 +385,7 @@ export default function RecommendationsPage() {
             <TabsList>
               <TabsTrigger value="grid" className="gap-2"><TrendingUp className="w-4 h-4" /> For You</TabsTrigger>
               <TabsTrigger value="manga" className="gap-2"><BookOpen className="w-4 h-4" /> Manga</TabsTrigger>
+              <TabsTrigger value="novels" className="gap-2"><BookOpen className="w-4 h-4" /> Novels</TabsTrigger>
               <TabsTrigger value="atlas" className="gap-2"><Compass className="w-4 h-4" /> Atlas</TabsTrigger>
             </TabsList>
 
@@ -441,8 +445,17 @@ export default function RecommendationsPage() {
             <MangaRecommendationGrid recommendations={mangaRecs} isLoading={loadingManga} />
           </TabsContent>
 
+          <TabsContent value="novels">
+            <div className="flex items-center gap-2 mb-4">
+              <BookOpen className="w-5 h-5 text-primary" />
+              <h2 className="text-lg font-bold">Light novels for you</h2>
+              <span className="text-xs text-muted-foreground">Based on your novel library</span>
+            </div>
+            <NovelRecommendationGrid recommendations={novelRecs} isLoading={loadingNovels} />
+          </TabsContent>
+
           <TabsContent value="atlas">
-            <AnimeAtlasPanel animeRecs={recommendations} mangaRecs={mangaRecs} />
+            <AnimeAtlasPanel animeRecs={recommendations} mangaRecs={mangaRecs} novelRecs={novelRecs} />
           </TabsContent>
         </Tabs>
       </main>

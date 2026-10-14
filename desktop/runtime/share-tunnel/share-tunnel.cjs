@@ -4,7 +4,7 @@
  * share-tunnel.cjs
  *
  * Host-hosted watch-party streaming. The desktop host resolves a stream
- * locally (via the toko extension + LocalProxyServer, which mints a
+ * locally (via the API extension + LocalProxyServer, which mints a
  * loopback `/stream/<token>` URL) and then exposes the proxy port to the
  * internet through a Cloudflare **quick tunnel** (`cloudflared tunnel --url`).
  * Every participant — on any platform — plays the host's single public URL,

@@ -93,7 +93,11 @@ const pathShim = (() => {
       ext: pathShim.extname(p),
       name: pathShim.basename(p, pathShim.extname(p)),
     }),
-  } as Record<string, unknown>;
+  } as Record<string, unknown> & {
+    dirname(path: string): string;
+    basename(path: string, extension?: string): string;
+    extname(path: string): string;
+  };
 })();
 
 /** A module stub whose property access is load-safe but calls throw clearly. */
@@ -438,7 +442,8 @@ export function createMobileNodeGlobals(): {
     platform: 'android', arch: 'arm64',
     version: 'v20.11.0',
     versions: { node: '20.11.0', v8: '11.3.244', uv: '1.46.0', modules: '115', openssl: '3.0.0' },
-    env: { NODE_ENV: 'production' },
+    // Native proxy handles clearance; a WebView cannot launch Node/Puppeteer.
+    env: { NODE_ENV: 'production', CF_BYPASS_ENABLED: 'false' },
     argv: ['node', 'extension'], argv0: 'node', execPath: '/', execArgv: [],
     pid: 1, ppid: 0, title: 'tatakai', browser: true,
     nextTick: (cb: (...a: unknown[]) => void, ...a: unknown[]) => queueMicrotask(() => cb(...a)),

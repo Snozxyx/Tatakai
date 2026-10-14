@@ -9,6 +9,8 @@ import { cn } from '@/lib/utils';
 import { MANGA_STATUS_LABELS, STATUS_ACCENT, TAB_PANEL_CLASS } from './statusLabels';
 import { ProfileShelf } from './shelf/ProfileShelf';
 import { useShelfSearch } from './shelf/useShelfSearch';
+import { useResolvedMangaReadlist } from '@/hooks/api/useResolvedMangaReadlist';
+import { readlistProgressLabels } from '@/lib/reader/readlistDisplay';
 
 interface MangaReadlistTabProps {
   mangaReadlist: any[];
@@ -22,7 +24,8 @@ const SHELF_GRID = 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4';
 const DIALOG_GRID = 'grid grid-cols-1 sm:grid-cols-2 gap-4';
 
 export function MangaReadlistTab({ mangaReadlist, loading, isViewingOther, onNavigate }: MangaReadlistTabProps) {
-  const items = useMemo(() => mangaReadlist || [], [mangaReadlist]);
+  const rows = useMemo(() => mangaReadlist || [], [mangaReadlist]);
+  const { data: items, isLoading: metadataLoading } = useResolvedMangaReadlist(rows);
   const { search, setSearch, term, groups, matchCount } = useShelfSearch<any>(
     items,
     STATUS_ORDER,
@@ -35,11 +38,7 @@ export function MangaReadlistTab({ mangaReadlist, loading, isViewingOther, onNav
     const statusKey = item.status || 'plan_to_read';
     const status = MANGA_STATUS_LABELS[statusKey] || MANGA_STATUS_LABELS.plan_to_read;
     const accent = STATUS_ACCENT[statusKey] || STATUS_ACCENT.plan_to_read;
-    const hasChapter = item.last_chapter_number != null;
-    const chapterLabel = hasChapter
-      ? `Chapter ${item.last_chapter_number}`
-      : item.last_chapter_title || 'Not started';
-    const pageLabel = hasChapter ? `Page ${(Number(item.last_page_index) || 0) + 1}` : null;
+    const { hasChapter, chapterLabel, pageLabel } = readlistProgressLabels(item);
 
     return (
       <motion.button
@@ -48,7 +47,7 @@ export function MangaReadlistTab({ mangaReadlist, loading, isViewingOther, onNav
         transition={{ delay: Math.min(index * 0.04, 0.4), type: 'spring', stiffness: 260, damping: 24 }}
         whileHover={{ y: -4 }}
         whileTap={{ scale: 0.985 }}
-        onClick={() => onNavigate(`/manga/${item.manga_id}`)}
+        onClick={() => onNavigate(`/manga/${encodeURIComponent(item.resolved_manga_id || item.manga_id)}`)}
         className="group relative flex gap-4 p-4 w-full text-left rounded-2xl border border-white/[0.06] bg-gradient-to-br from-white/[0.05] to-white/[0.01] overflow-hidden shadow-lg transition-colors duration-300 hover:border-white/20 hover:shadow-[0_16px_40px_-12px_rgba(0,0,0,0.6)]"
       >
         {/* status-tinted ambient glow */}
@@ -149,7 +148,7 @@ export function MangaReadlistTab({ mangaReadlist, loading, isViewingOther, onNav
           )}
         </div>
 
-        {loading ? (
+        {loading || metadataLoading ? (
           <div className={SHELF_GRID}>
             {[...Array(3)].map((_, i) => (
               <div key={i} className="h-36 bg-white/[0.02] rounded-2xl animate-pulse" />

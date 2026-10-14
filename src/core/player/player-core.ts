@@ -1,4 +1,13 @@
 export type PlaybackMode = 'hls' | 'direct' | 'torrent' | 'offline' | 'debrid';
+export type PlaybackBackend = 'html' | 'native' | 'external';
+
+export interface PlaybackSubtitle {
+  url: string;
+  lang?: string;
+  label?: string;
+  mime?: string;
+  headers?: Record<string, string>;
+}
 
 export interface PlaybackSource {
   id: string;
@@ -7,6 +16,13 @@ export interface PlaybackSource {
   quality?: string;
   episodeNumber?: number;
   filenameHint?: string;
+  mediaId?: string;
+  episodeId?: string;
+  headers?: Record<string, string>;
+  subtitles?: PlaybackSubtitle[];
+  sessionId?: string;
+  refererCandidates?: string[];
+  debridResolved?: boolean;
 }
 
 export interface PlayerCoreState {
