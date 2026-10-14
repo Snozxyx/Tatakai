@@ -1,3 +1,4 @@
+import { normalizeCatalogSort, preservesCatalogPageOrder } from '@/core/content/catalog-sort';
 /**
  * The novel catalogue (`/novel/discover` and `/novel/genre/:genre`) — same
  * primitives as the manga catalogue page: `ControlSelect` dropdowns,
@@ -135,10 +136,7 @@ function normalizeStatus(value: string | null): NovelStatusFilter {
 }
 
 function normalizeSort(value: string | null): NovelSortFilter {
-  const lowered = String(value || 'default').trim().toLowerCase();
-  if (lowered === 'default') return 'default';
-  if (Object.keys(SORT_LABELS).includes(lowered)) return lowered as NovelSortOption;
-  return 'default';
+  return normalizeCatalogSort(value, Object.keys(SORT_LABELS) as NovelSortOption[]);
 }
 
 function normalizeFeedMode(value: string | null): NovelDiscoverFeedMode {
@@ -202,10 +200,8 @@ interface CatalogPageArgs {
 const PAGE_LIMIT = 24;
 
 function sortToBackend(sort: NovelSortFilter, feedMode: NovelDiscoverFeedMode): string | undefined {
-  if (feedMode === 'popular') return 'POPULARITY_DESC';
-  if (feedMode === 'recommendation') return 'SCORE_DESC';
   if (sort === 'newest') return 'START_DATE_DESC';
-  if (sort === 'chapterCount') return 'POPULARITY_DESC';
+  if (sort === 'chapterCount') return 'CHAPTERS_DESC';
   if (sort !== 'default') {
     const map: Record<string, string> = {
       relevance: 'SEARCH_MATCH',
@@ -216,6 +212,8 @@ function sortToBackend(sort: NovelSortFilter, feedMode: NovelDiscoverFeedMode): 
     };
     return map[sort];
   }
+  if (feedMode === 'popular') return 'POPULARITY_DESC';
+  if (feedMode === 'recommendation') return 'SCORE_DESC';
   return undefined;
 }
 
@@ -542,7 +540,7 @@ export default function NovelGenreBrowsePage() {
     });
 
     const sorted =
-      sortMode === 'default'
+      preservesCatalogPageOrder(sortMode)
         ? filtered
         : [...filtered].sort((left, right) => {
             if (sortMode === 'rating') return Number(right?.score || 0) - Number(left?.score || 0);

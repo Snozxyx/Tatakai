@@ -1,3 +1,4 @@
+import { normalizeCatalogSort, preservesCatalogPageOrder } from '@/core/content/catalog-sort';
 /**
  * The manga catalogue (`/manga/discover` and `/manga/genre/:genre`), rebuilt on
  * the same primitives as the anime genre page (docs/Plans.md §2).
@@ -195,10 +196,7 @@ function normalizeStatus(value: string | null): MangaStatusFilter {
 }
 
 function normalizeSort(value: string | null): MangaSortFilter {
-  const lowered = String(value || 'default').trim().toLowerCase();
-  if (lowered === 'default') return 'default';
-  if (Object.keys(SORT_LABELS).includes(lowered)) return lowered as MangaSortOption;
-  return 'default';
+  return normalizeCatalogSort(value, Object.keys(SORT_LABELS) as MangaSortOption[]);
 }
 
 function normalizeFeedMode(value: string | null): MangaDiscoverFeedMode {
@@ -727,7 +725,7 @@ export default function MangaGenreBrowsePage() {
     });
 
     const sorted =
-      sortMode === 'default'
+      preservesCatalogPageOrder(sortMode)
         ? filtered
         : [...filtered].sort((left, right) => {
             if (sortMode === 'rating') return Number(right?.score || 0) - Number(left?.score || 0);

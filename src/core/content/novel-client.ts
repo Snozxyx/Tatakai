@@ -135,8 +135,8 @@ export async function searchNovels(
       }`,
       variables: {
         page, perPage: limit, search: query.trim() || undefined,
-        genre: options.genre, tags,
-        statuses: options.statuses?.map(status => statuses[status] || status),
+        genre: options.genre, tags: tags?.length ? tags : undefined,
+        statuses: options.statuses?.length ? options.statuses.map(status => statuses[status] || status) : undefined,
         sort: [options.sort || (query.trim() ? 'SEARCH_MATCH' : 'POPULARITY_DESC')],
         origin: options.origin, adult: options.adult ? undefined : false,
         minDate: options.minYear ? options.minYear * 10000 : undefined,
