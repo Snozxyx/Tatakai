@@ -31,6 +31,7 @@ import { DevConsole } from "@/components/debug/DevConsole";
 import { GlobalListeners, DeepLinkHandler } from "@/routes/AppRoutes";
 import { MobileDeepLinkBridge } from "@/components/mobile/MobileDeepLinkBridge";
 import { MobileBackHandler } from "@/components/mobile/MobileBackHandler";
+import { MobilePullToRefresh } from "@/components/mobile/MobilePullToRefresh";
 import { MobileUpdateBanner } from "@/components/mobile/MobileUpdateBanner";
 import { EasterEggs } from "@/components/layout/EasterEggs";
 import { CelebrationHost } from "@/components/effects/Celebrate";
@@ -243,6 +244,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
       <MobileUpdateBanner />
       <OfflineBanner />
       <MobileBackHandler />
+      <MobilePullToRefresh />
       {/* Rendered OUTSIDE OfflineGate: the titlebar (drag region + window
           controls) must stay visible even when NoInternetPage takes over the
           viewport, otherwise the desktop window can't be moved or closed. */}
