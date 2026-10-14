@@ -870,6 +870,7 @@ export default function SearchPage() {
 
   const filteredMangaResults = (allMangaResults || []).filter((manga) => {
     const mangaType = (manga.type || '').toLowerCase();
+    if (mangaType === 'novel' || mangaType === 'light_novel') return false;
     const mangaRating = Number.parseFloat(manga.rating || '0');
     const isAdult = Boolean(manga.isAdult);
     const statusValue = normalizeMangaStatus(manga.status);
@@ -2250,7 +2251,7 @@ export default function SearchPage() {
         )}
 
         {hasSearchContext ? (
-          hybridLoading ? (
+          hybridLoading && !hasAnyResult ? (
             <PosterGridSkeleton count={14} className="mt-6" />
           ) : (
           <>
