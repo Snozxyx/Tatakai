@@ -63,7 +63,7 @@ jobs:
           digest=hashlib.sha256(archive.read_bytes()).hexdigest()
           assert archive.stat().st_size<=500000000 and digest==os.environ['ARTIFACT_DIGEST'].removeprefix('sha256:')
           header={'repository':repo,'artifactId':artifact,'digest':digest}
-          proc=subprocess.Popen(['ssh','-i',str(key),'-o','BatchMode=yes','-o',f'UserKnownHostsFile={known}','-o','StrictHostKeyChecking=yes','ubuntu@137.23.42.34'],stdin=subprocess.PIPE)
+          proc=subprocess.Popen(['ssh','-T','-o','IPQoS=none','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3','-i',str(key),'-o','BatchMode=yes','-o',f'UserKnownHostsFile={known}','-o','StrictHostKeyChecking=yes','ubuntu@137.23.42.34'],stdin=subprocess.PIPE)
           proc.stdin.write((json.dumps(header)+'\n').encode())
           with archive.open('rb') as source:
             while chunk:=source.read(65536):proc.stdin.write(chunk)
