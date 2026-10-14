@@ -56,7 +56,7 @@ jobs:
           python3 - <<'PY'
           import os,pathlib,subprocess,json,hashlib,tempfile
           task=pathlib.Path(tempfile.mkdtemp(prefix='tatakai-delivery-'))
-          key=task/'key';key.write_text(os.environ['DEPLOY_SSH_KEY']);key.chmod(0o600)
+          key=task/'key';key.write_text(os.environ['DEPLOY_SSH_KEY'].replace('\r\n','\n').rstrip()+'\n');key.chmod(0o600)
           known=task/'known_hosts';known.write_text(os.environ['DEPLOY_KNOWN_HOSTS'])
           archive=task/'release.zip';repo=os.environ['GITHUB_REPOSITORY'];artifact=os.environ['ARTIFACT_ID']
           with archive.open('wb') as output:subprocess.run(['gh','api',f'repos/{repo}/actions/artifacts/{artifact}/zip'],stdout=output,check=True)
