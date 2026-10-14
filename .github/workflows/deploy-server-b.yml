@@ -43,6 +43,12 @@ jobs:
           path: server-release/
           retention-days: 7
           if-no-files-found: error
+      - name: Configure congestion control for the measured lossy build-transfer path
+        run: |
+          sudo modprobe tcp_bbr 2>/dev/null || true
+          if grep -qw bbr /proc/sys/net/ipv4/tcp_available_congestion_control; then
+            sudo sysctl -q -w net.ipv4.tcp_congestion_control=bbr
+          fi
       - name: Deliver verified build archive to Server B
         if: github.event_name == 'push'
         env:
