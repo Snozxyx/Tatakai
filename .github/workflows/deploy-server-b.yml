@@ -5,6 +5,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: tatakai-website-production
   cancel-in-progress: false
@@ -36,8 +37,36 @@ jobs:
           cp -a dist server-release/website
           node -e 'require("fs").writeFileSync("server-release/release.json", JSON.stringify({component:"website",commit:process.env.GITHUB_SHA}))'
       - uses: actions/upload-artifact@v4
+        id: release_artifact
         with:
           name: tatakai-server-b
           path: server-release/
           retention-days: 7
           if-no-files-found: error
+      - name: Deliver verified build archive to Server B
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          ARTIFACT_ID: ${{ steps.release_artifact.outputs.artifact-id }}
+          ARTIFACT_DIGEST: ${{ steps.release_artifact.outputs.artifact-digest }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os,pathlib,subprocess,json,hashlib,tempfile
+          task=pathlib.Path(tempfile.mkdtemp(prefix='tatakai-delivery-'))
+          key=task/'key';key.write_text(os.environ['DEPLOY_SSH_KEY']);key.chmod(0o600)
+          known=task/'known_hosts';known.write_text(os.environ['DEPLOY_KNOWN_HOSTS'])
+          archive=task/'release.zip';repo=os.environ['GITHUB_REPOSITORY'];artifact=os.environ['ARTIFACT_ID']
+          with archive.open('wb') as output:subprocess.run(['gh','api',f'repos/{repo}/actions/artifacts/{artifact}/zip'],stdout=output,check=True)
+          digest=hashlib.sha256(archive.read_bytes()).hexdigest()
+          assert archive.stat().st_size<=500000000 and digest==os.environ['ARTIFACT_DIGEST'].removeprefix('sha256:')
+          header={'repository':repo,'artifactId':artifact,'digest':digest}
+          proc=subprocess.Popen(['ssh','-i',str(key),'-o','BatchMode=yes','-o',f'UserKnownHostsFile={known}','-o','StrictHostKeyChecking=yes','ubuntu@137.23.42.34'],stdin=subprocess.PIPE)
+          proc.stdin.write((json.dumps(header)+'\n').encode())
+          with archive.open('rb') as source:
+            while chunk:=source.read(65536):proc.stdin.write(chunk)
+          proc.stdin.close();assert proc.wait(timeout=300)==0
+          key.unlink();archive.unlink()
+          PY
