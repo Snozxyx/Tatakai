@@ -1,3 +1,4 @@
+import {isWatchPartyShareUrl} from './watch-party-url';
 import { fetchViaChain } from "@/core/network/proxyChain";
 import { getAllActiveProxyUrls, getActiveStreamingProxySnapshot } from "@/hooks/user/useProxySettings";
 
@@ -210,6 +211,8 @@ export function buildProxyCandidateUrls(
   proxyPassword?: string,
   refererCandidates?: string[],
 ): string[] {
+  // Keep the share secret and relative playlist URLs on the host's tunnel.
+  if (isWatchPartyShareUrl(streamUrl)) return [streamUrl];
   if (!/^https?:/i.test(streamUrl) || isLoopbackProxyUrl(streamUrl)) {
     return preferredUrl ? [preferredUrl] : [streamUrl];
   }
@@ -286,6 +289,8 @@ export function buildMobilePlaybackCandidates(
     if (results.length >= 8) return;
     results.push(raw);
   };
+
+  if (isWatchPartyShareUrl(source)) return [source];
 
   // Already an in-app proxy token (mobile loopback): nothing to wrap.
   if (!/^https?:/i.test(source) || isLoopbackProxyUrl(source)) {

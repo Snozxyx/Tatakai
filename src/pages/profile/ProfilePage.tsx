@@ -1,3 +1,5 @@
+import { CachedProfileImage } from '@/components/ui/cached-profile-image';
+import { useProfileWatchTime } from '@/hooks/user/useProfileWatchTime';
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams, Link, useSearchParams } from 'react-router-dom';
@@ -181,16 +183,7 @@ export default function ProfilePage() {
   const loadingMangaHistory = isViewingOther ? loadingPublicMangaReadingHistory : loadingOwnMangaReadingHistory;
   const loadingCombinedHistory = loadingHistory || loadingMangaHistory;
 
-  const computedWatchTimeSeconds = useMemo(() => {
-    if (!history || history.length === 0) return 0;
-    return history.reduce((total: number, item: any) => {
-      const progressSeconds = Number(item?.progress_seconds);
-      if (Number.isFinite(progressSeconds) && progressSeconds > 0) return total + progressSeconds;
-      const durationSeconds = Number(item?.duration_seconds);
-      if (Number.isFinite(durationSeconds) && durationSeconds > 0) return total + durationSeconds;
-      return total;
-    }, 0);
-  }, [history]);
+  const { data: computedWatchTimeSeconds = 0 } = useProfileWatchTime(profile?.user_id, !isViewingOther || (!!publicProfile?.is_public && publicProfile?.show_history !== false));
 
   const mangaHistoryEntries = useMemo(() => {
     return [...(mangaHistorySource || [])]
@@ -434,7 +427,7 @@ export default function ProfilePage() {
       {/* ── Ambient Background Color Bleed Throughout Whole Page ── */}
       {profile?.banner_url && (
         <div className="fixed inset-0 w-full h-full overflow-hidden pointer-events-none -z-10">
-          <img
+          <CachedProfileImage
             src={profile.banner_url}
             alt=""
             loading="lazy"
@@ -461,7 +454,7 @@ export default function ProfilePage() {
             style={{ maskImage: 'linear-gradient(to bottom, black 35%, rgba(0,0,0,0.85) 60%, rgba(0,0,0,0.25) 85%, transparent 100%)' }}
           >
             {profile?.banner_url ? (
-              <img
+              <CachedProfileImage
                 src={profile.banner_url}
                 alt="Profile banner"
                 className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-[2s] ease-out group-hover:scale-[1.02]"

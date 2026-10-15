@@ -1,4 +1,5 @@
 'use strict';
+require('./services/stdio-guards.cjs').installStdioGuards();
 
 const {
     app,

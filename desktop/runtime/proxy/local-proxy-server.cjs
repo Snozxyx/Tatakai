@@ -58,11 +58,9 @@ class LocalProxyServer {
 
     async ensureStarted() {
         if (this._server && this._port) {
-            console.log(`[LocalProxy] Already running on port ${this._port}`);
             return this.baseUrl();
         }
         
-        console.log('[LocalProxy] Starting proxy server...');
         this._server = http.createServer(this._handleRequest.bind(this));
         await new Promise((resolve, reject) => {
             this._server.once('error', reject);
@@ -72,7 +70,6 @@ class LocalProxyServer {
             });
         });
         this._logger.info(`[LocalProxy] Started on 127.0.0.1:${this._port}`);
-        console.log(`[LocalProxy] ✅ Proxy server started on 127.0.0.1:${this._port}`);
         this._emit('runtime-proxy-started', { port: this._port });
         return this.baseUrl();
     }

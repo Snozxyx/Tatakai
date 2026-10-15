@@ -89,7 +89,7 @@ export function WatchRoomStage() {
                 // VIDEO / EMBED SCREEN
                 // -----------------------------------------------------
                 <div className="w-full h-full relative animate-in fade-in duration-700">
-                    {(room.manual_stream_url || (streamingData?.sources && room.anime_id && currentEpisodeId)) ? (
+                    {(room.manual_stream_url || !!streamingData?.sources?.length) ? (
                         
                         // Check if Embed vs Video Player
                         ((room.manual_stream_url ? ((room as any).manual_stream_type === 'embed' || (!room.manual_stream_url.includes('.m3u8') && !room.manual_stream_url.includes('.mp4') && !room.manual_stream_url.includes('.webm'))) : streamingData?.sources?.[0]?.isEmbed)) ? (

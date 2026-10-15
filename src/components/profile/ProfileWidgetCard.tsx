@@ -1,3 +1,5 @@
+import { CachedProfileImage } from '@/components/ui/cached-profile-image';
+import { useProfileWatchTime } from '@/hooks/user/useProfileWatchTime';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -18,7 +20,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ModerationMenu } from '@/components/moderation/ModerationMenu';
 import { computeReputation } from '@/core/profile/reputation';
 import { getRankNameStyle } from '@/lib/rankUtils';
-import { getProxiedImageUrl } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { triggerHaptic } from '@/lib/haptics';
 import { ProfileBackgroundEffects } from '@/components/profile/ProfileBackgroundEffects';
@@ -51,7 +52,7 @@ function useWidgetProfile(userId?: string | null, enabled = false) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('username, display_name, avatar_url, banner_url, bio, is_public, created_at, app_settings, is_admin, role')
+        .select('username, display_name, avatar_url, banner_url, bio, is_public, show_history, created_at, app_settings, is_admin, role')
         .eq('user_id', userId!)
         .maybeSingle();
       if (error) throw error;
@@ -60,14 +61,10 @@ function useWidgetProfile(userId?: string | null, enabled = false) {
   });
 }
 
-/**
- * Cheap activity stats for the popover — total episodes, cached watch time,
- * readlist size, and the raw signals `computeReputation` needs. Every read is a
- * `head:true` COUNT (no rows transferred) so this stays light even when the
- * widget is opened over a long comment list. Gated on `open` by the caller.
- */
-function useWidgetStats(userId?: string | null, enabled = false) {
-  return useQuery({
+/** Counts plus a cached, narrow watch-history total shared with full profiles. */
+function useWidgetStats(userId?: string | null, enabled = false, watchAllowed = false) {
+  const watched = useProfileWatchTime(userId, enabled && watchAllowed);
+  const stats = useQuery({
     queryKey: ['profile_widget_stats', userId],
     enabled: enabled && !!userId,
     staleTime: 5 * 60 * 1000,
@@ -79,13 +76,12 @@ function useWidgetStats(userId?: string | null, enabled = false) {
         return count || 0;
       };
 
-      const [episodes, mangaCount, commentsCount, ratingsCount, forumPostsCount, prof] = await Promise.all([
+      const [episodes, mangaCount, commentsCount, ratingsCount, forumPostsCount] = await Promise.all([
         countOf('watch_history'),
         countOf('manga_readlist'),
         countOf('comments'),
         countOf('ratings'),
         countOf('forum_posts', (q) => q.eq('is_approved', true)),
-        supabase.from('profiles').select('total_watch_time_seconds').eq('user_id', userId!).maybeSingle(),
       ]);
 
       return {
@@ -94,10 +90,10 @@ function useWidgetStats(userId?: string | null, enabled = false) {
         commentsCount,
         ratingsCount,
         forumPostsCount,
-        watchTimeSeconds: Number(prof.data?.total_watch_time_seconds) || 0,
       };
     },
   });
+  return { ...stats, data: stats.data ? { ...stats.data, watchTimeSeconds: watched.data ?? 0 } : undefined };
 }
 
 /**
@@ -191,8 +187,8 @@ export function ProfileWidgetCard({
   const activeId = open ? userId ?? undefined : undefined;
   const { data: badges } = useUserBadges(activeId);
   const { isFollowing, checkingFollow, followStats, follow, unfollow, isFollowingLoading } = useFollow(activeId);
-  const { data: stats } = useWidgetStats(activeId, open);
   const { data: fetched } = useWidgetProfile(userId, open);
+  const { data: stats } = useWidgetStats(activeId, open, user?.id === userId || (!!fetched?.is_public && fetched?.show_history !== false));
 
   // Prefer freshly-fetched values, fall back to the props the comment already had.
   const name = fetched?.display_name || displayName || fetched?.username || username || 'User';
@@ -272,8 +268,8 @@ export function ProfileWidgetCard({
               onClick={goToProfile}
             >
               {banner && (
-                <img
-                  src={getProxiedImageUrl(banner)}
+                <CachedProfileImage
+                  src={banner}
                   alt=""
                   className="h-full w-full object-cover opacity-90"
                 />

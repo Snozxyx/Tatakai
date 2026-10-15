@@ -2,6 +2,7 @@ import * as React from "react";
 import * as AvatarPrimitive from "@radix-ui/react-avatar";
 
 import { cn } from "@/lib/utils";
+import {cachedProfileImageUrl} from '@/lib/profileImage';
 
 const Avatar = React.forwardRef<
   React.ElementRef<typeof AvatarPrimitive.Root>,
@@ -18,9 +19,14 @@ Avatar.displayName = AvatarPrimitive.Root.displayName;
 const AvatarImage = React.forwardRef<
   React.ElementRef<typeof AvatarPrimitive.Image>,
   React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Image>
->(({ className, ...props }, ref) => (
-  <AvatarPrimitive.Image ref={ref} className={cn("aspect-square h-full w-full", className)} {...props} />
-));
+>(({ className, src, onLoadingStatusChange, ...props }, ref) => {
+  const [direct,setDirect]=React.useState(false);
+  React.useEffect(()=>setDirect(false),[src]);
+  const cached=cachedProfileImageUrl(src);
+  return <AvatarPrimitive.Image ref={ref} className={cn("aspect-square h-full w-full", className)} {...props} src={direct?src:cached} onLoadingStatusChange={status=>{
+    if(status==='error'&&!direct&&cached!==src){setDirect(true);return;}onLoadingStatusChange?.(status);
+  }}/>;
+});
 AvatarImage.displayName = AvatarPrimitive.Image.displayName;
 
 const AvatarFallback = React.forwardRef<

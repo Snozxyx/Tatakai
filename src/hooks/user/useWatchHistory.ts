@@ -282,6 +282,7 @@ export function useUpdateWatchHistory() {
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['watch_history'] });
+      queryClient.invalidateQueries({ queryKey: ['profile-watch-time'] });
       queryClient.invalidateQueries({ queryKey: ['continue_watching'] });
 
       // Auto-sync to MAL if linked
@@ -374,6 +375,7 @@ export function useClearAllWatchHistory() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['watch_history'] });
+      queryClient.invalidateQueries({ queryKey: ['profile-watch-time'] });
       queryClient.invalidateQueries({ queryKey: ['continue_watching'] });
     },
   });
