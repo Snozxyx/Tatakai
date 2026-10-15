@@ -23,9 +23,8 @@ All notable changes to Tatakai are documented here.
 - Correct analytics migration SQL aliases and validate named dollar-quoted PostgreSQL function bodies.
 - Improve extension prompts, native downloads and novel chapter loading.
 
-### Database and extension
+### Database
 - The reviewed admin dashboard aggregate migration was installed on Server B separately. Release workflows do not automatically apply migrations.
-- Update Toko to 4.5.5 for its dedicated Atsu prose-novel provider and novel API capabilities.
 
 ## [6.1.1] - 2026-10-14
 
@@ -285,7 +284,7 @@ admin/moderation surface. Highlights below; see the in-app changelog
 
 ### Fixed
 - **Manga Source Routing** — page/chapter requests route correctly across extension namespaces; header loss across IPC no longer breaks protected image fetches
-- **Streaming Source Mapping** — Toko-family providers mapped to Watch-page servers; Animepahe/Anikoto m3u8 and play-page resolution fixes; multilingual dub providers and FlixCloud resolution
+- **Streaming Source Mapping** — Extension providers mapped to Watch-page servers; Animepahe/Anikoto m3u8 and play-page resolution fixes; multilingual dub providers and FlixCloud resolution
 
 ### Security
 - **Extension Trust Model** — renderer (code-plane) contributions run with app privileges behind an explicit trust/sideloading gate; data-plane contributions are sandboxed to the Node host

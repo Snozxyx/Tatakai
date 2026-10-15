@@ -24,7 +24,6 @@ export const CHANGELOG: ChangelogRelease[] = [
       'Watch Party tunnel playback fixes and consistent profile watch-time totals',
       'Public profile image caching and Linux AppImage closed-output-pipe crash protection',
       'Improved developer logs, extension prompts, native downloads and update notifications',
-      'Toko 4.5.5 adds a separate Atsu prose-novel provider; update the extension separately',
     ],
   },
   {
